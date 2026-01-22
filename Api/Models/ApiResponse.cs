@@ -9,7 +9,7 @@
         public string? UserMessage { get; set; }
         public string? SystemMessage { get; set; }
 
-        public IReadOnlyList<string> ValidateInfo { get; set; } = [];
+        public IReadOnlyList<string> ValidateInfo { get; set; } = Array.Empty<string>();
         public T Data { get; set; } = default!;
 
         public bool GetLastData { get; set; }

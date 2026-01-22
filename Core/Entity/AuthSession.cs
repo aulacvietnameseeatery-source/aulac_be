@@ -17,5 +17,9 @@ public partial class AuthSession
 
     public bool? Revoked { get; set; }
 
+    public string? DeviceInfo { get; set; }
+
+    public string? IpAddress { get; set; }
+
     public virtual Account User { get; set; } = null!;
 }

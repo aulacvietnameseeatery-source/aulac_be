@@ -1,25 +1,28 @@
-﻿
-using API.Middleware;
+﻿using API.Middleware;
+using Core.Data;
 using Core.Interface.Repo;
 using Core.Interface.Service;
 using Core.Service;
+using Infa.Auth;
 using Infa.Data;
-using Infra.Repo;
+using Infa.Repo;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization.Policy;
 using Microsoft.AspNetCore.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using System;
+using System.Reflection;
 using System.Text.Encodings.Web;
+using Api.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 
-// Cấu Hình DI:
+// DI Configuration:
 builder.Services.AddControllers();
 
-
-
-// Cấu hình DbContext với chuỗi kết nối theo môi trường
+// Configure DbContext with connection string per environment
 var connectionString = builder.Configuration.GetConnectionString("Default")
     ?? throw new InvalidOperationException("Missing Default connection string.");
 
@@ -31,13 +34,46 @@ builder.Services.AddDbContext<RestaurantMgmtContext>(options =>
     );
 });
 
+// Authentication Infrastructure
+// Register auth services (token service, session repository, password hasher, etc.)
+builder.Services.AddAuthInfrastructure(builder.Configuration);
 
+// Configure JWT Bearer authentication with session validation
+builder.Services.AddJwtAuthentication(builder.Configuration);
 
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+//Register Custom Authorization Handler
+builder.Services.AddSingleton<IAuthorizationMiddlewareResultHandler, CustomAuthorizationMiddlewareResultHandler>();
+    
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options =>
+{
+    // Add JWT security definition for Swagger
+    options.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = Microsoft.OpenApi.Models.SecuritySchemeType.Http,
+        Scheme = "Bearer",
+        BearerFormat = "JWT",
+        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+        Description = "Enter 'Bearer' followed by a space and your JWT token."
+    });
 
-// Cấu hình JSON để không escape ký tự Unicode
+    options.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
+    {
+        {
+            new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+            {Reference = new Microsoft.OpenApi.Models.OpenApiReference
+            {
+                Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
+});
+
+// Configure JSON to not escape Unicode characters
 builder.Services.Configure<JsonOptions>(options =>
 {
     options.SerializerOptions.Encoder =
@@ -50,10 +86,27 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowFrontend", policy =>
     {
         policy.WithOrigins("http://localhost:3000") // Frontend URL
-              .AllowAnyMethod()
-              .AllowAnyHeader()
-              .AllowCredentials();
+                .AllowAnyMethod()
+                .AllowAnyHeader()
+                .AllowCredentials();
     });
+});
+
+// Dynamic Permission-Based Authorization permissions from Permissions class
+builder.Services.AddAuthorization(options =>
+{
+    var permissionFields = typeof(Permissions)
+        .GetFields(BindingFlags.Public | BindingFlags.Static);
+
+    foreach (var field in permissionFields)
+    {
+        var permission = field.GetValue(null)!.ToString()!;
+
+        options.AddPolicy(permission, policy =>
+        {
+            policy.RequireClaim("permission", permission);
+        });
+    }
 });
 
 
@@ -62,6 +115,7 @@ var app = builder.Build();
 
 
 // Kiểm tra kết nối database khi khởi động ứng dụng
+// tý xóa
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<RestaurantMgmtContext>();
@@ -84,8 +138,8 @@ using (var scope = app.Services.CreateScope())
 
 
 
-// *** QUAN TRỌNG: Đăng ký middleware xử lý exception toàn cục ***
-// Phải đặt đầu tiên trong pipeline để bắt được tất cả exception
+// Register global exception handling middleware
+// Must be first in the pipeline to catch all exceptions
 app.UseMiddleware<HandleExceptionMiddleware>();
 
 // Configure the HTTP request pipeline.
@@ -99,6 +153,9 @@ if (app.Environment.IsDevelopment())
 app.UseCors("AllowFrontend");
 app.UseHttpsRedirection();
 
+// Authentication & Authorization Middleware
+// Must be before UseAuthorization
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();

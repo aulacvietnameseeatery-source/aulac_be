@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using API.Models;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -8,10 +9,10 @@ using System.Threading.Tasks;
 
 namespace API.Middleware
 {
-    /* Middleware xử lý exception toàn cục và trả về ApiResponse chuẩn.
-    * Tất cả lỗi đều được format theo ApiResponse với thông báo tiếng Việt thân thiện.
-    * Created By DatND (18/1/2026)
-    */
+    /* 
+     * Middleware xử lý exception toàn cục và trả về ApiResponse chuẩn.
+     * Tất cả lỗi đều được format theo ApiResponse với thông báo thân thiện.
+     */
     public class HandleExceptionMiddleware
     {
         private readonly RequestDelegate _next;
@@ -42,18 +43,18 @@ namespace API.Middleware
             var response = context.Response;
 
             // Khởi tạo error response
-            ErrorApiResponse errorResponse;
+            ApiResponse<object> errorResponse;
 
             // Xử lý các loại exception khác nhau
             switch (exception)
             {
                 // Custom Exceptions
-                
+
 
                 // Exceptions thông thường
                 case ArgumentNullException argNullEx:
                     response.StatusCode = (int)HttpStatusCode.BadRequest;
-                    errorResponse = new ErrorApiResponse
+                    errorResponse = new ApiResponse<object>
                     {
                         Success = false,
                         Code = (int)HttpStatusCode.BadRequest,
@@ -61,7 +62,7 @@ namespace API.Middleware
                         UserMessage = "Dữ liệu đầu vào không hợp lệ. Vui lòng kiểm tra lại.",
                         SystemMessage = $"Tham số '{argNullEx.ParamName}' không được để trống",
                         ValidateInfo = new List<string> { $"Tham số '{argNullEx.ParamName}' là bắt buộc" },
-                        Data = null,
+                        Data = new {},
                         GetLastData = false,
                         ServerTime = DateTimeOffset.UtcNow
                     };
@@ -69,7 +70,7 @@ namespace API.Middleware
 
                 case ArgumentException argEx:
                     response.StatusCode = (int)HttpStatusCode.BadRequest;
-                    errorResponse = new ErrorApiResponse
+                    errorResponse = new ApiResponse<object>
                     {
                         Success = false,
                         Code = (int)HttpStatusCode.BadRequest,
@@ -79,7 +80,7 @@ namespace API.Middleware
                      : "Dữ liệu đầu vào không đúng định dạng. Vui lòng kiểm tra lại.",
                         SystemMessage = argEx.Message,
                         ValidateInfo = new List<string> { argEx.Message },
-                        Data = null,
+                        Data = new {},
                         GetLastData = false,
                         ServerTime = DateTimeOffset.UtcNow
                     };
@@ -87,7 +88,7 @@ namespace API.Middleware
 
                 case InvalidOperationException invalidOpEx:
                     response.StatusCode = (int)HttpStatusCode.BadRequest;
-                    errorResponse = new ErrorApiResponse
+                    errorResponse = new ApiResponse<object>
                     {
                         Success = false,
                         Code = (int)HttpStatusCode.BadRequest,
@@ -95,7 +96,7 @@ namespace API.Middleware
                         UserMessage = "Thao tác không hợp lệ. Vui lòng kiểm tra lại dữ liệu.",
                         SystemMessage = invalidOpEx.Message,
                         ValidateInfo = new List<string> { invalidOpEx.Message },
-                        Data = null,
+                        Data = new {},
                         GetLastData = false,
                         ServerTime = DateTimeOffset.UtcNow
                     };
@@ -103,7 +104,7 @@ namespace API.Middleware
 
                 case TimeoutException timeoutEx:
                     response.StatusCode = (int)HttpStatusCode.RequestTimeout;
-                    errorResponse = new ErrorApiResponse
+                    errorResponse = new ApiResponse<object>
                     {
                         Success = false,
                         Code = (int)HttpStatusCode.RequestTimeout,
@@ -111,7 +112,7 @@ namespace API.Middleware
                         UserMessage = "Yêu cầu xử lý quá lâu. Vui lòng thử lại.",
                         SystemMessage = timeoutEx.Message,
                         ValidateInfo = new List<string>(),
-                        Data = null,
+                        Data = new {},
                         GetLastData = false,
                         ServerTime = DateTimeOffset.UtcNow
                     };
@@ -119,7 +120,7 @@ namespace API.Middleware
 
                 case JsonException jsonEx:
                     response.StatusCode = (int)HttpStatusCode.BadRequest;
-                    errorResponse = new ErrorApiResponse
+                    errorResponse = new ApiResponse<object>
                     {
                         Success = false,
                         Code = (int)HttpStatusCode.BadRequest,
@@ -127,7 +128,7 @@ namespace API.Middleware
                         UserMessage = "Dữ liệu JSON không hợp lệ. Vui lòng kiểm tra định dạng.",
                         SystemMessage = jsonEx.Message,
                         ValidateInfo = new List<string> { "Định dạng JSON không đúng" },
-                        Data = null,
+                        Data = new {},
                         GetLastData = false,
                         ServerTime = DateTimeOffset.UtcNow
                     };
@@ -135,7 +136,7 @@ namespace API.Middleware
 
                 default:
                     response.StatusCode = (int)HttpStatusCode.InternalServerError;
-                    errorResponse = new ErrorApiResponse
+                    errorResponse = new ApiResponse<object>
                     {
                         Success = false,
                         Code = (int)HttpStatusCode.InternalServerError,
@@ -143,7 +144,7 @@ namespace API.Middleware
                         UserMessage = "Đã xảy ra lỗi hệ thống. Vui lòng liên hệ quản trị viên hoặc thử lại sau.",
                         SystemMessage = exception.Message,
                         ValidateInfo = new List<string>(),
-                        Data = null,
+                        Data = new {},
                         GetLastData = false,
                         ServerTime = DateTimeOffset.UtcNow
                     };
@@ -159,21 +160,5 @@ namespace API.Middleware
             var result = JsonSerializer.Serialize(errorResponse, options);
             await response.WriteAsync(result);
         }
-    }
-
-    /// <summary>
-    /// Error response class matching ApiResponse structure
-    /// </summary>
-    internal class ErrorApiResponse
-    {
-        public bool Success { get; set; }
-        public int Code { get; set; }
-        public int SubCode { get; set; }
-        public string? UserMessage { get; set; }
-        public string? SystemMessage { get; set; }
-        public List<string> ValidateInfo { get; set; } = new List<string>();
-        public object? Data { get; set; }
-        public bool GetLastData { get; set; }
-        public DateTimeOffset ServerTime { get; set; }
     }
 }

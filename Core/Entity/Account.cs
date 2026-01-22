@@ -5,7 +5,7 @@ namespace Core.Entity;
 
 public partial class Account
 {
-    public long StaffId { get; set; }
+    public long AccountId { get; set; }
 
     public string FullName { get; set; } = null!;
 

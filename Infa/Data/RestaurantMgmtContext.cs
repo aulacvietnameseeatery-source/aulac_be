@@ -79,7 +79,7 @@ public partial class RestaurantMgmtContext : DbContext
 
         modelBuilder.Entity<Account>(entity =>
         {
-            entity.HasKey(e => e.StaffId).HasName("PRIMARY");
+            entity.HasKey(e => e.AccountId).HasName("PRIMARY");
 
             entity.ToTable("account");
 
@@ -91,7 +91,7 @@ public partial class RestaurantMgmtContext : DbContext
 
             entity.HasIndex(e => e.Username, "username").IsUnique();
 
-            entity.Property(e => e.StaffId).HasColumnName("staff_id");
+            entity.Property(e => e.AccountId).HasColumnName("account_id");
             entity.Property(e => e.CreatedAt)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
                 .HasColumnType("datetime")
@@ -135,9 +135,9 @@ public partial class RestaurantMgmtContext : DbContext
 
             entity.ToTable("audit_log");
 
-            entity.HasIndex(e => e.CreatedAt, "idx_audit_time");
+            entity.HasIndex(e => e.StaffId, "audit_log_ibfk_1");
 
-            entity.HasIndex(e => e.StaffId, "staff_id");
+            entity.HasIndex(e => e.CreatedAt, "idx_audit_time");
 
             entity.Property(e => e.LogId).HasColumnName("log_id");
             entity.Property(e => e.ActionCode)
@@ -171,9 +171,15 @@ public partial class RestaurantMgmtContext : DbContext
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
                 .HasColumnType("datetime")
                 .HasColumnName("created_at");
+            entity.Property(e => e.DeviceInfo)
+                .HasMaxLength(500)
+                .HasColumnName("device_info");
             entity.Property(e => e.ExpiresAt)
                 .HasColumnType("datetime")
                 .HasColumnName("expires_at");
+            entity.Property(e => e.IpAddress)
+                .HasMaxLength(45)
+                .HasColumnName("ip_address");
             entity.Property(e => e.Revoked)
                 .HasDefaultValueSql("'0'")
                 .HasColumnName("revoked");
@@ -363,9 +369,9 @@ public partial class RestaurantMgmtContext : DbContext
 
             entity.HasIndex(e => new { e.StatusId, e.CreatedAt }, "idx_invoice_status");
 
-            entity.HasIndex(e => e.OrderId, "order_id").IsUnique();
+            entity.HasIndex(e => e.StaffId, "invoice_ibfk_2");
 
-            entity.HasIndex(e => e.StaffId, "staff_id");
+            entity.HasIndex(e => e.OrderId, "order_id").IsUnique();
 
             entity.Property(e => e.InvoiceId).HasColumnName("invoice_id");
             entity.Property(e => e.CreatedAt)
@@ -442,9 +448,9 @@ public partial class RestaurantMgmtContext : DbContext
 
             entity.HasIndex(e => new { e.StatusId, e.CreatedAt }, "idx_order_status");
 
-            entity.HasIndex(e => e.SourceId, "source_id");
+            entity.HasIndex(e => e.StaffId, "orders_ibfk_2");
 
-            entity.HasIndex(e => e.StaffId, "staff_id");
+            entity.HasIndex(e => e.SourceId, "source_id");
 
             entity.HasIndex(e => e.TableId, "table_id");
 
@@ -575,7 +581,7 @@ public partial class RestaurantMgmtContext : DbContext
 
             entity.ToTable("purchase");
 
-            entity.HasIndex(e => e.StaffId, "staff_id");
+            entity.HasIndex(e => e.StaffId, "purchase_ibfk_2");
 
             entity.HasIndex(e => e.SupplierId, "supplier_id");
 
@@ -781,7 +787,7 @@ public partial class RestaurantMgmtContext : DbContext
 
             entity.HasIndex(e => e.OrderItemId, "order_item_id");
 
-            entity.HasIndex(e => e.ResolvedBy, "resolved_by");
+            entity.HasIndex(e => e.ResolvedBy, "service_error_ibfk_7");
 
             entity.HasIndex(e => e.SeverityId, "severity_id");
 
