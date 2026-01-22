@@ -8,8 +8,8 @@
 
   <ItemGroup>
     <Folder Include="Data\" />
-    <Folder Include="Entity\" />
     <Folder Include="Exception\" />
+    <Folder Include="Domain\" />
   </ItemGroup>
 
   <ItemGroup>

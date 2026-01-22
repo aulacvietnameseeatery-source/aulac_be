@@ -1,0 +1,29 @@
+﻿using System;
+using System.Collections.Generic;
+
+namespace Core.Entity;
+
+public partial class MediaAsset
+{
+    public long MediaId { get; set; }
+
+    public long MediaTypeId { get; set; }
+
+    public string Url { get; set; } = null!;
+
+    public string? MimeType { get; set; }
+
+    public int? Width { get; set; }
+
+    public int? Height { get; set; }
+
+    public int? DurationSec { get; set; }
+
+    public DateTime? CreatedAt { get; set; }
+
+    public virtual ICollection<DishMedium> DishMedia { get; set; } = new List<DishMedium>();
+
+    public virtual SettingItem MediaType { get; set; } = null!;
+
+    public virtual ICollection<TableMedium> TableMedia { get; set; } = new List<TableMedium>();
+}

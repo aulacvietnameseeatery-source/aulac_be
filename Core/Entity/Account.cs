@@ -1,0 +1,47 @@
+﻿using System;
+using System.Collections.Generic;
+
+namespace Core.Entity;
+
+public partial class Account
+{
+    public long StaffId { get; set; }
+
+    public string FullName { get; set; } = null!;
+
+    public string? Phone { get; set; }
+
+    public string? Email { get; set; }
+
+    public long RoleId { get; set; }
+
+    public long StatusId { get; set; }
+
+    public DateTime CreatedAt { get; set; }
+
+    public string Username { get; set; } = null!;
+
+    public string PasswordHash { get; set; } = null!;
+
+    public bool IsLocked { get; set; }
+
+    public DateTime? LastLoginAt { get; set; }
+
+    public virtual ICollection<AuditLog> AuditLogs { get; set; } = new List<AuditLog>();
+
+    public virtual ICollection<AuthSession> AuthSessions { get; set; } = new List<AuthSession>();
+
+    public virtual ICollection<Invoice> Invoices { get; set; } = new List<Invoice>();
+
+    public virtual ICollection<Order> Orders { get; set; } = new List<Order>();
+
+    public virtual ICollection<Purchase> Purchases { get; set; } = new List<Purchase>();
+
+    public virtual Role Role { get; set; } = null!;
+
+    public virtual ICollection<ServiceError> ServiceErrorResolvedByNavigations { get; set; } = new List<ServiceError>();
+
+    public virtual ICollection<ServiceError> ServiceErrorStaffs { get; set; } = new List<ServiceError>();
+
+    public virtual SettingItem Status { get; set; } = null!;
+}

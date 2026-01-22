@@ -6,7 +6,7 @@ using System.Net;
 using System.Text.Json;
 using System.Threading.Tasks;
 
-namespace Core.Middleware
+namespace API.Middleware
 {
     /* Middleware xử lý exception toàn cục và trả về ApiResponse chuẩn.
     * Tất cả lỗi đều được format theo ApiResponse với thông báo tiếng Việt thân thiện.

@@ -1,10 +1,13 @@
 ﻿
+using API.Middleware;
 using Core.Interface.Repo;
 using Core.Interface.Service;
-using Core.Middleware;
 using Core.Service;
+using Infa.Data;
 using Infra.Repo;
 using Microsoft.AspNetCore.Http.Json;
+using Microsoft.EntityFrameworkCore;
+using System;
 using System.Text.Encodings.Web;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -13,6 +16,21 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Cấu Hình DI:
 builder.Services.AddControllers();
+
+
+
+// Cấu hình DbContext với chuỗi kết nối theo môi trường
+var connectionString = builder.Configuration.GetConnectionString("Default")
+    ?? throw new InvalidOperationException("Missing Default connection string.");
+
+builder.Services.AddDbContext<RestaurantMgmtContext>(options =>
+{
+    options.UseMySql(
+        connectionString,
+        ServerVersion.AutoDetect(connectionString)
+    );
+});
+
 
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -40,6 +58,31 @@ builder.Services.AddCors(options =>
 
 
 var app = builder.Build();
+
+
+
+// Kiểm tra kết nối database khi khởi động ứng dụng
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<RestaurantMgmtContext>();
+
+    try
+    {
+        if (!db.Database.CanConnect())
+        {
+            throw new Exception("Database connection failed.");
+        }
+
+        Console.WriteLine("Database connection successful.");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Database connection error: {ex.Message}");
+        throw; // stop application
+    }
+}
+
+
 
 // *** QUAN TRỌNG: Đăng ký middleware xử lý exception toàn cục ***
 // Phải đặt đầu tiên trong pipeline để bắt được tất cả exception
