@@ -25,5 +25,7 @@ public partial class MediaAsset
 
     public virtual SettingItem MediaType { get; set; } = null!;
 
+    public virtual ICollection<RestaurantTable> RestaurantTables { get; set; } = new List<RestaurantTable>();
+
     public virtual ICollection<TableMedium> TableMedia { get; set; } = new List<TableMedium>();
 }

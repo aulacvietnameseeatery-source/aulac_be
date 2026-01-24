@@ -37,6 +37,8 @@ public partial class RestaurantMgmtContext : DbContext
 
     public virtual DbSet<Invoice> Invoices { get; set; }
 
+    public virtual DbSet<InvoicePromotion> InvoicePromotions { get; set; }
+
     public virtual DbSet<MediaAsset> MediaAssets { get; set; }
 
     public virtual DbSet<Order> Orders { get; set; }
@@ -46,6 +48,12 @@ public partial class RestaurantMgmtContext : DbContext
     public virtual DbSet<Payment> Payments { get; set; }
 
     public virtual DbSet<Permission> Permissions { get; set; }
+
+    public virtual DbSet<Promotion> Promotions { get; set; }
+
+    public virtual DbSet<PromotionRule> PromotionRules { get; set; }
+
+    public virtual DbSet<PromotionTarget> PromotionTargets { get; set; }
 
     public virtual DbSet<Purchase> Purchases { get; set; }
 
@@ -410,6 +418,40 @@ public partial class RestaurantMgmtContext : DbContext
                 .HasConstraintName("invoice_ibfk_4");
         });
 
+        modelBuilder.Entity<InvoicePromotion>(entity =>
+        {
+            entity.HasKey(e => e.InvoicePromotionId).HasName("PRIMARY");
+
+            entity.ToTable("invoice_promotion");
+
+            entity.HasIndex(e => e.InvoiceId, "idx_invoice_promo_invoice");
+
+            entity.HasIndex(e => e.PromotionId, "idx_invoice_promo_promo");
+
+            entity.HasIndex(e => new { e.InvoiceId, e.PromotionId }, "uq_invoice_promo").IsUnique();
+
+            entity.Property(e => e.InvoicePromotionId).HasColumnName("invoice_promotion_id");
+            entity.Property(e => e.AppliedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime")
+                .HasColumnName("applied_at");
+            entity.Property(e => e.DiscountAmount)
+                .HasPrecision(14, 2)
+                .HasColumnName("discount_amount");
+            entity.Property(e => e.InvoiceId).HasColumnName("invoice_id");
+            entity.Property(e => e.PromotionId).HasColumnName("promotion_id");
+
+            entity.HasOne(d => d.Invoice).WithMany(p => p.InvoicePromotions)
+                .HasForeignKey(d => d.InvoiceId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("invoice_promotion_ibfk_1");
+
+            entity.HasOne(d => d.Promotion).WithMany(p => p.InvoicePromotions)
+                .HasForeignKey(d => d.PromotionId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("invoice_promotion_ibfk_2");
+        });
+
         modelBuilder.Entity<MediaAsset>(entity =>
         {
             entity.HasKey(e => e.MediaId).HasName("PRIMARY");
@@ -575,6 +617,117 @@ public partial class RestaurantMgmtContext : DbContext
                 .HasColumnName("screen_code");
         });
 
+        modelBuilder.Entity<Promotion>(entity =>
+        {
+            entity.HasKey(e => e.PromotionId).HasName("PRIMARY");
+
+            entity.ToTable("promotion");
+
+            entity.HasIndex(e => e.PromoCode, "promo_code").IsUnique();
+
+            entity.HasIndex(e => e.TypeId, "type_id");
+
+            entity.Property(e => e.PromotionId).HasColumnName("promotion_id");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime")
+                .HasColumnName("created_at");
+            entity.Property(e => e.Description)
+                .HasMaxLength(255)
+                .HasColumnName("description");
+            entity.Property(e => e.EndTime)
+                .HasColumnType("datetime")
+                .HasColumnName("end_time");
+            entity.Property(e => e.IsActive)
+                .HasDefaultValueSql("'1'")
+                .HasColumnName("is_active");
+            entity.Property(e => e.MaxUsage).HasColumnName("max_usage");
+            entity.Property(e => e.PromoCode)
+                .HasMaxLength(50)
+                .HasColumnName("promo_code");
+            entity.Property(e => e.PromoName)
+                .HasMaxLength(200)
+                .HasColumnName("promo_name");
+            entity.Property(e => e.StartTime)
+                .HasColumnType("datetime")
+                .HasColumnName("start_time");
+            entity.Property(e => e.TypeId).HasColumnName("type_id");
+            entity.Property(e => e.UsedCount)
+                .HasDefaultValueSql("'0'")
+                .HasColumnName("used_count");
+
+            entity.HasOne(d => d.Type).WithMany(p => p.Promotions)
+                .HasForeignKey(d => d.TypeId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("promotion_ibfk_1");
+        });
+
+        modelBuilder.Entity<PromotionRule>(entity =>
+        {
+            entity.HasKey(e => e.RuleId).HasName("PRIMARY");
+
+            entity.ToTable("promotion_rule");
+
+            entity.HasIndex(e => e.PromotionId, "promotion_id");
+
+            entity.HasIndex(e => e.RequiredCategoryId, "required_category_id");
+
+            entity.HasIndex(e => e.RequiredDishId, "required_dish_id");
+
+            entity.Property(e => e.RuleId).HasColumnName("rule_id");
+            entity.Property(e => e.MinOrderValue)
+                .HasPrecision(14, 2)
+                .HasColumnName("min_order_value");
+            entity.Property(e => e.MinQuantity).HasColumnName("min_quantity");
+            entity.Property(e => e.PromotionId).HasColumnName("promotion_id");
+            entity.Property(e => e.RequiredCategoryId).HasColumnName("required_category_id");
+            entity.Property(e => e.RequiredDishId).HasColumnName("required_dish_id");
+
+            entity.HasOne(d => d.Promotion).WithMany(p => p.PromotionRules)
+                .HasForeignKey(d => d.PromotionId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("promotion_rule_ibfk_1");
+
+            entity.HasOne(d => d.RequiredCategory).WithMany(p => p.PromotionRules)
+                .HasForeignKey(d => d.RequiredCategoryId)
+                .HasConstraintName("promotion_rule_ibfk_3");
+
+            entity.HasOne(d => d.RequiredDish).WithMany(p => p.PromotionRules)
+                .HasForeignKey(d => d.RequiredDishId)
+                .HasConstraintName("promotion_rule_ibfk_2");
+        });
+
+        modelBuilder.Entity<PromotionTarget>(entity =>
+        {
+            entity.HasKey(e => e.TargetId).HasName("PRIMARY");
+
+            entity.ToTable("promotion_target");
+
+            entity.HasIndex(e => e.CategoryId, "category_id");
+
+            entity.HasIndex(e => e.DishId, "dish_id");
+
+            entity.HasIndex(e => e.PromotionId, "promotion_id");
+
+            entity.Property(e => e.TargetId).HasColumnName("target_id");
+            entity.Property(e => e.CategoryId).HasColumnName("category_id");
+            entity.Property(e => e.DishId).HasColumnName("dish_id");
+            entity.Property(e => e.PromotionId).HasColumnName("promotion_id");
+
+            entity.HasOne(d => d.Category).WithMany(p => p.PromotionTargets)
+                .HasForeignKey(d => d.CategoryId)
+                .HasConstraintName("promotion_target_ibfk_3");
+
+            entity.HasOne(d => d.Dish).WithMany(p => p.PromotionTargets)
+                .HasForeignKey(d => d.DishId)
+                .HasConstraintName("promotion_target_ibfk_2");
+
+            entity.HasOne(d => d.Promotion).WithMany(p => p.PromotionTargets)
+                .HasForeignKey(d => d.PromotionId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("promotion_target_ibfk_1");
+        });
+
         modelBuilder.Entity<Purchase>(entity =>
         {
             entity.HasKey(e => e.PurchaseId).HasName("PRIMARY");
@@ -717,6 +870,10 @@ public partial class RestaurantMgmtContext : DbContext
 
             entity.ToTable("restaurant_table");
 
+            entity.HasIndex(e => e.TableQrImg, "FK_restaurant_table_table_qr_img");
+
+            entity.HasIndex(e => e.TableType, "FK_restaurant_table_table_type");
+
             entity.HasIndex(e => e.StatusId, "status_id");
 
             entity.HasIndex(e => e.TableCode, "table_code").IsUnique();
@@ -727,11 +884,23 @@ public partial class RestaurantMgmtContext : DbContext
             entity.Property(e => e.TableCode)
                 .HasMaxLength(50)
                 .HasColumnName("table_code");
+            entity.Property(e => e.TableQrImg).HasColumnName("table_qr_img");
+            entity.Property(e => e.TableType).HasColumnName("table_type");
 
-            entity.HasOne(d => d.Status).WithMany(p => p.RestaurantTables)
+            entity.HasOne(d => d.Status).WithMany(p => p.RestaurantTableStatuses)
                 .HasForeignKey(d => d.StatusId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("restaurant_table_ibfk_1");
+
+            entity.HasOne(d => d.TableQrImgNavigation).WithMany(p => p.RestaurantTables)
+                .HasForeignKey(d => d.TableQrImg)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_restaurant_table_table_qr_img");
+
+            entity.HasOne(d => d.TableTypeNavigation).WithMany(p => p.RestaurantTableTableTypeNavigations)
+                .HasForeignKey(d => d.TableType)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_restaurant_table_table_type");
         });
 
         modelBuilder.Entity<Role>(entity =>

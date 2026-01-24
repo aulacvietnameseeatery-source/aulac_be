@@ -23,6 +23,8 @@ public partial class Invoice
 
     public virtual Customer? Customer { get; set; }
 
+    public virtual ICollection<InvoicePromotion> InvoicePromotions { get; set; } = new List<InvoicePromotion>();
+
     public virtual Order Order { get; set; } = null!;
 
     public virtual ICollection<Payment> Payments { get; set; } = new List<Payment>();

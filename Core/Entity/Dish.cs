@@ -23,5 +23,9 @@ public partial class Dish
 
     public virtual ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
 
+    public virtual ICollection<PromotionRule> PromotionRules { get; set; } = new List<PromotionRule>();
+
+    public virtual ICollection<PromotionTarget> PromotionTargets { get; set; } = new List<PromotionTarget>();
+
     public virtual SettingItem Status { get; set; } = null!;
 }

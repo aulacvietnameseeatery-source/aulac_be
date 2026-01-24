@@ -37,11 +37,15 @@ public partial class SettingItem
 
     public virtual ICollection<Payment> Payments { get; set; } = new List<Payment>();
 
+    public virtual ICollection<Promotion> Promotions { get; set; } = new List<Promotion>();
+
     public virtual ICollection<Reservation> ReservationSources { get; set; } = new List<Reservation>();
 
     public virtual ICollection<Reservation> ReservationStatuses { get; set; } = new List<Reservation>();
 
-    public virtual ICollection<RestaurantTable> RestaurantTables { get; set; } = new List<RestaurantTable>();
+    public virtual ICollection<RestaurantTable> RestaurantTableStatuses { get; set; } = new List<RestaurantTable>();
+
+    public virtual ICollection<RestaurantTable> RestaurantTableTableTypeNavigations { get; set; } = new List<RestaurantTable>();
 
     public virtual ICollection<ServiceError> ServiceErrors { get; set; } = new List<ServiceError>();
 }
