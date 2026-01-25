@@ -1,5 +1,5 @@
 using Core.Interface.Repo;
-using Core.Interface.Service;
+using Core.Interface.Service.Auth;
 using Core.Service;
 using Infa.Repo;
 using Microsoft.AspNetCore.Authentication.JwtBearer;

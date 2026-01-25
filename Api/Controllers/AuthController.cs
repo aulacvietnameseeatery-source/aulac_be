@@ -2,7 +2,7 @@ using Core.DTO.Auth;
 using API.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Core.Interface.Service;
+using Core.Interface.Service.Auth;
 
 namespace Api.Controllers;
 

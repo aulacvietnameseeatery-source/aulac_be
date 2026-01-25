@@ -7,8 +7,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Folder Include="Enum\" />
     <Folder Include="Exception\" />
     <Folder Include="Domain\" />
+    <Folder Include="Helpers\" />
   </ItemGroup>
 
   <ItemGroup>

@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
+    <PackageReference Include="MailKit" Version="4.14.1" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.23" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.23">
@@ -17,11 +18,17 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="8.0.23" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.2" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.2" />
+    <PackageReference Include="MimeKit" Version="4.14.0" />
     <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="8.0.3" />
+    <PackageReference Include="StackExchange.Redis" Version="2.10.1" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Core\Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Email\Template\" />
   </ItemGroup>
 
 </Project>

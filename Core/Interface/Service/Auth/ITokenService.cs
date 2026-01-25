@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Security.Claims;
 
-namespace Core.Interface.Service;
+namespace Core.Interface.Service.Auth;
 
 /// <summary>
 /// Token service abstraction for generating and managing authentication tokens.

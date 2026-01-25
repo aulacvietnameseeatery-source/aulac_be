@@ -1,4 +1,4 @@
-namespace Core.Interface.Service;
+namespace Core.Interface.Service.Auth;
 
 /// <summary>
 /// Authentication service abstraction for handling login, refresh, and logout flows.

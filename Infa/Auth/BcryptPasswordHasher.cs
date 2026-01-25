@@ -1,4 +1,4 @@
-using Core.Interface.Service;
+using Core.Interface.Service.Auth;
 using BC = BCrypt.Net.BCrypt;
 
 namespace Infa.Auth;

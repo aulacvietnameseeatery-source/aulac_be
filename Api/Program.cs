@@ -1,26 +1,46 @@
-﻿using API.Middleware;
+﻿using Api.Background;
+using Api.Middleware;
+using API.Middleware;
 using Core.Data;
 using Core.Interface.Repo;
 using Core.Interface.Service;
+using Core.Interface.Service.Email;
 using Core.Service;
 using Infa.Auth;
 using Infa.Data;
+using Infa.Email;
 using Infa.Repo;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authorization.Policy;
 using Microsoft.AspNetCore.Http.Json;
 using Microsoft.EntityFrameworkCore;
+using StackExchange.Redis;
 using System;
 using System.Reflection;
 using System.Text.Encodings.Web;
-using Api.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+builder.Services.AddControllers();
 
 // DI Configuration:
-builder.Services.AddControllers();
+
+builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
+    ConnectionMultiplexer.Connect(builder.Configuration.GetConnectionString("Redis")!)
+);
+
+builder.Services.AddSingleton<IEmailQueue, RedisEmailQueue>();
+builder.Services.AddSingleton<IDeadLetterSink, RedisDeadLetterSink>();
+
+builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection("Smtp"));
+builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
+
+
+
+// Register Background Service
+builder.Services.AddHostedService<EmailBackgroundService>();
+
+
 
 // Configure DbContext with connection string per environment
 var connectionString = builder.Configuration.GetConnectionString("Default")

@@ -1,5 +1,5 @@
 using Core.Interface.Repo;
-using Core.Interface.Service;
+using Core.Interface.Service.Auth;
 
 namespace Core.Service;
 

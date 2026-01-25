@@ -1,4 +1,4 @@
-namespace Core.Interface.Service;
+namespace Core.Interface.Service.Auth;
 
 /// <summary>
 /// Password hasher abstraction for secure password verification.
