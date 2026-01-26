@@ -1,5 +1,6 @@
 ﻿using Core.DTO.Email;
 using Core.Interface.Service.Email;
+using Core.Interface.Service.Others;
 using StackExchange.Redis;
 using System;
 using System.Collections.Generic;
@@ -12,17 +13,18 @@ namespace Infa.Email
 {
     public sealed class RedisDeadLetterSink : IDeadLetterSink
     {
-        private readonly IDatabase _db;
+        private readonly ICacheService _cache;
         private readonly string _dlqKey;
 
-        public RedisDeadLetterSink(IConnectionMultiplexer mux, string dlqKey = "email:dlq")
+        public RedisDeadLetterSink(ICacheService cache, string dlqKey = "email:dlq")
         {
-            _db = mux.GetDatabase();
+            _cache = cache;
             _dlqKey = dlqKey;
         }
 
         public Task WriteAsync(DeadLetterEmail item, CancellationToken ct = default)
-            => _db.ListRightPushAsync(_dlqKey, JsonSerializer.Serialize(item));
+            => _cache.ListRightPushAsync(_dlqKey, item, ct);
     }
+
 
 }

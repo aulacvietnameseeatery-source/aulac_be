@@ -17,5 +17,5 @@ public partial class AuditLog
 
     public DateTime? CreatedAt { get; set; }
 
-    public virtual Account? Staff { get; set; }
+    public virtual StaffAccount? Staff { get; set; }
 }

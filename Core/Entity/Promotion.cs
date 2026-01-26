@@ -27,7 +27,7 @@ public partial class Promotion
 
     public DateTime? CreatedAt { get; set; }
 
-    public virtual ICollection<InvoicePromotion> InvoicePromotions { get; set; } = new List<InvoicePromotion>();
+    public virtual ICollection<OrderPromotion> OrderPromotions { get; set; } = new List<OrderPromotion>();
 
     public virtual ICollection<PromotionRule> PromotionRules { get; set; } = new List<PromotionRule>();
 

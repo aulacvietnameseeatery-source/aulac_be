@@ -14,7 +14,7 @@ public interface IAccountRepository
     /// <param name="username">The username to search for</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The account if found; otherwise null</returns>
-    Task<Account?> FindByUsernameAsync(
+    Task<StaffAccount?> FindByUsernameAsync(
         string username,
         CancellationToken cancellationToken = default);
 
@@ -24,9 +24,29 @@ public interface IAccountRepository
     /// <param name="userId">The user's identifier</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The account with role/permissions if found; otherwise null</returns>
-    Task<Account?> FindByIdWithRoleAsync(
+    Task<StaffAccount?> FindByIdWithRoleAsync(
         long userId,
-  CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Finds an account by ID without loading related entities.
+    /// </summary>
+    /// <param name="userId">The user's identifier</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The account if found; otherwise null</returns>
+    Task<StaffAccount?> FindByIdAsync(
+        long userId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Finds an account by email address (case-insensitive).
+    /// </summary>
+    /// <param name="emailNormalized">The normalized (uppercase) email to search for</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The account if found; otherwise null</returns>
+    Task<StaffAccount?> FindByEmailAsync(
+        string emailNormalized,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Updates the last login timestamp for an account.
@@ -37,5 +57,16 @@ public interface IAccountRepository
     Task UpdateLastLoginAsync(
         long userId,
         DateTime loginTime,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Updates the password hash for an account.
+    /// </summary>
+    /// <param name="userId">The user's identifier</param>
+    /// <param name="newPasswordHash">The new hashed password</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    Task UpdatePasswordAsync(
+        long userId,
+        string newPasswordHash,
         CancellationToken cancellationToken = default);
 }

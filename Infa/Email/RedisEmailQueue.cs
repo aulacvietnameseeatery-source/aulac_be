@@ -1,5 +1,6 @@
 ﻿using Core.DTO.Email;
 using Core.Interface.Service.Email;
+using Core.Interface.Service.Others;
 using Microsoft.EntityFrameworkCore.Storage;
 using StackExchange.Redis;
 using System;
@@ -14,32 +15,31 @@ namespace Infa.Email
 {
     public sealed class RedisEmailQueue : IEmailQueue
     {
-        private readonly IDatabase _db;
+        private readonly ICacheService _cache;
         private readonly string _queueKey;
 
-        public RedisEmailQueue(IConnectionMultiplexer mux, string queueKey = "email:queue")
+        public RedisEmailQueue(ICacheService cache, string queueKey = "email:queue")
         {
-            _db = mux.GetDatabase();
+            _cache = cache;
             _queueKey = queueKey;
         }
 
         public Task EnqueueAsync(QueuedEmail email, CancellationToken ct = default)
-            => _db.ListRightPushAsync(_queueKey, JsonSerializer.Serialize(email));
+            => _cache.ListRightPushAsync(_queueKey, email, ct);
 
         public async Task<QueuedEmail> DequeueAsync(CancellationToken ct = default)
         {
-            // Simple polling. Good enough for most apps; later you can move to Redis Streams for “blocking”.
+            // simple polling (fine for now). Upgrade later to Redis Streams if needed.
             while (!ct.IsCancellationRequested)
             {
-                var value = await _db.ListLeftPopAsync(_queueKey);
-                if (value.HasValue)
-                    return JsonSerializer.Deserialize<QueuedEmail>(value!)!;
+                var item = await _cache.ListLeftPopAsync<QueuedEmail>(_queueKey, ct);
+                if (item is not null) return item;
 
                 await Task.Delay(250, ct);
             }
 
             throw new OperationCanceledException(ct);
         }
-
     }
+
 }

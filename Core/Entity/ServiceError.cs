@@ -37,11 +37,11 @@ public partial class ServiceError
 
     public virtual OrderItem? OrderItem { get; set; }
 
-    public virtual Account? ResolvedByNavigation { get; set; }
+    public virtual StaffAccount? ResolvedByNavigation { get; set; }
 
     public virtual SettingItem Severity { get; set; } = null!;
 
-    public virtual Account Staff { get; set; } = null!;
+    public virtual StaffAccount Staff { get; set; } = null!;
 
     public virtual RestaurantTable? Table { get; set; }
 }

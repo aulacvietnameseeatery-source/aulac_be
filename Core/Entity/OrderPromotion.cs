@@ -3,11 +3,11 @@ using System.Collections.Generic;
 
 namespace Core.Entity;
 
-public partial class InvoicePromotion
+public partial class OrderPromotion
 {
-    public long InvoicePromotionId { get; set; }
+    public long OrderPromotionId { get; set; }
 
-    public long InvoiceId { get; set; }
+    public long OrderId { get; set; }
 
     public long PromotionId { get; set; }
 
@@ -15,7 +15,7 @@ public partial class InvoicePromotion
 
     public DateTime? AppliedAt { get; set; }
 
-    public virtual Invoice Invoice { get; set; } = null!;
+    public virtual Order Order { get; set; } = null!;
 
     public virtual Promotion Promotion { get; set; } = null!;
 }

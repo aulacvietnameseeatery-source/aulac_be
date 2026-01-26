@@ -7,7 +7,7 @@ public partial class Payment
 {
     public long PaymentId { get; set; }
 
-    public long InvoiceId { get; set; }
+    public long OrderId { get; set; }
 
     public long MethodId { get; set; }
 
@@ -17,7 +17,7 @@ public partial class Payment
 
     public DateTime? PaidAt { get; set; }
 
-    public virtual Invoice Invoice { get; set; } = null!;
-
     public virtual SettingItem Method { get; set; } = null!;
+
+    public virtual Order Order { get; set; } = null!;
 }

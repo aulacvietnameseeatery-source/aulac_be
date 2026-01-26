@@ -17,15 +17,13 @@ public partial class SettingItem
 
     public bool? IsActive { get; set; }
 
-    public virtual ICollection<Account> Accounts { get; set; } = new List<Account>();
-
     public virtual SettingCategory Category { get; set; } = null!;
 
     public virtual ICollection<Dish> Dishes { get; set; } = new List<Dish>();
 
-    public virtual ICollection<InventoryTransaction> InventoryTransactions { get; set; } = new List<InventoryTransaction>();
+    public virtual ICollection<InventoryTransaction> InventoryTransactionDirections { get; set; } = new List<InventoryTransaction>();
 
-    public virtual ICollection<Invoice> Invoices { get; set; } = new List<Invoice>();
+    public virtual ICollection<InventoryTransaction> InventoryTransactionReasons { get; set; } = new List<InventoryTransaction>();
 
     public virtual ICollection<MediaAsset> MediaAssets { get; set; } = new List<MediaAsset>();
 
@@ -48,4 +46,6 @@ public partial class SettingItem
     public virtual ICollection<RestaurantTable> RestaurantTableTableTypeNavigations { get; set; } = new List<RestaurantTable>();
 
     public virtual ICollection<ServiceError> ServiceErrors { get; set; } = new List<ServiceError>();
+
+    public virtual ICollection<StaffAccount> StaffAccounts { get; set; } = new List<StaffAccount>();
 }

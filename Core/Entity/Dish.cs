@@ -27,5 +27,7 @@ public partial class Dish
 
     public virtual ICollection<PromotionTarget> PromotionTargets { get; set; } = new List<PromotionTarget>();
 
+    public virtual ICollection<Recipe> Recipes { get; set; } = new List<Recipe>();
+
     public virtual SettingItem Status { get; set; } = null!;
 }

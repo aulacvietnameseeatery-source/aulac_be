@@ -7,23 +7,23 @@ public partial class InventoryTransaction
 {
     public long TransactionId { get; set; }
 
-    public long IngredientId { get; set; }
+    public long DirectionId { get; set; }
 
-    public long? PurchaseId { get; set; }
+    public long ReasonId { get; set; }
 
-    public long? SupplierId { get; set; }
-
-    public decimal Quantity { get; set; }
-
-    public long TypeId { get; set; }
+    public long? CreatedBy { get; set; }
 
     public DateTime? CreatedAt { get; set; }
 
-    public virtual Ingredient Ingredient { get; set; } = null!;
+    public string? Note { get; set; }
 
-    public virtual Purchase? Purchase { get; set; }
+    public virtual StaffAccount? CreatedByNavigation { get; set; }
 
-    public virtual Supplier? Supplier { get; set; }
+    public virtual SettingItem Direction { get; set; } = null!;
 
-    public virtual SettingItem Type { get; set; } = null!;
+    public virtual ICollection<InventoryTransactionItem> InventoryTransactionItems { get; set; } = new List<InventoryTransactionItem>();
+
+    public virtual ICollection<InventoryTransactionMedium> InventoryTransactionMedia { get; set; } = new List<InventoryTransactionMedium>();
+
+    public virtual SettingItem Reason { get; set; } = null!;
 }

@@ -96,3 +96,59 @@ public class AuthErrorDto
     /// </summary>
     public string ErrorMessage { get; set; } = string.Empty;
 }
+
+/// <summary>
+/// Request model for initiating a password reset.
+/// </summary>
+public class ForgotPasswordRequestDto
+{
+    /// <summary>
+    /// The email address associated with the account.
+    /// </summary>
+    [Required(ErrorMessage = "Email is required.")]
+    [EmailAddress(ErrorMessage = "Invalid email format.")]
+    [StringLength(255, ErrorMessage = "Email cannot exceed 255 characters.")]
+    public string Email { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Request model for verifying a password reset token.
+/// </summary>
+public class VerifyResetTokenRequestDto
+{
+    /// <summary>
+    /// The password reset token to verify.
+    /// </summary>
+    [Required(ErrorMessage = "Token is required.")]
+    public string Token { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Response model for token verification.
+/// </summary>
+public class VerifyResetTokenResponseDto
+{
+    /// <summary>
+    /// Indicates whether the token is valid and not expired.
+    /// </summary>
+    public bool Valid { get; set; }
+}
+
+/// <summary>
+/// Request model for resetting a password.
+/// </summary>
+public class ResetPasswordRequestDto
+{
+    /// <summary>
+    /// The password reset token received via email.
+    /// </summary>
+    [Required(ErrorMessage = "Token is required.")]
+    public string Token { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The new password to set for the account.
+    /// </summary>
+    [Required(ErrorMessage = "New password is required.")]
+    [StringLength(128, MinimumLength = 8, ErrorMessage = "Password must be between 8 and 128 characters.")]
+    public string NewPassword { get; set; } = string.Empty;
+}

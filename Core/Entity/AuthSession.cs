@@ -21,5 +21,5 @@ public partial class AuthSession
 
     public string? IpAddress { get; set; }
 
-    public virtual Account User { get; set; } = null!;
+    public virtual StaffAccount User { get; set; } = null!;
 }

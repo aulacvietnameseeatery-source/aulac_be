@@ -4,11 +4,14 @@ using API.Middleware;
 using Core.Data;
 using Core.Interface.Repo;
 using Core.Interface.Service;
+using Core.Interface.Service.Auth;
 using Core.Interface.Service.Email;
+using Core.Interface.Service.Others;
 using Core.Service;
 using Infa.Auth;
 using Infa.Data;
 using Infa.Email;
+using Infa.Others;
 using Infa.Repo;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authorization.Policy;
@@ -29,18 +32,39 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
     ConnectionMultiplexer.Connect(builder.Configuration.GetConnectionString("Redis")!)
 );
 
+// Cache service (single entry point)
+builder.Services.AddSingleton<ICacheService, RedisCacheService>();
+
+// Authentication Infrastructure
+// Register auth services (token service, session repository, password hasher, etc.)
+builder.Services.AddAuthInfrastructure(builder.Configuration);
+
+// Services
+
+// Repositories
+builder.Services.AddScoped<IAccountRepository, AccountRepository>();
+
+// Email services
 builder.Services.AddSingleton<IEmailQueue, RedisEmailQueue>();
 builder.Services.AddSingleton<IDeadLetterSink, RedisDeadLetterSink>();
-
-builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection("Smtp"));
 builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
 
+// Forgot password token store uses cache
+builder.Services.AddSingleton<IPasswordResetTokenStore, RedisPasswordResetTokenStore>();
 
 
 // Register Background Service
 builder.Services.AddHostedService<EmailBackgroundService>();
 
 
+// Load Options from configuration
+builder.Services.Configure<ForgotPasswordRulesOptions>(
+    builder.Configuration.GetSection("ForgotPasswordRules"));
+
+builder.Services.Configure<BaseUrlOptions>(
+    builder.Configuration.GetSection("BaseUrl"));
+
+builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection("Smtp"));
 
 // Configure DbContext with connection string per environment
 var connectionString = builder.Configuration.GetConnectionString("Default")
@@ -54,9 +78,6 @@ builder.Services.AddDbContext<RestaurantMgmtContext>(options =>
     );
 });
 
-// Authentication Infrastructure
-// Register auth services (token service, session repository, password hasher, etc.)
-builder.Services.AddAuthInfrastructure(builder.Configuration);
 
 // Configure JWT Bearer authentication with session validation
 builder.Services.AddJwtAuthentication(builder.Configuration);

@@ -23,6 +23,8 @@ public partial class MediaAsset
 
     public virtual ICollection<DishMedium> DishMedia { get; set; } = new List<DishMedium>();
 
+    public virtual ICollection<InventoryTransactionMedium> InventoryTransactionMedia { get; set; } = new List<InventoryTransactionMedium>();
+
     public virtual SettingItem MediaType { get; set; } = null!;
 
     public virtual ICollection<RestaurantTable> RestaurantTables { get; set; } = new List<RestaurantTable>();

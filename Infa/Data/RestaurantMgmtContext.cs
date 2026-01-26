@@ -17,11 +17,11 @@ public partial class RestaurantMgmtContext : DbContext
     {
     }
 
-    public virtual DbSet<Account> Accounts { get; set; }
-
     public virtual DbSet<AuditLog> AuditLogs { get; set; }
 
     public virtual DbSet<AuthSession> AuthSessions { get; set; }
+
+    public virtual DbSet<CurrentStock> CurrentStocks { get; set; }
 
     public virtual DbSet<Customer> Customers { get; set; }
 
@@ -35,15 +35,17 @@ public partial class RestaurantMgmtContext : DbContext
 
     public virtual DbSet<InventoryTransaction> InventoryTransactions { get; set; }
 
-    public virtual DbSet<Invoice> Invoices { get; set; }
+    public virtual DbSet<InventoryTransactionItem> InventoryTransactionItems { get; set; }
 
-    public virtual DbSet<InvoicePromotion> InvoicePromotions { get; set; }
+    public virtual DbSet<InventoryTransactionMedium> InventoryTransactionMedia { get; set; }
 
     public virtual DbSet<MediaAsset> MediaAssets { get; set; }
 
     public virtual DbSet<Order> Orders { get; set; }
 
     public virtual DbSet<OrderItem> OrderItems { get; set; }
+
+    public virtual DbSet<OrderPromotion> OrderPromotions { get; set; }
 
     public virtual DbSet<Payment> Payments { get; set; }
 
@@ -55,9 +57,7 @@ public partial class RestaurantMgmtContext : DbContext
 
     public virtual DbSet<PromotionTarget> PromotionTargets { get; set; }
 
-    public virtual DbSet<Purchase> Purchases { get; set; }
-
-    public virtual DbSet<PurchaseItem> PurchaseItems { get; set; }
+    public virtual DbSet<Recipe> Recipes { get; set; }
 
     public virtual DbSet<Reservation> Reservations { get; set; }
 
@@ -73,69 +73,19 @@ public partial class RestaurantMgmtContext : DbContext
 
     public virtual DbSet<SettingItem> SettingItems { get; set; }
 
+    public virtual DbSet<StaffAccount> StaffAccounts { get; set; }
+
     public virtual DbSet<Supplier> Suppliers { get; set; }
 
     public virtual DbSet<TableMedium> TableMedia { get; set; }
 
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder) { }
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder){}
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder
             .UseCollation("utf8mb4_unicode_ci")
             .HasCharSet("utf8mb4");
-
-        modelBuilder.Entity<Account>(entity =>
-        {
-            entity.HasKey(e => e.AccountId).HasName("PRIMARY");
-
-            entity.ToTable("account");
-
-            entity.HasIndex(e => e.Email, "email").IsUnique();
-
-            entity.HasIndex(e => e.RoleId, "role_id");
-
-            entity.HasIndex(e => e.StatusId, "status_id");
-
-            entity.HasIndex(e => e.Username, "username").IsUnique();
-
-            entity.Property(e => e.AccountId).HasColumnName("account_id");
-            entity.Property(e => e.CreatedAt)
-                .HasDefaultValueSql("CURRENT_TIMESTAMP")
-                .HasColumnType("datetime")
-                .HasColumnName("created_at");
-            entity.Property(e => e.Email)
-                .HasMaxLength(150)
-                .HasColumnName("email");
-            entity.Property(e => e.FullName)
-                .HasMaxLength(150)
-                .HasColumnName("full_name");
-            entity.Property(e => e.IsLocked).HasColumnName("is_locked");
-            entity.Property(e => e.LastLoginAt)
-                .HasColumnType("datetime")
-                .HasColumnName("last_login_at");
-            entity.Property(e => e.PasswordHash)
-                .HasMaxLength(255)
-                .HasColumnName("password_hash");
-            entity.Property(e => e.Phone)
-                .HasMaxLength(30)
-                .HasColumnName("phone");
-            entity.Property(e => e.RoleId).HasColumnName("role_id");
-            entity.Property(e => e.StatusId).HasColumnName("status_id");
-            entity.Property(e => e.Username)
-                .HasMaxLength(100)
-                .HasColumnName("username");
-
-            entity.HasOne(d => d.Role).WithMany(p => p.Accounts)
-                .HasForeignKey(d => d.RoleId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("account_ibfk_1");
-
-            entity.HasOne(d => d.Status).WithMany(p => p.Accounts)
-                .HasForeignKey(d => d.StatusId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("account_ibfk_2");
-        });
 
         modelBuilder.Entity<AuditLog>(entity =>
         {
@@ -200,6 +150,30 @@ public partial class RestaurantMgmtContext : DbContext
                 .HasForeignKey(d => d.UserId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("auth_session_ibfk_1");
+        });
+
+        modelBuilder.Entity<CurrentStock>(entity =>
+        {
+            entity.HasKey(e => e.IngredientId).HasName("PRIMARY");
+
+            entity.ToTable("current_stock");
+
+            entity.Property(e => e.IngredientId)
+                .ValueGeneratedNever()
+                .HasColumnName("ingredient_id");
+            entity.Property(e => e.LastUpdatedAt)
+                .ValueGeneratedOnAddOrUpdate()
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime")
+                .HasColumnName("last_updated_at");
+            entity.Property(e => e.QuantityOnHand)
+                .HasPrecision(14, 3)
+                .HasColumnName("quantity_on_hand");
+
+            entity.HasOne(d => d.Ingredient).WithOne(p => p.CurrentStock)
+                .HasForeignKey<CurrentStock>(d => d.IngredientId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_current_stock_ingredient");
         });
 
         modelBuilder.Entity<Customer>(entity =>
@@ -312,13 +286,20 @@ public partial class RestaurantMgmtContext : DbContext
 
             entity.ToTable("ingredient");
 
+            entity.HasIndex(e => e.SupplierId, "FK_ingredient_supplier_id");
+
             entity.Property(e => e.IngredientId).HasColumnName("ingredient_id");
             entity.Property(e => e.IngredientName)
                 .HasMaxLength(200)
                 .HasColumnName("ingredient_name");
+            entity.Property(e => e.SupplierId).HasColumnName("supplier_id");
             entity.Property(e => e.Unit)
                 .HasMaxLength(20)
                 .HasColumnName("unit");
+
+            entity.HasOne(d => d.Supplier).WithMany(p => p.Ingredients)
+                .HasForeignKey(d => d.SupplierId)
+                .HasConstraintName("FK_ingredient_supplier_id");
         });
 
         modelBuilder.Entity<InventoryTransaction>(entity =>
@@ -327,129 +308,101 @@ public partial class RestaurantMgmtContext : DbContext
 
             entity.ToTable("inventory_transaction");
 
-            entity.HasIndex(e => new { e.TypeId, e.CreatedAt }, "idx_inventory_type");
+            entity.HasIndex(e => e.ReasonId, "fk_inventory_transaction_reason");
 
-            entity.HasIndex(e => e.IngredientId, "ingredient_id");
+            entity.HasIndex(e => e.CreatedBy, "fk_inventory_transaction_staff");
 
-            entity.HasIndex(e => e.PurchaseId, "purchase_id");
+            entity.HasIndex(e => new { e.DirectionId, e.CreatedAt }, "idx_inventory_transaction_dir_time");
 
-            entity.HasIndex(e => e.SupplierId, "supplier_id");
+            entity.HasIndex(e => e.CreatedAt, "idx_inventory_transaction_time");
 
             entity.Property(e => e.TransactionId).HasColumnName("transaction_id");
             entity.Property(e => e.CreatedAt)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
                 .HasColumnType("datetime")
                 .HasColumnName("created_at");
-            entity.Property(e => e.IngredientId).HasColumnName("ingredient_id");
-            entity.Property(e => e.PurchaseId).HasColumnName("purchase_id");
-            entity.Property(e => e.Quantity)
-                .HasPrecision(12, 2)
-                .HasColumnName("quantity");
-            entity.Property(e => e.SupplierId).HasColumnName("supplier_id");
-            entity.Property(e => e.TypeId).HasColumnName("type_id");
+            entity.Property(e => e.CreatedBy).HasColumnName("created_by");
+            entity.Property(e => e.DirectionId).HasColumnName("direction_id");
+            entity.Property(e => e.Note)
+                .HasMaxLength(255)
+                .HasColumnName("note");
+            entity.Property(e => e.ReasonId).HasColumnName("reason_id");
 
-            entity.HasOne(d => d.Ingredient).WithMany(p => p.InventoryTransactions)
+            entity.HasOne(d => d.CreatedByNavigation).WithMany(p => p.InventoryTransactions)
+                .HasForeignKey(d => d.CreatedBy)
+                .HasConstraintName("fk_inventory_transaction_staff");
+
+            entity.HasOne(d => d.Direction).WithMany(p => p.InventoryTransactionDirections)
+                .HasForeignKey(d => d.DirectionId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_inventory_transaction_direction");
+
+            entity.HasOne(d => d.Reason).WithMany(p => p.InventoryTransactionReasons)
+                .HasForeignKey(d => d.ReasonId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_inventory_transaction_reason");
+        });
+
+        modelBuilder.Entity<InventoryTransactionItem>(entity =>
+        {
+            entity.HasKey(e => e.TransactionItemId).HasName("PRIMARY");
+
+            entity.ToTable("inventory_transaction_item");
+
+            entity.HasIndex(e => e.IngredientId, "idx_inventory_transaction_item_ingredient");
+
+            entity.HasIndex(e => e.TransactionId, "idx_inventory_transaction_item_transaction");
+
+            entity.HasIndex(e => new { e.TransactionId, e.IngredientId }, "uq_inventory_transaction_item").IsUnique();
+
+            entity.Property(e => e.TransactionItemId).HasColumnName("transaction_item_id");
+            entity.Property(e => e.IngredientId).HasColumnName("ingredient_id");
+            entity.Property(e => e.Note)
+                .HasMaxLength(255)
+                .HasColumnName("note");
+            entity.Property(e => e.Quantity)
+                .HasPrecision(14, 3)
+                .HasColumnName("quantity");
+            entity.Property(e => e.TransactionId).HasColumnName("transaction_id");
+            entity.Property(e => e.Unit)
+                .HasMaxLength(20)
+                .HasColumnName("unit");
+
+            entity.HasOne(d => d.Ingredient).WithMany(p => p.InventoryTransactionItems)
                 .HasForeignKey(d => d.IngredientId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("inventory_transaction_ibfk_1");
+                .HasConstraintName("fk_inventory_transaction_item_ingredient");
 
-            entity.HasOne(d => d.Purchase).WithMany(p => p.InventoryTransactions)
-                .HasForeignKey(d => d.PurchaseId)
-                .HasConstraintName("inventory_transaction_ibfk_2");
-
-            entity.HasOne(d => d.Supplier).WithMany(p => p.InventoryTransactions)
-                .HasForeignKey(d => d.SupplierId)
-                .HasConstraintName("inventory_transaction_ibfk_3");
-
-            entity.HasOne(d => d.Type).WithMany(p => p.InventoryTransactions)
-                .HasForeignKey(d => d.TypeId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("inventory_transaction_ibfk_4");
+            entity.HasOne(d => d.Transaction).WithMany(p => p.InventoryTransactionItems)
+                .HasForeignKey(d => d.TransactionId)
+                .HasConstraintName("fk_inventory_transaction_item_transaction");
         });
 
-        modelBuilder.Entity<Invoice>(entity =>
+        modelBuilder.Entity<InventoryTransactionMedium>(entity =>
         {
-            entity.HasKey(e => e.InvoiceId).HasName("PRIMARY");
+            entity.HasKey(e => new { e.TransactionId, e.MediaId })
+                .HasName("PRIMARY")
+                .HasAnnotation("MySql:IndexPrefixLength", new[] { 0, 0 });
 
-            entity.ToTable("invoice");
+            entity.ToTable("inventory_transaction_media");
 
-            entity.HasIndex(e => e.CustomerId, "customer_id");
+            entity.HasIndex(e => e.MediaId, "idx_inventory_transaction_media_media");
 
-            entity.HasIndex(e => new { e.StatusId, e.CreatedAt }, "idx_invoice_status");
+            entity.HasIndex(e => new { e.TransactionId, e.IsPrimary }, "idx_inventory_transaction_media_primary");
 
-            entity.HasIndex(e => e.StaffId, "invoice_ibfk_2");
+            entity.Property(e => e.TransactionId).HasColumnName("transaction_id");
+            entity.Property(e => e.MediaId).HasColumnName("media_id");
+            entity.Property(e => e.IsPrimary)
+                .HasDefaultValueSql("'0'")
+                .HasColumnName("is_primary");
 
-            entity.HasIndex(e => e.OrderId, "order_id").IsUnique();
+            entity.HasOne(d => d.Media).WithMany(p => p.InventoryTransactionMedia)
+                .HasForeignKey(d => d.MediaId)
+                .HasConstraintName("fk_inventory_transaction_media_asset");
 
-            entity.Property(e => e.InvoiceId).HasColumnName("invoice_id");
-            entity.Property(e => e.CreatedAt)
-                .HasDefaultValueSql("CURRENT_TIMESTAMP")
-                .HasColumnType("datetime")
-                .HasColumnName("created_at");
-            entity.Property(e => e.CustomerId).HasColumnName("customer_id");
-            entity.Property(e => e.OrderId).HasColumnName("order_id");
-            entity.Property(e => e.StaffId).HasColumnName("staff_id");
-            entity.Property(e => e.StatusId).HasColumnName("status_id");
-            entity.Property(e => e.TipAmount)
-                .HasPrecision(12, 2)
-                .HasDefaultValueSql("'0.00'")
-                .HasColumnName("tip_amount");
-            entity.Property(e => e.TotalAmount)
-                .HasPrecision(14, 2)
-                .HasColumnName("total_amount");
-
-            entity.HasOne(d => d.Customer).WithMany(p => p.Invoices)
-                .HasForeignKey(d => d.CustomerId)
-                .HasConstraintName("invoice_ibfk_3");
-
-            entity.HasOne(d => d.Order).WithOne(p => p.Invoice)
-                .HasForeignKey<Invoice>(d => d.OrderId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("invoice_ibfk_1");
-
-            entity.HasOne(d => d.Staff).WithMany(p => p.Invoices)
-                .HasForeignKey(d => d.StaffId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("invoice_ibfk_2");
-
-            entity.HasOne(d => d.Status).WithMany(p => p.Invoices)
-                .HasForeignKey(d => d.StatusId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("invoice_ibfk_4");
-        });
-
-        modelBuilder.Entity<InvoicePromotion>(entity =>
-        {
-            entity.HasKey(e => e.InvoicePromotionId).HasName("PRIMARY");
-
-            entity.ToTable("invoice_promotion");
-
-            entity.HasIndex(e => e.InvoiceId, "idx_invoice_promo_invoice");
-
-            entity.HasIndex(e => e.PromotionId, "idx_invoice_promo_promo");
-
-            entity.HasIndex(e => new { e.InvoiceId, e.PromotionId }, "uq_invoice_promo").IsUnique();
-
-            entity.Property(e => e.InvoicePromotionId).HasColumnName("invoice_promotion_id");
-            entity.Property(e => e.AppliedAt)
-                .HasDefaultValueSql("CURRENT_TIMESTAMP")
-                .HasColumnType("datetime")
-                .HasColumnName("applied_at");
-            entity.Property(e => e.DiscountAmount)
-                .HasPrecision(14, 2)
-                .HasColumnName("discount_amount");
-            entity.Property(e => e.InvoiceId).HasColumnName("invoice_id");
-            entity.Property(e => e.PromotionId).HasColumnName("promotion_id");
-
-            entity.HasOne(d => d.Invoice).WithMany(p => p.InvoicePromotions)
-                .HasForeignKey(d => d.InvoiceId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("invoice_promotion_ibfk_1");
-
-            entity.HasOne(d => d.Promotion).WithMany(p => p.InvoicePromotions)
-                .HasForeignKey(d => d.PromotionId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("invoice_promotion_ibfk_2");
+            entity.HasOne(d => d.Transaction).WithMany(p => p.InventoryTransactionMedia)
+                .HasForeignKey(d => d.TransactionId)
+                .HasConstraintName("fk_inventory_transaction_media_transaction");
         });
 
         modelBuilder.Entity<MediaAsset>(entity =>
@@ -488,6 +441,8 @@ public partial class RestaurantMgmtContext : DbContext
 
             entity.ToTable("orders");
 
+            entity.HasIndex(e => e.CustomerId, "FK_orders_customer_id");
+
             entity.HasIndex(e => new { e.StatusId, e.CreatedAt }, "idx_order_status");
 
             entity.HasIndex(e => e.StaffId, "orders_ibfk_2");
@@ -501,10 +456,25 @@ public partial class RestaurantMgmtContext : DbContext
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
                 .HasColumnType("datetime")
                 .HasColumnName("created_at");
+            entity.Property(e => e.CustomerId).HasColumnName("customer_id");
             entity.Property(e => e.SourceId).HasColumnName("source_id");
             entity.Property(e => e.StaffId).HasColumnName("staff_id");
             entity.Property(e => e.StatusId).HasColumnName("status_id");
             entity.Property(e => e.TableId).HasColumnName("table_id");
+            entity.Property(e => e.TipAmount)
+                .HasPrecision(14, 2)
+                .HasColumnName("tip_amount");
+            entity.Property(e => e.TotalAmount)
+                .HasPrecision(14, 2)
+                .HasColumnName("total_amount");
+            entity.Property(e => e.UpdatedAt)
+                .HasColumnType("datetime")
+                .HasColumnName("updated_at");
+
+            entity.HasOne(d => d.Customer).WithMany(p => p.Orders)
+                .HasForeignKey(d => d.CustomerId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_orders_customer_id");
 
             entity.HasOne(d => d.Source).WithMany(p => p.OrderSources)
                 .HasForeignKey(d => d.SourceId)
@@ -567,22 +537,54 @@ public partial class RestaurantMgmtContext : DbContext
                 .HasConstraintName("order_item_ibfk_3");
         });
 
+        modelBuilder.Entity<OrderPromotion>(entity =>
+        {
+            entity.HasKey(e => e.OrderPromotionId).HasName("PRIMARY");
+
+            entity.ToTable("order_promotion");
+
+            entity.HasIndex(e => e.PromotionId, "idx_invoice_promo_promo");
+
+            entity.HasIndex(e => new { e.OrderId, e.PromotionId }, "uq_invoice_promo").IsUnique();
+
+            entity.Property(e => e.OrderPromotionId).HasColumnName("order_promotion_id");
+            entity.Property(e => e.AppliedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime")
+                .HasColumnName("applied_at");
+            entity.Property(e => e.DiscountAmount)
+                .HasPrecision(14, 2)
+                .HasColumnName("discount_amount");
+            entity.Property(e => e.OrderId).HasColumnName("order_id");
+            entity.Property(e => e.PromotionId).HasColumnName("promotion_id");
+
+            entity.HasOne(d => d.Order).WithMany(p => p.OrderPromotions)
+                .HasForeignKey(d => d.OrderId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_invoice_promotion_order_id");
+
+            entity.HasOne(d => d.Promotion).WithMany(p => p.OrderPromotions)
+                .HasForeignKey(d => d.PromotionId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("order_promotion_ibfk_2");
+        });
+
         modelBuilder.Entity<Payment>(entity =>
         {
             entity.HasKey(e => e.PaymentId).HasName("PRIMARY");
 
             entity.ToTable("payment");
 
-            entity.HasIndex(e => e.InvoiceId, "invoice_id");
-
             entity.HasIndex(e => e.MethodId, "method_id");
+
+            entity.HasIndex(e => e.OrderId, "payment_ibfk_1");
 
             entity.Property(e => e.PaymentId).HasColumnName("payment_id");
             entity.Property(e => e.ChangeAmount)
                 .HasPrecision(14, 2)
                 .HasColumnName("change_amount");
-            entity.Property(e => e.InvoiceId).HasColumnName("invoice_id");
             entity.Property(e => e.MethodId).HasColumnName("method_id");
+            entity.Property(e => e.OrderId).HasColumnName("order_id");
             entity.Property(e => e.PaidAt)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
                 .HasColumnType("datetime")
@@ -591,15 +593,15 @@ public partial class RestaurantMgmtContext : DbContext
                 .HasPrecision(14, 2)
                 .HasColumnName("received_amount");
 
-            entity.HasOne(d => d.Invoice).WithMany(p => p.Payments)
-                .HasForeignKey(d => d.InvoiceId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("payment_ibfk_1");
-
             entity.HasOne(d => d.Method).WithMany(p => p.Payments)
                 .HasForeignKey(d => d.MethodId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("payment_ibfk_2");
+
+            entity.HasOne(d => d.Order).WithMany(p => p.Payments)
+                .HasForeignKey(d => d.OrderId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("payment_ibfk_1");
         });
 
         modelBuilder.Entity<Permission>(entity =>
@@ -728,67 +730,37 @@ public partial class RestaurantMgmtContext : DbContext
                 .HasConstraintName("promotion_target_ibfk_1");
         });
 
-        modelBuilder.Entity<Purchase>(entity =>
+        modelBuilder.Entity<Recipe>(entity =>
         {
-            entity.HasKey(e => e.PurchaseId).HasName("PRIMARY");
+            entity.HasKey(e => new { e.DishId, e.IngredientId })
+                .HasName("PRIMARY")
+                .HasAnnotation("MySql:IndexPrefixLength", new[] { 0, 0 });
 
-            entity.ToTable("purchase");
+            entity.ToTable("recipe");
 
-            entity.HasIndex(e => e.StaffId, "purchase_ibfk_2");
+            entity.HasIndex(e => e.IngredientId, "idx_recipe_ingredient");
 
-            entity.HasIndex(e => e.SupplierId, "supplier_id");
-
-            entity.Property(e => e.PurchaseId).HasColumnName("purchase_id");
-            entity.Property(e => e.PurchasedAt)
-                .HasDefaultValueSql("CURRENT_TIMESTAMP")
-                .HasColumnType("datetime")
-                .HasColumnName("purchased_at");
-            entity.Property(e => e.StaffId).HasColumnName("staff_id");
-            entity.Property(e => e.SupplierId).HasColumnName("supplier_id");
-            entity.Property(e => e.TotalAmount)
-                .HasPrecision(14, 2)
-                .HasColumnName("total_amount");
-
-            entity.HasOne(d => d.Staff).WithMany(p => p.Purchases)
-                .HasForeignKey(d => d.StaffId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("purchase_ibfk_2");
-
-            entity.HasOne(d => d.Supplier).WithMany(p => p.Purchases)
-                .HasForeignKey(d => d.SupplierId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("purchase_ibfk_1");
-        });
-
-        modelBuilder.Entity<PurchaseItem>(entity =>
-        {
-            entity.HasKey(e => e.PurchaseItemId).HasName("PRIMARY");
-
-            entity.ToTable("purchase_item");
-
-            entity.HasIndex(e => e.IngredientId, "ingredient_id");
-
-            entity.HasIndex(e => e.PurchaseId, "purchase_id");
-
-            entity.Property(e => e.PurchaseItemId).HasColumnName("purchase_item_id");
+            entity.Property(e => e.DishId).HasColumnName("dish_id");
             entity.Property(e => e.IngredientId).HasColumnName("ingredient_id");
-            entity.Property(e => e.PurchaseId).HasColumnName("purchase_id");
+            entity.Property(e => e.Note)
+                .HasMaxLength(255)
+                .HasColumnName("note");
             entity.Property(e => e.Quantity)
-                .HasPrecision(12, 2)
+                .HasPrecision(12, 3)
                 .HasColumnName("quantity");
-            entity.Property(e => e.UnitPrice)
-                .HasPrecision(12, 2)
-                .HasColumnName("unit_price");
+            entity.Property(e => e.Unit)
+                .HasMaxLength(20)
+                .HasColumnName("unit");
 
-            entity.HasOne(d => d.Ingredient).WithMany(p => p.PurchaseItems)
+            entity.HasOne(d => d.Dish).WithMany(p => p.Recipes)
+                .HasForeignKey(d => d.DishId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_recipe_dish");
+
+            entity.HasOne(d => d.Ingredient).WithMany(p => p.Recipes)
                 .HasForeignKey(d => d.IngredientId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("purchase_item_ibfk_2");
-
-            entity.HasOne(d => d.Purchase).WithMany(p => p.PurchaseItems)
-                .HasForeignKey(d => d.PurchaseId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("purchase_item_ibfk_1");
+                .HasConstraintName("fk_recipe_ingredient");
         });
 
         modelBuilder.Entity<Reservation>(entity =>
@@ -1089,6 +1061,58 @@ public partial class RestaurantMgmtContext : DbContext
                 .HasForeignKey(d => d.CategoryId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("fk_setting_category");
+        });
+
+        modelBuilder.Entity<StaffAccount>(entity =>
+        {
+            entity.HasKey(e => e.AccountId).HasName("PRIMARY");
+
+            entity.ToTable("staff_account");
+
+            entity.HasIndex(e => e.Email, "email").IsUnique();
+
+            entity.HasIndex(e => e.RoleId, "role_id");
+
+            entity.HasIndex(e => e.StatusId, "status_id");
+
+            entity.HasIndex(e => e.Username, "username").IsUnique();
+
+            entity.Property(e => e.AccountId).HasColumnName("account_id");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime")
+                .HasColumnName("created_at");
+            entity.Property(e => e.Email)
+                .HasMaxLength(150)
+                .HasColumnName("email");
+            entity.Property(e => e.FullName)
+                .HasMaxLength(150)
+                .HasColumnName("full_name");
+            entity.Property(e => e.IsLocked).HasColumnName("is_locked");
+            entity.Property(e => e.LastLoginAt)
+                .HasColumnType("datetime")
+                .HasColumnName("last_login_at");
+            entity.Property(e => e.PasswordHash)
+                .HasMaxLength(255)
+                .HasColumnName("password_hash");
+            entity.Property(e => e.Phone)
+                .HasMaxLength(30)
+                .HasColumnName("phone");
+            entity.Property(e => e.RoleId).HasColumnName("role_id");
+            entity.Property(e => e.StatusId).HasColumnName("status_id");
+            entity.Property(e => e.Username)
+                .HasMaxLength(100)
+                .HasColumnName("username");
+
+            entity.HasOne(d => d.Role).WithMany(p => p.StaffAccounts)
+                .HasForeignKey(d => d.RoleId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("staff_account_ibfk_1");
+
+            entity.HasOne(d => d.Status).WithMany(p => p.StaffAccounts)
+                .HasForeignKey(d => d.StatusId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("staff_account_ibfk_2");
         });
 
         modelBuilder.Entity<Supplier>(entity =>

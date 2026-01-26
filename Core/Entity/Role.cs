@@ -11,7 +11,7 @@ public partial class Role
 
     public string RoleName { get; set; } = null!;
 
-    public virtual ICollection<Account> Accounts { get; set; } = new List<Account>();
+    public virtual ICollection<StaffAccount> StaffAccounts { get; set; } = new List<StaffAccount>();
 
     public virtual ICollection<Permission> Permissions { get; set; } = new List<Permission>();
 }

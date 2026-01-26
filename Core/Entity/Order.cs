@@ -17,15 +17,27 @@ public partial class Order
 
     public DateTime? CreatedAt { get; set; }
 
-    public virtual Invoice? Invoice { get; set; }
+    public long CustomerId { get; set; }
+
+    public DateTime? UpdatedAt { get; set; }
+
+    public decimal TotalAmount { get; set; }
+
+    public decimal? TipAmount { get; set; }
+
+    public virtual Customer Customer { get; set; } = null!;
 
     public virtual ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
+
+    public virtual ICollection<OrderPromotion> OrderPromotions { get; set; } = new List<OrderPromotion>();
+
+    public virtual ICollection<Payment> Payments { get; set; } = new List<Payment>();
 
     public virtual ICollection<ServiceError> ServiceErrors { get; set; } = new List<ServiceError>();
 
     public virtual SettingItem Source { get; set; } = null!;
 
-    public virtual Account Staff { get; set; } = null!;
+    public virtual StaffAccount Staff { get; set; } = null!;
 
     public virtual SettingItem Status { get; set; } = null!;
 

@@ -11,7 +11,13 @@ public partial class Ingredient
 
     public string Unit { get; set; } = null!;
 
-    public virtual ICollection<InventoryTransaction> InventoryTransactions { get; set; } = new List<InventoryTransaction>();
+    public long? SupplierId { get; set; }
 
-    public virtual ICollection<PurchaseItem> PurchaseItems { get; set; } = new List<PurchaseItem>();
+    public virtual CurrentStock? CurrentStock { get; set; }
+
+    public virtual ICollection<InventoryTransactionItem> InventoryTransactionItems { get; set; } = new List<InventoryTransactionItem>();
+
+    public virtual ICollection<Recipe> Recipes { get; set; } = new List<Recipe>();
+
+    public virtual Supplier? Supplier { get; set; }
 }

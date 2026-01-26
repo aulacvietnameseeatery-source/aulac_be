@@ -18,25 +18,45 @@ public class AccountRepository : IAccountRepository
     }
 
     /// <inheritdoc />
-    public async Task<Account?> FindByUsernameAsync(
+    public async Task<StaffAccount?> FindByUsernameAsync(
    string username,
     CancellationToken cancellationToken = default)
     {
-        return await _context.Accounts
+        return await _context.StaffAccounts
             .Include(a => a.Role)
             .ThenInclude(r => r.Permissions)
             .FirstOrDefaultAsync(a => a.Username == username,cancellationToken);
     }
 
     /// <inheritdoc />
-    public async Task<Account?> FindByIdWithRoleAsync(
-   long userId,
-    CancellationToken cancellationToken = default)
+    public async Task<StaffAccount?> FindByIdWithRoleAsync(
+        long userId,
+        CancellationToken cancellationToken = default)
     {
-        return await _context.Accounts
+        return await _context.StaffAccounts
             .Include(a => a.Role)
             .ThenInclude(r => r.Permissions)
             .FirstOrDefaultAsync(a => a.AccountId == userId,cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<StaffAccount?> FindByIdAsync(
+        long userId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _context.StaffAccounts
+            .FirstOrDefaultAsync(a => a.AccountId == userId, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<StaffAccount?> FindByEmailAsync(
+        string emailNormalized,
+        CancellationToken cancellationToken = default)
+    {
+     // Email is stored as-is, but we search case-insensitively
+        // The emailNormalized parameter is already uppercased by the caller
+      return await _context.StaffAccounts
+            .FirstOrDefaultAsync(a => a.Email != null && a.Email.ToUpper() == emailNormalized, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -45,12 +65,28 @@ public class AccountRepository : IAccountRepository
         DateTime loginTime,
         CancellationToken cancellationToken = default)
     {
-        var account = await _context.Accounts
+        var account = await _context.StaffAccounts
        .FirstOrDefaultAsync(a => a.AccountId == userId, cancellationToken);
 
-        if (account != null)
+      if (account != null)
+     {
+          account.LastLoginAt = loginTime;
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task UpdatePasswordAsync(
+        long userId,
+        string newPasswordHash,
+        CancellationToken cancellationToken = default)
+    {
+        var account = await _context.StaffAccounts
+  .FirstOrDefaultAsync(a => a.AccountId == userId, cancellationToken);
+
+ if (account != null)
         {
-            account.LastLoginAt = loginTime;
+     account.PasswordHash = newPasswordHash;
             await _context.SaveChangesAsync(cancellationToken);
         }
     }

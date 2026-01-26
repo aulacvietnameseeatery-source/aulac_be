@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace Core.Entity;
 
-public partial class Account
+public partial class StaffAccount
 {
     public long AccountId { get; set; }
 
@@ -31,11 +31,9 @@ public partial class Account
 
     public virtual ICollection<AuthSession> AuthSessions { get; set; } = new List<AuthSession>();
 
-    public virtual ICollection<Invoice> Invoices { get; set; } = new List<Invoice>();
+    public virtual ICollection<InventoryTransaction> InventoryTransactions { get; set; } = new List<InventoryTransaction>();
 
     public virtual ICollection<Order> Orders { get; set; } = new List<Order>();
-
-    public virtual ICollection<Purchase> Purchases { get; set; } = new List<Purchase>();
 
     public virtual Role Role { get; set; } = null!;
 
