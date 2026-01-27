@@ -1,11 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+using Core.Enum;
 
 namespace Core.Entity;
 
 public partial class OrderItem
 {
-    public long OrderItemId { get; set; }
+  public long OrderItemId { get; set; }
 
     public long OrderId { get; set; }
 
@@ -15,7 +16,7 @@ public partial class OrderItem
 
     public decimal Price { get; set; }
 
-    public long StatusId { get; set; }
+ public OrderItemStatus ItemStatus { get; set; }
 
     public string? RejectReason { get; set; }
 
@@ -23,7 +24,5 @@ public partial class OrderItem
 
     public virtual Order Order { get; set; } = null!;
 
-    public virtual ICollection<ServiceError> ServiceErrors { get; set; } = new List<ServiceError>();
-
-    public virtual SettingItem Status { get; set; } = null!;
+public virtual ICollection<ServiceError> ServiceErrors { get; set; } = new List<ServiceError>();
 }

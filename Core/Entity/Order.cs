@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Core.Enum;
 
 namespace Core.Entity;
 
@@ -11,9 +12,9 @@ public partial class Order
 
     public long StaffId { get; set; }
 
-    public long SourceId { get; set; }
+    public OrderSource SourceId { get; set; }
 
-    public long StatusId { get; set; }
+    public OrderStatus OrderStatus { get; set; }
 
     public DateTime? CreatedAt { get; set; }
 
@@ -35,11 +36,7 @@ public partial class Order
 
     public virtual ICollection<ServiceError> ServiceErrors { get; set; } = new List<ServiceError>();
 
-    public virtual SettingItem Source { get; set; } = null!;
-
     public virtual StaffAccount Staff { get; set; } = null!;
-
-    public virtual SettingItem Status { get; set; } = null!;
 
     public virtual RestaurantTable Table { get; set; } = null!;
 }

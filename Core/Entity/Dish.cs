@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Core.Enum;
 
 namespace Core.Entity;
 
@@ -13,7 +14,7 @@ public partial class Dish
 
     public decimal Price { get; set; }
 
-    public long StatusId { get; set; }
+    public DishStatus DishStatus { get; set; }
 
     public DateTime? CreatedAt { get; set; }
 
@@ -28,6 +29,4 @@ public partial class Dish
     public virtual ICollection<PromotionTarget> PromotionTargets { get; set; } = new List<PromotionTarget>();
 
     public virtual ICollection<Recipe> Recipes { get; set; } = new List<Recipe>();
-
-    public virtual SettingItem Status { get; set; } = null!;
 }

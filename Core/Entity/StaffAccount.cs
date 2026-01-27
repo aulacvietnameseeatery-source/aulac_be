@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Core.Enum;
 
 namespace Core.Entity;
 
@@ -15,7 +16,7 @@ public partial class StaffAccount
 
     public long RoleId { get; set; }
 
-    public long StatusId { get; set; }
+    public AccountStatus AccountStatus { get; set; }
 
     public DateTime CreatedAt { get; set; }
 
@@ -40,6 +41,4 @@ public partial class StaffAccount
     public virtual ICollection<ServiceError> ServiceErrorResolvedByNavigations { get; set; } = new List<ServiceError>();
 
     public virtual ICollection<ServiceError> ServiceErrorStaffs { get; set; } = new List<ServiceError>();
-
-    public virtual SettingItem Status { get; set; } = null!;
 }

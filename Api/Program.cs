@@ -21,10 +21,20 @@ using StackExchange.Redis;
 using System;
 using System.Reflection;
 using System.Text.Encodings.Web;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        // Serialize enums as strings in JSON responses (e.g., "Active" instead of 1)
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
+        
+        // Keep existing Unicode handling
+        options.JsonSerializerOptions.Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping;
+    });
 
 // DI Configuration:
 
@@ -112,13 +122,6 @@ builder.Services.AddSwaggerGen(options =>
             Array.Empty<string>()
         }
     });
-});
-
-// Configure JSON to not escape Unicode characters
-builder.Services.Configure<JsonOptions>(options =>
-{
-    options.SerializerOptions.Encoder =
-        JavaScriptEncoder.UnsafeRelaxedJsonEscaping;
 });
 
 // Add CORS services

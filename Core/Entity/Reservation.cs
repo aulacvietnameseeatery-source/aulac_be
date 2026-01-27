@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Core.Enum;
 
 namespace Core.Entity;
 
@@ -19,17 +20,13 @@ public partial class Reservation
 
     public DateTime ReservedTime { get; set; }
 
-    public long SourceId { get; set; }
+    public ReservationSource SourceId { get; set; }
 
-    public long StatusId { get; set; }
+    public ReservationStatus ReservationStatus { get; set; }
 
     public DateTime? CreatedAt { get; set; }
 
     public virtual Customer? Customer { get; set; }
-
-    public virtual SettingItem Source { get; set; } = null!;
-
-    public virtual SettingItem Status { get; set; } = null!;
 
     public virtual ICollection<RestaurantTable> Tables { get; set; } = new List<RestaurantTable>();
 }

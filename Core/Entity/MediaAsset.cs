@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Core.Enum;
 
 namespace Core.Entity;
 
@@ -7,7 +8,7 @@ public partial class MediaAsset
 {
     public long MediaId { get; set; }
 
-    public long MediaTypeId { get; set; }
+    public MediaType MediaTypeId { get; set; }
 
     public string Url { get; set; } = null!;
 
@@ -24,8 +25,6 @@ public partial class MediaAsset
     public virtual ICollection<DishMedium> DishMedia { get; set; } = new List<DishMedium>();
 
     public virtual ICollection<InventoryTransactionMedium> InventoryTransactionMedia { get; set; } = new List<InventoryTransactionMedium>();
-
-    public virtual SettingItem MediaType { get; set; } = null!;
 
     public virtual ICollection<RestaurantTable> RestaurantTables { get; set; } = new List<RestaurantTable>();
 

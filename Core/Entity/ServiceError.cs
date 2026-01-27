@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Core.Enum;
 
 namespace Core.Entity;
 
@@ -17,7 +18,7 @@ public partial class ServiceError
 
     public long CategoryId { get; set; }
 
-    public long SeverityId { get; set; }
+    public SeverityLevel SeverityId { get; set; }
 
     public string Description { get; set; } = null!;
 
@@ -38,8 +39,6 @@ public partial class ServiceError
     public virtual OrderItem? OrderItem { get; set; }
 
     public virtual StaffAccount? ResolvedByNavigation { get; set; }
-
-    public virtual SettingItem Severity { get; set; } = null!;
 
     public virtual StaffAccount Staff { get; set; } = null!;
 

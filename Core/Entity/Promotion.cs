@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Core.Enum;
 
 namespace Core.Entity;
 
@@ -13,13 +14,13 @@ public partial class Promotion
 
     public string? Description { get; set; }
 
-    public long TypeId { get; set; }
+    public PromotionType TypeId { get; set; }
 
     public DateTime StartTime { get; set; }
 
     public DateTime EndTime { get; set; }
 
-    public bool? IsActive { get; set; }
+    public PromotionStatus PromotionStatus { get; set; }
 
     public int? MaxUsage { get; set; }
 
@@ -32,6 +33,4 @@ public partial class Promotion
     public virtual ICollection<PromotionRule> PromotionRules { get; set; } = new List<PromotionRule>();
 
     public virtual ICollection<PromotionTarget> PromotionTargets { get; set; } = new List<PromotionTarget>();
-
-    public virtual SettingItem Type { get; set; } = null!;
 }

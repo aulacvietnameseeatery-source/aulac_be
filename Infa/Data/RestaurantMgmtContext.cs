@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using Core.Entity;
+using Core.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using Pomelo.EntityFrameworkCore.MySql.Scaffolding.Internal;
 
@@ -69,17 +70,13 @@ public partial class RestaurantMgmtContext : DbContext
 
     public virtual DbSet<ServiceErrorCategory> ServiceErrorCategories { get; set; }
 
-    public virtual DbSet<SettingCategory> SettingCategories { get; set; }
-
-    public virtual DbSet<SettingItem> SettingItems { get; set; }
-
     public virtual DbSet<StaffAccount> StaffAccounts { get; set; }
 
     public virtual DbSet<Supplier> Suppliers { get; set; }
 
     public virtual DbSet<TableMedium> TableMedia { get; set; }
 
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder){}
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder) { }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -214,8 +211,6 @@ public partial class RestaurantMgmtContext : DbContext
 
             entity.HasIndex(e => e.CategoryId, "category_id");
 
-            entity.HasIndex(e => e.StatusId, "idx_dish_status");
-
             entity.Property(e => e.DishId).HasColumnName("dish_id");
             entity.Property(e => e.CategoryId).HasColumnName("category_id");
             entity.Property(e => e.CreatedAt)
@@ -225,20 +220,20 @@ public partial class RestaurantMgmtContext : DbContext
             entity.Property(e => e.DishName)
                 .HasMaxLength(200)
                 .HasColumnName("dish_name");
+            entity.Property(e => e.DishStatus)
+                .HasConversion<byte>()
+                .HasDefaultValueSql("'1'")
+                .HasComment("DishStatus: 1=AVAILABLE,2=OUT_OF_STOCK,3=HIDDEN")
+                .HasColumnName("dish_status")
+                .HasColumnType("tinyint unsigned");
             entity.Property(e => e.Price)
                 .HasPrecision(12, 2)
                 .HasColumnName("price");
-            entity.Property(e => e.StatusId).HasColumnName("status_id");
 
             entity.HasOne(d => d.Category).WithMany(p => p.Dishes)
                 .HasForeignKey(d => d.CategoryId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("dish_ibfk_1");
-
-            entity.HasOne(d => d.Status).WithMany(p => p.Dishes)
-                .HasForeignKey(d => d.StatusId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("dish_ibfk_2");
         });
 
         modelBuilder.Entity<DishCategory>(entity =>
@@ -308,11 +303,9 @@ public partial class RestaurantMgmtContext : DbContext
 
             entity.ToTable("inventory_transaction");
 
-            entity.HasIndex(e => e.ReasonId, "fk_inventory_transaction_reason");
-
             entity.HasIndex(e => e.CreatedBy, "fk_inventory_transaction_staff");
 
-            entity.HasIndex(e => new { e.DirectionId, e.CreatedAt }, "idx_inventory_transaction_dir_time");
+            entity.HasIndex(e => new { e.Type, e.CreatedAt }, "idx_inventory_transaction_dir_time");
 
             entity.HasIndex(e => e.CreatedAt, "idx_inventory_transaction_time");
 
@@ -322,25 +315,23 @@ public partial class RestaurantMgmtContext : DbContext
                 .HasColumnType("datetime")
                 .HasColumnName("created_at");
             entity.Property(e => e.CreatedBy).HasColumnName("created_by");
-            entity.Property(e => e.DirectionId).HasColumnName("direction_id");
             entity.Property(e => e.Note)
                 .HasMaxLength(255)
                 .HasColumnName("note");
-            entity.Property(e => e.ReasonId).HasColumnName("reason_id");
+            entity.Property(e => e.Status)
+                .HasConversion<byte>()
+                .HasComment("1=DRAFT,2=PENDING_APPROVAL,3=COMPLETED,4=CANCELLED")
+                .HasColumnName("status")
+                .HasColumnType("tinyint unsigned");
+            entity.Property(e => e.Type)
+                .HasConversion<byte>()
+                .HasComment("1=IN, 2=OUT, 3=ADJUST")
+                .HasColumnName("type")
+                .HasColumnType("tinyint unsigned");
 
             entity.HasOne(d => d.CreatedByNavigation).WithMany(p => p.InventoryTransactions)
                 .HasForeignKey(d => d.CreatedBy)
                 .HasConstraintName("fk_inventory_transaction_staff");
-
-            entity.HasOne(d => d.Direction).WithMany(p => p.InventoryTransactionDirections)
-                .HasForeignKey(d => d.DirectionId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("fk_inventory_transaction_direction");
-
-            entity.HasOne(d => d.Reason).WithMany(p => p.InventoryTransactionReasons)
-                .HasForeignKey(d => d.ReasonId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("fk_inventory_transaction_reason");
         });
 
         modelBuilder.Entity<InventoryTransactionItem>(entity =>
@@ -420,7 +411,11 @@ public partial class RestaurantMgmtContext : DbContext
                 .HasColumnName("created_at");
             entity.Property(e => e.DurationSec).HasColumnName("duration_sec");
             entity.Property(e => e.Height).HasColumnName("height");
-            entity.Property(e => e.MediaTypeId).HasColumnName("media_type_id");
+            entity.Property(e => e.MediaTypeId)
+                .HasConversion<byte>()
+                .HasComment("MediaType (numeric enum in app)")
+                .HasColumnName("media_type_id")
+                .HasColumnType("tinyint unsigned");
             entity.Property(e => e.MimeType)
                 .HasMaxLength(100)
                 .HasColumnName("mime_type");
@@ -428,11 +423,6 @@ public partial class RestaurantMgmtContext : DbContext
                 .HasMaxLength(500)
                 .HasColumnName("url");
             entity.Property(e => e.Width).HasColumnName("width");
-
-            entity.HasOne(d => d.MediaType).WithMany(p => p.MediaAssets)
-                .HasForeignKey(d => d.MediaTypeId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("media_asset_ibfk_1");
         });
 
         modelBuilder.Entity<Order>(entity =>
@@ -443,7 +433,7 @@ public partial class RestaurantMgmtContext : DbContext
 
             entity.HasIndex(e => e.CustomerId, "FK_orders_customer_id");
 
-            entity.HasIndex(e => new { e.StatusId, e.CreatedAt }, "idx_order_status");
+            entity.HasIndex(e => e.CreatedAt, "idx_order_status");
 
             entity.HasIndex(e => e.StaffId, "orders_ibfk_2");
 
@@ -457,9 +447,18 @@ public partial class RestaurantMgmtContext : DbContext
                 .HasColumnType("datetime")
                 .HasColumnName("created_at");
             entity.Property(e => e.CustomerId).HasColumnName("customer_id");
-            entity.Property(e => e.SourceId).HasColumnName("source_id");
+            entity.Property(e => e.OrderStatus)
+                .HasConversion<byte>()
+                .HasDefaultValueSql("'1'")
+                .HasComment("OrderStatus: 1=PENDING,2=IN_PROGRESS,3=COMPLETED,4=CANCELLED")
+                .HasColumnName("order_status")
+                .HasColumnType("tinyint unsigned");
+            entity.Property(e => e.SourceId)
+                .HasConversion<byte>()
+                .HasComment("OrderSource (numeric enum in app)")
+                .HasColumnName("source_id")
+                .HasColumnType("tinyint unsigned");
             entity.Property(e => e.StaffId).HasColumnName("staff_id");
-            entity.Property(e => e.StatusId).HasColumnName("status_id");
             entity.Property(e => e.TableId).HasColumnName("table_id");
             entity.Property(e => e.TipAmount)
                 .HasPrecision(14, 2)
@@ -476,20 +475,10 @@ public partial class RestaurantMgmtContext : DbContext
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_orders_customer_id");
 
-            entity.HasOne(d => d.Source).WithMany(p => p.OrderSources)
-                .HasForeignKey(d => d.SourceId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("orders_ibfk_3");
-
             entity.HasOne(d => d.Staff).WithMany(p => p.Orders)
                 .HasForeignKey(d => d.StaffId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("orders_ibfk_2");
-
-            entity.HasOne(d => d.Status).WithMany(p => p.OrderStatuses)
-                .HasForeignKey(d => d.StatusId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("orders_ibfk_4");
 
             entity.HasOne(d => d.Table).WithMany(p => p.Orders)
                 .HasForeignKey(d => d.TableId)
@@ -505,12 +494,16 @@ public partial class RestaurantMgmtContext : DbContext
 
             entity.HasIndex(e => e.DishId, "dish_id");
 
-            entity.HasIndex(e => e.StatusId, "idx_order_item_status");
-
             entity.HasIndex(e => e.OrderId, "order_id");
 
             entity.Property(e => e.OrderItemId).HasColumnName("order_item_id");
             entity.Property(e => e.DishId).HasColumnName("dish_id");
+            entity.Property(e => e.ItemStatus)
+                .HasConversion<byte>()
+                .HasDefaultValueSql("'1'")
+                .HasComment("OrderItemStatus: 1=CREATED,2=IN_PROGRESS,3=READY,4=SERVED,5=REJECTED")
+                .HasColumnName("item_status")
+                .HasColumnType("tinyint unsigned");
             entity.Property(e => e.OrderId).HasColumnName("order_id");
             entity.Property(e => e.Price)
                 .HasPrecision(12, 2)
@@ -519,7 +512,6 @@ public partial class RestaurantMgmtContext : DbContext
             entity.Property(e => e.RejectReason)
                 .HasMaxLength(255)
                 .HasColumnName("reject_reason");
-            entity.Property(e => e.StatusId).HasColumnName("status_id");
 
             entity.HasOne(d => d.Dish).WithMany(p => p.OrderItems)
                 .HasForeignKey(d => d.DishId)
@@ -530,11 +522,6 @@ public partial class RestaurantMgmtContext : DbContext
                 .HasForeignKey(d => d.OrderId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("order_item_ibfk_1");
-
-            entity.HasOne(d => d.Status).WithMany(p => p.OrderItems)
-                .HasForeignKey(d => d.StatusId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("order_item_ibfk_3");
         });
 
         modelBuilder.Entity<OrderPromotion>(entity =>
@@ -583,7 +570,11 @@ public partial class RestaurantMgmtContext : DbContext
             entity.Property(e => e.ChangeAmount)
                 .HasPrecision(14, 2)
                 .HasColumnName("change_amount");
-            entity.Property(e => e.MethodId).HasColumnName("method_id");
+            entity.Property(e => e.MethodId)
+                .HasConversion<byte>()
+                .HasComment("PaymentMethod (numeric enum in app)")
+                .HasColumnName("method_id")
+                .HasColumnType("tinyint unsigned");
             entity.Property(e => e.OrderId).HasColumnName("order_id");
             entity.Property(e => e.PaidAt)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
@@ -592,11 +583,6 @@ public partial class RestaurantMgmtContext : DbContext
             entity.Property(e => e.ReceivedAmount)
                 .HasPrecision(14, 2)
                 .HasColumnName("received_amount");
-
-            entity.HasOne(d => d.Method).WithMany(p => p.Payments)
-                .HasForeignKey(d => d.MethodId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("payment_ibfk_2");
 
             entity.HasOne(d => d.Order).WithMany(p => p.Payments)
                 .HasForeignKey(d => d.OrderId)
@@ -640,9 +626,6 @@ public partial class RestaurantMgmtContext : DbContext
             entity.Property(e => e.EndTime)
                 .HasColumnType("datetime")
                 .HasColumnName("end_time");
-            entity.Property(e => e.IsActive)
-                .HasDefaultValueSql("'1'")
-                .HasColumnName("is_active");
             entity.Property(e => e.MaxUsage).HasColumnName("max_usage");
             entity.Property(e => e.PromoCode)
                 .HasMaxLength(50)
@@ -650,18 +633,23 @@ public partial class RestaurantMgmtContext : DbContext
             entity.Property(e => e.PromoName)
                 .HasMaxLength(200)
                 .HasColumnName("promo_name");
+            entity.Property(e => e.PromotionStatus)
+                .HasConversion<byte>()
+                .HasDefaultValueSql("'1'")
+                .HasComment("PromotionStatus: 1=SCHEDULED,2=ACTIVE,3=EXPIRED,4=DISABLED")
+                .HasColumnName("promotion_status")
+                .HasColumnType("tinyint unsigned");
             entity.Property(e => e.StartTime)
                 .HasColumnType("datetime")
                 .HasColumnName("start_time");
-            entity.Property(e => e.TypeId).HasColumnName("type_id");
+            entity.Property(e => e.TypeId)
+                .HasConversion<byte>()
+                .HasComment("PromotionType (numeric enum in app)")
+                .HasColumnName("type_id")
+                .HasColumnType("tinyint unsigned");
             entity.Property(e => e.UsedCount)
                 .HasDefaultValueSql("'0'")
                 .HasColumnName("used_count");
-
-            entity.HasOne(d => d.Type).WithMany(p => p.Promotions)
-                .HasForeignKey(d => d.TypeId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("promotion_ibfk_1");
         });
 
         modelBuilder.Entity<PromotionRule>(entity =>
@@ -771,11 +759,9 @@ public partial class RestaurantMgmtContext : DbContext
 
             entity.HasIndex(e => e.CustomerId, "customer_id");
 
-            entity.HasIndex(e => new { e.ReservedTime, e.StatusId }, "idx_reservation_time");
+            entity.HasIndex(e => e.ReservedTime, "idx_reservation_time");
 
             entity.HasIndex(e => e.SourceId, "source_id");
-
-            entity.HasIndex(e => e.StatusId, "status_id");
 
             entity.Property(e => e.ReservationId).HasColumnName("reservation_id");
             entity.Property(e => e.CreatedAt)
@@ -793,25 +779,24 @@ public partial class RestaurantMgmtContext : DbContext
             entity.Property(e => e.Phone)
                 .HasMaxLength(30)
                 .HasColumnName("phone");
+            entity.Property(e => e.ReservationStatus)
+                .HasConversion<byte>()
+                .HasDefaultValueSql("'1'")
+                .HasComment("ReservationStatus: 1=PENDING,2=CONFIRMED,3=CHECKED_IN,4=CANCELLED,5=NO_SHOW")
+                .HasColumnName("reservation_status")
+                .HasColumnType("tinyint unsigned");
             entity.Property(e => e.ReservedTime)
                 .HasColumnType("datetime")
                 .HasColumnName("reserved_time");
-            entity.Property(e => e.SourceId).HasColumnName("source_id");
-            entity.Property(e => e.StatusId).HasColumnName("status_id");
+            entity.Property(e => e.SourceId)
+                .HasConversion<byte>()
+                .HasComment("ReservationSource (numeric enum in app)")
+                .HasColumnName("source_id")
+                .HasColumnType("tinyint unsigned");
 
             entity.HasOne(d => d.Customer).WithMany(p => p.Reservations)
                 .HasForeignKey(d => d.CustomerId)
                 .HasConstraintName("reservation_ibfk_1");
-
-            entity.HasOne(d => d.Source).WithMany(p => p.ReservationSources)
-                .HasForeignKey(d => d.SourceId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("reservation_ibfk_2");
-
-            entity.HasOne(d => d.Status).WithMany(p => p.ReservationStatuses)
-                .HasForeignKey(d => d.StatusId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("reservation_ibfk_3");
 
             entity.HasMany(d => d.Tables).WithMany(p => p.Reservations)
                 .UsingEntity<Dictionary<string, object>>(
@@ -846,33 +831,30 @@ public partial class RestaurantMgmtContext : DbContext
 
             entity.HasIndex(e => e.TableType, "FK_restaurant_table_table_type");
 
-            entity.HasIndex(e => e.StatusId, "status_id");
-
             entity.HasIndex(e => e.TableCode, "table_code").IsUnique();
 
             entity.Property(e => e.TableId).HasColumnName("table_id");
             entity.Property(e => e.Capacity).HasColumnName("capacity");
-            entity.Property(e => e.StatusId).HasColumnName("status_id");
             entity.Property(e => e.TableCode)
                 .HasMaxLength(50)
                 .HasColumnName("table_code");
             entity.Property(e => e.TableQrImg).HasColumnName("table_qr_img");
-            entity.Property(e => e.TableType).HasColumnName("table_type");
-
-            entity.HasOne(d => d.Status).WithMany(p => p.RestaurantTableStatuses)
-                .HasForeignKey(d => d.StatusId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("restaurant_table_ibfk_1");
+            entity.Property(e => e.TableStatus)
+                .HasConversion<byte>()
+                .HasDefaultValueSql("'1'")
+                .HasComment("TableStatus: 1=AVAILABLE,2=OCCUPIED,3=RESERVED,4=LOCKED")
+                .HasColumnName("table_status")
+                .HasColumnType("tinyint unsigned");
+            entity.Property(e => e.TableType)
+                .HasConversion<byte>()
+                .HasComment("TableType (numeric enum in app)")
+                .HasColumnName("table_type")
+                .HasColumnType("tinyint unsigned");
 
             entity.HasOne(d => d.TableQrImgNavigation).WithMany(p => p.RestaurantTables)
                 .HasForeignKey(d => d.TableQrImg)
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("FK_restaurant_table_table_qr_img");
-
-            entity.HasOne(d => d.TableTypeNavigation).WithMany(p => p.RestaurantTableTableTypeNavigations)
-                .HasForeignKey(d => d.TableType)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_restaurant_table_table_type");
         });
 
         modelBuilder.Entity<Role>(entity =>
@@ -956,7 +938,11 @@ public partial class RestaurantMgmtContext : DbContext
                 .HasColumnType("datetime")
                 .HasColumnName("resolved_at");
             entity.Property(e => e.ResolvedBy).HasColumnName("resolved_by");
-            entity.Property(e => e.SeverityId).HasColumnName("severity_id");
+            entity.Property(e => e.SeverityId)
+                .HasConversion<byte>()
+                .HasComment("Severity (numeric enum in app)")
+                .HasColumnName("severity_id")
+                .HasColumnType("tinyint unsigned");
             entity.Property(e => e.StaffId).HasColumnName("staff_id");
             entity.Property(e => e.TableId).HasColumnName("table_id");
 
@@ -976,11 +962,6 @@ public partial class RestaurantMgmtContext : DbContext
             entity.HasOne(d => d.ResolvedByNavigation).WithMany(p => p.ServiceErrorResolvedByNavigations)
                 .HasForeignKey(d => d.ResolvedBy)
                 .HasConstraintName("service_error_ibfk_7");
-
-            entity.HasOne(d => d.Severity).WithMany(p => p.ServiceErrors)
-                .HasForeignKey(d => d.SeverityId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("service_error_ibfk_6");
 
             entity.HasOne(d => d.Staff).WithMany(p => p.ServiceErrorStaffs)
                 .HasForeignKey(d => d.StaffId)
@@ -1012,57 +993,6 @@ public partial class RestaurantMgmtContext : DbContext
                 .HasColumnName("description");
         });
 
-        modelBuilder.Entity<SettingCategory>(entity =>
-        {
-            entity.HasKey(e => e.CategoryId).HasName("PRIMARY");
-
-            entity.ToTable("setting_category");
-
-            entity.HasIndex(e => e.CategoryCode, "category_code").IsUnique();
-
-            entity.Property(e => e.CategoryId).HasColumnName("category_id");
-            entity.Property(e => e.CategoryCode)
-                .HasMaxLength(50)
-                .HasColumnName("category_code");
-            entity.Property(e => e.CategoryName)
-                .HasMaxLength(100)
-                .HasColumnName("category_name");
-            entity.Property(e => e.Description)
-                .HasMaxLength(255)
-                .HasColumnName("description");
-        });
-
-        modelBuilder.Entity<SettingItem>(entity =>
-        {
-            entity.HasKey(e => e.SettingId).HasName("PRIMARY");
-
-            entity.ToTable("setting_item");
-
-            entity.HasIndex(e => new { e.CategoryId, e.IsActive }, "idx_setting_category");
-
-            entity.HasIndex(e => new { e.CategoryId, e.SettingCode }, "uq_setting").IsUnique();
-
-            entity.Property(e => e.SettingId).HasColumnName("setting_id");
-            entity.Property(e => e.CategoryId).HasColumnName("category_id");
-            entity.Property(e => e.IsActive)
-                .HasDefaultValueSql("'1'")
-                .HasColumnName("is_active");
-            entity.Property(e => e.SettingCode)
-                .HasMaxLength(50)
-                .HasColumnName("setting_code");
-            entity.Property(e => e.SettingName)
-                .HasMaxLength(100)
-                .HasColumnName("setting_name");
-            entity.Property(e => e.SortOrder)
-                .HasDefaultValueSql("'0'")
-                .HasColumnName("sort_order");
-
-            entity.HasOne(d => d.Category).WithMany(p => p.SettingItems)
-                .HasForeignKey(d => d.CategoryId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("fk_setting_category");
-        });
-
         modelBuilder.Entity<StaffAccount>(entity =>
         {
             entity.HasKey(e => e.AccountId).HasName("PRIMARY");
@@ -1073,11 +1003,15 @@ public partial class RestaurantMgmtContext : DbContext
 
             entity.HasIndex(e => e.RoleId, "role_id");
 
-            entity.HasIndex(e => e.StatusId, "status_id");
-
             entity.HasIndex(e => e.Username, "username").IsUnique();
 
             entity.Property(e => e.AccountId).HasColumnName("account_id");
+            entity.Property(e => e.AccountStatus)
+                .HasConversion<byte>()
+                .HasDefaultValueSql("'1'")
+                .HasComment("AccountStatus: 1=ACTIVE,2=INACTIVE,3=LOCKED")
+                .HasColumnName("account_status")
+                .HasColumnType("tinyint unsigned");
             entity.Property(e => e.CreatedAt)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
                 .HasColumnType("datetime")
@@ -1099,7 +1033,6 @@ public partial class RestaurantMgmtContext : DbContext
                 .HasMaxLength(30)
                 .HasColumnName("phone");
             entity.Property(e => e.RoleId).HasColumnName("role_id");
-            entity.Property(e => e.StatusId).HasColumnName("status_id");
             entity.Property(e => e.Username)
                 .HasMaxLength(100)
                 .HasColumnName("username");
@@ -1108,11 +1041,6 @@ public partial class RestaurantMgmtContext : DbContext
                 .HasForeignKey(d => d.RoleId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("staff_account_ibfk_1");
-
-            entity.HasOne(d => d.Status).WithMany(p => p.StaffAccounts)
-                .HasForeignKey(d => d.StatusId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("staff_account_ibfk_2");
         });
 
         modelBuilder.Entity<Supplier>(entity =>
