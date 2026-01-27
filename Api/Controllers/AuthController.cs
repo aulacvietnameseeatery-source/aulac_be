@@ -8,7 +8,6 @@ namespace Api.Controllers;
 
 /// <summary>
 /// Authentication controller providing login, refresh, logout, and password reset endpoints.
-/// Implements security best practices for all authentication flows.
 /// </summary>
 [ApiController]
 [Route("api/auth")]
@@ -248,9 +247,6 @@ public class AuthController : ControllerBase
     /// 
     /// - **Timing Attack Mitigation**: The service layer includes random delays for non-existent emails
     ///   to ensure response times are consistent, preventing timing-based enumeration.
-    /// 
-    /// - **Rate Limiting**: Consider implementing rate limiting at the middleware/gateway level to prevent
-    ///   abuse (e.g., max 5 requests per IP per hour).
     /// 
     /// - **Token Security**: Generated tokens are cryptographically random (256-bit), hashed before storage,
     ///   and expire after 30 minutes.
