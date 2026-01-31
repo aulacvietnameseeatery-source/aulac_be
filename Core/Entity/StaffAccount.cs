@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using Core.Enum;
 
 namespace Core.Entity;
 
@@ -16,7 +15,10 @@ public partial class StaffAccount
 
     public long RoleId { get; set; }
 
-    public AccountStatus AccountStatus { get; set; }
+    /// <summary>
+    /// AccountStatus: 1=ACTIVE,2=INACTIVE,3=LOCKED
+    /// </summary>
+    public int AccountStatus { get; set; }
 
     public DateTime CreatedAt { get; set; }
 
@@ -27,6 +29,8 @@ public partial class StaffAccount
     public bool IsLocked { get; set; }
 
     public DateTime? LastLoginAt { get; set; }
+
+    public uint AccountStatusLvId { get; set; }
 
     public virtual ICollection<AuditLog> AuditLogs { get; set; } = new List<AuditLog>();
 
@@ -41,4 +45,6 @@ public partial class StaffAccount
     public virtual ICollection<ServiceError> ServiceErrorResolvedByNavigations { get; set; } = new List<ServiceError>();
 
     public virtual ICollection<ServiceError> ServiceErrorStaffs { get; set; } = new List<ServiceError>();
+
+    public virtual ICollection<SystemSetting> SystemSettings { get; set; } = new List<SystemSetting>();
 }

@@ -11,13 +11,15 @@ public partial class Ingredient
 
     public string Unit { get; set; } = null!;
 
-    public long? SupplierId { get; set; }
+    public uint? TypeLvId { get; set; }
 
     public virtual CurrentStock? CurrentStock { get; set; }
+
+    public virtual ICollection<IngredientSupplier> IngredientSuppliers { get; set; } = new List<IngredientSupplier>();
 
     public virtual ICollection<InventoryTransactionItem> InventoryTransactionItems { get; set; } = new List<InventoryTransactionItem>();
 
     public virtual ICollection<Recipe> Recipes { get; set; } = new List<Recipe>();
 
-    public virtual Supplier? Supplier { get; set; }
+    public virtual LookupValue? TypeLv { get; set; }
 }

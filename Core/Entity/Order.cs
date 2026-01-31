@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using Core.Enum;
 
 namespace Core.Entity;
 
@@ -12,9 +11,15 @@ public partial class Order
 
     public long StaffId { get; set; }
 
-    public OrderSource SourceId { get; set; }
+    /// <summary>
+    /// OrderSource (numeric enum in app)
+    /// </summary>
+    public byte SourceId { get; set; }
 
-    public OrderStatus OrderStatus { get; set; }
+    /// <summary>
+    /// OrderStatus: 1=PENDING,2=IN_PROGRESS,3=COMPLETED,4=CANCELLED
+    /// </summary>
+    public byte OrderStatus { get; set; }
 
     public DateTime? CreatedAt { get; set; }
 
@@ -26,15 +31,23 @@ public partial class Order
 
     public decimal? TipAmount { get; set; }
 
+    public uint SourceLvId { get; set; }
+
+    public uint OrderStatusLvId { get; set; }
+
     public virtual Customer Customer { get; set; } = null!;
 
     public virtual ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
 
     public virtual ICollection<OrderPromotion> OrderPromotions { get; set; } = new List<OrderPromotion>();
 
+    public virtual LookupValue OrderStatusLv { get; set; } = null!;
+
     public virtual ICollection<Payment> Payments { get; set; } = new List<Payment>();
 
     public virtual ICollection<ServiceError> ServiceErrors { get; set; } = new List<ServiceError>();
+
+    public virtual LookupValue SourceLv { get; set; } = null!;
 
     public virtual StaffAccount Staff { get; set; } = null!;
 

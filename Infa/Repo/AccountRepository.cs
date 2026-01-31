@@ -55,7 +55,7 @@ public class AccountRepository : IAccountRepository
     {
      // Email is stored as-is, but we search case-insensitively
         // The emailNormalized parameter is already uppercased by the caller
-      return await _context.StaffAccounts
+      return await _context.StaffAccounts.Include(s=>s.Role)
             .FirstOrDefaultAsync(a => a.Email != null && a.Email.ToUpper() == emailNormalized, cancellationToken);
     }
 

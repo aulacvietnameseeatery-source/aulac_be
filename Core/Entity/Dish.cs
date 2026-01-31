@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using Core.Enum;
 
 namespace Core.Entity;
 
@@ -14,13 +13,20 @@ public partial class Dish
 
     public decimal Price { get; set; }
 
-    public DishStatus DishStatus { get; set; }
+    /// <summary>
+    /// DishStatus: 1=AVAILABLE,2=OUT_OF_STOCK,3=HIDDEN
+    /// </summary>
+    public byte DishStatus { get; set; }
 
     public DateTime? CreatedAt { get; set; }
+
+    public uint DishStatusLvId { get; set; }
 
     public virtual DishCategory Category { get; set; } = null!;
 
     public virtual ICollection<DishMedium> DishMedia { get; set; } = new List<DishMedium>();
+
+    public virtual LookupValue DishStatusLv { get; set; } = null!;
 
     public virtual ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
 

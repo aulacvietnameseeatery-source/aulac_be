@@ -13,5 +13,7 @@ public partial class Supplier
 
     public string? Email { get; set; }
 
-    public virtual ICollection<Ingredient> Ingredients { get; set; } = new List<Ingredient>();
+    public virtual ICollection<IngredientSupplier> IngredientSuppliers { get; set; } = new List<IngredientSupplier>();
+
+    public virtual ICollection<InventoryTransaction> InventoryTransactions { get; set; } = new List<InventoryTransaction>();
 }
