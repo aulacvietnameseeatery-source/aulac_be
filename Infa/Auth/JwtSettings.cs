@@ -10,7 +10,7 @@ public class JwtSettings
     /// <summary>
     /// The secret key used to sign JWT tokens.
     /// Must be at least 32 characters for HS256.
- /// </summary>
+    /// </summary>
     public string SecretKey { get; set; } = string.Empty;
 
     /// <summary>

@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace Core.DTO.Auth;
 
@@ -8,10 +9,11 @@ namespace Core.DTO.Auth;
 public class LoginRequestDto
 {
     /// <summary>
-    /// The username for authentication.
+    /// The username or email address for authentication.
+    /// Can be either the user's username or their registered email address.
     /// </summary>
-    [Required(ErrorMessage = "Username is required.")]
-    [StringLength(100, MinimumLength = 1, ErrorMessage = "Username must be between 1 and 100 characters.")]
+    [Required(ErrorMessage = "Username or email is required.")]
+    [StringLength(100, MinimumLength = 1, ErrorMessage = "Username or email must be between 1 and 100 characters.")]
     public string Username { get; set; } = string.Empty;
 
     /// <summary>
@@ -32,12 +34,6 @@ public class RefreshTokenRequestDto
     /// </summary>
     [Required(ErrorMessage = "Access token is required.")]
     public string AccessToken { get; set; } = string.Empty;
-
-    /// <summary>
-    /// The refresh token issued during login or previous refresh.
-    /// </summary>
-    [Required(ErrorMessage = "Refresh token is required.")]
-    public string RefreshToken { get; set; } = string.Empty;
 }
 
 /// <summary>
@@ -49,11 +45,6 @@ public class AuthResponseDto
     /// The JWT access token for API authentication.
     /// </summary>
     public string AccessToken { get; set; } = string.Empty;
-
-    /// <summary>
-    /// The refresh token for obtaining new access tokens.
-    /// </summary>
-    public string RefreshToken { get; set; } = string.Empty;
 
     /// <summary>
     /// Access token lifetime in seconds.

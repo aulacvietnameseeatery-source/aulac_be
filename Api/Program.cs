@@ -1,6 +1,7 @@
 ﻿using Api.Background;
 using Api.Middleware;
 using API.Middleware;
+using API.Models;
 using Core.Data;
 using Core.Interface.Repo;
 using Core.Interface.Service;
@@ -16,9 +17,11 @@ using Infa.Repo;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authorization.Policy;
 using Microsoft.AspNetCore.Http.Json;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using StackExchange.Redis;
 using System;
+using System.Net;
 using System.Reflection;
 using System.Text.Encodings.Web;
 using System.Text.Json;
@@ -34,7 +37,36 @@ builder.Services.AddControllers()
         
         // Keep existing Unicode handling
         options.JsonSerializerOptions.Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping;
-    });
+    })
+    .ConfigureApiBehaviorOptions(options =>
+    {
+        options.InvalidModelStateResponseFactory = context =>
+        {
+            var errors = context.ModelState
+                .Where(x => x.Value?.Errors.Count > 0)
+                .SelectMany(kvp => kvp.Value!.Errors.Select(e =>
+                    string.IsNullOrWhiteSpace(kvp.Key)
+                        ? e.ErrorMessage
+                        : $"{kvp.Key}: {e.ErrorMessage}"
+                ))
+                .ToList();
+
+            var api = new ApiResponse<object>
+            { 
+                Success = false,
+                Code = (int)HttpStatusCode.BadRequest,
+                SubCode = 1,
+                UserMessage = "Input values are not correct.",
+                SystemMessage = "Validation failed",
+                ValidateInfo = errors,
+                Data = new { },
+                GetLastData = false,
+                ServerTime = DateTimeOffset.UtcNow
+            };
+
+            return new BadRequestObjectResult(api);
+        };
+    }); ;
 
 // DI Configuration:
 

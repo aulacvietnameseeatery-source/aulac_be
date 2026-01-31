@@ -3,6 +3,7 @@ using API.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Core.Interface.Service.Auth;
+using Api.Helpers;
 
 namespace Api.Controllers;
 
@@ -16,23 +17,46 @@ public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
     private readonly ILogger<AuthController> _logger;
+    private readonly ITokenService _tokenService;
+    private readonly bool _isProduction;
 
     public AuthController(
         IAuthService authService,
-        ILogger<AuthController> logger)
+        ILogger<AuthController> logger,
+        ITokenService tokenService,
+        IWebHostEnvironment environment)
     {
         _authService = authService;
         _logger = logger;
+        _tokenService = tokenService;
+        _isProduction = environment.IsProduction();
     }
 
     /// <summary>
     /// Authenticates a user and returns access and refresh tokens.
     /// </summary>
-    /// <param name="request">Login credentials</param>
+    /// <param name="request">Login credentials (username or email + password)</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Authentication tokens on success</returns>
     /// <response code="200">Authentication successful</response>
     /// <response code="401">Invalid credentials or account locked</response>
+    /// <remarks>
+    /// **Login Options:** 
+    /// - You can login using either your **username** or **email address**
+    /// - The system will automatically detect which one you're using
+    /// 
+    /// **Security:** The refresh token is set as a secure HttpOnly cookie and is NOT included in the JSON response.
+    /// This prevents XSS attacks from stealing the refresh token.
+    /// 
+    /// **Cookie Details:**
+    /// - Name: `refresh_token`
+    /// - HttpOnly: true (JavaScript cannot access)
+    /// - Secure: true in production (HTTPS only)
+    /// - SameSite: Strict (CSRF protection)
+    /// - Path: `/api/auth/refresh` (restricted scope)
+    /// - Expires: Aligned with refresh token lifetime
+    /// 
+    /// </remarks>
     [HttpPost("login")]
     [AllowAnonymous]
     [ProducesResponseType(typeof(ApiResponse<AuthResponseDto>), StatusCodes.Status200OK)]
@@ -75,6 +99,11 @@ public class AuthController : ControllerBase
             result.Username,
             result.SessionId);
 
+        // Set refresh token in HttpOnly cookie (SECURITY: not accessible by JavaScript)
+        var refreshTokenExpiry = DateTime.UtcNow.Add(_tokenService.RefreshTokenLifetime);
+        RefreshTokenCookieHelper.SetCookie(Response, result.RefreshToken!, refreshTokenExpiry, _isProduction);
+
+        // Return response WITHOUT refresh token in JSON
         return Ok(new ApiResponse<AuthResponseDto>
         {
             Success = true,
@@ -83,7 +112,6 @@ public class AuthController : ControllerBase
             Data = new AuthResponseDto
             {
                 AccessToken = result.AccessToken!,
-                RefreshToken = result.RefreshToken!,
                 ExpiresIn = result.ExpiresIn,
                 TokenType = "Bearer",
                 UserId = result.UserId!.Value,
@@ -103,21 +131,58 @@ public class AuthController : ControllerBase
     /// <returns>New access and refresh tokens</returns>
     /// <response code="200">Token refresh successful</response>
     /// <response code="401">Invalid or expired refresh token</response>
+    /// <remarks>
+    /// **Security:** The refresh token is read from the `refresh_token` HttpOnly cookie.
+    /// A new refresh token is generated and rotated into the cookie.
+    /// 
+    /// **Client Requirements:**
+    /// - Must send requests with credentials enabled (`credentials: 'include'` in fetch/axios)
+    /// - Cookie must be present and valid
+    /// 
+    /// **Token Rotation:**
+    /// - Each refresh generates a new refresh token
+    /// - Old refresh token is invalidated
+    /// - Prevents token reuse attacks
+    /// </remarks>
     [HttpPost("refresh")]
     [AllowAnonymous]
     [ProducesResponseType(typeof(ApiResponse<AuthResponseDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<AuthErrorDto>), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequestDto request, CancellationToken cancellationToken)
     {
+        // Read refresh token from HttpOnly cookie
+        var refreshToken = RefreshTokenCookieHelper.GetCookie(Request);
+
+        if (string.IsNullOrWhiteSpace(refreshToken))
+        {
+            _logger.LogWarning("Token refresh failed: No refresh token cookie found");
+
+            return Unauthorized(new ApiResponse<AuthErrorDto>
+            {
+                Success = false,
+                Code = 401,
+                UserMessage = "Refresh token not found. Please log in again.",
+                Data = new AuthErrorDto
+                {
+                    ErrorCode = "REFRESH_TOKEN_MISSING",
+                    ErrorMessage = "Refresh token cookie is missing or empty."
+                },
+                ServerTime = DateTimeOffset.UtcNow
+            });
+        }
+
         var refreshRequest = new RefreshTokenRequest(
-         request.AccessToken,
-  request.RefreshToken);
+            request.AccessToken,
+            refreshToken);
 
         var result = await _authService.RefreshTokenAsync(refreshRequest, cancellationToken);
 
         if (!result.Success)
         {
             _logger.LogWarning("Token refresh failed: {ErrorCode}", result.ErrorCode);
+
+            // Delete invalid cookie
+            RefreshTokenCookieHelper.DeleteCookie(Response, _isProduction);
 
             return Unauthorized(new ApiResponse<AuthErrorDto>
             {
@@ -138,6 +203,11 @@ public class AuthController : ControllerBase
             result.Username,
             result.SessionId);
 
+        // Rotate refresh token in cookie
+        var refreshTokenExpiry = DateTime.UtcNow.Add(_tokenService.RefreshTokenLifetime);
+        RefreshTokenCookieHelper.SetCookie(Response, result.RefreshToken!, refreshTokenExpiry, _isProduction);
+
+        // Return response WITHOUT refresh token in JSON
         return Ok(new ApiResponse<AuthResponseDto>
         {
             Success = true,
@@ -146,7 +216,7 @@ public class AuthController : ControllerBase
             Data = new AuthResponseDto
             {
                 AccessToken = result.AccessToken!,
-                RefreshToken = result.RefreshToken!,
+                // RefreshToken is NOT set here - it's rotated in the cookie
                 ExpiresIn = result.ExpiresIn,
                 TokenType = "Bearer",
                 UserId = result.UserId!.Value,
@@ -164,6 +234,9 @@ public class AuthController : ControllerBase
     /// <returns>Logout confirmation</returns>
     /// <response code="200">Logout successful</response>
     /// <response code="401">Not authenticated</response>
+    /// <remarks>
+    /// **Security:** Deletes the refresh token cookie and revokes the session in the database.
+    /// </remarks>
     [HttpPost("logout")]
     [Authorize]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
@@ -177,6 +250,9 @@ public class AuthController : ControllerBase
         }
 
         var success = await _authService.LogoutAsync(sessionId.Value, cancellationToken);
+
+        // Delete refresh token cookie
+        RefreshTokenCookieHelper.DeleteCookie(Response, _isProduction);
 
         _logger.LogInformation("User logged out. SessionId: {SessionId}", sessionId);
 
@@ -197,6 +273,10 @@ public class AuthController : ControllerBase
     /// <returns>Number of sessions revoked</returns>
     /// <response code="200">Logout all successful</response>
     /// <response code="401">Not authenticated</response>
+    /// <remarks>
+    /// **Note:** This endpoint does NOT delete the current session's refresh token cookie,
+    /// as the current session remains active.
+    /// </remarks>
     [HttpPost("logout-all")]
     [Authorize]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
@@ -215,6 +295,8 @@ public class AuthController : ControllerBase
             userId.Value,
             sessionId,
             cancellationToken);
+
+        // Note: We keep the current session's cookie since this session remains active
 
         _logger.LogInformation(
             "User {UserId} logged out from all devices. Sessions revoked: {Count}",
@@ -257,7 +339,7 @@ public class AuthController : ControllerBase
     [HttpPost("forgot-password")]
     [AllowAnonymous]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequestDto request,CancellationToken cancellationToken)
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequestDto request, CancellationToken cancellationToken)
     {
         // Capture client metadata for security audit logging
         var ipAddress = GetClientIpAddress();
@@ -327,9 +409,9 @@ public class AuthController : ControllerBase
 
         // Log verification attempt (without logging the token itself)
         _logger.LogInformation(
-        "Password reset token verification: {IsValid} from IP {IP}",
-                 isValid,
-          GetClientIpAddress());
+            "Password reset token verification: {IsValid} from IP {IP}",
+            isValid,
+            GetClientIpAddress());
 
         return Ok(new ApiResponse<VerifyResetTokenResponseDto>
         {
@@ -381,7 +463,7 @@ public class AuthController : ControllerBase
     [AllowAnonymous]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequestDto request,CancellationToken cancellationToken)
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequestDto request, CancellationToken cancellationToken)
     {
         try
         {
@@ -392,8 +474,8 @@ public class AuthController : ControllerBase
                cancellationToken);
 
             _logger.LogInformation(
-               "Password reset completed successfully from IP {IP}",
-                    GetClientIpAddress());
+                "Password reset completed successfully from IP {IP}",
+                GetClientIpAddress());
 
             return Ok(new ApiResponse<object>
             {
@@ -408,9 +490,9 @@ public class AuthController : ControllerBase
         {
             // Token is invalid, expired, or user account issues
             _logger.LogWarning(
-                  "Password reset failed: {Message} from IP {IP}",
-             ex.Message,
-            GetClientIpAddress());
+                "Password reset failed: {Message} from IP {IP}",
+                ex.Message,
+                GetClientIpAddress());
 
             return BadRequest(new ApiResponse<object>
             {
@@ -426,8 +508,8 @@ public class AuthController : ControllerBase
             // Password validation failed
             _logger.LogWarning(
                "Password reset failed due to validation: {Message} from IP {IP}",
-              ex.Message,
-                  GetClientIpAddress());
+               ex.Message,
+               GetClientIpAddress());
 
             return BadRequest(new ApiResponse<object>
             {
@@ -442,8 +524,8 @@ public class AuthController : ControllerBase
         {
             // Unexpected error
             _logger.LogError(ex,
-                    "Unexpected error during password reset from IP {IP}",
-                         GetClientIpAddress());
+                "Unexpected error during password reset from IP {IP}",
+                GetClientIpAddress());
 
             return BadRequest(new ApiResponse<object>
             {

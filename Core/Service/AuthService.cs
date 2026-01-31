@@ -1,5 +1,6 @@
 using Core.Data;
 using Core.DTO.Email;
+using Core.Entity;
 using Core.Interface.Repo;
 using Core.Interface.Service.Auth;
 using Core.Interface.Service.Email;
@@ -52,22 +53,34 @@ public class AuthService : IAuthService
     /// <inheritdoc />
     /// <remarks>
     /// Login Flow:
-    /// 1. Validate credentials (username + password)
+    /// 1. Validate credentials (username/email + password)
     /// 2. Check account status (not locked)
     /// 3. Generate access token (short-lived JWT)
     /// 4. Generate refresh token (cryptographically random)
     /// 5. Hash refresh token and store session
     /// 6. Update last login timestamp
     /// 7. Return tokens to client
+    /// 
+    /// Note: The login identifier can be either username or email address.
     /// </remarks>
     public async Task<AuthResult> LoginAsync(
         LoginRequest request,
-        string? deviceInfo = null,
+      string? deviceInfo = null,
         string? ipAddress = null,
         CancellationToken cancellationToken = default)
     {
-        // Step 1: Find account by username
-        var account = await _accountRepository.FindByUsernameAsync(request.Username, cancellationToken);
+        // Step 1: Find account by username or email
+        StaffAccount? account = null;
+
+        // Try to find by username first
+        account = await _accountRepository.FindByUsernameAsync(request.Username, cancellationToken);
+
+        // If not found, try to find by email (case-insensitive)
+        if (account == null)
+        {
+            var emailNormalized = request.Username.Trim().ToUpperInvariant();
+            account = await _accountRepository.FindByEmailAsync(emailNormalized, cancellationToken);
+        }
 
         if (account == null)
         {
@@ -93,12 +106,12 @@ public class AuthService : IAuthService
 
         // Step 5: Create session with hashed token
         var session = await _sessionRepository.CreateSessionAsync(
-    account.AccountId,
-       refreshTokenHash,
-         refreshTokenExpiry,
-          deviceInfo,
-        ipAddress,
-       cancellationToken);
+            account.AccountId,
+            refreshTokenHash,
+            refreshTokenExpiry,
+            deviceInfo,
+            ipAddress,
+            cancellationToken);
 
         // Step 6: Generate access token with session ID
         var roles = new[] { account.Role.RoleCode };
@@ -115,12 +128,12 @@ public class AuthService : IAuthService
         await _accountRepository.UpdateLastLoginAsync(account.AccountId, DateTime.UtcNow, cancellationToken);
 
         return AuthResult.Succeeded(
-       accessToken,
-           refreshToken,
-           (int)_tokenService.AccessTokenLifetime.TotalSeconds,
-                 session.SessionId,
-        account.AccountId,
-               account.Username,
+            accessToken,
+            refreshToken,
+            (int)_tokenService.AccessTokenLifetime.TotalSeconds,
+            session.SessionId,
+            account.AccountId,
+            account.Username,
             roles);
     }
 
@@ -391,9 +404,9 @@ public class AuthService : IAuthService
 
         // URL-safe Base64 encoding
         return Convert.ToBase64String(bytes)
-                .Replace('+', '-')
-                .Replace('/', '_')
-             .TrimEnd('=');
+            .Replace('+', '-')
+            .Replace('/', '_')
+            .TrimEnd('=');
     }
 
     /// <summary>

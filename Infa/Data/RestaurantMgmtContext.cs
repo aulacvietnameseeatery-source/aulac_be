@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using Core.Entity;
-using Core.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using Pomelo.EntityFrameworkCore.MySql.Scaffolding.Internal;
 
