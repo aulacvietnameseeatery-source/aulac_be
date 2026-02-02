@@ -19,16 +19,6 @@ public partial class Reservation
 
     public DateTime ReservedTime { get; set; }
 
-    /// <summary>
-    /// ReservationSource (numeric enum in app)
-    /// </summary>
-    public byte SourceId { get; set; }
-
-    /// <summary>
-    /// ReservationStatus: 1=PENDING,2=CONFIRMED,3=CHECKED_IN,4=CANCELLED,5=NO_SHOW
-    /// </summary>
-    public byte ReservationStatus { get; set; }
-
     public DateTime? CreatedAt { get; set; }
 
     public uint SourceLvId { get; set; }

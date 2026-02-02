@@ -15,11 +15,6 @@ public partial class StaffAccount
 
     public long RoleId { get; set; }
 
-    /// <summary>
-    /// AccountStatus: 1=ACTIVE,2=INACTIVE,3=LOCKED
-    /// </summary>
-    public int AccountStatus { get; set; }
-
     public DateTime CreatedAt { get; set; }
 
     public string Username { get; set; } = null!;

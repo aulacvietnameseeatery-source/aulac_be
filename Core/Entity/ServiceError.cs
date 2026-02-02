@@ -17,11 +17,6 @@ public partial class ServiceError
 
     public long CategoryId { get; set; }
 
-    /// <summary>
-    /// Severity (numeric enum in app)
-    /// </summary>
-    public byte SeverityId { get; set; }
-
     public string Description { get; set; } = null!;
 
     public decimal? PenaltyAmount { get; set; }

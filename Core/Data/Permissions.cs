@@ -13,6 +13,11 @@ namespace Core.Data
         public const string CreateAccount = "ACCOUNT:CREATE";
         public const string EditAccount = "ACCOUNT:EDIT";
         public const string DeleteAccount = "ACCOUNT:DELETE";
+        public const string ResetPassword = "ACCOUNT:RESET_PASSWORD";
+
+        //System Settings
+        public const string ViewSystemSettings = "SYSTEM_SETTING:READ";
+        public const string ManageSystemSettings = "SYSTEM_SETTING:EDIT";
 
         //...
     }

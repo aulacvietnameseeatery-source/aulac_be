@@ -13,19 +13,9 @@ public partial class Promotion
 
     public string? Description { get; set; }
 
-    /// <summary>
-    /// PromotionType (numeric enum in app)
-    /// </summary>
-    public byte TypeId { get; set; }
-
     public DateTime StartTime { get; set; }
 
     public DateTime EndTime { get; set; }
-
-    /// <summary>
-    /// PromotionStatus: 1=SCHEDULED,2=ACTIVE,3=EXPIRED,4=DISABLED
-    /// </summary>
-    public byte PromotionStatus { get; set; }
 
     public int? MaxUsage { get; set; }
 

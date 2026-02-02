@@ -7,16 +7,6 @@ public partial class InventoryTransaction
 {
     public long TransactionId { get; set; }
 
-    /// <summary>
-    /// 1=IN, 2=OUT, 3=ADJUST
-    /// </summary>
-    public sbyte Type { get; set; }
-
-    /// <summary>
-    /// 1=DRAFT,2=PENDING_APPROVAL,3=COMPLETED,4=CANCELLED
-    /// </summary>
-    public sbyte Status { get; set; }
-
     public long? CreatedBy { get; set; }
 
     public DateTime? CreatedAt { get; set; }

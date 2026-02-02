@@ -11,16 +11,6 @@ public partial class Order
 
     public long StaffId { get; set; }
 
-    /// <summary>
-    /// OrderSource (numeric enum in app)
-    /// </summary>
-    public byte SourceId { get; set; }
-
-    /// <summary>
-    /// OrderStatus: 1=PENDING,2=IN_PROGRESS,3=COMPLETED,4=CANCELLED
-    /// </summary>
-    public byte OrderStatus { get; set; }
-
     public DateTime? CreatedAt { get; set; }
 
     public long CustomerId { get; set; }

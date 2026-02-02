@@ -7,6 +7,7 @@ using Core.Interface.Repo;
 using Core.Interface.Service;
 using Core.Interface.Service.Auth;
 using Core.Interface.Service.Email;
+using Core.Interface.Service.Entity;
 using Core.Interface.Service.Others;
 using Core.Service;
 using Infa.Auth;
@@ -14,6 +15,7 @@ using Infa.Data;
 using Infa.Email;
 using Infa.Others;
 using Infa.Repo;
+using Infa.Service;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authorization.Policy;
 using Microsoft.AspNetCore.Http.Json;
@@ -34,7 +36,7 @@ builder.Services.AddControllers()
     {
         // Serialize enums as strings in JSON responses (e.g., "Active" instead of 1)
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
-        
+
         // Keep existing Unicode handling
         options.JsonSerializerOptions.Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping;
     })
@@ -52,7 +54,7 @@ builder.Services.AddControllers()
                 .ToList();
 
             var api = new ApiResponse<object>
-            { 
+            {
                 Success = false,
                 Code = (int)HttpStatusCode.BadRequest,
                 SubCode = 1,
@@ -74,22 +76,29 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
     ConnectionMultiplexer.Connect(builder.Configuration.GetConnectionString("Redis")!)
 );
 
-// Cache service (single entry point)
+// Cache service (SINGLETON - Redis client is thread-safe)
 builder.Services.AddSingleton<ICacheService, RedisCacheService>();
 
 // Authentication Infrastructure
 // Register auth services (token service, session repository, password hasher, etc.)
 builder.Services.AddAuthInfrastructure(builder.Configuration);
 
-// Services
+// Business Services
+builder.Services.AddScoped<ISystemSettingService, SystemSettingService>();
+builder.Services.AddScoped<IAccountService, AccountService>();
+
+// Lookup System: ILookupLoader (SCOPED) + ILookupResolver (SINGLETON)
+builder.Services.AddScoped<ILookupRepo, LookupRepo>();
+builder.Services.AddSingleton<ILookupResolver, LookupResolver>();
 
 // Repositories
 builder.Services.AddScoped<IAccountRepository, AccountRepository>();
+builder.Services.AddScoped<ISystemSettingRepository, SystemSettingRepository>();
 
 // Email services
 builder.Services.AddSingleton<IEmailQueue, RedisEmailQueue>();
 builder.Services.AddSingleton<IDeadLetterSink, RedisDeadLetterSink>();
-builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
+builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();
 
 // Forgot password token store uses cache
 builder.Services.AddSingleton<IPasswordResetTokenStore, RedisPasswordResetTokenStore>();
@@ -114,10 +123,7 @@ var connectionString = builder.Configuration.GetConnectionString("Default")
 
 builder.Services.AddDbContext<RestaurantMgmtContext>(options =>
 {
-    options.UseMySql(
-        connectionString,
-        ServerVersion.AutoDetect(connectionString)
-    );
+    options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString));
 });
 
 
@@ -126,7 +132,7 @@ builder.Services.AddJwtAuthentication(builder.Configuration);
 
 //Register Custom Authorization Handler
 builder.Services.AddSingleton<IAuthorizationMiddlewareResultHandler, CustomAuthorizationMiddlewareResultHandler>();
-    
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
@@ -188,10 +194,7 @@ builder.Services.AddAuthorization(options =>
 
 var app = builder.Build();
 
-
-
 // Kiểm tra kết nối database khi khởi động ứng dụng
-// tý xóa
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<RestaurantMgmtContext>();
@@ -204,15 +207,18 @@ using (var scope = app.Services.CreateScope())
         }
 
         Console.WriteLine("Database connection successful.");
+
+        // Warm up lookup resolver cache
+        var lookupResolver = scope.ServiceProvider.GetRequiredService<ILookupResolver>();
+        await lookupResolver.WarmUpAsync();
+        Console.WriteLine("Lookup resolver cache warmed up.");
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"Database connection error: {ex.Message}");
+      Console.WriteLine($"Startup error: {ex.Message}");
         throw; // stop application
     }
 }
-
-
 
 // Register global exception handling middleware
 // Must be first in the pipeline to catch all exceptions

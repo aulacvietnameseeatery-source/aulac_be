@@ -7,11 +7,6 @@ public partial class MediaAsset
 {
     public long MediaId { get; set; }
 
-    /// <summary>
-    /// MediaType (numeric enum in app)
-    /// </summary>
-    public byte MediaTypeId { get; set; }
-
     public string Url { get; set; } = null!;
 
     public string? MimeType { get; set; }

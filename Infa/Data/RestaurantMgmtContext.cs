@@ -229,10 +229,6 @@ public partial class RestaurantMgmtContext : DbContext
             entity.Property(e => e.DishName)
                 .HasMaxLength(200)
                 .HasColumnName("dish_name");
-            entity.Property(e => e.DishStatus)
-                .HasDefaultValueSql("'1'")
-                .HasComment("DishStatus: 1=AVAILABLE,2=OUT_OF_STOCK,3=HIDDEN")
-                .HasColumnName("dish_status");
             entity.Property(e => e.DishStatusLvId).HasColumnName("dish_status_lv_id");
             entity.Property(e => e.Price)
                 .HasPrecision(12, 2)
@@ -344,9 +340,7 @@ public partial class RestaurantMgmtContext : DbContext
 
             entity.HasIndex(e => e.CreatedBy, "fk_inventory_transaction_staff");
 
-            entity.HasIndex(e => new { e.Type, e.CreatedAt }, "idx_inventory_transaction_dir_time");
-
-            entity.HasIndex(e => e.CreatedAt, "idx_inventory_transaction_time");
+            entity.HasIndex(e => e.CreatedAt, "idx_inventory_transaction_dir_time");
 
             entity.HasIndex(e => e.StatusLvId, "idx_inventory_tx_status_lv");
 
@@ -361,14 +355,8 @@ public partial class RestaurantMgmtContext : DbContext
             entity.Property(e => e.Note)
                 .HasMaxLength(255)
                 .HasColumnName("note");
-            entity.Property(e => e.Status)
-                .HasComment("1=DRAFT,2=PENDING_APPROVAL,3=COMPLETED,4=CANCELLED")
-                .HasColumnName("status");
             entity.Property(e => e.StatusLvId).HasColumnName("status_lv_id");
             entity.Property(e => e.SupplierId).HasColumnName("supplier_id");
-            entity.Property(e => e.Type)
-                .HasComment("1=IN, 2=OUT, 3=ADJUST")
-                .HasColumnName("type");
             entity.Property(e => e.TypeLvId).HasColumnName("type_lv_id");
 
             entity.HasOne(d => d.CreatedByNavigation).WithMany(p => p.InventoryTransactions)
@@ -493,6 +481,9 @@ public partial class RestaurantMgmtContext : DbContext
                 .HasComment("Soft delete timestamp; never hard delete lookup values")
                 .HasColumnType("datetime")
                 .HasColumnName("deleted_at");
+            entity.Property(e => e.Description)
+                .HasColumnType("text")
+                .HasColumnName("description");
             entity.Property(e => e.IsActive)
                 .IsRequired()
                 .HasDefaultValueSql("'1'")
@@ -512,6 +503,9 @@ public partial class RestaurantMgmtContext : DbContext
                 .HasColumnName("meta");
             entity.Property(e => e.SortOrder).HasColumnName("sort_order");
             entity.Property(e => e.TypeId).HasColumnName("type_id");
+            entity.Property(e => e.UpdateAt)
+                .HasColumnType("datetime")
+                .HasColumnName("update_at");
             entity.Property(e => e.ValueCode)
                 .HasMaxLength(50)
                 .HasColumnName("value_code");
@@ -533,8 +527,6 @@ public partial class RestaurantMgmtContext : DbContext
 
             entity.HasIndex(e => e.MediaTypeLvId, "idx_media_asset_type_lv");
 
-            entity.HasIndex(e => e.MediaTypeId, "media_type_id");
-
             entity.Property(e => e.MediaId).HasColumnName("media_id");
             entity.Property(e => e.CreatedAt)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
@@ -542,9 +534,6 @@ public partial class RestaurantMgmtContext : DbContext
                 .HasColumnName("created_at");
             entity.Property(e => e.DurationSec).HasColumnName("duration_sec");
             entity.Property(e => e.Height).HasColumnName("height");
-            entity.Property(e => e.MediaTypeId)
-                .HasComment("MediaType (numeric enum in app)")
-                .HasColumnName("media_type_id");
             entity.Property(e => e.MediaTypeLvId).HasColumnName("media_type_lv_id");
             entity.Property(e => e.MimeType)
                 .HasMaxLength(100)
@@ -576,8 +565,6 @@ public partial class RestaurantMgmtContext : DbContext
 
             entity.HasIndex(e => e.StaffId, "orders_ibfk_2");
 
-            entity.HasIndex(e => e.SourceId, "source_id");
-
             entity.HasIndex(e => e.TableId, "table_id");
 
             entity.Property(e => e.OrderId).HasColumnName("order_id");
@@ -586,14 +573,7 @@ public partial class RestaurantMgmtContext : DbContext
                 .HasColumnType("datetime")
                 .HasColumnName("created_at");
             entity.Property(e => e.CustomerId).HasColumnName("customer_id");
-            entity.Property(e => e.OrderStatus)
-                .HasDefaultValueSql("'1'")
-                .HasComment("OrderStatus: 1=PENDING,2=IN_PROGRESS,3=COMPLETED,4=CANCELLED")
-                .HasColumnName("order_status");
             entity.Property(e => e.OrderStatusLvId).HasColumnName("order_status_lv_id");
-            entity.Property(e => e.SourceId)
-                .HasComment("OrderSource (numeric enum in app)")
-                .HasColumnName("source_id");
             entity.Property(e => e.SourceLvId).HasColumnName("source_lv_id");
             entity.Property(e => e.StaffId).HasColumnName("staff_id");
             entity.Property(e => e.TableId).HasColumnName("table_id");
@@ -717,17 +697,12 @@ public partial class RestaurantMgmtContext : DbContext
 
             entity.HasIndex(e => e.MethodLvId, "idx_payment_method_lv");
 
-            entity.HasIndex(e => e.MethodId, "method_id");
-
             entity.HasIndex(e => e.OrderId, "payment_ibfk_1");
 
             entity.Property(e => e.PaymentId).HasColumnName("payment_id");
             entity.Property(e => e.ChangeAmount)
                 .HasPrecision(14, 2)
                 .HasColumnName("change_amount");
-            entity.Property(e => e.MethodId)
-                .HasComment("PaymentMethod (numeric enum in app)")
-                .HasColumnName("method_id");
             entity.Property(e => e.MethodLvId).HasColumnName("method_lv_id");
             entity.Property(e => e.OrderId).HasColumnName("order_id");
             entity.Property(e => e.PaidAt)
@@ -776,8 +751,6 @@ public partial class RestaurantMgmtContext : DbContext
 
             entity.HasIndex(e => e.PromoCode, "promo_code").IsUnique();
 
-            entity.HasIndex(e => e.TypeId, "type_id");
-
             entity.Property(e => e.PromotionId).HasColumnName("promotion_id");
             entity.Property(e => e.CreatedAt)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
@@ -796,17 +769,10 @@ public partial class RestaurantMgmtContext : DbContext
             entity.Property(e => e.PromoName)
                 .HasMaxLength(200)
                 .HasColumnName("promo_name");
-            entity.Property(e => e.PromotionStatus)
-                .HasDefaultValueSql("'1'")
-                .HasComment("PromotionStatus: 1=SCHEDULED,2=ACTIVE,3=EXPIRED,4=DISABLED")
-                .HasColumnName("promotion_status");
             entity.Property(e => e.PromotionStatusLvId).HasColumnName("promotion_status_lv_id");
             entity.Property(e => e.StartTime)
                 .HasColumnType("datetime")
                 .HasColumnName("start_time");
-            entity.Property(e => e.TypeId)
-                .HasComment("PromotionType (numeric enum in app)")
-                .HasColumnName("type_id");
             entity.Property(e => e.TypeLvId).HasColumnName("type_lv_id");
             entity.Property(e => e.UsedCount)
                 .HasDefaultValueSql("'0'")
@@ -936,8 +902,6 @@ public partial class RestaurantMgmtContext : DbContext
 
             entity.HasIndex(e => e.ReservedTime, "idx_reservation_time");
 
-            entity.HasIndex(e => e.SourceId, "source_id");
-
             entity.Property(e => e.ReservationId).HasColumnName("reservation_id");
             entity.Property(e => e.CreatedAt)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
@@ -954,17 +918,10 @@ public partial class RestaurantMgmtContext : DbContext
             entity.Property(e => e.Phone)
                 .HasMaxLength(30)
                 .HasColumnName("phone");
-            entity.Property(e => e.ReservationStatus)
-                .HasDefaultValueSql("'1'")
-                .HasComment("ReservationStatus: 1=PENDING,2=CONFIRMED,3=CHECKED_IN,4=CANCELLED,5=NO_SHOW")
-                .HasColumnName("reservation_status");
             entity.Property(e => e.ReservationStatusLvId).HasColumnName("reservation_status_lv_id");
             entity.Property(e => e.ReservedTime)
                 .HasColumnType("datetime")
                 .HasColumnName("reserved_time");
-            entity.Property(e => e.SourceId)
-                .HasComment("ReservationSource (numeric enum in app)")
-                .HasColumnName("source_id");
             entity.Property(e => e.SourceLvId).HasColumnName("source_lv_id");
 
             entity.HasOne(d => d.Customer).WithMany(p => p.Reservations)
@@ -1022,6 +979,10 @@ public partial class RestaurantMgmtContext : DbContext
 
             entity.Property(e => e.TableId).HasColumnName("table_id");
             entity.Property(e => e.Capacity).HasColumnName("capacity");
+            entity.Property(e => e.IsOnline)
+                .IsRequired()
+                .HasDefaultValueSql("'1'")
+                .HasColumnName("isOnline");
             entity.Property(e => e.TableCode)
                 .HasMaxLength(50)
                 .HasColumnName("table_code");
@@ -1109,8 +1070,6 @@ public partial class RestaurantMgmtContext : DbContext
 
             entity.HasIndex(e => e.ResolvedBy, "service_error_ibfk_7");
 
-            entity.HasIndex(e => e.SeverityId, "severity_id");
-
             entity.HasIndex(e => e.TableId, "table_id");
 
             entity.Property(e => e.ErrorId).HasColumnName("error_id");
@@ -1135,9 +1094,6 @@ public partial class RestaurantMgmtContext : DbContext
                 .HasColumnType("datetime")
                 .HasColumnName("resolved_at");
             entity.Property(e => e.ResolvedBy).HasColumnName("resolved_by");
-            entity.Property(e => e.SeverityId)
-                .HasComment("Severity (numeric enum in app)")
-                .HasColumnName("severity_id");
             entity.Property(e => e.SeverityLvId).HasColumnName("severity_lv_id");
             entity.Property(e => e.StaffId).HasColumnName("staff_id");
             entity.Property(e => e.TableId).HasColumnName("table_id");
@@ -1209,10 +1165,6 @@ public partial class RestaurantMgmtContext : DbContext
             entity.HasIndex(e => e.Username, "username").IsUnique();
 
             entity.Property(e => e.AccountId).HasColumnName("account_id");
-            entity.Property(e => e.AccountStatus)
-                .HasDefaultValueSql("'1'")
-                .HasComment("AccountStatus: 1=ACTIVE,2=INACTIVE,3=LOCKED")
-                .HasColumnName("account_status");
             entity.Property(e => e.AccountStatusLvId).HasColumnName("account_status_lv_id");
             entity.Property(e => e.CreatedAt)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")

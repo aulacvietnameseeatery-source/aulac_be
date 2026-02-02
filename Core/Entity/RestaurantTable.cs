@@ -27,6 +27,8 @@ public partial class RestaurantTable
 
     public uint TableTypeLvId { get; set; }
 
+    public bool? IsOnline { get; set; }
+
     public virtual ICollection<Order> Orders { get; set; } = new List<Order>();
 
     public virtual ICollection<ServiceError> ServiceErrors { get; set; } = new List<ServiceError>();

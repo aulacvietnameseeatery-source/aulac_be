@@ -13,11 +13,6 @@ public partial class Dish
 
     public decimal Price { get; set; }
 
-    /// <summary>
-    /// DishStatus: 1=AVAILABLE,2=OUT_OF_STOCK,3=HIDDEN
-    /// </summary>
-    public byte DishStatus { get; set; }
-
     public DateTime? CreatedAt { get; set; }
 
     public uint DishStatusLvId { get; set; }

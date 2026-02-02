@@ -34,6 +34,10 @@ public partial class LookupValue
     /// </summary>
     public DateTime? DeletedAt { get; set; }
 
+    public string? Description { get; set; }
+
+    public DateTime? UpdateAt { get; set; }
+
     public virtual ICollection<Dish> Dishes { get; set; } = new List<Dish>();
 
     public virtual ICollection<Ingredient> Ingredients { get; set; } = new List<Ingredient>();

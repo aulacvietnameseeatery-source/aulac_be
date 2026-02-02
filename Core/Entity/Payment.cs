@@ -9,11 +9,6 @@ public partial class Payment
 
     public long OrderId { get; set; }
 
-    /// <summary>
-    /// PaymentMethod (numeric enum in app)
-    /// </summary>
-    public byte MethodId { get; set; }
-
     public decimal ReceivedAmount { get; set; }
 
     public decimal ChangeAmount { get; set; }
