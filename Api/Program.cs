@@ -86,6 +86,7 @@ builder.Services.AddAuthInfrastructure(builder.Configuration);
 // Business Services
 builder.Services.AddScoped<ISystemSettingService, SystemSettingService>();
 builder.Services.AddScoped<IAccountService, AccountService>();
+builder.Services.AddScoped<IDishService, DishService>();
 
 // Lookup System: ILookupLoader (SCOPED) + ILookupResolver (SINGLETON)
 builder.Services.AddScoped<ILookupRepo, LookupRepo>();
@@ -94,6 +95,7 @@ builder.Services.AddSingleton<ILookupResolver, LookupResolver>();
 // Repositories
 builder.Services.AddScoped<IAccountRepository, AccountRepository>();
 builder.Services.AddScoped<ISystemSettingRepository, SystemSettingRepository>();
+builder.Services.AddScoped<IDishRepository, DishRepository>();
 
 // Email services
 builder.Services.AddSingleton<IEmailQueue, RedisEmailQueue>();
