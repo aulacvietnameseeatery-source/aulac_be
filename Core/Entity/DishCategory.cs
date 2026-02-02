@@ -9,6 +9,10 @@ public partial class DishCategory
 
     public string CategoryName { get; set; } = null!;
 
+    public long? CategoryNameTextId { get; set; }
+
+    public virtual I18nText? CategoryNameText { get; set; }
+
     public virtual ICollection<Dish> Dishes { get; set; } = new List<Dish>();
 
     public virtual ICollection<PromotionRule> PromotionRules { get; set; } = new List<PromotionRule>();

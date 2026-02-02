@@ -11,17 +11,7 @@ public partial class RestaurantTable
 
     public int Capacity { get; set; }
 
-    /// <summary>
-    /// TableStatus: 1=AVAILABLE,2=OCCUPIED,3=RESERVED,4=LOCKED
-    /// </summary>
-    public byte TableStatus { get; set; }
-
     public long? TableQrImg { get; set; }
-
-    /// <summary>
-    /// TableType (numeric enum in app)
-    /// </summary>
-    public byte TableType { get; set; }
 
     public uint TableStatusLvId { get; set; }
 

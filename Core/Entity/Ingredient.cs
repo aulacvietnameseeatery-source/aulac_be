@@ -13,7 +13,11 @@ public partial class Ingredient
 
     public uint? TypeLvId { get; set; }
 
+    public long? IngredientNameTextId { get; set; }
+
     public virtual CurrentStock? CurrentStock { get; set; }
+
+    public virtual I18nText? IngredientNameText { get; set; }
 
     public virtual ICollection<IngredientSupplier> IngredientSuppliers { get; set; } = new List<IngredientSupplier>();
 

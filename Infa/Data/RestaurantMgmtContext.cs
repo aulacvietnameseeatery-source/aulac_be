@@ -31,6 +31,12 @@ public partial class RestaurantMgmtContext : DbContext
 
     public virtual DbSet<DishMedium> DishMedia { get; set; }
 
+    public virtual DbSet<I18nLanguage> I18nLanguages { get; set; }
+
+    public virtual DbSet<I18nText> I18nTexts { get; set; }
+
+    public virtual DbSet<I18nTranslation> I18nTranslations { get; set; }
+
     public virtual DbSet<Ingredient> Ingredients { get; set; }
 
     public virtual DbSet<IngredientSupplier> IngredientSuppliers { get; set; }
@@ -83,7 +89,9 @@ public partial class RestaurantMgmtContext : DbContext
 
     public virtual DbSet<TableMedium> TableMedia { get; set; }
 
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder) { }
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
+        => optionsBuilder.UseMySql("server=localhost;database=restaurant_mgmt;user=root;password=1234", ServerVersion.Parse("8.0.44-mysql"));
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -218,31 +226,94 @@ public partial class RestaurantMgmtContext : DbContext
 
             entity.HasIndex(e => e.CategoryId, "category_id");
 
+            entity.HasIndex(e => e.DescriptionTextId, "fk_dish_desc_text");
+
+            entity.HasIndex(e => e.DishNameTextId, "fk_dish_name_text");
+
+            entity.HasIndex(e => e.NoteTextId, "fk_dish_note_text");
+
+            entity.HasIndex(e => e.ShortDescriptionTextId, "fk_dish_short_desc_text");
+
+            entity.HasIndex(e => e.SloganTextId, "fk_dish_slogan_text");
+
             entity.HasIndex(e => e.DishStatusLvId, "idx_dish_status_lv");
 
             entity.Property(e => e.DishId).HasColumnName("dish_id");
+            entity.Property(e => e.Calories).HasColumnName("calories");
             entity.Property(e => e.CategoryId).HasColumnName("category_id");
+            entity.Property(e => e.ChefRecommended).HasColumnName("chef_recommended");
+            entity.Property(e => e.CookTimeMinutes).HasColumnName("cook_time_minutes");
             entity.Property(e => e.CreatedAt)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
                 .HasColumnType("datetime")
                 .HasColumnName("created_at");
+            entity.Property(e => e.Description)
+                .HasColumnType("text")
+                .HasColumnName("description");
+            entity.Property(e => e.DescriptionTextId).HasColumnName("description_text_id");
             entity.Property(e => e.DishName)
                 .HasMaxLength(200)
                 .HasColumnName("dish_name");
+            entity.Property(e => e.DishNameTextId).HasColumnName("dish_name_text_id");
             entity.Property(e => e.DishStatusLvId).HasColumnName("dish_status_lv_id");
+            entity.Property(e => e.DisplayOrder).HasColumnName("display_order");
+            entity.Property(e => e.IsOnline)
+                .IsRequired()
+                .HasDefaultValueSql("'1'")
+                .HasColumnName("isOnline");
+            entity.Property(e => e.Note)
+                .HasMaxLength(500)
+                .HasColumnName("note")
+                .UseCollation("utf8mb3_general_ci")
+                .HasCharSet("utf8mb3");
+            entity.Property(e => e.NoteTextId).HasColumnName("note_text_id");
+            entity.Property(e => e.PrepTimeMinutes).HasColumnName("prep_time_minutes");
             entity.Property(e => e.Price)
                 .HasPrecision(12, 2)
                 .HasColumnName("price");
+            entity.Property(e => e.ShortDescription)
+                .HasMaxLength(255)
+                .HasColumnName("short_description")
+                .UseCollation("utf8mb3_general_ci")
+                .HasCharSet("utf8mb3");
+            entity.Property(e => e.ShortDescriptionTextId).HasColumnName("short_description_text_id");
+            entity.Property(e => e.Slogan)
+                .HasMaxLength(250)
+                .HasColumnName("slogan")
+                .UseCollation("utf8mb3_general_ci")
+                .HasCharSet("utf8mb3");
+            entity.Property(e => e.SloganTextId).HasColumnName("slogan_text_id");
 
             entity.HasOne(d => d.Category).WithMany(p => p.Dishes)
                 .HasForeignKey(d => d.CategoryId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("dish_ibfk_1");
 
+            entity.HasOne(d => d.DescriptionText).WithMany(p => p.DishDescriptionTexts)
+                .HasForeignKey(d => d.DescriptionTextId)
+                .HasConstraintName("fk_dish_desc_text");
+
+            entity.HasOne(d => d.DishNameText).WithMany(p => p.DishDishNameTexts)
+                .HasForeignKey(d => d.DishNameTextId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_dish_name_text");
+
             entity.HasOne(d => d.DishStatusLv).WithMany(p => p.Dishes)
                 .HasForeignKey(d => d.DishStatusLvId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("fk_dish_status_lv");
+
+            entity.HasOne(d => d.NoteText).WithMany(p => p.DishNoteTexts)
+                .HasForeignKey(d => d.NoteTextId)
+                .HasConstraintName("fk_dish_note_text");
+
+            entity.HasOne(d => d.ShortDescriptionText).WithMany(p => p.DishShortDescriptionTexts)
+                .HasForeignKey(d => d.ShortDescriptionTextId)
+                .HasConstraintName("fk_dish_short_desc_text");
+
+            entity.HasOne(d => d.SloganText).WithMany(p => p.DishSloganTexts)
+                .HasForeignKey(d => d.SloganTextId)
+                .HasConstraintName("fk_dish_slogan_text");
         });
 
         modelBuilder.Entity<DishCategory>(entity =>
@@ -251,10 +322,17 @@ public partial class RestaurantMgmtContext : DbContext
 
             entity.ToTable("dish_category");
 
+            entity.HasIndex(e => e.CategoryNameTextId, "fk_cat_name_text");
+
             entity.Property(e => e.CategoryId).HasColumnName("category_id");
             entity.Property(e => e.CategoryName)
                 .HasMaxLength(100)
                 .HasColumnName("category_name");
+            entity.Property(e => e.CategoryNameTextId).HasColumnName("category_name_text_id");
+
+            entity.HasOne(d => d.CategoryNameText).WithMany(p => p.DishCategories)
+                .HasForeignKey(d => d.CategoryNameTextId)
+                .HasConstraintName("fk_cat_name_text");
         });
 
         modelBuilder.Entity<DishMedium>(entity =>
@@ -284,6 +362,97 @@ public partial class RestaurantMgmtContext : DbContext
                 .HasConstraintName("dish_media_ibfk_2");
         });
 
+        modelBuilder.Entity<I18nLanguage>(entity =>
+        {
+            entity.HasKey(e => e.LangCode).HasName("PRIMARY");
+
+            entity.ToTable("i18n_language");
+
+            entity.Property(e => e.LangCode)
+                .HasMaxLength(10)
+                .HasColumnName("lang_code");
+            entity.Property(e => e.IsActive)
+                .IsRequired()
+                .HasDefaultValueSql("'1'")
+                .HasColumnName("is_active");
+            entity.Property(e => e.LangName)
+                .HasMaxLength(50)
+                .HasColumnName("lang_name");
+        });
+
+        modelBuilder.Entity<I18nText>(entity =>
+        {
+            entity.HasKey(e => e.TextId).HasName("PRIMARY");
+
+            entity.ToTable("i18n_text");
+
+            entity.HasIndex(e => e.SourceLangCode, "idx_i18n_text_source_lang");
+
+            entity.HasIndex(e => e.TextKey, "uq_i18n_text_key").IsUnique();
+
+            entity.Property(e => e.TextId).HasColumnName("text_id");
+            entity.Property(e => e.Context)
+                .HasMaxLength(255)
+                .HasColumnName("context");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime")
+                .HasColumnName("created_at");
+            entity.Property(e => e.SourceLangCode)
+                .HasMaxLength(10)
+                .HasDefaultValueSql("'en'")
+                .HasColumnName("source_lang_code");
+            entity.Property(e => e.SourceText)
+                .HasColumnType("text")
+                .HasColumnName("source_text");
+            entity.Property(e => e.TextKey)
+                .HasMaxLength(200)
+                .HasColumnName("text_key");
+            entity.Property(e => e.UpdatedAt)
+                .ValueGeneratedOnAddOrUpdate()
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime")
+                .HasColumnName("updated_at");
+
+            entity.HasOne(d => d.SourceLangCodeNavigation).WithMany(p => p.I18nTexts)
+                .HasForeignKey(d => d.SourceLangCode)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_i18n_text_lang");
+        });
+
+        modelBuilder.Entity<I18nTranslation>(entity =>
+        {
+            entity.HasKey(e => new { e.TextId, e.LangCode })
+                .HasName("PRIMARY")
+                .HasAnnotation("MySql:IndexPrefixLength", new[] { 0, 0 });
+
+            entity.ToTable("i18n_translation");
+
+            entity.HasIndex(e => e.LangCode, "fk_i18n_tr_lang");
+
+            entity.Property(e => e.TextId).HasColumnName("text_id");
+            entity.Property(e => e.LangCode)
+                .HasMaxLength(10)
+                .HasColumnName("lang_code");
+            entity.Property(e => e.TranslatedText)
+                .HasColumnType("text")
+                .HasColumnName("translated_text");
+            entity.Property(e => e.UpdatedAt)
+                .ValueGeneratedOnAddOrUpdate()
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime")
+                .HasColumnName("updated_at");
+
+            entity.HasOne(d => d.LangCodeNavigation).WithMany(p => p.I18nTranslations)
+                .HasForeignKey(d => d.LangCode)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_i18n_tr_lang");
+
+            entity.HasOne(d => d.Text).WithMany(p => p.I18nTranslations)
+                .HasForeignKey(d => d.TextId)
+                .HasConstraintName("fk_i18n_tr_text");
+        });
+
         modelBuilder.Entity<Ingredient>(entity =>
         {
             entity.HasKey(e => e.IngredientId).HasName("PRIMARY");
@@ -292,14 +461,21 @@ public partial class RestaurantMgmtContext : DbContext
 
             entity.HasIndex(e => e.TypeLvId, "FK_ingredient_type_lv_id");
 
+            entity.HasIndex(e => e.IngredientNameTextId, "fk_ingredient_name_text");
+
             entity.Property(e => e.IngredientId).HasColumnName("ingredient_id");
             entity.Property(e => e.IngredientName)
                 .HasMaxLength(200)
                 .HasColumnName("ingredient_name");
+            entity.Property(e => e.IngredientNameTextId).HasColumnName("ingredient_name_text_id");
             entity.Property(e => e.TypeLvId).HasColumnName("type_lv_id");
             entity.Property(e => e.Unit)
                 .HasMaxLength(20)
                 .HasColumnName("unit");
+
+            entity.HasOne(d => d.IngredientNameText).WithMany(p => p.Ingredients)
+                .HasForeignKey(d => d.IngredientNameTextId)
+                .HasConstraintName("fk_ingredient_name_text");
 
             entity.HasOne(d => d.TypeLv).WithMany(p => p.Ingredients)
                 .HasForeignKey(d => d.TypeLvId)
@@ -444,6 +620,10 @@ public partial class RestaurantMgmtContext : DbContext
 
             entity.ToTable("lookup_type");
 
+            entity.HasIndex(e => e.TypeDescTextId, "fk_lookup_type_desc_text");
+
+            entity.HasIndex(e => e.TypeNameTextId, "fk_lookup_type_name_text");
+
             entity.HasIndex(e => e.TypeCode, "uq_lookup_type_code").IsUnique();
 
             entity.Property(e => e.TypeId).HasColumnName("type_id");
@@ -461,9 +641,19 @@ public partial class RestaurantMgmtContext : DbContext
             entity.Property(e => e.TypeCode)
                 .HasMaxLength(50)
                 .HasColumnName("type_code");
+            entity.Property(e => e.TypeDescTextId).HasColumnName("type_desc_text_id");
             entity.Property(e => e.TypeName)
                 .HasMaxLength(150)
                 .HasColumnName("type_name");
+            entity.Property(e => e.TypeNameTextId).HasColumnName("type_name_text_id");
+
+            entity.HasOne(d => d.TypeDescText).WithMany(p => p.LookupTypeTypeDescTexts)
+                .HasForeignKey(d => d.TypeDescTextId)
+                .HasConstraintName("fk_lookup_type_desc_text");
+
+            entity.HasOne(d => d.TypeNameText).WithMany(p => p.LookupTypeTypeNameTexts)
+                .HasForeignKey(d => d.TypeNameTextId)
+                .HasConstraintName("fk_lookup_type_name_text");
         });
 
         modelBuilder.Entity<LookupValue>(entity =>
@@ -471,6 +661,10 @@ public partial class RestaurantMgmtContext : DbContext
             entity.HasKey(e => e.ValueId).HasName("PRIMARY");
 
             entity.ToTable("lookup_value");
+
+            entity.HasIndex(e => e.ValueDescTextId, "fk_lookup_value_desc_text");
+
+            entity.HasIndex(e => e.ValueNameTextId, "fk_lookup_value_name_text");
 
             entity.HasIndex(e => new { e.TypeId, e.IsActive, e.SortOrder }, "idx_lookup_value_type_active");
 
@@ -509,14 +703,24 @@ public partial class RestaurantMgmtContext : DbContext
             entity.Property(e => e.ValueCode)
                 .HasMaxLength(50)
                 .HasColumnName("value_code");
+            entity.Property(e => e.ValueDescTextId).HasColumnName("value_desc_text_id");
             entity.Property(e => e.ValueName)
                 .HasMaxLength(150)
                 .HasColumnName("value_name");
+            entity.Property(e => e.ValueNameTextId).HasColumnName("value_name_text_id");
 
             entity.HasOne(d => d.Type).WithMany(p => p.LookupValues)
                 .HasForeignKey(d => d.TypeId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("fk_lookup_value_type");
+
+            entity.HasOne(d => d.ValueDescText).WithMany(p => p.LookupValueValueDescTexts)
+                .HasForeignKey(d => d.ValueDescTextId)
+                .HasConstraintName("fk_lookup_value_desc_text");
+
+            entity.HasOne(d => d.ValueNameText).WithMany(p => p.LookupValueValueNameTexts)
+                .HasForeignKey(d => d.ValueNameTextId)
+                .HasConstraintName("fk_lookup_value_name_text");
         });
 
         modelBuilder.Entity<MediaAsset>(entity =>
@@ -745,6 +949,10 @@ public partial class RestaurantMgmtContext : DbContext
 
             entity.ToTable("promotion");
 
+            entity.HasIndex(e => e.PromoDescTextId, "fk_promo_desc_text");
+
+            entity.HasIndex(e => e.PromoNameTextId, "fk_promo_name_text");
+
             entity.HasIndex(e => e.PromotionStatusLvId, "idx_promotion_status_lv");
 
             entity.HasIndex(e => e.TypeLvId, "idx_promotion_type_lv");
@@ -766,9 +974,11 @@ public partial class RestaurantMgmtContext : DbContext
             entity.Property(e => e.PromoCode)
                 .HasMaxLength(50)
                 .HasColumnName("promo_code");
+            entity.Property(e => e.PromoDescTextId).HasColumnName("promo_desc_text_id");
             entity.Property(e => e.PromoName)
                 .HasMaxLength(200)
                 .HasColumnName("promo_name");
+            entity.Property(e => e.PromoNameTextId).HasColumnName("promo_name_text_id");
             entity.Property(e => e.PromotionStatusLvId).HasColumnName("promotion_status_lv_id");
             entity.Property(e => e.StartTime)
                 .HasColumnType("datetime")
@@ -777,6 +987,14 @@ public partial class RestaurantMgmtContext : DbContext
             entity.Property(e => e.UsedCount)
                 .HasDefaultValueSql("'0'")
                 .HasColumnName("used_count");
+
+            entity.HasOne(d => d.PromoDescText).WithMany(p => p.PromotionPromoDescTexts)
+                .HasForeignKey(d => d.PromoDescTextId)
+                .HasConstraintName("fk_promo_desc_text");
+
+            entity.HasOne(d => d.PromoNameText).WithMany(p => p.PromotionPromoNameTexts)
+                .HasForeignKey(d => d.PromoNameTextId)
+                .HasConstraintName("fk_promo_name_text");
 
             entity.HasOne(d => d.PromotionStatusLv).WithMany(p => p.PromotionPromotionStatusLvs)
                 .HasForeignKey(d => d.PromotionStatusLvId)
@@ -969,8 +1187,6 @@ public partial class RestaurantMgmtContext : DbContext
 
             entity.HasIndex(e => e.TableQrImg, "FK_restaurant_table_table_qr_img");
 
-            entity.HasIndex(e => e.TableType, "FK_restaurant_table_table_type");
-
             entity.HasIndex(e => e.TableStatusLvId, "idx_restaurant_table_status_lv");
 
             entity.HasIndex(e => e.TableTypeLvId, "idx_restaurant_table_type_lv");
@@ -987,14 +1203,7 @@ public partial class RestaurantMgmtContext : DbContext
                 .HasMaxLength(50)
                 .HasColumnName("table_code");
             entity.Property(e => e.TableQrImg).HasColumnName("table_qr_img");
-            entity.Property(e => e.TableStatus)
-                .HasDefaultValueSql("'1'")
-                .HasComment("TableStatus: 1=AVAILABLE,2=OCCUPIED,3=RESERVED,4=LOCKED")
-                .HasColumnName("table_status");
             entity.Property(e => e.TableStatusLvId).HasColumnName("table_status_lv_id");
-            entity.Property(e => e.TableType)
-                .HasComment("TableType (numeric enum in app)")
-                .HasColumnName("table_type");
             entity.Property(e => e.TableTypeLvId).HasColumnName("table_type_lv_id");
 
             entity.HasOne(d => d.TableQrImgNavigation).WithMany(p => p.RestaurantTables)
@@ -1138,16 +1347,30 @@ public partial class RestaurantMgmtContext : DbContext
 
             entity.HasIndex(e => e.CategoryCode, "category_code").IsUnique();
 
+            entity.HasIndex(e => e.CategoryDescTextId, "fk_sec_desc_text");
+
+            entity.HasIndex(e => e.CategoryNameTextId, "fk_sec_name_text");
+
             entity.Property(e => e.CategoryId).HasColumnName("category_id");
             entity.Property(e => e.CategoryCode)
                 .HasMaxLength(50)
                 .HasColumnName("category_code");
+            entity.Property(e => e.CategoryDescTextId).HasColumnName("category_desc_text_id");
             entity.Property(e => e.CategoryName)
                 .HasMaxLength(150)
                 .HasColumnName("category_name");
+            entity.Property(e => e.CategoryNameTextId).HasColumnName("category_name_text_id");
             entity.Property(e => e.Description)
                 .HasMaxLength(255)
                 .HasColumnName("description");
+
+            entity.HasOne(d => d.CategoryDescText).WithMany(p => p.ServiceErrorCategoryCategoryDescTexts)
+                .HasForeignKey(d => d.CategoryDescTextId)
+                .HasConstraintName("fk_sec_desc_text");
+
+            entity.HasOne(d => d.CategoryNameText).WithMany(p => p.ServiceErrorCategoryCategoryNameTexts)
+                .HasForeignKey(d => d.CategoryNameTextId)
+                .HasConstraintName("fk_sec_name_text");
         });
 
         modelBuilder.Entity<StaffAccount>(entity =>

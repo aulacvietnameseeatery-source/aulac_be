@@ -38,6 +38,10 @@ public partial class LookupValue
 
     public DateTime? UpdateAt { get; set; }
 
+    public long? ValueNameTextId { get; set; }
+
+    public long? ValueDescTextId { get; set; }
+
     public virtual ICollection<Dish> Dishes { get; set; } = new List<Dish>();
 
     public virtual ICollection<Ingredient> Ingredients { get; set; } = new List<Ingredient>();
@@ -71,4 +75,8 @@ public partial class LookupValue
     public virtual ICollection<ServiceError> ServiceErrors { get; set; } = new List<ServiceError>();
 
     public virtual LookupType Type { get; set; } = null!;
+
+    public virtual I18nText? ValueDescText { get; set; }
+
+    public virtual I18nText? ValueNameText { get; set; }
 }

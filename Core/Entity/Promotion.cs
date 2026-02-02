@@ -27,7 +27,15 @@ public partial class Promotion
 
     public uint PromotionStatusLvId { get; set; }
 
+    public long? PromoNameTextId { get; set; }
+
+    public long? PromoDescTextId { get; set; }
+
     public virtual ICollection<OrderPromotion> OrderPromotions { get; set; } = new List<OrderPromotion>();
+
+    public virtual I18nText? PromoDescText { get; set; }
+
+    public virtual I18nText? PromoNameText { get; set; }
 
     public virtual ICollection<PromotionRule> PromotionRules { get; set; } = new List<PromotionRule>();
 

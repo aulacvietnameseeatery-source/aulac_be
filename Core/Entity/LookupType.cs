@@ -23,5 +23,13 @@ public partial class LookupType
     /// </summary>
     public bool? IsSystem { get; set; }
 
+    public long? TypeNameTextId { get; set; }
+
+    public long? TypeDescTextId { get; set; }
+
     public virtual ICollection<LookupValue> LookupValues { get; set; } = new List<LookupValue>();
+
+    public virtual I18nText? TypeDescText { get; set; }
+
+    public virtual I18nText? TypeNameText { get; set; }
 }
