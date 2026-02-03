@@ -42,7 +42,6 @@ public class TableRepository : ITableRepository
     public async Task<RestaurantTable?> GetByIdAsync(long tableId, CancellationToken ct = default)
     {
         return await _context.RestaurantTables
-            .AsNoTracking()
             .Include(t => t.TableTypeLv)
             .FirstOrDefaultAsync(t => t.TableId == tableId, ct);
     }
