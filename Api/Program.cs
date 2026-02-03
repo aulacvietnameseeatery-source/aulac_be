@@ -6,6 +6,7 @@ using Core.Data;
 using Core.Interface.Repo;
 using Core.Interface.Service;
 using Core.Interface.Service.Auth;
+using Core.Interface.Service.Dishes;
 using Core.Interface.Service.Email;
 using Core.Interface.Service.Entity;
 using Core.Interface.Service.Others;
@@ -106,6 +107,10 @@ builder.Services.AddSingleton<IPasswordResetTokenStore, RedisPasswordResetTokenS
 
 // Register Background Service
 builder.Services.AddHostedService<EmailBackgroundService>();
+
+// Dish Management
+builder.Services.AddScoped<IDishRepository, Infa.Repo.DishRepository>();
+builder.Services.AddScoped<IDishService, Core.Service.DishService>();
 
 
 // Load Options from configuration
