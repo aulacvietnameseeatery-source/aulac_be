@@ -93,6 +93,7 @@ builder.Services.AddSingleton<ILookupResolver, LookupResolver>();
 
 // Repositories
 builder.Services.AddScoped<IAccountRepository, AccountRepository>();
+builder.Services.AddScoped<IDishRepository, DishRepository>();
 builder.Services.AddScoped<ISystemSettingRepository, SystemSettingRepository>();
 
 // Email services
