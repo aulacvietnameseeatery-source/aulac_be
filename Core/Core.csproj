@@ -10,6 +10,7 @@
     <Folder Include="Domain\" />
     <Folder Include="Exception\" />
     <Folder Include="Helpers\" />
+    <Folder Include="Interface\Service\LocalStorage\" />
   </ItemGroup>
 
   <ItemGroup>

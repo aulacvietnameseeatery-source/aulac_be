@@ -3,11 +3,15 @@ using Api.Middleware;
 using API.Middleware;
 using API.Models;
 using Core.Data;
+using Core.DTO.General;
 using Core.Interface.Repo;
 using Core.Interface.Service;
 using Core.Interface.Service.Auth;
+using Core.Interface.Service.Dish;
 using Core.Interface.Service.Email;
 using Core.Interface.Service.Entity;
+using Core.Interface.Service.FileStorage;
+using Core.Interface.Service.I18n;
 using Core.Interface.Service.Others;
 using Core.Service;
 using Infa.Auth;
@@ -86,6 +90,10 @@ builder.Services.AddAuthInfrastructure(builder.Configuration);
 // Business Services
 builder.Services.AddScoped<ISystemSettingService, SystemSettingService>();
 builder.Services.AddScoped<IAccountService, AccountService>();
+builder.Services.AddScoped<IDishService, DishService>();
+builder.Services.AddScoped<IFileStorage, LocalFileStorage>();
+builder.Services.AddScoped<IDishI18nService, DishI18nService>();
+builder.Services.AddScoped<Ii18nService, I18nService>();
 
 // Lookup System: ILookupLoader (SCOPED) + ILookupResolver (SINGLETON)
 builder.Services.AddScoped<ILookupRepo, LookupRepo>();
@@ -94,6 +102,10 @@ builder.Services.AddSingleton<ILookupResolver, LookupResolver>();
 // Repositories
 builder.Services.AddScoped<IAccountRepository, AccountRepository>();
 builder.Services.AddScoped<ISystemSettingRepository, SystemSettingRepository>();
+builder.Services.AddScoped<IDishRepository, DishRepository>();
+builder.Services.AddScoped<II18nRepository, I18nRepository>();
+builder.Services.AddScoped<IMediaRepository, MediaRepository>();
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
 // Email services
 builder.Services.AddSingleton<IEmailQueue, RedisEmailQueue>();
@@ -116,6 +128,9 @@ builder.Services.Configure<BaseUrlOptions>(
     builder.Configuration.GetSection("BaseUrl"));
 
 builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection("Smtp"));
+
+builder.Services.Configure<FileStorageOptions>(
+    builder.Configuration.GetSection("FileStorage"));
 
 // Configure DbContext with connection string per environment
 var connectionString = builder.Configuration.GetConnectionString("Default")

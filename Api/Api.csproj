@@ -21,4 +21,8 @@
     <ProjectReference Include="..\Infa\Infa.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="wwwroot\dishes\static\" />
+  </ItemGroup>
+
 </Project>
