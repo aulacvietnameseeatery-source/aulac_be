@@ -11,7 +11,15 @@ public partial class DishCategory
 
     public long? CategoryNameTextId { get; set; }
 
+    public string? Description { get; set; }
+
+    public long? DescriptionTextId { get; set; }
+
+    public bool IsDisabled { get; set; }
+
     public virtual I18nText? CategoryNameText { get; set; }
+
+    public virtual I18nText? DescriptionText { get; set; }
 
     public virtual ICollection<Dish> Dishes { get; set; } = new List<Dish>();
 

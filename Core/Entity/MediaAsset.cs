@@ -23,6 +23,8 @@ public partial class MediaAsset
 
     public virtual ICollection<DishMedium> DishMedia { get; set; } = new List<DishMedium>();
 
+    public virtual ICollection<Ingredient> Ingredients { get; set; } = new List<Ingredient>();
+
     public virtual ICollection<InventoryTransactionMedium> InventoryTransactionMedia { get; set; } = new List<InventoryTransactionMedium>();
 
     public virtual LookupValue MediaTypeLv { get; set; } = null!;
