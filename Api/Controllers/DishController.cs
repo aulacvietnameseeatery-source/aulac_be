@@ -1,6 +1,6 @@
 using API.Models;
 using Core.DTO.Dish;
-using Core.Interface.Repo;
+using Core.Interface.Service.Entity;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -14,14 +14,14 @@ namespace Api.Controllers;
 [Produces("application/json")]
 public class DishController : ControllerBase
 {
-    private readonly IDishRepository _dishRepository;
+    private readonly IDishService _dishService;
     private readonly ILogger<DishController> _logger;
 
     public DishController(
-        IDishRepository dishRepository,
+        IDishService dishService,
         ILogger<DishController> logger)
     {
-        _dishRepository = dishRepository;
+        _dishService = dishService;
         _logger = logger;
     }
 
@@ -41,9 +41,9 @@ public class DishController : ControllerBase
         long id,
         CancellationToken cancellationToken)
     {
-        var dish = await _dishRepository.GetDishByIdAsync(id, cancellationToken);
+        var dishDto = await _dishService.GetDishByIdAsync(id, cancellationToken);
 
-        if (dish == null)
+        if (dishDto == null)
         {
             return NotFound(new ApiResponse<object>
             {
@@ -54,25 +54,6 @@ public class DishController : ControllerBase
                 ServerTime = DateTimeOffset.UtcNow
             });
         }
-
-        var dishDto = new DishDetailDto
-        {
-            DishId = dish.DishId,
-            DishName = dish.DishName,
-            Price = dish.Price,
-            CategoryName = dish.Category.CategoryName,
-            Description = dish.Description,
-            ShortDescription = dish.ShortDescription,
-            Slogan = dish.Slogan,
-            Calories = dish.Calories,
-            PrepTimeMinutes = dish.PrepTimeMinutes,
-            CookTimeMinutes = dish.CookTimeMinutes,
-            ImageUrls = dish.DishMedia
-                .Where(dm => dm.Media != null)
-                .Select(dm => dm.Media!.Url ?? string.Empty)
-                .Where(url => !string.IsNullOrEmpty(url))
-                .ToList()
-        };
 
         return Ok(new ApiResponse<DishDetailDto>
         {
@@ -95,26 +76,7 @@ public class DishController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<List<DishDetailDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAllDishes(CancellationToken cancellationToken)
     {
-        var dishes = await _dishRepository.GetAllDishesAsync(cancellationToken);
-
-        var dishDtos = dishes.Select(dish => new DishDetailDto
-        {
-            DishId = dish.DishId,
-            DishName = dish.DishName,
-            Price = dish.Price,
-            CategoryName = dish.Category.CategoryName,
-            Description = dish.Description,
-            ShortDescription = dish.ShortDescription,
-            Slogan = dish.Slogan,
-            Calories = dish.Calories,
-            PrepTimeMinutes = dish.PrepTimeMinutes,
-            CookTimeMinutes = dish.CookTimeMinutes,
-            ImageUrls = dish.DishMedia
-                .Where(dm => dm.Media != null)
-                .Select(dm => dm.Media!.Url ?? string.Empty)
-                .Where(url => !string.IsNullOrEmpty(url))
-                .ToList()
-        }).ToList();
+        var dishDtos = await _dishService.GetAllDishesAsync(cancellationToken);
 
         return Ok(new ApiResponse<List<DishDetailDto>>
         {
