@@ -19,7 +19,9 @@ public partial class I18nText
 
     public DateTime? UpdatedAt { get; set; }
 
-    public virtual ICollection<DishCategory> DishCategories { get; set; } = new List<DishCategory>();
+    public virtual ICollection<DishCategory> DishCategoryCategoryNameTexts { get; set; } = new List<DishCategory>();
+
+    public virtual ICollection<DishCategory> DishCategoryDescriptionTexts { get; set; } = new List<DishCategory>();
 
     public virtual ICollection<Dish> DishDescriptionTexts { get; set; } = new List<Dish>();
 
