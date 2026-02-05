@@ -8,7 +8,6 @@
 
   <ItemGroup>
     <Folder Include="Domain\" />
-    <Folder Include="Exception\" />
     <Folder Include="Helpers\" />
   </ItemGroup>
 

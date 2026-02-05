@@ -12,6 +12,7 @@ namespace Core.Data
         public const string ViewAccount = "ACCOUNT:READ";
         public const string CreateAccount = "ACCOUNT:CREATE";
         public const string EditAccount = "ACCOUNT:EDIT";
+        public const string UpdateAccount = "ACCOUNT:UPDATE";
         public const string DeleteAccount = "ACCOUNT:DELETE";
         public const string ResetPassword = "ACCOUNT:RESET_PASSWORD";
 
