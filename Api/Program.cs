@@ -184,7 +184,12 @@ builder.Services.AddAuthorization(options =>
 
 builder.Services.AddScoped<ISystemSettingService, SystemSettingService>();
 builder.Services.AddScoped<IAccountService, AccountService>();
+
 builder.Services.AddScoped<IDishService, DishService>();
+
+builder.Services.AddScoped<IPasswordGenerator, PasswordGeneratorService>();
+builder.Services.AddScoped<IUsernameGenerator, UsernameGeneratorService>();
+
 
 #endregion
 
@@ -199,6 +204,7 @@ builder.Services.AddSingleton<ILookupResolver, LookupResolver>();
 #region Repositories
 
 builder.Services.AddScoped<IAccountRepository, AccountRepository>();
+builder.Services.AddScoped<IRoleRepository, RoleRepository>();
 builder.Services.AddScoped<ISystemSettingRepository, SystemSettingRepository>();
 builder.Services.AddScoped<IDishRepository, DishRepository>();
 

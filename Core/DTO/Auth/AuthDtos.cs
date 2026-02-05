@@ -1,3 +1,4 @@
+using Core.DTO.Account;
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 
@@ -142,4 +143,115 @@ public class ResetPasswordRequestDto
     [Required(ErrorMessage = "New password is required.")]
     [StringLength(128, MinimumLength = 8, ErrorMessage = "Password must be between 8 and 128 characters.")]
     public string NewPassword { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Result of a password reset operation.
+/// </summary>
+public record PasswordResetResult
+{
+    public long AccountId { get; init; }
+    public string Username { get; init; } = string.Empty;
+    public string FullName { get; init; } = string.Empty;
+    public bool Success { get; init; }
+    public string? Message { get; init; }
+}
+
+
+/// <summary>
+/// Account data transfer object (legacy).
+/// </summary>
+public record AccountDto
+{
+    public long AccountId { get; init; }
+    public string Username { get; init; } = string.Empty;
+    public string FullName { get; init; } = string.Empty;
+    public string? Email { get; init; }
+    public string? Phone { get; init; }
+    public int AccountStatus { get; init; }
+    public bool IsLocked { get; init; }
+    public DateTime CreatedAt { get; init; }
+    public DateTime? LastLoginAt { get; init; }
+    public RoleDto? Role { get; init; }
+}
+
+/// <summary>
+/// Login request DTO.
+/// </summary>
+public record LoginRequest(
+    string Username,
+    string Password);
+
+/// <summary>
+/// Refresh token request DTO.
+/// </summary>
+public record RefreshTokenRequest(
+    string AccessToken,
+    string RefreshToken);
+
+/// <summary>
+/// Authentication result containing tokens and metadata.
+/// </summary>
+public record AuthResult
+{
+    public bool Success { get; init; }
+    public string? AccessToken { get; init; }
+    public string? RefreshToken { get; init; }
+    public int ExpiresIn { get; init; }
+    public long? SessionId { get; init; }
+    public long? UserId { get; init; }
+    public string? Username { get; init; }
+    public IEnumerable<string>? Roles { get; init; }
+    public string? ErrorCode { get; init; }
+    public string? ErrorMessage { get; init; }
+
+    /// <summary>
+    /// Indicates if the user must change their password before continuing.
+    /// </summary>
+    public bool RequirePasswordChange { get; init; }
+
+    public static AuthResult Failed(string errorCode, string errorMessage) =>
+    new() { Success = false, ErrorCode = errorCode, ErrorMessage = errorMessage };
+
+    public static AuthResult Succeeded(
+        string accessToken,
+        string refreshToken,
+        int expiresIn,
+        long sessionId,
+        long userId,
+        string username,
+        IEnumerable<string> roles) =>
+     new()
+     {
+         Success = true,
+         AccessToken = accessToken,
+         RefreshToken = refreshToken,
+         ExpiresIn = expiresIn,
+         SessionId = sessionId,
+         UserId = userId,
+         Username = username,
+         Roles = roles,
+         RequirePasswordChange = false
+     };
+
+    public static AuthResult PasswordChangeRequired(
+          string tempAccessToken,
+       int expiresIn,
+        long sessionId,
+          long userId,
+          string username,
+          string message) =>
+          new()
+          {
+              Success = true,
+              AccessToken = tempAccessToken,
+              RefreshToken = null, // No refresh token for password change session
+              ExpiresIn = expiresIn,
+              SessionId = sessionId,
+              UserId = userId,
+              Username = username,
+              RequirePasswordChange = true,
+              ErrorCode = "PASSWORD_CHANGE_REQUIRED",
+              ErrorMessage = message
+          };
 }

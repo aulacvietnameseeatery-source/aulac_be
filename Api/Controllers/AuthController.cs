@@ -94,6 +94,36 @@ public class AuthController : ControllerBase
             });
         }
 
+        // Check if password change is required
+        if (result.RequirePasswordChange)
+        {
+            _logger.LogInformation(
+                "User {Username} logged in but requires password change. SessionId: {SessionId}",
+                result.Username,
+                result.SessionId);
+
+            // Return success with special flag indicating password change is required
+            return Ok(new ApiResponse<AuthResponseDto>
+            {
+                Success = true,
+                Code = 200,
+                UserMessage = result.ErrorMessage ?? "Password change required.",
+                Data = new AuthResponseDto
+                {
+                    AccessToken = result.AccessToken!,
+                    ExpiresIn = result.ExpiresIn,
+                    TokenType = "Bearer",
+                    UserId = result.UserId!.Value,
+                    Username = result.Username!,
+                    Roles = result.Roles ?? []
+                },
+                // Add custom property to indicate password change requirement
+                SubCode = 1, // Custom sub-code for password change required
+                SystemMessage = "PASSWORD_CHANGE_REQUIRED",
+                ServerTime = DateTimeOffset.UtcNow
+            });
+        }
+
         _logger.LogInformation(
             "User {Username} logged in successfully. SessionId: {SessionId}",
             result.Username,
@@ -145,7 +175,6 @@ public class AuthController : ControllerBase
     /// - Prevents token reuse attacks
     /// </remarks>
     [HttpPost("refresh")]
-    [AllowAnonymous]
     [ProducesResponseType(typeof(ApiResponse<AuthResponseDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<AuthErrorDto>), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequestDto request, CancellationToken cancellationToken)

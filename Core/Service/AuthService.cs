@@ -1,9 +1,12 @@
 using Core.Data;
+using Core.DTO.Auth;
 using Core.DTO.Email;
 using Core.Entity;
+using Core.Extensions;
 using Core.Interface.Repo;
 using Core.Interface.Service.Auth;
 using Core.Interface.Service.Email;
+using Core.Interface.Service.Entity;
 using Microsoft.Extensions.Options;
 using System.Security.Cryptography;
 using System.Text;
@@ -22,6 +25,7 @@ public class AuthService : IAuthService
     private readonly IPasswordHasher _passwordHasher;
     private readonly IPasswordResetTokenStore _tokenStore;
     private readonly IEmailQueue _emailQueue;
+    private readonly ILookupResolver _lookupResolver;
 
     // Password reset security configuration
     private readonly ForgotPasswordRulesOptions _forgotOpt;
@@ -35,6 +39,7 @@ public class AuthService : IAuthService
         IPasswordHasher passwordHasher,
         IPasswordResetTokenStore tokenStore,
         IEmailQueue emailQueue,
+        ILookupResolver lookupResolver,
         IOptions<ForgotPasswordRulesOptions> forgotOpt,
         IOptions<BaseUrlOptions> baseUrlOpt)
     {
@@ -44,6 +49,7 @@ public class AuthService : IAuthService
         _passwordHasher = passwordHasher;
         _tokenStore = tokenStore;
         _emailQueue = emailQueue;
+        _lookupResolver = lookupResolver;
 
         _forgotOpt = forgotOpt.Value;
         _baseUrl = baseUrlOpt.Value;
@@ -62,10 +68,16 @@ public class AuthService : IAuthService
     /// 7. Return tokens to client
     /// 
     /// Note: The login identifier can be either username or email address.
+    /// 
+    /// **First-Time Login:**
+    /// - If account is LOCKED, password verification still succeeds
+    /// - Returns special response indicating password change is required
+    /// - Client must redirect to password change page
+    /// - Account becomes ACTIVE after password change
     /// </remarks>
     public async Task<AuthResult> LoginAsync(
         LoginRequest request,
-      string? deviceInfo = null,
+        string? deviceInfo = null,
         string? ipAddress = null,
         CancellationToken cancellationToken = default)
     {
@@ -93,13 +105,44 @@ public class AuthService : IAuthService
             return AuthResult.Failed("INVALID_CREDENTIALS", "Invalid username or password.");
         }
 
-        // Step 3: Check account status
-        if (account.IsLocked)
+        // Step 3: Check if account requires password change (LOCKED status)
+        // Allow login but flag for required password change
+        var requirePasswordChange = account.AccountStatusLvId == await AccountStatusCode.LOCKED.ToAccountStatusIdAsync(_lookupResolver, cancellationToken);
+
+        if (requirePasswordChange)
         {
-            return AuthResult.Failed("ACCOUNT_LOCKED", "This account has been locked.");
+            // Allow limited session for password change
+            // Note: This is a special case - account is locked but we allow login
+            // to enable password change
+            var tempSession = await _sessionRepository.CreateSessionAsync(
+                account.AccountId,
+                "temp_for_password_change",
+                DateTime.UtcNow.AddMinutes(15), // Short-lived
+                deviceInfo,
+                ipAddress,
+                cancellationToken);
+
+            var roles = new[] { account.Role.RoleCode };
+            var permissions = account.Role.Permissions.Select(p => $"{p.ScreenCode}:{p.ActionCode}");
+
+            var tempAccessToken = _tokenService.GenerateAccessToken(
+                account.AccountId,
+                account.Username,
+                tempSession.SessionId,
+                roles,
+                permissions);
+
+            return AuthResult.PasswordChangeRequired(
+                tempAccessToken,
+                (int)TimeSpan.FromMinutes(15).TotalSeconds,
+                tempSession.SessionId,
+                account.AccountId,
+                account.Username,
+                "Your account requires a password change before you can continue.");
         }
 
-        // Step 4: Generate refresh token
+        // Step 4: Normal login flow (account is active)
+        // Generate refresh token
         var refreshToken = _tokenService.GenerateRefreshToken();
         var refreshTokenHash = _tokenService.HashToken(refreshToken);
         var refreshTokenExpiry = DateTime.UtcNow.Add(_tokenService.RefreshTokenLifetime);
@@ -114,15 +157,15 @@ public class AuthService : IAuthService
             cancellationToken);
 
         // Step 6: Generate access token with session ID
-        var roles = new[] { account.Role.RoleCode };
-        var permissions = account.Role.Permissions.Select(p => $"{p.ScreenCode}:{p.ActionCode}");
+        var sessionRoles = new[] { account.Role.RoleCode };
+        var sessionPermissions = account.Role.Permissions.Select(p => $"{p.ScreenCode}:{p.ActionCode}");
 
         var accessToken = _tokenService.GenerateAccessToken(
             account.AccountId,
             account.Username,
             session.SessionId,
-            roles,
-            permissions);
+            sessionRoles,
+            sessionPermissions);
 
         // Step 7: Update last login
         await _accountRepository.UpdateLastLoginAsync(account.AccountId, DateTime.UtcNow, cancellationToken);
@@ -134,7 +177,7 @@ public class AuthService : IAuthService
             session.SessionId,
             account.AccountId,
             account.Username,
-            roles);
+            sessionRoles);
     }
 
     /// <inheritdoc />

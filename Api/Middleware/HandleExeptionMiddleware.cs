@@ -48,10 +48,40 @@ namespace API.Middleware
             // Xử lý các loại exception khác nhau
             switch (exception)
             {
-                // Custom Exceptions
-
+                // Business Exceptions (Custom)
+                case Core.Exception.BusinessException businessEx:
+                    response.StatusCode = businessEx.StatusCode;
+                    errorResponse = new ApiResponse<object>
+                    {
+                        Success = false,
+                        Code = businessEx.StatusCode,
+                        SubCode = GetSubCodeForBusinessException(businessEx.ErrorCode),
+                        UserMessage = businessEx.Message,
+                        SystemMessage = businessEx.ErrorCode,
+                        ValidateInfo = new List<string> { businessEx.Message },
+                        Data = new { },
+                        GetLastData = false,
+                        ServerTime = DateTimeOffset.UtcNow
+                    };
+                    break;
 
                 // Exceptions thông thường
+                case KeyNotFoundException keyNotFoundEx:
+                    response.StatusCode = (int)HttpStatusCode.NotFound;
+                    errorResponse = new ApiResponse<object>
+                    {
+                        Success = false,
+                        Code = (int)HttpStatusCode.NotFound,
+                        SubCode = 404,
+                        UserMessage = keyNotFoundEx.Message,
+                        SystemMessage = "Resource not found",
+                        ValidateInfo = new List<string> { keyNotFoundEx.Message },
+                        Data = new { },
+                        GetLastData = false,
+                        ServerTime = DateTimeOffset.UtcNow
+                    };
+                    break;
+
                 case ArgumentNullException argNullEx:
                     response.StatusCode = (int)HttpStatusCode.BadRequest;
                     errorResponse = new ApiResponse<object>
@@ -62,7 +92,7 @@ namespace API.Middleware
                         UserMessage = "Dữ liệu đầu vào không hợp lệ. Vui lòng kiểm tra lại.",
                         SystemMessage = $"Tham số '{argNullEx.ParamName}' không được để trống",
                         ValidateInfo = new List<string> { $"Tham số '{argNullEx.ParamName}' là bắt buộc" },
-                        Data = new {},
+                        Data = new { },
                         GetLastData = false,
                         ServerTime = DateTimeOffset.UtcNow
                     };
@@ -80,7 +110,7 @@ namespace API.Middleware
                      : "Dữ liệu đầu vào không đúng định dạng. Vui lòng kiểm tra lại.",
                         SystemMessage = argEx.Message,
                         ValidateInfo = new List<string> { argEx.Message },
-                        Data = new {},
+                        Data = new { },
                         GetLastData = false,
                         ServerTime = DateTimeOffset.UtcNow
                     };
@@ -96,7 +126,7 @@ namespace API.Middleware
                         UserMessage = "Thao tác không hợp lệ. Vui lòng kiểm tra lại dữ liệu.",
                         SystemMessage = invalidOpEx.Message,
                         ValidateInfo = new List<string> { invalidOpEx.Message },
-                        Data = new {},
+                        Data = new { },
                         GetLastData = false,
                         ServerTime = DateTimeOffset.UtcNow
                     };
@@ -112,7 +142,7 @@ namespace API.Middleware
                         UserMessage = "Yêu cầu xử lý quá lâu. Vui lòng thử lại.",
                         SystemMessage = timeoutEx.Message,
                         ValidateInfo = new List<string>(),
-                        Data = new {},
+                        Data = new { },
                         GetLastData = false,
                         ServerTime = DateTimeOffset.UtcNow
                     };
@@ -128,7 +158,7 @@ namespace API.Middleware
                         UserMessage = "Dữ liệu JSON không hợp lệ. Vui lòng kiểm tra định dạng.",
                         SystemMessage = jsonEx.Message,
                         ValidateInfo = new List<string> { "Định dạng JSON không đúng" },
-                        Data = new {},
+                        Data = new { },
                         GetLastData = false,
                         ServerTime = DateTimeOffset.UtcNow
                     };
@@ -144,7 +174,7 @@ namespace API.Middleware
                         UserMessage = "Đã xảy ra lỗi hệ thống. Vui lòng liên hệ quản trị viên hoặc thử lại sau.",
                         SystemMessage = exception.Message,
                         ValidateInfo = new List<string>(),
-                        Data = new {},
+                        Data = new { },
                         GetLastData = false,
                         ServerTime = DateTimeOffset.UtcNow
                     };
@@ -159,6 +189,18 @@ namespace API.Middleware
 
             var result = JsonSerializer.Serialize(errorResponse, options);
             await response.WriteAsync(result);
+        }
+
+        private static int GetSubCodeForBusinessException(string errorCode)
+        {
+            return errorCode switch
+            {
+                "NOT_FOUND" => 404,
+                "CONFLICT" => 409,
+                "FORBIDDEN" => 403,
+                "VALIDATION_ERROR" => 400,
+                _ => 400
+            };
         }
     }
 }
