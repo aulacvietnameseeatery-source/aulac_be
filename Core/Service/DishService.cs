@@ -45,29 +45,4 @@ public class DishService : IDishService
                 .ToList()
         };
     }
-
-    /// <inheritdoc/>
-    public async Task<List<DishDetailDto>> GetAllDishesAsync(CancellationToken cancellationToken = default)
-    {
-        var dishes = await _dishRepository.GetAllDishesAsync(cancellationToken);
-
-        return dishes.Select(dish => new DishDetailDto
-        {
-            DishId = dish.DishId,
-            DishName = dish.DishName,
-            Price = dish.Price,
-            CategoryName = dish.Category.CategoryName,
-            Description = dish.Description,
-            ShortDescription = dish.ShortDescription,
-            Slogan = dish.Slogan,
-            Calories = dish.Calories,
-            PrepTimeMinutes = dish.PrepTimeMinutes,
-            CookTimeMinutes = dish.CookTimeMinutes,
-            ImageUrls = dish.DishMedia
-                .Where(dm => dm.Media != null)
-                .Select(dm => dm.Media!.Url ?? string.Empty)
-                .Where(url => !string.IsNullOrEmpty(url))
-                .ToList()
-        }).ToList();
-    }
 }

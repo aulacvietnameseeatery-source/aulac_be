@@ -64,27 +64,4 @@ public class DishController : ControllerBase
             ServerTime = DateTimeOffset.UtcNow
         });
     }
-
-    /// <summary>
-    /// Get all dishes
-    /// </summary>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>List of dishes</returns>
-    /// <response code="200">Dishes retrieved successfully</response>
-    [HttpGet]
-    [AllowAnonymous]
-    [ProducesResponseType(typeof(ApiResponse<List<DishDetailDto>>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetAllDishes(CancellationToken cancellationToken)
-    {
-        var dishDtos = await _dishService.GetAllDishesAsync(cancellationToken);
-
-        return Ok(new ApiResponse<List<DishDetailDto>>
-        {
-            Success = true,
-            Code = 200,
-            UserMessage = "Dishes retrieved successfully.",
-            Data = dishDtos,
-            ServerTime = DateTimeOffset.UtcNow
-        });
-    }
 }

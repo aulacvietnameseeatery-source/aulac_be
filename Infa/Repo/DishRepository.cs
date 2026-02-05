@@ -23,14 +23,4 @@ public class DishRepository : IDishRepository
                 .ThenInclude(dm => dm.Media)
             .FirstOrDefaultAsync(d => d.DishId == dishId, cancellationToken);
     }
-
-    public async Task<List<Dish>> GetAllDishesAsync(CancellationToken cancellationToken = default)
-    {
-        return await _context.Dishes
-            .Include(d => d.Category)
-            .Include(d => d.DishStatusLv)
-            .Include(d => d.DishMedia)
-                .ThenInclude(dm => dm.Media)
-            .ToListAsync(cancellationToken);
-    }
 }
