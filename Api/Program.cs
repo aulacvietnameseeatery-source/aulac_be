@@ -22,7 +22,6 @@ using Microsoft.AspNetCore.Http.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using StackExchange.Redis;
-using System;
 using System.Net;
 using System.Reflection;
 using System.Text.Encodings.Web;
@@ -30,18 +29,27 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
+// Do NOT stop the whole API if a BackgroundService throws
+builder.Services.Configure<HostOptions>(options =>
+{
+    options.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.Ignore;
+});
+
+#region Controllers + JSON + Model Validation Response
 
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
         // Serialize enums as strings in JSON responses (e.g., "Active" instead of 1)
-        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
+        options.JsonSerializerOptions.Converters.Add(
+            new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
 
         // Keep existing Unicode handling
         options.JsonSerializerOptions.Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping;
     })
     .ConfigureApiBehaviorOptions(options =>
     {
+        // Unified validation error response
         options.InvalidModelStateResponseFactory = context =>
         {
             var errors = context.ModelState
@@ -68,50 +76,11 @@ builder.Services.AddControllers()
 
             return new BadRequestObjectResult(api);
         };
-    }); ;
+    });
 
-// DI Configuration:
+#endregion
 
-builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
-    ConnectionMultiplexer.Connect(builder.Configuration.GetConnectionString("Redis")!)
-);
-
-// Cache service (SINGLETON - Redis client is thread-safe)
-builder.Services.AddSingleton<ICacheService, RedisCacheService>();
-
-// Authentication Infrastructure
-// Register auth services (token service, session repository, password hasher, etc.)
-builder.Services.AddAuthInfrastructure(builder.Configuration);
-
-// Business Services
-builder.Services.AddScoped<ISystemSettingService, SystemSettingService>();
-builder.Services.AddScoped<IAccountService, AccountService>();
-builder.Services.AddScoped<IDishService, DishService>();
-builder.Services.AddScoped<IPublicReservationService, PublicReservationService>();
-
-// Lookup System: ILookupLoader (SCOPED) + ILookupResolver (SINGLETON)
-builder.Services.AddScoped<ILookupRepo, LookupRepo>();
-builder.Services.AddSingleton<ILookupResolver, LookupResolver>();
-
-// Repositories
-builder.Services.AddScoped<IAccountRepository, AccountRepository>();
-builder.Services.AddScoped<ISystemSettingRepository, SystemSettingRepository>();
-builder.Services.AddScoped<IDishRepository, DishRepository>();
-builder.Services.AddScoped<ITableRepository, TableRepository>();
-builder.Services.AddScoped<IReservationRepository, ReservationRepository>();
-
-// Email services
-builder.Services.AddSingleton<IEmailQueue, RedisEmailQueue>();
-builder.Services.AddSingleton<IDeadLetterSink, RedisDeadLetterSink>();
-builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();
-
-// Forgot password token store uses cache
-builder.Services.AddSingleton<IPasswordResetTokenStore, RedisPasswordResetTokenStore>();
-
-
-// Register Background Service
-builder.Services.AddHostedService<EmailBackgroundService>();
-
+#region Options (Bind from configuration)
 
 // Load Options from configuration
 builder.Services.Configure<ForgotPasswordRulesOptions>(
@@ -120,7 +89,12 @@ builder.Services.Configure<ForgotPasswordRulesOptions>(
 builder.Services.Configure<BaseUrlOptions>(
     builder.Configuration.GetSection("BaseUrl"));
 
-builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection("Smtp"));
+builder.Services.Configure<SmtpOptions>(
+    builder.Configuration.GetSection("Smtp"));
+
+#endregion
+
+#region Database (DbContext)
 
 // Configure DbContext with connection string per environment
 var connectionString = builder.Configuration.GetConnectionString("Default")
@@ -131,12 +105,126 @@ builder.Services.AddDbContext<RestaurantMgmtContext>(options =>
     options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString));
 });
 
+#endregion
+
+#region Redis (NON-BLOCKING STARTUP)
+
+// IMPORTANT:
+// - We register Lazy<IConnectionMultiplexer> so the app DOES NOT connect at startup.
+// - If Redis is down, the app still starts.
+// - Any service that uses Redis should catch RedisConnectionException at runtime.
+
+builder.Services.AddSingleton(sp =>
+{
+    var cs = builder.Configuration.GetConnectionString("Redis");
+
+    return new Lazy<IConnectionMultiplexer>(() =>
+    {
+        if (string.IsNullOrWhiteSpace(cs))
+            throw new InvalidOperationException("Missing Redis connection string.");
+
+        var options = ConfigurationOptions.Parse(cs);
+
+        // Key setting: do not fail the process if Redis isn't reachable at startup
+        options.AbortOnConnectFail = false;
+
+        // Some safe defaults for resiliency
+        options.ConnectRetry = 3;
+        options.ReconnectRetryPolicy = new ExponentialRetry(1000);
+
+        return ConnectionMultiplexer.Connect(options);
+    });
+});
+
+// Backwards compatibility:
+// If your existing services inject IConnectionMultiplexer directly, this adapter preserves that.
+// NOTE: This will attempt the connection the FIRST time any service requests IConnectionMultiplexer.
+// If you want *all* redis-using services to be fully resilient, those services should inject Lazy<IConnectionMultiplexer>
+// (or a wrapper) and handle connection failures gracefully.
+builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
+    sp.GetRequiredService<Lazy<IConnectionMultiplexer>>().Value);
+
+// Cache service (SINGLETON - Redis client is thread-safe)
+builder.Services.AddSingleton<ICacheService, RedisCacheService>();
+
+#endregion
+
+#region Authentication / Authorization
+
+// Authentication Infrastructure
+// Register auth services (token service, session repository, password hasher, etc.)
+builder.Services.AddAuthInfrastructure(builder.Configuration);
 
 // Configure JWT Bearer authentication with session validation
 builder.Services.AddJwtAuthentication(builder.Configuration);
 
-//Register Custom Authorization Handler
+// Register Custom Authorization Handler
 builder.Services.AddSingleton<IAuthorizationMiddlewareResultHandler, CustomAuthorizationMiddlewareResultHandler>();
+
+// Dynamic Permission-Based Authorization permissions from Permissions class
+builder.Services.AddAuthorization(options =>
+{
+    var permissionFields = typeof(Permissions)
+        .GetFields(BindingFlags.Public | BindingFlags.Static);
+
+    foreach (var field in permissionFields)
+    {
+        var permission = field.GetValue(null)!.ToString()!;
+
+        options.AddPolicy(permission, policy =>
+        {
+            policy.RequireClaim("permission", permission);
+        });
+    }
+});
+
+#endregion
+
+#region Business Services
+
+builder.Services.AddScoped<ISystemSettingService, SystemSettingService>();
+builder.Services.AddScoped<IAccountService, AccountService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IPublicReservationService, PublicReservationService>();
+
+
+#endregion
+
+#region Lookup System
+
+// Lookup System: ILookupLoader (SCOPED) + ILookupResolver (SINGLETON)
+builder.Services.AddScoped<ILookupRepo, LookupRepo>();
+builder.Services.AddSingleton<ILookupResolver, LookupResolver>();
+
+#endregion
+
+#region Repositories
+
+builder.Services.AddScoped<IAccountRepository, AccountRepository>();
+builder.Services.AddScoped<ISystemSettingRepository, SystemSettingRepository>();
+builder.Services.AddScoped<IReservationRepository, ReservationRepository>();
+builder.Services.AddScoped<ITableRepository, TableRepository>();
+
+#endregion
+
+#region Email Services + Background Worker
+
+// Email services
+builder.Services.AddSingleton<IEmailQueue, RedisEmailQueue>();
+builder.Services.AddSingleton<IDeadLetterSink, RedisDeadLetterSink>();
+builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();
+
+// Forgot password token store uses cache
+builder.Services.AddSingleton<IPasswordResetTokenStore, RedisPasswordResetTokenStore>();
+
+// Register Background Service
+// NOTE: Ensure EmailBackgroundService catches RedisConnectionException inside its loop
+// so it doesn't crash the host when Redis is down.
+builder.Services.AddHostedService<EmailBackgroundService>();
+
+#endregion
+
+#region Swagger
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
@@ -156,9 +244,10 @@ builder.Services.AddSwaggerGen(options =>
     {
         {
             new Microsoft.OpenApi.Models.OpenApiSecurityScheme
-            {Reference = new Microsoft.OpenApi.Models.OpenApiReference
             {
-                Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
+                Reference = new Microsoft.OpenApi.Models.OpenApiReference
+                {
+                    Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
                     Id = "Bearer"
                 }
             },
@@ -167,37 +256,27 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
+#endregion
+
+#region CORS
+
 // Add CORS services
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
         policy.WithOrigins("http://localhost:3000") // Frontend URL
-                .AllowAnyMethod()
-                .AllowAnyHeader()
-                .AllowCredentials();
+              .AllowAnyMethod()
+              .AllowAnyHeader()
+              .AllowCredentials();
     });
 });
 
-// Dynamic Permission-Based Authorization permissions from Permissions class
-builder.Services.AddAuthorization(options =>
-{
-    var permissionFields = typeof(Permissions)
-        .GetFields(BindingFlags.Public | BindingFlags.Static);
-
-    foreach (var field in permissionFields)
-    {
-        var permission = field.GetValue(null)!.ToString()!;
-
-        options.AddPolicy(permission, policy =>
-        {
-            policy.RequireClaim("permission", permission);
-        });
-    }
-});
-
+#endregion
 
 var app = builder.Build();
+
+#region Startup Checks / Warmups
 
 // Kiểm tra kết nối database khi khởi động ứng dụng
 using (var scope = app.Services.CreateScope())
@@ -214,16 +293,28 @@ using (var scope = app.Services.CreateScope())
         Console.WriteLine("Database connection successful.");
 
         // Warm up lookup resolver cache
+        // If warmup fails, DO NOT stop the application
         var lookupResolver = scope.ServiceProvider.GetRequiredService<ILookupResolver>();
-        await lookupResolver.WarmUpAsync();
-        Console.WriteLine("Lookup resolver cache warmed up.");
+        try
+        {
+            await lookupResolver.WarmUpAsync();
+            Console.WriteLine("Lookup resolver cache warmed up.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Lookup warmup skipped (startup continues): {ex.Message}");
+        }
     }
     catch (Exception ex)
     {
-      Console.WriteLine($"Startup error: {ex.Message}");
+        Console.WriteLine($"Startup error: {ex.Message}");
         throw; // stop application
     }
 }
+
+#endregion
+
+#region Middleware Pipeline
 
 // Register global exception handling middleware
 // Must be first in the pipeline to catch all exceptions
@@ -236,7 +327,6 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-
 app.UseCors("AllowFrontend");
 app.UseHttpsRedirection();
 
@@ -246,5 +336,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+#endregion
 
 app.Run();

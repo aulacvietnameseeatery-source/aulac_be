@@ -15,7 +15,11 @@ public partial class Ingredient
 
     public long? IngredientNameTextId { get; set; }
 
+    public long? ImageId { get; set; }
+
     public virtual CurrentStock? CurrentStock { get; set; }
+
+    public virtual MediaAsset? Image { get; set; }
 
     public virtual I18nText? IngredientNameText { get; set; }
 

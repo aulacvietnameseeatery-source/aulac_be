@@ -24,6 +24,7 @@ namespace Core.Enum
         Severity = 14, // SEVERITY
         PromotionType = 15, // PROMOTION_TYPE
         PromotionStatus = 16, // PROMOTION_STATUS
-        IngredientType = 17  // INGREDIENT_TYPE
+        IngredientType = 17,  // INGREDIENT_TYPE
+        Tag = 18,         // TAG
     }
 }
