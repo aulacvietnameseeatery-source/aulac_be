@@ -1,3 +1,5 @@
+using Core.DTO.Auth;
+
 namespace Core.Interface.Service.Auth;
 
 /// <summary>
@@ -116,56 +118,3 @@ public interface IAuthService
     Task ResetPasswordAsync(string token, string newPassword, CancellationToken cancellationToken = default);
 }
 
-/// <summary>
-/// Login request DTO.
-/// </summary>
-public record LoginRequest(
-    string Username,
-    string Password);
-
-/// <summary>
-/// Refresh token request DTO.
-/// </summary>
-public record RefreshTokenRequest(
-    string AccessToken,
-    string RefreshToken);
-
-/// <summary>
-/// Authentication result containing tokens and metadata.
-/// </summary>
-public record AuthResult
-{
-    public bool Success { get; init; }
-    public string? AccessToken { get; init; }
-    public string? RefreshToken { get; init; }
-    public int ExpiresIn { get; init; }
-    public long? SessionId { get; init; }
-    public long? UserId { get; init; }
-    public string? Username { get; init; }
-    public IEnumerable<string>? Roles { get; init; }
-    public string? ErrorCode { get; init; }
-    public string? ErrorMessage { get; init; }
-
-    public static AuthResult Failed(string errorCode, string errorMessage) =>
-    new() { Success = false, ErrorCode = errorCode, ErrorMessage = errorMessage };
-
-    public static AuthResult Succeeded(
-        string accessToken,
-        string refreshToken,
-        int expiresIn,
-        long sessionId,
-        long userId,
-        string username,
-        IEnumerable<string> roles) =>
-     new()
-     {
-         Success = true,
-         AccessToken = accessToken,
-         RefreshToken = refreshToken,
-         ExpiresIn = expiresIn,
-         SessionId = sessionId,
-         UserId = userId,
-         Username = username,
-         Roles = roles
-     };
-}
