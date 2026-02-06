@@ -362,3 +362,7 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 CarRental-BE/Properties/serviceDependencies.json
+/Api/appsettings.json
+/Api/appsettings.Development.json
+/Api/appsettings.Production.json
+/Api/appsettings.Production.Development.json

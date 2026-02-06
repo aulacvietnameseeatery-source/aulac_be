@@ -91,7 +91,10 @@ public partial class RestaurantMgmtContext : DbContext
 
     public virtual DbSet<TableMedium> TableMedia { get; set; }
 
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder) { }
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

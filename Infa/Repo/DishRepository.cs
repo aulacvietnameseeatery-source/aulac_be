@@ -10,16 +10,16 @@ using System.Text;
 using System.Threading.Tasks;
 using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 
-namespace Infa.Repo
-{
-    public class DishRepository : IDishRepository
-    {
-        private readonly RestaurantMgmtContext _context;
+namespace Infa.Repo;
 
-        public DishRepository(RestaurantMgmtContext context)
-        {
-            _context = context;
-        }
+public class DishRepository : IDishRepository
+{
+    private readonly RestaurantMgmtContext _context;
+
+    public DishRepository(RestaurantMgmtContext context)
+    {
+        _context = context;
+    }
 
         public async Task<(List<Dish> Items, int TotalCount)> GetDishesAsync(GetDishesRequest request)
         {
@@ -52,7 +52,7 @@ namespace Infa.Repo
             else
             {
                 switch (request.SortBy.ToLower())
-                {
+    {
                     case "price":
                         dish = request.IsDescending
                             ? dish.OrderByDescending(d => d.Price)
