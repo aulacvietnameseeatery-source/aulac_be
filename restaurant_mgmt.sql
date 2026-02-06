@@ -924,9 +924,10 @@ REFERENCES dish_category (category_id);
 -- Create table `dish_tag`
 --
 CREATE TABLE dish_tag (
-  dish_tag_id bigint NOT NULL,
+  dish_tag_id bigint NOT NULL AUTO_INCREMENT,
   dish_id bigint NOT NULL,
-  tag_id int UNSIGNED NOT NULL
+  tag_id int UNSIGNED NOT NULL,
+  PRIMARY KEY (dish_tag_id)
 )
 ENGINE = INNODB,
 CHARACTER SET utf8mb4,

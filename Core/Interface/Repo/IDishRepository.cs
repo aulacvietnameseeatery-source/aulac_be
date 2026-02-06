@@ -30,4 +30,5 @@ public interface IDishRepository
     /// <param name="ct">Cancellation token</param>
     /// <returns>True if the dish exists; otherwise false</returns>
     Task<bool> ExistsAsync(long dishId, CancellationToken ct = default);
+    Task<Dish?> GetDishByIdAsync(long dishId, CancellationToken cancellationToken = default);
 }
