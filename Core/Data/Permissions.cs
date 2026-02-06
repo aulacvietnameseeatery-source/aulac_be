@@ -20,6 +20,12 @@ namespace Core.Data
         public const string ViewSystemSettings = "SYSTEM_SETTING:READ";
         public const string ManageSystemSettings = "SYSTEM_SETTING:EDIT";
 
+        //Dish
+        public const string ViewDish = "DISH:READ";
+        public const string CreateDish = "DISH:CREATE";
+        public const string EditDish = "DISH:EDIT";
+        public const string DeleteDish = "DISH:DELETE";
+
         //...
     }
 }

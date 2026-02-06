@@ -5,6 +5,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Infa.Repo;
 
+/// <summary>
+/// Repository implementation for dish data access operations.
+/// </summary>
 public class DishRepository : IDishRepository
 {
     private readonly RestaurantMgmtContext _context;
@@ -34,5 +37,31 @@ public class DishRepository : IDishRepository
             .Include(d => d.SloganText)
                 .ThenInclude(t => t!.I18nTranslations)
             .FirstOrDefaultAsync(d => d.DishId == dishId, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<Dish?> FindByIdAsync(long dishId, CancellationToken ct = default)
+    {
+        return await _context.Dishes
+            .AsNoTracking()
+            .FirstOrDefaultAsync(d => d.DishId == dishId, ct);
+    }
+
+    /// <inheritdoc />
+    public async Task UpdateStatusAsync(long dishId, uint statusLvId, CancellationToken ct = default)
+    {
+        await _context.Dishes
+            .Where(d => d.DishId == dishId)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(d => d.DishStatusLvId, statusLvId),
+                ct);
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> ExistsAsync(long dishId, CancellationToken ct = default)
+    {
+        return await _context.Dishes
+            .AsNoTracking()
+            .AnyAsync(d => d.DishId == dishId, ct);
     }
 }

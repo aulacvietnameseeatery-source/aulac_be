@@ -189,6 +189,9 @@ builder.Services.AddScoped<IDishService, DishService>();
 
 builder.Services.AddScoped<IPasswordGenerator, PasswordGeneratorService>();
 builder.Services.AddScoped<IUsernameGenerator, UsernameGeneratorService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IPublicReservationService, PublicReservationService>();
+
 
 
 #endregion
@@ -207,6 +210,8 @@ builder.Services.AddScoped<IAccountRepository, AccountRepository>();
 builder.Services.AddScoped<IRoleRepository, RoleRepository>();
 builder.Services.AddScoped<ISystemSettingRepository, SystemSettingRepository>();
 builder.Services.AddScoped<IDishRepository, DishRepository>();
+builder.Services.AddScoped<IReservationRepository, ReservationRepository>();
+builder.Services.AddScoped<ITableRepository, TableRepository>();
 
 #endregion
 

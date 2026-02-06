@@ -1,4 +1,5 @@
 ﻿using API.Models;
+using Core.Exceptions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using System;
@@ -49,7 +50,7 @@ namespace API.Middleware
             switch (exception)
             {
                 // Business Exceptions (Custom)
-                case Core.Exception.BusinessException businessEx:
+                case BusinessException businessEx:
                     response.StatusCode = businessEx.StatusCode;
                     errorResponse = new ApiResponse<object>
                     {
