@@ -16,5 +16,12 @@ namespace Core.Interface.Service.I18n
             Dictionary<string, string> translations,
             CancellationToken ct
         );
+
+        Task UpdateTextAsync(
+            long textId,
+            Dictionary<string, DishI18nDto> i18n,
+            Func<DishI18nDto, string?> selector,
+            CancellationToken ct
+        );
     }
 }

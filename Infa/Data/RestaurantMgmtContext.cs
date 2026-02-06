@@ -31,6 +31,8 @@ public partial class RestaurantMgmtContext : DbContext
 
     public virtual DbSet<DishMedium> DishMedia { get; set; }
 
+    public virtual DbSet<DishTag> DishTags { get; set; }
+
     public virtual DbSet<I18nLanguage> I18nLanguages { get; set; }
 
     public virtual DbSet<I18nText> I18nTexts { get; set; }
@@ -322,6 +324,8 @@ public partial class RestaurantMgmtContext : DbContext
 
             entity.ToTable("dish_category");
 
+            entity.HasIndex(e => e.DescriptionTextId, "FK_dish_category_i18n_text_text_id");
+
             entity.HasIndex(e => e.CategoryNameTextId, "fk_cat_name_text");
 
             entity.Property(e => e.CategoryId).HasColumnName("category_id");
@@ -329,10 +333,19 @@ public partial class RestaurantMgmtContext : DbContext
                 .HasMaxLength(100)
                 .HasColumnName("category_name");
             entity.Property(e => e.CategoryNameTextId).HasColumnName("category_name_text_id");
+            entity.Property(e => e.Description)
+                .HasMaxLength(100)
+                .HasColumnName("description");
+            entity.Property(e => e.DescriptionTextId).HasColumnName("description_text_id");
+            entity.Property(e => e.IsDisabled).HasColumnName("isDisabled");
 
-            entity.HasOne(d => d.CategoryNameText).WithMany(p => p.DishCategories)
+            entity.HasOne(d => d.CategoryNameText).WithMany(p => p.DishCategoryCategoryNameTexts)
                 .HasForeignKey(d => d.CategoryNameTextId)
                 .HasConstraintName("fk_cat_name_text");
+
+            entity.HasOne(d => d.DescriptionText).WithMany(p => p.DishCategoryDescriptionTexts)
+                .HasForeignKey(d => d.DescriptionTextId)
+                .HasConstraintName("FK_dish_category_i18n_text_text_id");
         });
 
         modelBuilder.Entity<DishMedium>(entity =>
@@ -360,6 +373,29 @@ public partial class RestaurantMgmtContext : DbContext
                 .HasForeignKey(d => d.MediaId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("dish_media_ibfk_2");
+        });
+
+        modelBuilder.Entity<DishTag>(entity =>
+        {
+            entity.HasKey(e => e.DishTagId).HasName("PRIMARY");
+            entity.ToTable("dish_tag");
+
+            entity.HasIndex(e => e.DishId, "FK_dish_tag_dish_dish_id");
+
+            entity.HasIndex(e => e.TagId, "FK_dish_tag_lookup_value_value_id");
+
+            entity.Property(e => e.DishId).HasColumnName("dish_id");
+            entity.Property(e => e.DishTagId).HasColumnName("dish_tag_id");
+            entity.Property(e => e.TagId).HasColumnName("tag_id");
+
+            entity.HasOne(d => d.Dish).WithMany()
+                .HasForeignKey(d => d.DishId)
+                .OnDelete(DeleteBehavior.ClientSetNull);
+
+            entity.HasOne(d => d.Tag).WithMany()
+                .HasForeignKey(d => d.TagId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_dish_tag_lookup_value_value_id");
         });
 
         modelBuilder.Entity<I18nLanguage>(entity =>
@@ -459,11 +495,14 @@ public partial class RestaurantMgmtContext : DbContext
 
             entity.ToTable("ingredient");
 
+            entity.HasIndex(e => e.ImageId, "FK_ingredient_image_id");
+
             entity.HasIndex(e => e.TypeLvId, "FK_ingredient_type_lv_id");
 
             entity.HasIndex(e => e.IngredientNameTextId, "fk_ingredient_name_text");
 
             entity.Property(e => e.IngredientId).HasColumnName("ingredient_id");
+            entity.Property(e => e.ImageId).HasColumnName("image_id");
             entity.Property(e => e.IngredientName)
                 .HasMaxLength(200)
                 .HasColumnName("ingredient_name");
@@ -472,6 +511,10 @@ public partial class RestaurantMgmtContext : DbContext
             entity.Property(e => e.Unit)
                 .HasMaxLength(20)
                 .HasColumnName("unit");
+
+            entity.HasOne(d => d.Image).WithMany(p => p.Ingredients)
+                .HasForeignKey(d => d.ImageId)
+                .HasConstraintName("FK_ingredient_image_id");
 
             entity.HasOne(d => d.IngredientNameText).WithMany(p => p.Ingredients)
                 .HasForeignKey(d => d.IngredientNameTextId)

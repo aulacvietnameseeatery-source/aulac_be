@@ -55,3 +55,8 @@ public enum IngredientTypeCode
     BEVERAGE,
     PACKAGING
 }
+
+public enum Tag
+{
+
+}
