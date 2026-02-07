@@ -10,4 +10,5 @@ public class TableAvailabilityDto
     public int Capacity { get; set; }
     public string TableType { get; set; } = null!;
     public bool IsAvailable { get; set; }
+    public DateTime? LockedUntil { get; set; }
 }

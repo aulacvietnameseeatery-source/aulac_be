@@ -27,6 +27,8 @@ using System.Reflection;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Api.Hubs;
+using Api.SignalR;
 
 var builder = WebApplication.CreateBuilder(args);
 // Do NOT stop the whole API if a BackgroundService throws
@@ -232,6 +234,13 @@ builder.Services.AddHostedService<EmailBackgroundService>();
 
 #endregion
 
+#region SignalR
+
+builder.Services.AddSignalR();
+builder.Services.AddScoped<IReservationBroadcastService, SignalRReservationBroadcastService>();
+
+#endregion
+
 #region Swagger
 
 builder.Services.AddEndpointsApiExplorer();
@@ -344,6 +353,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<ReservationHub>("/hubs/reservation");
 
 #endregion
 
