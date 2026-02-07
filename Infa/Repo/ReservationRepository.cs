@@ -49,14 +49,13 @@ public class ReservationRepository : IReservationRepository
         int durationMinutes = 120,
         CancellationToken ct = default)
     {
-        // Check for overlapping reservations within the time window
-        // A reservation conflicts if:
-        // - It's for the same table
-        // - It's not cancelled or no-show
-        // - The time windows overlap
-
-        var startWindow = reservedTime.AddMinutes(-durationMinutes);
-        var endWindow = reservedTime.AddMinutes(durationMinutes);
+        // New reservation will occupy: [reservedTime, reservedTime + durationMinutes]
+        // Check for overlapping existing reservations
+        // Two time ranges overlap if:
+        // - Range A starts before Range B ends AND
+        // - Range A ends after Range B starts
+        
+        var newReservationEnd = reservedTime.AddMinutes(durationMinutes);
 
         return await _context.Reservations
             .AsNoTracking()
@@ -64,7 +63,13 @@ public class ReservationRepository : IReservationRepository
             .Where(r => r.Tables.Any(t => t.TableId == tableId))
             .Where(r => r.ReservationStatusLvId != ReservationStatusCancelled)
             .Where(r => r.ReservationStatusLvId != ReservationStatusNoShow)
-            .Where(r => r.ReservedTime >= startWindow && r.ReservedTime <= endWindow)
+            // Overlap check: existing reservation overlaps with new reservation window
+            // Existing: [r.ReservedTime, r.ReservedTime + duration]
+            // New: [reservedTime, reservedTime + duration]
+            .Where(r => 
+                r.ReservedTime < newReservationEnd &&
+                r.ReservedTime.AddMinutes(durationMinutes) > reservedTime
+            )
             .ToListAsync(ct);
     }
 }

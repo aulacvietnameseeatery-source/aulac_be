@@ -48,6 +48,7 @@ public class PublicReservationService : IPublicReservationService
     public async Task<List<TableAvailabilityDto>> GetAvailableTablesAsync(
         DateTime? reservedTime,
         int? partySize,
+        string? zone,
         CancellationToken ct = default)
     {
         // Get all non-maintenance tables
@@ -57,6 +58,12 @@ public class PublicReservationService : IPublicReservationService
         if (partySize.HasValue)
         {
             tables = tables.Where(t => t.Capacity >= partySize.Value).ToList();
+        }
+
+        // Filter by zone if specified and not "All"
+        if (!string.IsNullOrEmpty(zone) && !zone.Equals("All", StringComparison.OrdinalIgnoreCase))
+        {
+            tables = tables.Where(t => t.ZoneLv?.ValueName?.Equals(zone, StringComparison.OrdinalIgnoreCase) == true).ToList();
         }
 
         var result = new List<TableAvailabilityDto>();
@@ -108,8 +115,10 @@ public class PublicReservationService : IPublicReservationService
                 TableCode = table.TableCode,
                 Capacity = table.Capacity,
                 TableType = table.TableTypeLv?.ValueName ?? "Standard",
+                Zone = table.ZoneLv?.ValueName ?? "Indoor",
                 IsAvailable = !isLocked && !hasConflict,
-                LockedUntil = isLocked ? lockedUntil : null
+                LockedUntil = isLocked ? lockedUntil : null,
+                ImageUrl = table.TableMedia?.FirstOrDefault()?.Media?.Url
             });
         }
 
@@ -192,27 +201,56 @@ public class PublicReservationService : IPublicReservationService
         CreateReservationRequest request,
         CancellationToken ct = default)
     {
-        // Validate lock token
-        var lockKey = $"{LockKeyPrefix}{request.TableId}";
-        var lockDataJson = await _cacheService.GetAsync<string>(lockKey);
-        if (string.IsNullOrEmpty(lockDataJson))
-        {
-            throw new InvalidOperationException(
-                "Lock has expired or is invalid. Please lock the table again.");
-        }
-
-        var lockData = JsonSerializer.Deserialize<TableLockData>(lockDataJson);
-        if (lockData == null || lockData.LockToken != request.LockToken)
-        {
-            throw new InvalidOperationException(
-                "Invalid lock token. Please lock the table again.");
-        }
-
-        // Get table for response
+        // Get table for validation and response
         var table = await _tableRepository.GetByIdAsync(request.TableId, ct);
         if (table == null)
         {
             throw new KeyNotFoundException($"Table with ID {request.TableId} not found.");
+        }
+
+        // Check if table is under maintenance
+        if (table.TableStatusLvId == 17) // LOCKED status
+        {
+            throw new InvalidOperationException($"Table {table.TableCode} is under maintenance.");
+        }
+
+        var lockKey = $"{LockKeyPrefix}{request.TableId}";
+
+        // If lock token is provided, validate it (legacy flow)
+        if (!string.IsNullOrEmpty(request.LockToken))
+        {
+            var lockDataJson = await _cacheService.GetAsync<string>(lockKey);
+            if (string.IsNullOrEmpty(lockDataJson))
+            {
+                throw new InvalidOperationException(
+                    "Lock has expired or is invalid. Please try booking again.");
+            }
+
+            var lockData = JsonSerializer.Deserialize<TableLockData>(lockDataJson);
+            if (lockData == null || lockData.LockToken != request.LockToken)
+            {
+                throw new InvalidOperationException(
+                    "Invalid lock token. Please try booking again.");
+            }
+        }
+        else
+        {
+            // Direct reservation flow (no lock token)
+            // Check if table is currently soft-locked by someone else
+            if (await _cacheService.ExistsAsync(lockKey))
+            {
+                throw new InvalidOperationException(
+                    $"Table {table.TableCode} is currently being reserved by another customer. Please try again.");
+            }
+
+            // Check for existing reservations at the requested time
+            var conflicts = await _reservationRepository.GetTableReservationsForTimeAsync(
+                request.TableId, request.ReservedTime, 120, ct);
+            if (conflicts.Any())
+            {
+                throw new InvalidOperationException(
+                    $"Table {table.TableCode} already has a reservation around the requested time.");
+            }
         }
 
         // Create reservation
@@ -225,18 +263,16 @@ public class PublicReservationService : IPublicReservationService
             ReservedTime = request.ReservedTime,
             CreatedAt = DateTime.UtcNow,
             SourceLvId = ReservationSourceOnline,
-            ReservationStatusLvId = ReservationStatusPending, // Pending
+            ReservationStatusLvId = ReservationStatusPending,
             Tables = new List<RestaurantTable> { table }
         };
 
         var created = await _reservationRepository.CreateAsync(reservation, ct);
 
-        // Remove lock from Redis
+        // Remove lock from Redis if it exists
         await _cacheService.RemoveAsync(lockKey);
 
-        // Broadcast updates
-        // 1. Table is no longer soft-locked (implicit by remove), but now it has a reservation.
-        // We might want to broadcast a specific "ReservationCreated" which implies availability changes.
+        // Broadcast reservation created event
         await _broadcastService.BroadcastReservationCreatedAsync(created.ReservationId, table.TableId);
 
         _logger.LogInformation(
@@ -252,6 +288,7 @@ public class PublicReservationService : IPublicReservationService
             PartySize = created.PartySize,
             ReservedTime = created.ReservedTime,
             TableCode = table.TableCode,
+            Zone = table.ZoneLv?.ValueName ?? "Indoor",
             Status = "Pending",
             CreatedAt = created.CreatedAt ?? DateTime.UtcNow
         };

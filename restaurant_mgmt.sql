@@ -529,6 +529,9 @@ CREATE TABLE restaurant_table (
   table_qr_img bigint DEFAULT NULL,
   table_status_lv_id int UNSIGNED NOT NULL,
   table_type_lv_id int UNSIGNED NOT NULL,
+  table_status_lv_id int UNSIGNED NOT NULL,
+  table_type_lv_id int UNSIGNED NOT NULL,
+  zone_lv_id int UNSIGNED NOT NULL,
   isOnline tinyint(1) NOT NULL DEFAULT 1,
   PRIMARY KEY (table_id)
 )
@@ -548,6 +551,12 @@ ADD INDEX idx_restaurant_table_status_lv (table_status_lv_id);
 --
 ALTER TABLE restaurant_table
 ADD INDEX idx_restaurant_table_type_lv (table_type_lv_id);
+
+--
+-- Create index `idx_restaurant_table_zone_lv` on table `restaurant_table`
+--
+ALTER TABLE restaurant_table
+ADD INDEX idx_restaurant_table_zone_lv (zone_lv_id);
 
 --
 -- Create index `table_code` on table `restaurant_table`
@@ -574,6 +583,13 @@ REFERENCES media_asset (media_id) ON DELETE CASCADE;
 --
 ALTER TABLE restaurant_table
 ADD CONSTRAINT fk_restaurant_table_type_lv FOREIGN KEY (table_type_lv_id)
+REFERENCES lookup_value (value_id);
+
+--
+-- Create foreign key
+--
+ALTER TABLE restaurant_table
+ADD CONSTRAINT fk_restaurant_table_zone_lv FOREIGN KEY (zone_lv_id)
 REFERENCES lookup_value (value_id);
 
 --
@@ -1904,7 +1920,12 @@ INSERT INTO i18n_text(text_id, text_key, source_lang_code, source_text, context,
 (120, 'lookup_value.value_name.82', 'en', 'Semi-processed', 'lookup value name', '2026-02-02 23:19:57', '2026-02-02 23:19:57'),
 (121, 'lookup_value.value_name.83', 'en', 'Seasoning', 'lookup value name', '2026-02-02 23:19:57', '2026-02-02 23:19:57'),
 (122, 'lookup_value.value_name.84', 'en', 'Beverage', 'lookup value name', '2026-02-02 23:19:57', '2026-02-02 23:19:57'),
-(123, 'lookup_value.value_name.85', 'en', 'Packaging', 'lookup value name', '2026-02-02 23:19:57', '2026-02-02 23:19:57');
+(123, 'lookup_value.value_name.85', 'en', 'Packaging', 'lookup value name', '2026-02-02 23:19:57', '2026-02-02 23:19:57'),
+(124, 'enum.type.table_zone.name', 'en', 'Table Zone', 'Enum Type Name', NOW(), NOW()),
+(125, 'enum.type.table_zone.desc', 'en', 'Zone of the table', 'Enum Type Description', NOW(), NOW()),
+(126, 'enum.value.table_zone.indoor.name', 'en', 'Indoor', 'Enum Value Name', NOW(), NOW()),
+(127, 'enum.value.table_zone.outdoor.name', 'en', 'Outdoor', 'Enum Value Name', NOW(), NOW()),
+(128, 'enum.value.table_zone.rooftop.name', 'en', 'Rooftop', 'Enum Value Name', NOW(), NOW());
 
 -- 
 -- Dumping data for table lookup_type
@@ -1927,7 +1948,8 @@ INSERT INTO lookup_type(type_id, type_code, type_name, description, is_configura
 (15, 'PROMOTION_TYPE', 'Promotion Type', 'promotion.type_id', 1, 1, 15, 46),
 (16, 'PROMOTION_STATUS', 'Promotion Status', 'promotion.promotion_status', 0, 1, 16, 47),
 (17, 'INGREDIENT_TYPE', 'Ingredient Type', 'ingredient.type', 1, 1, 17, 48),
-(18, 'TAG', 'Tag', 'tag', 1, 1, NULL, NULL);
+(18, 'TAG', 'Tag', 'tag', 1, 1, NULL, NULL),
+(19, 'TABLE_ZONE', 'Table Zone', 'Zone of the table (Indoor, Outdoor, etc.)', 1, 1, 124, 125);
 
 -- 
 -- Dumping data for table lookup_value
@@ -1993,7 +2015,10 @@ INSERT INTO lookup_value(value_id, type_id, value_code, value_name, sort_order, 
 (82, 17, 'SEMI_PROCESSED', 'Semi-processed', 2, 1, '{"legacy_num": 2}', 1, 0, NULL, NULL, NULL, 120, NULL),
 (83, 17, 'SEASONING', 'Seasoning', 3, 1, '{"legacy_num": 3}', 1, 0, NULL, NULL, NULL, 121, NULL),
 (84, 17, 'BEVERAGE', 'Beverage', 4, 1, '{"legacy_num": 4}', 1, 0, NULL, NULL, NULL, 122, NULL),
-(85, 17, 'PACKAGING', 'Packaging', 5, 1, '{"legacy_num": 5}', 1, 0, NULL, NULL, NULL, 123, NULL);
+(85, 17, 'PACKAGING', 'Packaging', 5, 1, '{"legacy_num": 5}', 1, 0, NULL, NULL, NULL, 123, NULL),
+(94, 19, 'INDOOR', 'Indoor', 1, 1, NULL, 1, 1, NULL, NULL, NULL, 126, NULL),
+(95, 19, 'OUTDOOR', 'Outdoor', 2, 1, NULL, 1, 1, NULL, NULL, NULL, 127, NULL),
+(96, 19, 'ROOFTOP', 'Rooftop', 3, 1, NULL, 1, 1, NULL, NULL, NULL, 128, NULL);
 
 -- 
 -- Dumping data for table role
