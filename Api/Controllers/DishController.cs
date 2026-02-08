@@ -1,4 +1,6 @@
 using API.Models;
+using Core.Attribute;
+using Core.Data;
 using Core.DTO.Dish;
 using Core.Entity;
 using Core.Interface.Service.Entity;
@@ -12,7 +14,6 @@ namespace Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/dishes")]
-[Produces("application/json")]
 public class DishController : ControllerBase
 {
     private readonly IDishService _dishService;
@@ -30,6 +31,7 @@ public class DishController : ControllerBase
     /// Get dish detail by ID
     /// </summary>
     /// <param name="id">Dish ID</param>
+    /// <param name="lang">Language code. Supported: "en" (English - default), "fr" (French), "vi" (Vietnamese)</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Dish detail information</returns>
     /// <response code="200">Dish found</response>
@@ -40,9 +42,10 @@ public class DishController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetDishById(
         long id,
+        [FromQuery] string? lang,
         CancellationToken cancellationToken)
     {
-        var dishDto = await _dishService.GetDishByIdAsync(id, cancellationToken);
+        var dishDto = await _dishService.GetDishByIdAsync(id, lang, cancellationToken);
 
         if (dishDto == null)
         {
@@ -96,6 +99,52 @@ public class DishController : ControllerBase
             Code = 200,
             UserMessage = "Get dish list successfully.",
             Data = pagedResult,
+            ServerTime = DateTimeOffset.UtcNow
+        });
+    }
+    /// <summary>
+    /// Updates the status of a dish.
+    /// </summary>
+    /// <param name="id">The dish ID</param>
+    /// <param name="request">The status update request</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Updated dish status information</returns>
+    /// <response code="200">Status updated successfully</response>
+    /// <response code="404">Dish not found</response>
+    /// <response code="400">Invalid request</response>
+    /// <remarks>
+    /// Updates the dish status to one of the following values:
+    /// - AVAILABLE: Dish is available for ordering
+    /// - OUT_OF_STOCK: Dish is temporarily out of stock
+    /// - HIDDEN: Dish is hidden from the menu
+    /// 
+    /// The status is stored using the lookup system for internationalization support.
+    /// </remarks>
+    [HttpPatch("{id}/status")]
+    //[HasPermission(Permissions.EditDish)]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(ApiResponse<DishStatusDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> UpdateDishStatus(
+        long id,
+        [FromBody] UpdateDishStatusRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _dishService.UpdateDishStatusAsync(id, request.Status, cancellationToken);
+
+        _logger.LogInformation(
+            "Dish {DishId} status updated to {Status}",
+            id,
+            request.Status);
+
+        return Ok(new ApiResponse<DishStatusDto>
+        {
+            Success = true,
+            Code = 200,
+            UserMessage = $"Dish status updated to {request.Status} successfully.",
+            SystemMessage = "Status update successful",
+            Data = result,
             ServerTime = DateTimeOffset.UtcNow
         });
     }

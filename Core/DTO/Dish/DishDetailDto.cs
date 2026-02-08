@@ -16,4 +16,5 @@ public class DishDetailDto
     public int? PrepTimeMinutes { get; set; }
     public int? CookTimeMinutes { get; set; }
     public List<string> ImageUrls { get; set; } = new();
+    public List<RecipeItemDto> Composition { get; set; } = new();
 }
