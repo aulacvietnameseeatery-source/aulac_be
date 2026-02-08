@@ -11,6 +11,5 @@ namespace Core.Interface.Repo;
 public interface IDishRepository
 {
     Task<Dish?> GetDishByIdAsync(long dishId, CancellationToken cancellationToken = default);
-        Task<(List<Dish> Items, int TotalCount)> GetDishesAsync(GetDishesRequest request);
-    }
+    Task<(List<Dish> Items, int TotalCount)> GetDishesAsync(GetDishesRequest request, CancellationToken cancellationToken = default);
 }

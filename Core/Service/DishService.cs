@@ -1,12 +1,7 @@
-﻿using Core.DTO.Dish;
+﻿
+using Core.DTO.Dish;
 using Core.Entity;
 using Core.Interface.Repo;
-using Core.Interface.Service.Dishes;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Core.Interface.Service.Entity;
 
 namespace Core.Service;
@@ -18,7 +13,6 @@ public class DishService : IDishService
 {
     private readonly IDishRepository _dishRepository;
 
-        private readonly IDishRepository _dishRepository;
     public DishService(IDishRepository dishRepository)
     {
         _dishRepository = dishRepository;
@@ -52,5 +46,9 @@ public class DishService : IDishService
                 .Where(url => !string.IsNullOrEmpty(url))
                 .ToList()
         };
+    }
+    public async Task<(List<Dish> Items, int TotalCount)> GetAllDishesAsync(GetDishesRequest request, CancellationToken cancellationToken = default)
+    {
+        return await _dishRepository.GetDishesAsync(request, cancellationToken);
     }
 }

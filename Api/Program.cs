@@ -6,7 +6,6 @@ using Core.Data;
 using Core.Interface.Repo;
 using Core.Interface.Service;
 using Core.Interface.Service.Auth;
-using Core.Interface.Service.Dishes;
 using Core.Interface.Service.Email;
 using Core.Interface.Service.Entity;
 using Core.Interface.Service.Others;
@@ -30,6 +29,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
+
 // Do NOT stop the whole API if a BackgroundService throws
 builder.Services.Configure<HostOptions>(options =>
 {
@@ -41,16 +41,14 @@ builder.Services.Configure<HostOptions>(options =>
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
-        // Serialize enums as strings in JSON responses (e.g., "Active" instead of 1)
+        // Serialize enums as strings in JSON responses
         options.JsonSerializerOptions.Converters.Add(
             new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
 
-        // Keep existing Unicode handling
         options.JsonSerializerOptions.Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping;
     })
     .ConfigureApiBehaviorOptions(options =>
     {
-        // Unified validation error response
         options.InvalidModelStateResponseFactory = context =>
         {
             var errors = context.ModelState
@@ -83,7 +81,6 @@ builder.Services.AddControllers()
 
 #region Options (Bind from configuration)
 
-// Load Options from configuration
 builder.Services.Configure<ForgotPasswordRulesOptions>(
     builder.Configuration.GetSection("ForgotPasswordRules"));
 
@@ -97,7 +94,6 @@ builder.Services.Configure<SmtpOptions>(
 
 #region Database (DbContext)
 
-// Configure DbContext with connection string per environment
 var connectionString = builder.Configuration.GetConnectionString("Default")
     ?? throw new InvalidOperationException("Missing Default connection string.");
 
@@ -110,11 +106,6 @@ builder.Services.AddDbContext<RestaurantMgmtContext>(options =>
 
 #region Redis (NON-BLOCKING STARTUP)
 
-// IMPORTANT:
-// - We register Lazy<IConnectionMultiplexer> so the app DOES NOT connect at startup.
-// - If Redis is down, the app still starts.
-// - Any service that uses Redis should catch RedisConnectionException at runtime.
-
 builder.Services.AddSingleton(sp =>
 {
     var cs = builder.Configuration.GetConnectionString("Redis");
@@ -125,11 +116,7 @@ builder.Services.AddSingleton(sp =>
             throw new InvalidOperationException("Missing Redis connection string.");
 
         var options = ConfigurationOptions.Parse(cs);
-
-        // Key setting: do not fail the process if Redis isn't reachable at startup
         options.AbortOnConnectFail = false;
-
-        // Some safe defaults for resiliency
         options.ConnectRetry = 3;
         options.ReconnectRetryPolicy = new ExponentialRetry(1000);
 
@@ -137,32 +124,19 @@ builder.Services.AddSingleton(sp =>
     });
 });
 
-// Backwards compatibility:
-// If your existing services inject IConnectionMultiplexer directly, this adapter preserves that.
-// NOTE: This will attempt the connection the FIRST time any service requests IConnectionMultiplexer.
-// If you want *all* redis-using services to be fully resilient, those services should inject Lazy<IConnectionMultiplexer>
-// (or a wrapper) and handle connection failures gracefully.
 builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
     sp.GetRequiredService<Lazy<IConnectionMultiplexer>>().Value);
 
-// Cache service (SINGLETON - Redis client is thread-safe)
 builder.Services.AddSingleton<ICacheService, RedisCacheService>();
 
 #endregion
 
 #region Authentication / Authorization
 
-// Authentication Infrastructure
-// Register auth services (token service, session repository, password hasher, etc.)
 builder.Services.AddAuthInfrastructure(builder.Configuration);
-
-// Configure JWT Bearer authentication with session validation
 builder.Services.AddJwtAuthentication(builder.Configuration);
-
-// Register Custom Authorization Handler
 builder.Services.AddSingleton<IAuthorizationMiddlewareResultHandler, CustomAuthorizationMiddlewareResultHandler>();
 
-// Dynamic Permission-Based Authorization permissions from Permissions class
 builder.Services.AddAuthorization(options =>
 {
     var permissionFields = typeof(Permissions)
@@ -185,18 +159,13 @@ builder.Services.AddAuthorization(options =>
 
 builder.Services.AddScoped<ISystemSettingService, SystemSettingService>();
 builder.Services.AddScoped<IAccountService, AccountService>();
-
-builder.Services.AddScoped<IDishService, DishService>();
-
 builder.Services.AddScoped<IPasswordGenerator, PasswordGeneratorService>();
 builder.Services.AddScoped<IUsernameGenerator, UsernameGeneratorService>();
-
 
 #endregion
 
 #region Lookup System
 
-// Lookup System: ILookupLoader (SCOPED) + ILookupResolver (SINGLETON)
 builder.Services.AddScoped<ILookupRepo, LookupRepo>();
 builder.Services.AddSingleton<ILookupResolver, LookupResolver>();
 
@@ -207,36 +176,31 @@ builder.Services.AddSingleton<ILookupResolver, LookupResolver>();
 builder.Services.AddScoped<IAccountRepository, AccountRepository>();
 builder.Services.AddScoped<IRoleRepository, RoleRepository>();
 builder.Services.AddScoped<ISystemSettingRepository, SystemSettingRepository>();
-builder.Services.AddScoped<IDishRepository, DishRepository>();
 
 #endregion
 
 #region Email Services + Background Worker
 
-// Email services
 builder.Services.AddSingleton<IEmailQueue, RedisEmailQueue>();
 builder.Services.AddSingleton<IDeadLetterSink, RedisDeadLetterSink>();
 builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();
-
-// Forgot password token store uses cache
 builder.Services.AddSingleton<IPasswordResetTokenStore, RedisPasswordResetTokenStore>();
-
-// Register Background Service
-// NOTE: Ensure EmailBackgroundService catches RedisConnectionException inside its loop
-// so it doesn't crash the host when Redis is down.
 builder.Services.AddHostedService<EmailBackgroundService>();
 
-// Dish Management
+#endregion
+
+#region Dish Management
+
 builder.Services.AddScoped<IDishRepository, Infa.Repo.DishRepository>();
 builder.Services.AddScoped<IDishService, Core.Service.DishService>();
 
+#endregion
 
 #region Swagger
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
-    // Add JWT security definition for Swagger
     options.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
     {
         Name = "Authorization",
@@ -267,12 +231,11 @@ builder.Services.AddSwaggerGen(options =>
 
 #region CORS
 
-// Add CORS services
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins("http://localhost:3000") // Frontend URL
+        policy.WithOrigins("http://localhost:3000")
               .AllowAnyMethod()
               .AllowAnyHeader()
               .AllowCredentials();
@@ -285,7 +248,6 @@ var app = builder.Build();
 
 #region Startup Checks / Warmups
 
-// Kiểm tra kết nối database khi khởi động ứng dụng
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<RestaurantMgmtContext>();
@@ -299,8 +261,6 @@ using (var scope = app.Services.CreateScope())
 
         Console.WriteLine("Database connection successful.");
 
-        // Warm up lookup resolver cache
-        // If warmup fails, DO NOT stop the application
         var lookupResolver = scope.ServiceProvider.GetRequiredService<ILookupResolver>();
         try
         {
@@ -315,7 +275,7 @@ using (var scope = app.Services.CreateScope())
     catch (Exception ex)
     {
         Console.WriteLine($"Startup error: {ex.Message}");
-        throw; // stop application
+        throw;
     }
 }
 
@@ -323,11 +283,8 @@ using (var scope = app.Services.CreateScope())
 
 #region Middleware Pipeline
 
-// Register global exception handling middleware
-// Must be first in the pipeline to catch all exceptions
 app.UseMiddleware<HandleExceptionMiddleware>();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -337,8 +294,6 @@ if (app.Environment.IsDevelopment())
 app.UseCors("AllowFrontend");
 app.UseHttpsRedirection();
 
-// Authentication & Authorization Middleware
-// Must be before UseAuthorization
 app.UseAuthentication();
 app.UseAuthorization();
 
