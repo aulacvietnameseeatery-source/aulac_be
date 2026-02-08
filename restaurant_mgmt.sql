@@ -529,8 +529,6 @@ CREATE TABLE restaurant_table (
   table_qr_img bigint DEFAULT NULL,
   table_status_lv_id int UNSIGNED NOT NULL,
   table_type_lv_id int UNSIGNED NOT NULL,
-  table_status_lv_id int UNSIGNED NOT NULL,
-  table_type_lv_id int UNSIGNED NOT NULL,
   zone_lv_id int UNSIGNED NOT NULL,
   isOnline tinyint(1) NOT NULL DEFAULT 1,
   PRIMARY KEY (table_id)
