@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using API.Models;
 using System.Security.Claims;
 using Core.DTO.Account;
+using Core.DTO.General;
 
 namespace Api.Controllers
 {
@@ -443,12 +444,67 @@ namespace Api.Controllers
             });
         }
 
-        #region Helper Methods
 
-        /// <summary>
-        /// Gets the current user's ID from JWT claims.
-        /// </summary>
-        private long? GetCurrentUserId()
+
+
+		[HttpGet("staff")]
+		[HasPermission(Permissions.ViewAccount)]
+		public async Task<IActionResult> GetAccounts([FromQuery] AccountListQueryDTO query)
+		{
+			var result = await _accountService.GetAccountsAsync(query);
+
+			return Ok(new ApiResponse<PagedResultDTO<AccountListDTO>>
+			{
+				Success = true,
+				Code = 200,
+				SubCode = 0,
+				UserMessage = "Get staff accounts successfully",
+				Data = result,
+				ServerTime = DateTimeOffset.Now
+			});
+		}
+
+		[HttpGet("roles")]
+		[HasPermission(Permissions.ViewAccount)]
+		public async Task<IActionResult> GetAllRoles(CancellationToken cancellationToken = default)
+		{
+			var roles = await _accountService.GetAllRolesAsync(cancellationToken);
+
+			return Ok(new ApiResponse<List<RoleDTO>>
+			{
+				Success = true,
+				Code = 200,
+				SubCode = 0,
+				UserMessage = "Get roles successfully",
+				Data = roles,
+				ServerTime = DateTimeOffset.Now
+			});
+		}
+
+		[HttpGet("statuses")]
+		[HasPermission(Permissions.ViewAccount)]
+		public async Task<IActionResult> GetAccountStatuses(CancellationToken cancellationToken = default)
+		{
+			var statuses = await _accountService.GetAccountStatusesAsync(cancellationToken);
+
+			return Ok(new ApiResponse<List<AccountStatusDTO>>
+			{
+				Success = true,
+				Code = 200,
+				SubCode = 0,
+				UserMessage = "Get account statuses successfully",
+				Data = statuses,
+				ServerTime = DateTimeOffset.Now
+			});
+		}
+
+
+		#region Helper Methods
+
+		/// <summary>
+		/// Gets the current user's ID from JWT claims.
+		/// </summary>
+		private long? GetCurrentUserId()
         {
             var userIdClaim = User.FindFirst("user_id");
             if (userIdClaim != null && long.TryParse(userIdClaim.Value, out var userId))
