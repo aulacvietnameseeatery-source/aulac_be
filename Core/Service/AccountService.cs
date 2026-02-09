@@ -9,7 +9,7 @@ using Core.Interface.Service.Auth;
 using Core.Interface.Service.Email;
 using Core.Interface.Service.Entity;
 using Microsoft.Extensions.Logging;
-using Core.Exception;
+using Core.Exceptions;
 using Core.DTO.Account;
 
 namespace Core.Service;
@@ -393,12 +393,12 @@ CancellationToken cancellationToken = default)
       // Validate new password
    if (string.IsNullOrWhiteSpace(newPassword))
         {
-            throw new Core.Exception.ValidationException("New password cannot be empty");
+            throw new ValidationException("New password cannot be empty");
         }
 
         if (newPassword.Length < 8)
         {
-    throw new Core.Exception.ValidationException("Password must be at least 8 characters");
+    throw new ValidationException("Password must be at least 8 characters");
  }
 
         // Find the account with role info
@@ -406,7 +406,7 @@ CancellationToken cancellationToken = default)
 
      if (account == null)
         {
-       throw new Core.Exception.NotFoundException($"Account with ID {accountId} not found.");
+       throw new NotFoundException($"Account with ID {accountId} not found.");
         }
 
         // Check if this is a first-time password change (locked account)
@@ -417,7 +417,7 @@ CancellationToken cancellationToken = default)
           // Normal password change - require current password verification
           if (string.IsNullOrWhiteSpace(currentPassword))
          {
-                throw new Core.Exception.ValidationException("Current password is required");
+                throw new ValidationException("Current password is required");
             }
 
             // Verify current password
@@ -426,7 +426,7 @@ CancellationToken cancellationToken = default)
                 _logger.LogWarning(
          "Failed password change attempt for account ID {AccountId} - incorrect current password",
           accountId);
-      throw new Core.Exception.ValidationException("Current password is incorrect");
+      throw new ValidationException("Current password is incorrect");
        }
     }
 
