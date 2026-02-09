@@ -91,7 +91,10 @@ public partial class RestaurantMgmtContext : DbContext
 
     public virtual DbSet<TableMedium> TableMedia { get; set; }
 
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder) { }
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -375,9 +378,9 @@ public partial class RestaurantMgmtContext : DbContext
 
         modelBuilder.Entity<DishTag>(entity =>
         {
-            entity
-                .HasNoKey()
-                .ToTable("dish_tag");
+            entity.HasKey(e => e.DishTagId).HasName("PRIMARY");
+
+            entity.ToTable("dish_tag");
 
             entity.HasIndex(e => e.DishId, "FK_dish_tag_dish_dish_id");
 

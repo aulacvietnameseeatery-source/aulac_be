@@ -1,4 +1,4 @@
-namespace Core.Exception;
+namespace Core.Exceptions;
 
 /// <summary>
 /// Base exception for business rule violations.
