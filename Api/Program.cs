@@ -149,6 +149,9 @@ switch (cacheMode)
     case "none":
     default:
         Console.WriteLine($"Cache Mode: Disabled ({Environment.MachineName})");
+        Console.WriteLine("Warning: Disabling cache may impact performance and disable certain features.");
+        Console.WriteLine("Warning: Forgotten password functionality will not work.");
+
 
         // No caching - simplest production setup
         builder.Services.AddSingleton<ICacheService, NoCacheService>();
