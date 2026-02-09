@@ -72,6 +72,8 @@ public partial class LookupValue
 
     public virtual ICollection<RestaurantTable> RestaurantTableTableTypeLvs { get; set; } = new List<RestaurantTable>();
 
+    public virtual ICollection<RestaurantTable> RestaurantTableZoneLvs { get; set; } = new List<RestaurantTable>();
+
     public virtual ICollection<ServiceError> ServiceErrors { get; set; } = new List<ServiceError>();
 
     public virtual LookupType Type { get; set; } = null!;

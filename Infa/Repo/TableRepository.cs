@@ -31,6 +31,7 @@ public class TableRepository : ITableRepository
         return await _context.RestaurantTables
             .AsNoTracking()
             .Include(t => t.TableTypeLv)
+            .Include(t => t.ZoneLv)
             .Where(t => t.TableStatusLvId != TableStatusLocked)
             .Where(t => t.IsOnline == true)
             .OrderBy(t => t.Capacity)
@@ -43,6 +44,7 @@ public class TableRepository : ITableRepository
     {
         return await _context.RestaurantTables
             .Include(t => t.TableTypeLv)
+            .Include(t => t.ZoneLv)
             .FirstOrDefaultAsync(t => t.TableId == tableId, ct);
     }
 
