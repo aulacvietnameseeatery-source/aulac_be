@@ -1,22 +1,21 @@
-﻿using Core.DTO.Auth;
+using Core.DTO.Auth;
 using Core.Interface.Service.Auth;
 using Core.Interface.Service.Others;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Infa.Auth
 {
-    public sealed class RedisPasswordResetTokenStore : IPasswordResetTokenStore
+    /// <summary>
+    /// Cache-based password reset token store implementation.
+    /// Works with any ICacheService implementation (Redis, In-Memory, etc.)
+    /// </summary>
+    public sealed class CachePasswordResetTokenStore : IPasswordResetTokenStore
     {
         private readonly ICacheService _cache;
 
         private const string TokenPrefix = "pwdreset:";      // pwdreset:{hash}
         private const string UserPrefix = "pwdreset:u:";    // pwdreset:u:{userId}
 
-        public RedisPasswordResetTokenStore(ICacheService cache) => _cache = cache;
+        public CachePasswordResetTokenStore(ICacheService cache) => _cache = cache;
 
         public async Task StoreAsync(PasswordResetTokenRecord record, TimeSpan ttl, CancellationToken ct)
         {
@@ -28,10 +27,10 @@ namespace Infa.Auth
         }
 
         public Task<PasswordResetTokenRecord?> GetByTokenHashAsync(string tokenHash, CancellationToken ct)
-            => _cache.GetAsync<PasswordResetTokenRecord>(TokenPrefix + tokenHash, ct);
+    => _cache.GetAsync<PasswordResetTokenRecord>(TokenPrefix + tokenHash, ct);
 
         public Task ConsumeAsync(string tokenHash, CancellationToken ct)
-            => _cache.RemoveAsync(TokenPrefix + tokenHash, ct);
+                    => _cache.RemoveAsync(TokenPrefix + tokenHash, ct);
 
         public async Task InvalidateUserAsync(long userId, CancellationToken ct)
         {
@@ -45,5 +44,4 @@ namespace Infa.Auth
             }
         }
     }
-
 }
