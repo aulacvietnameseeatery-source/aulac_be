@@ -63,6 +63,12 @@ namespace Core.Data
         public static readonly LookupTypeInfo IngredientType =
             new(17, "INGREDIENT_TYPE", true);
 
+        public static readonly LookupTypeInfo Tag =
+            new(18, "Tag", true);
+
+        public static readonly LookupTypeInfo TableZone =
+            new(19  , "Table_Zone", true);
+
         // Convenience: list all
         public static IReadOnlyList<LookupTypeInfo> All { get; } = new[]
         {

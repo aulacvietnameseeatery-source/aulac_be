@@ -12,6 +12,7 @@ public class ReservationResponseDto
     public int PartySize { get; set; }
     public DateTime ReservedTime { get; set; }
     public string TableCode { get; set; } = null!;
+    public string Zone { get; set; } = null!;
     public string Status { get; set; } = null!;
     public DateTime CreatedAt { get; set; }
 }

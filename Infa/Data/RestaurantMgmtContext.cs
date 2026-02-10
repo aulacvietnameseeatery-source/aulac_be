@@ -1250,6 +1250,7 @@ public partial class RestaurantMgmtContext : DbContext
             entity.Property(e => e.TableQrImg).HasColumnName("table_qr_img");
             entity.Property(e => e.TableStatusLvId).HasColumnName("table_status_lv_id");
             entity.Property(e => e.TableTypeLvId).HasColumnName("table_type_lv_id");
+            entity.Property(e => e.ZoneLvId).HasColumnName("zone_lv_id");
 
             entity.HasOne(d => d.TableQrImgNavigation).WithMany(p => p.RestaurantTables)
                 .HasForeignKey(d => d.TableQrImg)
@@ -1265,6 +1266,11 @@ public partial class RestaurantMgmtContext : DbContext
                 .HasForeignKey(d => d.TableTypeLvId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("fk_restaurant_table_type_lv");
+
+            entity.HasOne(d => d.ZoneLv).WithMany(p => p.RestaurantTableZoneLvs)
+                .HasForeignKey(d => d.ZoneLvId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_restaurant_table_zone_lv");
         });
 
         modelBuilder.Entity<Role>(entity =>
