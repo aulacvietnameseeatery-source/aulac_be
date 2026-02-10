@@ -69,13 +69,17 @@ namespace Core.Data
         public static readonly LookupTypeInfo TableZone =
             new(19  , "Table_Zone", true);
 
+        // Constants can be kept for Type Codes, but IDs we'll try to keep aligned or careful use
+        public static readonly LookupTypeInfo RoleStatus =
+            new(20, "ROLE_STATUS", false);
+
         // Convenience: list all
         public static IReadOnlyList<LookupTypeInfo> All { get; } = new[]
         {
         AccountStatus, InventoryTxType, InventoryTxStatus, MediaType, TableStatus,
         TableType, ReservationSource, ReservationStatus, OrderSource, OrderStatus,
         PaymentMethod, DishStatus, OrderItemStatus, Severity, PromotionType,
-        PromotionStatus, IngredientType
+        PromotionStatus, IngredientType, RoleStatus
     };
     }
 

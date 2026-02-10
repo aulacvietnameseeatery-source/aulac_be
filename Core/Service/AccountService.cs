@@ -220,6 +220,42 @@ public class AccountService : IAccountService
     }
 
     /// <inheritdoc />
+    public async Task<bool> UpdateAccountStatusAsync(
+        long accountId,
+        AccountStatusCode newStatusCode,
+        CancellationToken cancellationToken = default)
+    {
+        // 1. Find account
+        var account = await _accountRepository.FindByIdAsync(accountId, cancellationToken);
+        if (account == null)
+        {
+            throw new NotFoundException($"Account ID {accountId} not found.");
+        }
+
+        // 2. Resolve new status ID
+        var newStatusId = await newStatusCode.ToAccountStatusIdAsync(_lookupResolver, cancellationToken);
+
+        // 3. Update status
+        account.AccountStatusLvId = newStatusId;
+
+        // 4. Handle specific logic for certain statuses
+        if (newStatusCode == AccountStatusCode.LOCKED)
+        {
+            account.IsLocked = true;
+        }
+        else if (newStatusCode == AccountStatusCode.ACTIVE)
+        {
+            account.IsLocked = false;
+        }
+
+        await _accountRepository.UpdateAccountAsync(account, cancellationToken);
+        
+        _logger.LogInformation("Updated account {AccountId} status to {Status}", accountId, newStatusCode);
+
+        return true;
+    }
+
+    /// <inheritdoc />
     public async Task<AccountDetailDto?> GetAccountDetailAsync(
         long accountId,
         CancellationToken cancellationToken = default)

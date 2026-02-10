@@ -47,6 +47,14 @@ public class RoleRepository : IRoleRepository
                 .AsNoTracking()
                 .AsQueryable();
 
+        // Filter by ACTIVE status
+        // We need to know what ID is "ACTIVE".
+        // Since we don't want to hardcode 130, and we want to avoid extra DB call every time, 
+        // ideally we should join with LookupValue or use a known constant if possible.
+        // But per request "not hardcoded", let's look it up or join.
+        // Joining in EF Core:
+        query = query.Where(r => r.RoleStatusLv != null && r.RoleStatusLv.ValueCode == RoleStatusCode.ACTIVE.ToString());
+
         if (!string.IsNullOrWhiteSpace(search))
         {
             query = query.Where(r =>
@@ -70,6 +78,20 @@ public class RoleRepository : IRoleRepository
     {
         _context.Roles.Remove(role);
         await _context.SaveChangesAsync();
+    }
+
+    public async Task UpdateAsync(Role role)
+    {
+        _context.Roles.Update(role);
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task<uint?> GetRoleStatusIdAsync(string statusCode)
+    {
+        var status = await _context.LookupValues
+            .AsNoTracking()
+            .FirstOrDefaultAsync(lv => lv.Type.TypeCode == "ROLE_STATUS" && lv.ValueCode == statusCode);
+        return status?.ValueId;
     }
 
     public async Task<bool> HasStaffAssignedAsync(long roleId, CancellationToken cancellationToken = default)

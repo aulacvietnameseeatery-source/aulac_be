@@ -13,5 +13,9 @@ public partial class Role
 
     public virtual ICollection<StaffAccount> StaffAccounts { get; set; } = new List<StaffAccount>();
 
+    public uint RoleStatusLvId { get; set; }
+
+    public virtual LookupValue? RoleStatusLv { get; set; }
+
     public virtual ICollection<Permission> Permissions { get; set; } = new List<Permission>();
 }
