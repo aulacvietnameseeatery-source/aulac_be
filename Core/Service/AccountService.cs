@@ -11,6 +11,7 @@ using Core.Interface.Service.Entity;
 using Microsoft.Extensions.Logging;
 using Core.Exceptions;
 using Core.DTO.Account;
+using Core.DTO.General;
 
 namespace Core.Service;
 
@@ -515,12 +516,21 @@ else
         return account.AccountStatusLvId == activeStatusId && !account.IsLocked;
     }
 
-    #region Helper Methods
+	public Task<PagedResultDTO<AccountListDTO>> GetAccountsAsync(AccountListQueryDTO query)
+		=> _accountRepository.GetAccountsAsync(query);
 
-    /// <summary>
-    /// Builds the HTML email body for temporary password.
-    /// </summary>
-    private static string BuildTemporaryPasswordEmail(string fullName, string username, string temporaryPassword)
+	public Task<List<RoleDTO>> GetAllRolesAsync(CancellationToken cancellationToken = default)
+		=> _accountRepository.GetAllRolesAsync(cancellationToken);
+
+	public Task<List<AccountStatusDTO>> GetAccountStatusesAsync(CancellationToken cancellationToken = default)
+		=> _accountRepository.GetAccountStatusesAsync(cancellationToken);
+
+	#region Helper Methods
+
+	/// <summary>
+	/// Builds the HTML email body for temporary password.
+	/// </summary>
+	private static string BuildTemporaryPasswordEmail(string fullName, string username, string temporaryPassword)
     {
         return $@"
 <!DOCTYPE html>
