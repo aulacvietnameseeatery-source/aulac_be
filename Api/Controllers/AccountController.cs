@@ -7,6 +7,7 @@ using API.Models;
 using System.Security.Claims;
 using Core.DTO.Account;
 using Core.DTO.General;
+using Core.Enum;
 
 namespace Api.Controllers
 {
@@ -138,6 +139,47 @@ namespace Api.Controllers
                 Code = 200,
                 UserMessage = "Account updated successfully.",
                 Data = result,
+                ServerTime = DateTimeOffset.UtcNow
+            });
+        }
+
+        /// <summary>
+        /// Updates the status of an account (Active/Inactive/Locked).
+        /// </summary>
+        /// <param name="id">Account ID</param>
+        /// <param name="status">New status (ACTIVE, INACTIVE, LOCKED)</param>
+        /// <param name="cancellationToken">Cancellation token</param>
+        /// <response code="200">Status updated successfully</response>
+        /// <response code="404">Account not found</response>
+        [HttpPut("{id}/status")]
+        [HasPermission(Permissions.UpdateAccount)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> UpdateStatus(
+            long id, 
+            [FromBody] string status, 
+            CancellationToken cancellationToken = default)
+        {
+            if (!Enum.TryParse<AccountStatusCode>(status, true, out var statusCode))
+            {
+                return BadRequest(new ApiResponse<object>
+                {
+                    Success = false,
+                    Code = 400,
+                    UserMessage = "Invalid status code. Allowed values: ACTIVE, INACTIVE, LOCKED",
+                    Data = null,
+                    ServerTime = DateTimeOffset.UtcNow
+                });
+            }
+
+            await _accountService.UpdateAccountStatusAsync(id, statusCode, cancellationToken);
+
+            return Ok(new ApiResponse<object>
+            {
+                Success = true,
+                Code = 200,
+                UserMessage = $"Account status updated to {statusCode}",
+                Data = null,
                 ServerTime = DateTimeOffset.UtcNow
             });
         }

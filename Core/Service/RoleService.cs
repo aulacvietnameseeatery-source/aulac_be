@@ -54,7 +54,19 @@ namespace Core.Service
                 throw new InvalidOperationException("Cannot delete role that has assigned staff accounts.");
             }
 
-            await _roleRepository.DeleteAsync(role);
+            // Soft delete: Update status to INACTIVE
+            // Look up the "INACTIVE" status value since IDs are dynamic
+            var inactiveStatus = await _roleRepository.GetRoleStatusIdAsync(RoleStatusCode.INACTIVE.ToString());
+            if (inactiveStatus == null)
+            {
+                 // Fallback or error if status configuration is missing. 
+                 // Ideally this shouldn't happen if SQL script ran correctly.
+                 // For safety, throwing exception or logging.
+                 throw new InvalidOperationException("Role Status 'INACTIVE' not found config in database.");
+            }
+
+            role.RoleStatusLvId = inactiveStatus.Value;
+            await _roleRepository.UpdateAsync(role);
         }
     }
 }

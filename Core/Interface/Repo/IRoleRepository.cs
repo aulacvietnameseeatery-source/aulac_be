@@ -47,6 +47,10 @@ public interface IRoleRepository
     /// <returns>Task</returns>
     Task DeleteAsync(Role role);
 
+    Task UpdateAsync(Role role);
+
+    Task<uint?> GetRoleStatusIdAsync(string statusCode);
+
     /// <summary>
     /// Checks if a role has any staff accounts assigned.
     /// </summary>
