@@ -17,6 +17,13 @@ namespace Core.Interface.Service.Role
         /// <returns>
         /// A tuple containing the list of role items and the total count of roles matching the query.
         /// </returns>
+        /// <summary>
+        /// Deletes a role.
+        /// </summary>
+        /// <param name="roleId">The role ID</param>
+        /// <returns>Task</returns>
+        Task DeleteRoleAsync(long roleId);
+
         Task<(List<RoleListItemDto> Items, int TotalCount)> GetPagedAsync(PagedQuery query);
     }
 }

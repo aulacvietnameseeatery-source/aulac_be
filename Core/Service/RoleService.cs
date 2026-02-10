@@ -39,5 +39,22 @@ namespace Core.Service
 
             return (items, totalCount);
         }
+
+        public async Task DeleteRoleAsync(long roleId)
+        {
+            var role = await _roleRepository.FindByIdAsync(roleId);
+            if (role == null)
+            {
+                throw new KeyNotFoundException($"Role with ID {roleId} not found.");
+            }
+
+            // Check if staff are assigned using optimized query
+            if (await _roleRepository.HasStaffAssignedAsync(roleId))
+            {
+                throw new InvalidOperationException("Cannot delete role that has assigned staff accounts.");
+            }
+
+            await _roleRepository.DeleteAsync(role);
+        }
     }
 }
