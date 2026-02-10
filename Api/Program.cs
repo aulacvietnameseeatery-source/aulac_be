@@ -9,6 +9,7 @@ using Core.Interface.Service.Auth;
 using Core.Interface.Service.Email;
 using Core.Interface.Service.Entity;
 using Core.Interface.Service.Others;
+using Core.Interface.Service.Role;
 using Core.Service;
 using Infa.Auth;
 using Infa.Data;
@@ -202,7 +203,7 @@ builder.Services.AddScoped<IPasswordGenerator, PasswordGeneratorService>();
 builder.Services.AddScoped<IUsernameGenerator, UsernameGeneratorService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IPublicReservationService, PublicReservationService>();
-
+builder.Services.AddScoped<IRoleService, RoleService>();
 
 
 #endregion
