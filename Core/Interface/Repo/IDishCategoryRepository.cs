@@ -1,3 +1,5 @@
+using Core.DTO.DishCategory;
+using Core.DTO.General;
 using Core.Entity;
 
 namespace Core.Interface.Repo;
@@ -7,13 +9,15 @@ namespace Core.Interface.Repo;
 /// </summary>
 public interface IDishCategoryRepository
 {
+
+
     /// <summary>
-    /// Get all dish categories
+    /// Get paginated dish categories with filtering
     /// </summary>
-    /// <param name="includeDisabled">Whether to include disabled categories</param>
+    /// <param name="query">Query parameters including pagination and filters</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>List of dish categories</returns>
-    Task<List<DishCategory>> GetAllAsync(bool includeDisabled = false, CancellationToken cancellationToken = default);
+    /// <returns>Paginated result of dish categories</returns>
+    Task<PagedResultDTO<DishCategoryDto>> GetAllCategoriesAsync(DishCategoryListQueryDTO query, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Get dish category by ID
@@ -38,14 +42,6 @@ public interface IDishCategoryRepository
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Updated category</returns>
     Task<DishCategory> UpdateAsync(DishCategory category, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Delete a dish category
-    /// </summary>
-    /// <param name="id">Category ID</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>True if deleted successfully</returns>
-    Task<bool> DeleteAsync(long id, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Check if category has dishes

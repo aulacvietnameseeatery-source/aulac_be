@@ -1,3 +1,5 @@
+using Core.DTO.DishCategory;
+using Core.DTO.General;
 using Core.Entity;
 using Core.Interface.Repo;
 using Infa.Data;
@@ -17,19 +19,53 @@ public class DishCategoryRepository : IDishCategoryRepository
         _context = context;
     }
 
-    /// <inheritdoc />
-    public async Task<List<DishCategory>> GetAllAsync(bool includeDisabled = false, CancellationToken cancellationToken = default)
-    {
-        var query = _context.DishCategories.AsQueryable();
+   
 
-        if (!includeDisabled)
+    /// <inheritdoc />
+    public async Task<PagedResultDTO<DishCategoryDto>> GetAllCategoriesAsync(DishCategoryListQueryDTO query, CancellationToken cancellationToken = default)
+    {
+        var dbQuery = _context.DishCategories.AsQueryable();
+
+        // Apply search filter
+        if (!string.IsNullOrWhiteSpace(query.Search))
         {
-            query = query.Where(c => !c.IsDisabled);
+            var searchLower = query.Search.ToLower();
+            dbQuery = dbQuery.Where(c => 
+                c.CategoryName.ToLower().Contains(searchLower) ||
+                (c.Description != null && c.Description.ToLower().Contains(searchLower))
+            );
         }
 
-        return await query
+        // Apply status filter
+        if (query.IsDisabled.HasValue)
+        {
+            dbQuery = dbQuery.Where(c => c.IsDisabled == query.IsDisabled.Value);
+        }
+
+        // Get total count
+        var totalCount = await dbQuery.CountAsync(cancellationToken);
+
+        // Apply pagination
+        var categories = await dbQuery
             .OrderBy(c => c.CategoryId)
+            .Skip((query.PageIndex - 1) * query.PageSize)
+            .Take(query.PageSize)
+            .Select(c => new DishCategoryDto
+            {
+                CategoryId = c.CategoryId,
+                CategoryName = c.CategoryName,
+                Description = c.Description,
+                IsDisabled = c.IsDisabled
+            })
             .ToListAsync(cancellationToken);
+
+        return new PagedResultDTO<DishCategoryDto>
+        {
+            PageData = categories,
+            PageIndex = query.PageIndex,
+            PageSize = query.PageSize,
+            TotalCount = totalCount
+        };
     }
 
     /// <inheritdoc />
@@ -56,18 +92,7 @@ public class DishCategoryRepository : IDishCategoryRepository
     }
 
     /// <inheritdoc />
-    public async Task<bool> DeleteAsync(long id, CancellationToken cancellationToken = default)
-    {
-        var category = await GetByIdAsync(id, cancellationToken);
-        if (category == null)
-        {
-            return false;
-        }
-
-        _context.DishCategories.Remove(category);
-        await _context.SaveChangesAsync(cancellationToken);
-        return true;
-    }
+   
 
     /// <inheritdoc />
     public async Task<bool> HasDishesAsync(long id, CancellationToken cancellationToken = default)

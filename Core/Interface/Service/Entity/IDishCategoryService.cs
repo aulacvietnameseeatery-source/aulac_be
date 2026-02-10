@@ -1,4 +1,5 @@
 using Core.DTO.DishCategory;
+using Core.DTO.General;
 
 namespace Core.Interface.Service.Entity;
 
@@ -7,13 +8,14 @@ namespace Core.Interface.Service.Entity;
 /// </summary>
 public interface IDishCategoryService
 {
+
     /// <summary>
-    /// Get all dish categories
+    /// Get paginated dish categories with filtering
     /// </summary>
-    /// <param name="includeDisabled">Whether to include disabled categories</param>
+    /// <param name="query">Query parameters including pagination and filters</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>List of dish categories</returns>
-    Task<List<DishCategoryDto>> GetAllCategoriesAsync(bool includeDisabled = false, CancellationToken cancellationToken = default);
+    /// <returns>Paginated result of dish categories</returns>
+    Task<PagedResultDTO<DishCategoryDto>> GetAllCategoriesAsync(DishCategoryListQueryDTO query, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Get dish category by ID
@@ -50,14 +52,4 @@ public interface IDishCategoryService
     /// <returns>Updated dish category</returns>
     /// <exception cref="KeyNotFoundException">Thrown when category not found</exception>
     Task<DishCategoryDto> ToggleCategoryStatusAsync(long id, bool isDisabled, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Delete a dish category
-    /// </summary>
-    /// <param name="id">Category ID</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>True if deleted successfully</returns>
-    /// <exception cref="KeyNotFoundException">Thrown when category not found</exception>
-    /// <exception cref="InvalidOperationException">Thrown when category has dishes</exception>
-    Task<bool> DeleteCategoryAsync(long id, CancellationToken cancellationToken = default);
 }

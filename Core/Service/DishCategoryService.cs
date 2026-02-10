@@ -1,4 +1,5 @@
 using Core.DTO.DishCategory;
+using Core.DTO.General;
 using Core.Entity;
 using Core.Interface.Repo;
 using Core.Interface.Service.Entity;
@@ -23,11 +24,9 @@ public class DishCategoryService : IDishCategoryService
     }
 
     /// <inheritdoc />
-    public async Task<List<DishCategoryDto>> GetAllCategoriesAsync(bool includeDisabled = false, CancellationToken cancellationToken = default)
+    public async Task<PagedResultDTO<DishCategoryDto>> GetAllCategoriesAsync(DishCategoryListQueryDTO query, CancellationToken cancellationToken = default)
     {
-        var categories = await _dishCategoryRepository.GetAllAsync(includeDisabled, cancellationToken);
-        
-        return categories.Select(MapToDto).ToList();
+        return await _dishCategoryRepository.GetAllCategoriesAsync(query, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -113,36 +112,6 @@ public class DishCategoryService : IDishCategoryService
             updatedCategory.CategoryName, updatedCategory.CategoryId, isDisabled);
         
         return MapToDto(updatedCategory);
-    }
-
-    /// <inheritdoc />
-    public async Task<bool> DeleteCategoryAsync(long id, CancellationToken cancellationToken = default)
-    {
-        var category = await _dishCategoryRepository.GetByIdAsync(id, cancellationToken);
-        
-        if (category == null)
-        {
-            _logger.LogWarning("Dish category with ID {CategoryId} not found", id);
-            throw new KeyNotFoundException($"Dish category with ID {id} not found.");
-        }
-
-        // Check if category has dishes
-        var hasDishes = await _dishCategoryRepository.HasDishesAsync(id, cancellationToken);
-        if (hasDishes)
-        {
-            _logger.LogWarning("Cannot delete dish category {CategoryId} because it has dishes", id);
-            throw new InvalidOperationException($"Cannot delete category '{category.CategoryName}' because it has associated dishes.");
-        }
-
-        var result = await _dishCategoryRepository.DeleteAsync(id, cancellationToken);
-        
-        if (result)
-        {
-            _logger.LogInformation("Deleted dish category: {CategoryName} (ID: {CategoryId})", 
-                category.CategoryName, id);
-        }
-        
-        return result;
     }
 
     /// <summary>

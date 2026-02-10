@@ -2,6 +2,7 @@ using API.Models;
 using Core.Attribute;
 using Core.Data;
 using Core.DTO.DishCategory;
+using Core.DTO.General;
 using Core.Interface.Service.Entity;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -27,30 +28,33 @@ public class DishCategoryController : ControllerBase
     }
 
     /// <summary>
-    /// Get all dish categories
+    /// Get paginated dish categories with filtering and search
     /// </summary>
-    /// <param name="includeDisabled">Whether to include disabled categories</param>
+    /// <param name="query">Query parameters including pagination, search and filters</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>List of dish categories</returns>
+    /// <returns>Paginated list of dish categories</returns>
     /// <response code="200">Categories retrieved successfully</response>
-    [HttpGet]
-    [AllowAnonymous]
-    [ProducesResponseType(typeof(ApiResponse<List<DishCategoryDto>>), StatusCodes.Status200OK)]
+    [HttpGet("list")]
+    [HasPermission(Permissions.ViewDishCategory)]
+    [ProducesResponseType(typeof(ApiResponse<PagedResultDTO<DishCategoryDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAllCategories(
-        [FromQuery] bool includeDisabled = false,
+        [FromQuery] DishCategoryListQueryDTO query,
         CancellationToken cancellationToken = default)
     {
-        var categories = await _dishCategoryService.GetAllCategoriesAsync(includeDisabled, cancellationToken);
+        var result = await _dishCategoryService.GetAllCategoriesAsync(query, cancellationToken);
 
-        return Ok(new ApiResponse<List<DishCategoryDto>>
+        return Ok(new ApiResponse<PagedResultDTO<DishCategoryDto>>
         {
             Success = true,
             Code = 200,
-            UserMessage = "Categories retrieved successfully.",
-            Data = categories,
-            ServerTime = DateTimeOffset.UtcNow
+            SubCode = 0,
+            UserMessage = "Get dish categories successfully",
+            Data = result,
+            ServerTime = DateTimeOffset.Now
         });
     }
+
+
 
     /// <summary>
     /// Get dish category by ID
@@ -61,7 +65,7 @@ public class DishCategoryController : ControllerBase
     /// <response code="200">Category found</response>
     /// <response code="404">Category not found</response>
     [HttpGet("{id}")]
-    [AllowAnonymous]
+    [HasPermission(Permissions.ViewDishCategory)]
     [ProducesResponseType(typeof(ApiResponse<DishCategoryDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetCategoryById(
