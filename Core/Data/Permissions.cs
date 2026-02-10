@@ -26,6 +26,11 @@ namespace Core.Data
         public const string EditDish = "DISH:EDIT";
         public const string DeleteDish = "DISH:DELETE";
 
+        //Dish Category
+        public const string ViewDishCategory = "DISH_CATEGORY:READ";
+        public const string CreateDishCategory = "DISH_CATEGORY:CREATE";
+        public const string EditDishCategory = "DISH_CATEGORY:EDIT";
+
         //...
     }
 }
