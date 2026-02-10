@@ -65,4 +65,16 @@ public class RoleRepository : IRoleRepository
 
         return (roles, totalCount);
     }
+
+    public async Task DeleteAsync(Role role)
+    {
+        _context.Roles.Remove(role);
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task<bool> HasStaffAssignedAsync(long roleId, CancellationToken cancellationToken = default)
+    {
+        return await _context.StaffAccounts
+            .AnyAsync(s => s.RoleId == roleId, cancellationToken);
+    }
 }
