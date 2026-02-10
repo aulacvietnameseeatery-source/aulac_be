@@ -75,3 +75,9 @@ public enum TableZoneCode
     OUTDOOR,
     ROOFTOP
 }
+
+public enum RoleStatusCode
+{
+    ACTIVE,
+    INACTIVE
+}

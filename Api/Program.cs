@@ -9,6 +9,7 @@ using Core.Interface.Service.Auth;
 using Core.Interface.Service.Email;
 using Core.Interface.Service.Entity;
 using Core.Interface.Service.Others;
+using Core.Interface.Service.Role;
 using Core.Service;
 using Infa.Auth;
 using Infa.Data;
@@ -149,6 +150,9 @@ switch (cacheMode)
     case "none":
     default:
         Console.WriteLine($"Cache Mode: Disabled ({Environment.MachineName})");
+        Console.WriteLine("Warning: Disabling cache may impact performance and disable certain features.");
+        Console.WriteLine("Warning: Forgotten password functionality will not work.");
+
 
         // No caching - simplest production setup
         builder.Services.AddSingleton<ICacheService, NoCacheService>();
@@ -199,7 +203,7 @@ builder.Services.AddScoped<IPasswordGenerator, PasswordGeneratorService>();
 builder.Services.AddScoped<IUsernameGenerator, UsernameGeneratorService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IPublicReservationService, PublicReservationService>();
-
+builder.Services.AddScoped<IRoleService, RoleService>();
 
 
 #endregion

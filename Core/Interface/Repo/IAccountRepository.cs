@@ -1,3 +1,5 @@
+using Core.DTO.Account;
+using Core.DTO.General;
 using Core.Entity;
 
 namespace Core.Interface.Repo;
@@ -107,4 +109,23 @@ public interface IAccountRepository
         long userId,
         string newPasswordHash,
         CancellationToken cancellationToken = default);
+
+	Task<PagedResultDTO<AccountListDTO>> GetAccountsAsync(
+	AccountListQueryDTO query,
+	CancellationToken cancellationToken = default);
+
+	/// <summary>
+	/// Gets all active roles for account management.
+	/// </summary>
+	/// <param name="cancellationToken">Cancellation token</param>
+	/// <returns>List of roles</returns>
+	Task<List<RoleDTO>> GetAllRolesAsync(CancellationToken cancellationToken = default);
+
+	/// <summary>
+	/// Gets all account statuses from lookup values.
+	/// </summary>
+	/// <param name="cancellationToken">Cancellation token</param>
+	/// <returns>List of account statuses</returns>
+	Task<List<AccountStatusDTO>> GetAccountStatusesAsync(CancellationToken cancellationToken = default);
+
 }

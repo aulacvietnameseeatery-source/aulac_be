@@ -11,6 +11,7 @@ using Core.Interface.Service.Entity;
 using Microsoft.Extensions.Logging;
 using Core.Exceptions;
 using Core.DTO.Account;
+using Core.DTO.General;
 
 namespace Core.Service;
 
@@ -216,6 +217,42 @@ public class AccountService : IAccountService
         // 7. Return updated details
         return await GetAccountDetailAsync(accountId, cancellationToken)
                  ?? throw new InvalidOperationException("Failed to retrieve updated account.");
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> UpdateAccountStatusAsync(
+        long accountId,
+        AccountStatusCode newStatusCode,
+        CancellationToken cancellationToken = default)
+    {
+        // 1. Find account
+        var account = await _accountRepository.FindByIdAsync(accountId, cancellationToken);
+        if (account == null)
+        {
+            throw new NotFoundException($"Account ID {accountId} not found.");
+        }
+
+        // 2. Resolve new status ID
+        var newStatusId = await newStatusCode.ToAccountStatusIdAsync(_lookupResolver, cancellationToken);
+
+        // 3. Update status
+        account.AccountStatusLvId = newStatusId;
+
+        // 4. Handle specific logic for certain statuses
+        if (newStatusCode == AccountStatusCode.LOCKED)
+        {
+            account.IsLocked = true;
+        }
+        else if (newStatusCode == AccountStatusCode.ACTIVE)
+        {
+            account.IsLocked = false;
+        }
+
+        await _accountRepository.UpdateAccountAsync(account, cancellationToken);
+        
+        _logger.LogInformation("Updated account {AccountId} status to {Status}", accountId, newStatusCode);
+
+        return true;
     }
 
     /// <inheritdoc />
@@ -515,12 +552,21 @@ else
         return account.AccountStatusLvId == activeStatusId && !account.IsLocked;
     }
 
-    #region Helper Methods
+	public Task<PagedResultDTO<AccountListDTO>> GetAccountsAsync(AccountListQueryDTO query)
+		=> _accountRepository.GetAccountsAsync(query);
 
-    /// <summary>
-    /// Builds the HTML email body for temporary password.
-    /// </summary>
-    private static string BuildTemporaryPasswordEmail(string fullName, string username, string temporaryPassword)
+	public Task<List<RoleDTO>> GetAllRolesAsync(CancellationToken cancellationToken = default)
+		=> _accountRepository.GetAllRolesAsync(cancellationToken);
+
+	public Task<List<AccountStatusDTO>> GetAccountStatusesAsync(CancellationToken cancellationToken = default)
+		=> _accountRepository.GetAccountStatusesAsync(cancellationToken);
+
+	#region Helper Methods
+
+	/// <summary>
+	/// Builds the HTML email body for temporary password.
+	/// </summary>
+	private static string BuildTemporaryPasswordEmail(string fullName, string username, string temporaryPassword)
     {
         return $@"
 <!DOCTYPE html>

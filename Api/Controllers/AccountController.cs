@@ -6,6 +6,8 @@ using Microsoft.AspNetCore.Mvc;
 using API.Models;
 using System.Security.Claims;
 using Core.DTO.Account;
+using Core.DTO.General;
+using Core.Enum;
 
 namespace Api.Controllers
 {
@@ -137,6 +139,47 @@ namespace Api.Controllers
                 Code = 200,
                 UserMessage = "Account updated successfully.",
                 Data = result,
+                ServerTime = DateTimeOffset.UtcNow
+            });
+        }
+
+        /// <summary>
+        /// Updates the status of an account (Active/Inactive/Locked).
+        /// </summary>
+        /// <param name="id">Account ID</param>
+        /// <param name="status">New status (ACTIVE, INACTIVE, LOCKED)</param>
+        /// <param name="cancellationToken">Cancellation token</param>
+        /// <response code="200">Status updated successfully</response>
+        /// <response code="404">Account not found</response>
+        [HttpPut("{id}/status")]
+        [HasPermission(Permissions.UpdateAccount)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> UpdateStatus(
+            long id, 
+            [FromBody] string status, 
+            CancellationToken cancellationToken = default)
+        {
+            if (!Enum.TryParse<AccountStatusCode>(status, true, out var statusCode))
+            {
+                return BadRequest(new ApiResponse<object>
+                {
+                    Success = false,
+                    Code = 400,
+                    UserMessage = "Invalid status code. Allowed values: ACTIVE, INACTIVE, LOCKED",
+                    Data = null,
+                    ServerTime = DateTimeOffset.UtcNow
+                });
+            }
+
+            await _accountService.UpdateAccountStatusAsync(id, statusCode, cancellationToken);
+
+            return Ok(new ApiResponse<object>
+            {
+                Success = true,
+                Code = 200,
+                UserMessage = $"Account status updated to {statusCode}",
+                Data = null,
                 ServerTime = DateTimeOffset.UtcNow
             });
         }
@@ -443,12 +486,67 @@ namespace Api.Controllers
             });
         }
 
-        #region Helper Methods
 
-        /// <summary>
-        /// Gets the current user's ID from JWT claims.
-        /// </summary>
-        private long? GetCurrentUserId()
+
+
+		[HttpGet("staff")]
+		[HasPermission(Permissions.ViewAccount)]
+		public async Task<IActionResult> GetAccounts([FromQuery] AccountListQueryDTO query)
+		{
+			var result = await _accountService.GetAccountsAsync(query);
+
+			return Ok(new ApiResponse<PagedResultDTO<AccountListDTO>>
+			{
+				Success = true,
+				Code = 200,
+				SubCode = 0,
+				UserMessage = "Get staff accounts successfully",
+				Data = result,
+				ServerTime = DateTimeOffset.Now
+			});
+		}
+
+		[HttpGet("roles")]
+		[HasPermission(Permissions.ViewAccount)]
+		public async Task<IActionResult> GetAllRoles(CancellationToken cancellationToken = default)
+		{
+			var roles = await _accountService.GetAllRolesAsync(cancellationToken);
+
+			return Ok(new ApiResponse<List<RoleDTO>>
+			{
+				Success = true,
+				Code = 200,
+				SubCode = 0,
+				UserMessage = "Get roles successfully",
+				Data = roles,
+				ServerTime = DateTimeOffset.Now
+			});
+		}
+
+		[HttpGet("statuses")]
+		[HasPermission(Permissions.ViewAccount)]
+		public async Task<IActionResult> GetAccountStatuses(CancellationToken cancellationToken = default)
+		{
+			var statuses = await _accountService.GetAccountStatusesAsync(cancellationToken);
+
+			return Ok(new ApiResponse<List<AccountStatusDTO>>
+			{
+				Success = true,
+				Code = 200,
+				SubCode = 0,
+				UserMessage = "Get account statuses successfully",
+				Data = statuses,
+				ServerTime = DateTimeOffset.Now
+			});
+		}
+
+
+		#region Helper Methods
+
+		/// <summary>
+		/// Gets the current user's ID from JWT claims.
+		/// </summary>
+		private long? GetCurrentUserId()
         {
             var userIdClaim = User.FindFirst("user_id");
             if (userIdClaim != null && long.TryParse(userIdClaim.Value, out var userId))
