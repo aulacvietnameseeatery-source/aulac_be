@@ -29,4 +29,13 @@ public interface IRoleRepository
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>List of all roles</returns>
     Task<List<Role>> GetAllAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets a paged list of roles with the count of staff accounts per role.
+    /// </summary>
+    /// <param name="pageIndex">The page index (zero-based)</param>
+    /// <param name="pageSize">The number of items per page</param>
+    /// <param name="search">Optional search term for filtering roles</param>
+    /// <returns>A tuple containing the list of roles and the total count</returns>
+    Task<(List<Role> Roles, int TotalCount)> GetPagedWithStaffCountAsync(int pageIndex, int pageSize, string? search);
 }

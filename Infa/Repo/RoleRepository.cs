@@ -40,4 +40,29 @@ public class RoleRepository : IRoleRepository
             .AsNoTracking()
             .ToListAsync(cancellationToken);
     }
+
+    public async Task<(List<Role> Roles, int TotalCount)> GetPagedWithStaffCountAsync(int pageIndex, int pageSize, string? search)
+    {
+        var query = _context.Roles
+                .AsNoTracking()
+                .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            query = query.Where(r =>
+                r.RoleCode.Contains(search) ||
+                r.RoleName.Contains(search));
+        }
+
+        var totalCount = await query.CountAsync();
+
+        var roles = await query
+            .Include(r => r.StaffAccounts)
+            .OrderBy(r => r.RoleCode)
+            .Skip((pageIndex - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        return (roles, totalCount);
+    }
 }
