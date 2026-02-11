@@ -1288,6 +1288,12 @@ public partial class RestaurantMgmtContext : DbContext
             entity.Property(e => e.RoleName)
                 .HasMaxLength(100)
                 .HasColumnName("role_name");
+            entity.Property(e => e.RoleStatusLvId)
+                .HasColumnName("role_status_lv_id");
+
+            entity.HasOne(d => d.RoleStatusLv)
+                .WithMany()
+                .HasForeignKey(d => d.RoleStatusLvId);
 
             entity.HasMany(d => d.Permissions).WithMany(p => p.Roles)
                 .UsingEntity<Dictionary<string, object>>(
