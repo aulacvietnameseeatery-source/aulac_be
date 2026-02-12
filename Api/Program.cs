@@ -9,6 +9,7 @@ using Core.Interface.Service.Auth;
 using Core.Interface.Service.Email;
 using Core.Interface.Service.Entity;
 using Core.Interface.Service.Others;
+using Core.Interface.Service.Role;
 using Core.Service;
 using Infa.Auth;
 using Infa.Data;
@@ -17,8 +18,6 @@ using Infa.Others;
 using Infa.Repo;
 using Infa.Service;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Authorization.Policy;
-using Microsoft.AspNetCore.Http.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using StackExchange.Redis;
@@ -27,6 +26,8 @@ using System.Reflection;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Api.Hubs;
+using Api.SignalR;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -104,30 +105,56 @@ builder.Services.AddDbContext<RestaurantMgmtContext>(options =>
 
 #endregion
 
-#region Redis (NON-BLOCKING STARTUP)
+#region Cache Service (Three Modes: Redis / In-Memory / No Cache)
 
-builder.Services.AddSingleton(sp =>
+var cacheMode = builder.Configuration.GetValue<string>("CacheMode", "None")?.ToLower();
+
+switch (cacheMode)
 {
-    var cs = builder.Configuration.GetConnectionString("Redis");
+    case "redis":
+        Console.WriteLine($"Cache Mode: Redis ({Environment.MachineName})");
 
-    return new Lazy<IConnectionMultiplexer>(() =>
-    {
-        if (string.IsNullOrWhiteSpace(cs))
-            throw new InvalidOperationException("Missing Redis connection string.");
+        // Redis Configuration
+        builder.Services.AddSingleton(sp =>
+        {
+            var cs = builder.Configuration.GetConnectionString("Redis")
+                ?? throw new InvalidOperationException("Missing Redis connection string when CacheMode=Redis.");
 
-        var options = ConfigurationOptions.Parse(cs);
-        options.AbortOnConnectFail = false;
-        options.ConnectRetry = 3;
-        options.ReconnectRetryPolicy = new ExponentialRetry(1000);
+            return new Lazy<IConnectionMultiplexer>(() =>
+            {
+                var options = ConfigurationOptions.Parse(cs);
+                options.AbortOnConnectFail = false;
+                options.ConnectRetry = 3;
+                options.ReconnectRetryPolicy = new ExponentialRetry(1000);
+                return ConnectionMultiplexer.Connect(options);
+            });
+        });
 
-        return ConnectionMultiplexer.Connect(options);
-    });
-});
+        builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
+       sp.GetRequiredService<Lazy<IConnectionMultiplexer>>().Value);
 
-builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
-    sp.GetRequiredService<Lazy<IConnectionMultiplexer>>().Value);
+        builder.Services.AddSingleton<ICacheService, RedisCacheService>();
+        break;
 
-builder.Services.AddSingleton<ICacheService, RedisCacheService>();
+    case "memory":
+        Console.WriteLine($"Cache Mode: In-Memory ({Environment.MachineName})");
+
+        // In-Memory Cache Configuration
+        builder.Services.AddMemoryCache();
+        builder.Services.AddSingleton<ICacheService, InMemoryCacheService>();
+        break;
+
+    case "none":
+    default:
+        Console.WriteLine($"Cache Mode: Disabled ({Environment.MachineName})");
+        Console.WriteLine("Warning: Disabling cache may impact performance and disable certain features.");
+        Console.WriteLine("Warning: Forgotten password functionality will not work.");
+
+
+        // No caching - simplest production setup
+        builder.Services.AddSingleton<ICacheService, NoCacheService>();
+        break;
+}
 
 #endregion
 
@@ -159,10 +186,15 @@ builder.Services.AddAuthorization(options =>
 
 builder.Services.AddScoped<ISystemSettingService, SystemSettingService>();
 builder.Services.AddScoped<IAccountService, AccountService>();
+
+builder.Services.AddScoped<IDishService, DishService>();
+builder.Services.AddScoped<IDishCategoryService, DishCategoryService>();
+
 builder.Services.AddScoped<IPasswordGenerator, PasswordGeneratorService>();
 builder.Services.AddScoped<IUsernameGenerator, UsernameGeneratorService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IPublicReservationService, PublicReservationService>();
+builder.Services.AddScoped<IRoleService, RoleService>();
 
 
 #endregion
@@ -180,6 +212,7 @@ builder.Services.AddScoped<IAccountRepository, AccountRepository>();
 builder.Services.AddScoped<IRoleRepository, RoleRepository>();
 builder.Services.AddScoped<ISystemSettingRepository, SystemSettingRepository>();
 builder.Services.AddScoped<IDishRepository, DishRepository>();
+builder.Services.AddScoped<IDishCategoryRepository, DishCategoryRepository>();
 builder.Services.AddScoped<IReservationRepository, ReservationRepository>();
 builder.Services.AddScoped<ITableRepository, TableRepository>();
 
@@ -187,6 +220,25 @@ builder.Services.AddScoped<ITableRepository, TableRepository>();
 
 #region Email Services + Background Worker
 
+// Email queue implementation based on cache mode
+var emailQueueCacheMode = builder.Configuration.GetValue<string>("CacheMode", "None")?.ToLower();
+
+if (emailQueueCacheMode == "none")
+{
+    // Direct email sending (synchronous) - no background worker needed
+    builder.Services.AddSingleton<IEmailQueue, DirectEmailQueue>();
+    // Note: EmailBackgroundService will NOT be registered
+}
+else
+{
+    // Cache-based email queue (async with background worker)
+    builder.Services.AddSingleton<IEmailQueue, CacheEmailQueue>();
+    // Register Background Service for async email processing
+    builder.Services.AddHostedService<EmailBackgroundService>();
+}
+
+// Other email services (work with all modes)
+builder.Services.AddSingleton<IDeadLetterSink, CacheDeadLetterSink>();
 builder.Services.AddSingleton<IEmailQueue, RedisEmailQueue>();
 builder.Services.AddSingleton<IDeadLetterSink, RedisDeadLetterSink>();
 builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();
@@ -195,8 +247,15 @@ builder.Services.AddHostedService<EmailBackgroundService>();
 
 #endregion
 
-#region Dish Management
+// Forgot password token store uses cache
+builder.Services.AddSingleton<IPasswordResetTokenStore, CachePasswordResetTokenStore>();
 
+#endregion
+
+#region SignalR
+
+builder.Services.AddSignalR();
+builder.Services.AddScoped<IReservationBroadcastService, SignalRReservationBroadcastService>();
 builder.Services.AddScoped<IDishRepository, Infa.Repo.DishRepository>();
 builder.Services.AddScoped<IDishService, Core.Service.DishService>();
 
@@ -207,6 +266,7 @@ builder.Services.AddScoped<IDishService, Core.Service.DishService>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
+    // Add JWT security definition for Swagger
     options.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
     {
         Name = "Authorization",
@@ -237,6 +297,7 @@ builder.Services.AddSwaggerGen(options =>
 
 #region CORS
 
+// Add CORS services
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
@@ -254,34 +315,38 @@ var app = builder.Build();
 
 #region Startup Checks / Warmups
 
+// Database connection check (non-blocking)
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<RestaurantMgmtContext>();
 
     try
     {
-        if (!db.Database.CanConnect())
+        if (db.Database.CanConnect())
         {
-            throw new Exception("Database connection failed.");
-        }
+            Console.WriteLine($"Database connection successful on {app.Environment.EnvironmentName} - {Environment.MachineName}.");
 
-        Console.WriteLine("Database connection successful.");
-
-        var lookupResolver = scope.ServiceProvider.GetRequiredService<ILookupResolver>();
-        try
-        {
-            await lookupResolver.WarmUpAsync();
-            Console.WriteLine("Lookup resolver cache warmed up.");
+            // Warm up lookup resolver cache
+            var lookupResolver = scope.ServiceProvider.GetRequiredService<ILookupResolver>();
+            try
+            {
+                await lookupResolver.WarmUpAsync();
+                Console.WriteLine("Lookup resolver cache warmed up.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Lookup warmup failed (startup continues): {ex.Message}");
+            }
         }
-        catch (Exception ex)
+        else
         {
-            Console.WriteLine($"Lookup warmup skipped (startup continues): {ex.Message}");
+            Console.WriteLine("Database connection failed. Application will start but database operations will fail.");
         }
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"Startup error: {ex.Message}");
-        throw;
+        Console.WriteLine($"Database check failed: {ex.Message}");
+        Console.WriteLine("Application will start, but database operations may fail.");
     }
 }
 
@@ -289,8 +354,11 @@ using (var scope = app.Services.CreateScope())
 
 #region Middleware Pipeline
 
+// Register global exception handling middleware
+// Must be first in the pipeline to catch all exceptions
 app.UseMiddleware<HandleExceptionMiddleware>();
 
+// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -300,10 +368,13 @@ if (app.Environment.IsDevelopment())
 app.UseCors("AllowFrontend");
 app.UseHttpsRedirection();
 
+// Authentication & Authorization Middleware
+// Must be before UseAuthorization
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<ReservationHub>("/hubs/reservation");
 
 #endregion
 

@@ -68,3 +68,16 @@ public enum PromotionStatusCode
     EXPIRED,
     DISABLED
 }
+
+public enum TableZoneCode
+{
+    INDOOR,
+    OUTDOOR,
+    ROOFTOP
+}
+
+public enum RoleStatusCode
+{
+    ACTIVE,
+    INACTIVE
+}

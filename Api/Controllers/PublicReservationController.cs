@@ -39,10 +39,11 @@ public class PublicReservationController : ControllerBase
     public async Task<IActionResult> GetAvailability(
         [FromQuery] DateTime? reservedTime,
         [FromQuery] int? partySize,
+        [FromQuery] string? zone,
         CancellationToken cancellationToken = default)
     {
         var tables = await _reservationService.GetAvailableTablesAsync(
-            reservedTime, partySize, cancellationToken);
+            reservedTime, partySize, zone, cancellationToken);
 
         return Ok(new ApiResponse<List<TableAvailabilityDto>>
         {

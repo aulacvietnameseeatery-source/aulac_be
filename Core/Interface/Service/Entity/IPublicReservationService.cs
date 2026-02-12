@@ -12,11 +12,13 @@ public interface IPublicReservationService
     /// </summary>
     /// <param name="reservedTime">Optional filter by reservation time</param>
     /// <param name="partySize">Optional filter by minimum capacity</param>
+    /// <param name="zone">Optional filter by zone</param>
     /// <param name="ct">Cancellation token</param>
     /// <returns>List of available tables</returns>
     Task<List<TableAvailabilityDto>> GetAvailableTablesAsync(
         DateTime? reservedTime,
         int? partySize,
+        string? zone,
         CancellationToken ct = default);
 
     /// <summary>

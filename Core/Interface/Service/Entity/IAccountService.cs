@@ -1,6 +1,7 @@
 ﻿
 using Core.DTO.Account;
 using Core.DTO.Auth;
+using Core.DTO.General;
 
 namespace Core.Interface.Service.Entity;
 
@@ -31,6 +32,18 @@ public interface IAccountService
         long accountId,
         UpdateAccountRequest request,
         long requestingUserId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Updates the status of an account (Active/Inactive/Locked).
+    /// </summary>
+    /// <param name="accountId">Account ID to update</param>
+    /// <param name="newStatusCode">The new status code (ACTIVE, INACTIVE, LOCKED)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>True if successful</returns>
+    Task<bool> UpdateAccountStatusAsync(
+        long accountId,
+        AccountStatusCode newStatusCode,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -99,6 +112,23 @@ public interface IAccountService
     Task<bool> IsAccountActiveAsync(
         long accountId,
         CancellationToken cancellationToken = default);
+
+	Task<PagedResultDTO<AccountListDTO>> GetAccountsAsync(AccountListQueryDTO query);
+
+	/// <summary>
+	/// Gets all active roles for dropdown/filter purposes.
+	/// </summary>
+	/// <param name="cancellationToken">Cancellation token</param>
+	/// <returns>List of all roles</returns>
+	Task<List<RoleDTO>> GetAllRolesAsync(CancellationToken cancellationToken = default);
+
+	/// <summary>
+	/// Gets all account statuses for dropdown/filter purposes.
+	/// </summary>
+	/// <param name="cancellationToken">Cancellation token</param>
+	/// <returns>List of account statuses</returns>
+	Task<List<AccountStatusDTO>> GetAccountStatusesAsync(CancellationToken cancellationToken = default);
+
 }
 
 
