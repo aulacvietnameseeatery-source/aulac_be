@@ -99,4 +99,61 @@ public class RoleRepository : IRoleRepository
         return await _context.StaffAccounts
             .AnyAsync(s => s.RoleId == roleId, cancellationToken);
     }
+
+    public async Task<Role?> GetRoleWithPermissionsAsync(long roleId, CancellationToken cancellationToken = default)
+    {
+        return await _context.Roles
+            .Include(r => r.Permissions)
+            .Include(r => r.RoleStatusLv)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(r => r.RoleId == roleId, cancellationToken);
+    }
+
+    public async Task<Role?> GetRoleWithPermissionsForUpdateAsync(long roleId, CancellationToken cancellationToken = default)
+    {
+        return await _context.Roles
+            .Include(r => r.Permissions)
+            .Include(r => r.RoleStatusLv)
+            .FirstOrDefaultAsync(r => r.RoleId == roleId, cancellationToken);
+    }
+
+    public async Task<List<Permission>> GetAllPermissionsAsync(CancellationToken cancellationToken = default)
+    {
+        return await _context.Permissions
+            .AsNoTracking()
+            .OrderBy(p => p.ScreenCode)
+            .ThenBy(p => p.ActionCode)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<List<Permission>> GetPermissionsByIdsAsync(List<long> permissionIds, CancellationToken cancellationToken = default)
+    {
+        return await _context.Permissions
+            .Where(p => permissionIds.Contains(p.PermissionId))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<Role> AddAsync(Role role, CancellationToken cancellationToken = default)
+    {
+        // Attach permissions as existing entities to prevent EF from trying to insert them
+        if (role.Permissions != null && role.Permissions.Any())
+        {
+            foreach (var permission in role.Permissions)
+            {
+                _context.Attach(permission);
+            }
+        }
+
+        await _context.Roles.AddAsync(role, cancellationToken);
+        await _context.SaveChangesAsync(cancellationToken);
+        return role;
+    }
+
+    public async Task<bool> RoleCodeExistsAsync(string roleCode, CancellationToken cancellationToken = default)
+    {
+        return await _context.Roles
+            .AnyAsync(r => r.RoleCode == roleCode, cancellationToken);
+    }
+
+
 }

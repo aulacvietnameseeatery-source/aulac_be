@@ -79,6 +79,246 @@ namespace Api.Controllers
         }
 
         /// <summary>
+        /// Gets detailed information about a specific role including permissions.
+        /// </summary>
+        /// <param name="id">The role ID</param>
+        /// <returns>Role detail with permissions grouped by screen</returns>
+        /// <response code="200">Role detail retrieved successfully</response>
+        /// <response code="404">Role not found</response>
+        /// <remarks>
+        /// **Returned Fields:**
+        /// - RoleId
+        /// - RoleCode
+        /// - RoleName
+        /// - RoleStatusLvId
+        /// - IsActive (whether the role status is ACTIVE)
+        /// - PermissionGroups (permissions grouped by screen/module)
+        ///
+        /// **Permission Groups:**
+        /// Each group contains:
+        /// - ScreenCode (e.g., "ROLE", "ACCOUNT", "DISH")
+        /// - DisplayName (user-friendly name like "Role Management")
+        /// - DisplayName (user-friendly name like "Role Management")
+        /// - Permissions (list of permissions with IsAssigned flag)
+        ///
+        /// **Use Case:**
+        /// - Role detail view screen
+        /// - Role editing
+        /// - Permission assignment management
+        /// </remarks>
+        [HttpGet("{id}")]
+        [HasPermission(Permissions.ViewRole)]
+        [ProducesResponseType(typeof(ApiResponse<RoleDetailDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetRoleDetail(long id)
+        {
+            try
+            {
+                var roleDetail = await _roleService.GetRoleDetailAsync(id);
+
+                _logger.LogInformation("Retrieved role detail. RoleId: {RoleId}", id);
+
+                return Ok(new ApiResponse<RoleDetailDto>
+                {
+                    Success = true,
+                    Code = 200,
+                    UserMessage = "Role detail retrieved successfully.",
+                    Data = roleDetail,
+                    ServerTime = DateTimeOffset.UtcNow
+                });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                _logger.LogWarning("Get role detail failed: {Message}", ex.Message);
+                return NotFound(new ApiResponse<object>
+                {
+                    Success = false,
+                    Code = 404,
+                    UserMessage = ex.Message,
+                    Data = new { },
+                    ServerTime = DateTimeOffset.UtcNow
+                });
+            }
+        }
+
+        /// <summary>
+        /// Creates a new role with specified permissions.
+        /// </summary>
+        /// <param name="request">The create role request containing role code, role name, status, and permissions</param>
+        /// <returns>The created role detail</returns>
+        /// <response code="201">Role created successfully</response>
+        /// <response code="400">Invalid request (validation error)</response>
+        /// <response code="409">Role code already exists</response>
+        /// <remarks>
+        /// **Request Body:**
+        /// - RoleCode: The unique code for the role (required, max 50 characters, e.g., "MANAGER", "STAFF")
+        /// - RoleName: The name of the role (required, max 100 characters)
+        /// - IsActive: Whether the role should be active (required)
+        /// - PermissionIds: List of permission IDs to assign to the role
+        ///
+        /// **Conflict Check:**
+        /// - Role code must be unique
+        /// - Returns 409 Conflict if duplicate role code found
+        ///
+        /// **Response:**
+        /// Returns the complete role detail including all permissions grouped by screen.
+        ///
+        /// **Use Case:**
+        /// - Creating new roles from the role management screen
+        /// - Setting up initial permissions for a new role
+        /// - Admin role configuration
+        /// </remarks>
+        [HttpPost]
+        [HasPermission(Permissions.CreateRole)]
+        [ProducesResponseType(typeof(ApiResponse<RoleDetailDto>), StatusCodes.Status201Created)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
+        public async Task<IActionResult> CreateRole([FromBody] CreateRoleRequestDto request)
+        {
+            try
+            {
+                var createdRole = await _roleService.CreateRoleAsync(request);
+
+                _logger.LogInformation(
+                    "Role created successfully. RoleId: {RoleId}, RoleCode: {RoleCode}, RoleName: {RoleName}",
+                    createdRole.RoleId,
+                    createdRole.RoleCode,
+                    createdRole.RoleName);
+
+                return CreatedAtAction(
+                    nameof(GetRoleDetail),
+                    new { id = createdRole.RoleId },
+                    new ApiResponse<RoleDetailDto>
+                    {
+                        Success = true,
+                        Code = 201,
+                        UserMessage = "Role created successfully.",
+                        Data = createdRole,
+                        ServerTime = DateTimeOffset.UtcNow
+                    });
+            }
+            catch (Core.Exceptions.ConflictException ex)
+            {
+                _logger.LogWarning("Create role failed - conflict: {Message}", ex.Message);
+                return Conflict(new ApiResponse<object>
+                {
+                    Success = false,
+                    Code = 409,
+                    UserMessage = ex.Message,
+                    Data = new { },
+                    ServerTime = DateTimeOffset.UtcNow
+                });
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogWarning("Create role failed: {Message}", ex.Message);
+                return BadRequest(new ApiResponse<object>
+                {
+                    Success = false,
+                    Code = 400,
+                    UserMessage = ex.Message,
+                    Data = new { },
+                    ServerTime = DateTimeOffset.UtcNow
+                });
+            }
+        }
+
+        /// <summary>
+        /// Updates an existing role with specified permissions.
+        /// </summary>
+        /// <param name="id">The role ID to update</param>
+        /// <param name="request">The update role request containing role code, role name, status, and permissions</param>
+        /// <returns>The updated role detail</returns>
+        /// <response code="200">Role updated successfully</response>
+        /// <response code="400">Invalid request (validation error)</response>
+        /// <response code="404">Role not found</response>
+        /// <response code="409">Role code already exists for another role</response>
+        /// <remarks>
+        /// **Request Body:**
+        /// - RoleCode: The unique code for the role (required, max 50 characters, e.g., "MANAGER", "STAFF")
+        /// - RoleName: The name of the role (required, max 100 characters)
+        /// - IsActive: Whether the role should be active (required)
+        /// - PermissionIds: List of permission IDs to assign to the role
+        ///
+        /// **Conflict Check:**
+        /// - Role code must be unique across all roles except the current one being updated
+        /// - Returns 409 Conflict if duplicate role code found
+        ///
+        /// **Response:**
+        /// Returns the complete role detail including all permissions grouped by screen.
+        ///
+        /// **Use Case:**
+        /// - Editing existing roles from the role management screen
+        /// - Updating permissions for a role
+        /// - Activating/deactivating roles
+        /// - Admin role configuration
+        /// </remarks>
+        [HttpPut("{id}")]
+        [HasPermission(Permissions.UpdateRole)]
+        [ProducesResponseType(typeof(ApiResponse<RoleDetailDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
+        public async Task<IActionResult> UpdateRole(long id, [FromBody] UpdateRoleRequestDto request)
+        {
+            try
+            {
+                var updatedRole = await _roleService.UpdateRoleAsync(id, request);
+
+                _logger.LogInformation(
+                    "Role updated successfully. RoleId: {RoleId}, RoleCode: {RoleCode}, RoleName: {RoleName}",
+                    updatedRole.RoleId,
+                    updatedRole.RoleCode,
+                    updatedRole.RoleName);
+
+                return Ok(new ApiResponse<RoleDetailDto>
+                {
+                    Success = true,
+                    Code = 200,
+                    UserMessage = "Role updated successfully.",
+                    Data = updatedRole,
+                    ServerTime = DateTimeOffset.UtcNow
+                });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                _logger.LogWarning("Update role failed - not found: {Message}", ex.Message);
+                return NotFound(new ApiResponse<object>
+                {
+                    Success = false,
+                    Code = 404,
+                    UserMessage = ex.Message,
+                    Data = new { },
+                    ServerTime = DateTimeOffset.UtcNow
+                });
+            }
+            catch (Core.Exceptions.ConflictException ex)
+            {
+                _logger.LogWarning("Update role failed - conflict: {Message}", ex.Message);
+                return Conflict(new ApiResponse<object>
+                {
+                    Success = false,
+                    Code = 409,
+                    UserMessage = ex.Message,
+                    Data = new { },
+                    ServerTime = DateTimeOffset.UtcNow
+                });
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogWarning("Update role failed: {Message}", ex.Message);
+                return BadRequest(new ApiResponse<object>
+                {
+                    Success = false,
+                    Code = 400,
+                    UserMessage = ex.Message,
+                    Data = new { },
+                    ServerTime = DateTimeOffset.UtcNow
+                });
+            }
+        }
+
+        /// <summary>
         /// Deletes a role by ID.
         /// </summary>
         /// <param name="id">The role ID</param>
