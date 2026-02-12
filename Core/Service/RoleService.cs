@@ -138,15 +138,17 @@ namespace Core.Service
                 throw new InvalidOperationException($"Role Status '{statusCode}' not found in database configuration.");
             }
 
-            // Get all permissions to validate the requested permission IDs
-            var allPermissions = await _roleRepository.GetAllPermissionsAsync();
-            var validPermissionIds = allPermissions.Select(p => p.PermissionId).ToHashSet();
+            // Query requested permissions directly and validate
+            var requestedPermissionIds = request.PermissionIds.Distinct().ToList();
+            var validPermissions = await _roleRepository.GetPermissionsByIdsAsync(requestedPermissionIds);
+            var validPermissionIds = validPermissions.Select(p => p.PermissionId).ToList();
 
-            // Filter out invalid permission IDs
-            var validRequestedPermissions = request.PermissionIds
-                .Where(id => validPermissionIds.Contains(id))
-                .Distinct()
-                .ToList();
+            // Strict validation: throw if any requested permission ID doesn't exist
+            if (validPermissionIds.Count != requestedPermissionIds.Count)
+            {
+                var invalidIds = requestedPermissionIds.Except(validPermissionIds);
+                throw new InvalidOperationException($"Invalid permission IDs: {string.Join(", ", invalidIds)}");
+            }
 
             // Create the new role entity
             var newRole = new Role
@@ -154,7 +156,7 @@ namespace Core.Service
                 RoleCode = request.RoleCode,
                 RoleName = request.RoleName,
                 RoleStatusLvId = roleStatusId.Value,
-                Permissions = allPermissions.Where(p => validRequestedPermissions.Contains(p.PermissionId)).ToList()
+                Permissions = validPermissions.ToList()
             };
 
             // Save to database
@@ -188,29 +190,51 @@ namespace Core.Service
                 throw new InvalidOperationException($"Role Status '{statusCode}' not found in database configuration.");
             }
 
-            // Get all permissions to validate the requested permission IDs
-            var allPermissions = await _roleRepository.GetAllPermissionsAsync();
-            var validPermissionIds = allPermissions.Select(p => p.PermissionId).ToHashSet();
+            // Query requested permissions directly and validate
+            var requestedPermissionIds = request.PermissionIds.Distinct().ToList();
+            var permissionsToAdd = await _roleRepository.GetPermissionsByIdsAsync(requestedPermissionIds);
+            var validPermissionIds = permissionsToAdd.Select(p => p.PermissionId).ToList();
 
-            // Filter out invalid permission IDs
-            var validRequestedPermissions = request.PermissionIds
-                .Where(id => validPermissionIds.Contains(id))
-                .Distinct()
-                .ToList();
+            // Strict validation: throw if any requested permission ID doesn't exist
+            if (validPermissionIds.Count != requestedPermissionIds.Count)
+            {
+                var invalidIds = requestedPermissionIds.Except(validPermissionIds);
+                throw new InvalidOperationException($"Invalid permission IDs: {string.Join(", ", invalidIds)}");
+            }
 
             // Update role properties
             existingRole.RoleCode = request.RoleCode;
             existingRole.RoleName = request.RoleName;
             existingRole.RoleStatusLvId = roleStatusId.Value;
 
-            // Update permissions - clear existing and add new ones
-            existingRole.Permissions.Clear();
-            
-            // Get permissions by IDs to add (query in same context to avoid tracking conflict)
-            if (validRequestedPermissions.Any())
+            // Differential update: only add/remove what's necessary
+            var currentIds = existingRole.Permissions.Select(p => p.PermissionId).ToHashSet();
+            var requestedIds = validPermissionIds.ToHashSet();
+
+            var toRemove = currentIds.Except(requestedIds).ToHashSet();
+            var toAdd = requestedIds.Except(currentIds).ToHashSet();
+
+            // Remove permissions that are no longer needed
+            if (toRemove.Any())
             {
-                var permissionsToAdd = await _roleRepository.GetPermissionsByIdsAsync(validRequestedPermissions);
-                foreach (var permission in permissionsToAdd)
+                var permissionsToRemove = existingRole.Permissions
+                    .Where(p => toRemove.Contains(p.PermissionId))
+                    .ToList();
+                
+                foreach (var permission in permissionsToRemove)
+                {
+                    existingRole.Permissions.Remove(permission);
+                }
+            }
+
+            // Add new permissions
+            if (toAdd.Any())
+            {
+                var newPermissions = permissionsToAdd
+                    .Where(p => toAdd.Contains(p.PermissionId))
+                    .ToList();
+                
+                foreach (var permission in newPermissions)
                 {
                     existingRole.Permissions.Add(permission);
                 }
