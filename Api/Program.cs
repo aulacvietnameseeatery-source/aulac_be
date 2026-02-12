@@ -239,18 +239,14 @@ else
 
 // Other email services (work with all modes)
 builder.Services.AddSingleton<IDeadLetterSink, CacheDeadLetterSink>();
-builder.Services.AddSingleton<IEmailQueue, RedisEmailQueue>();
-builder.Services.AddSingleton<IDeadLetterSink, RedisDeadLetterSink>();
 builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();
-builder.Services.AddSingleton<IPasswordResetTokenStore, RedisPasswordResetTokenStore>();
-builder.Services.AddHostedService<EmailBackgroundService>();
+
 
 #endregion
 
 // Forgot password token store uses cache
 builder.Services.AddSingleton<IPasswordResetTokenStore, CachePasswordResetTokenStore>();
 
-#endregion
 
 #region SignalR
 
