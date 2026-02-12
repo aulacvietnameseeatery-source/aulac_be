@@ -1,4 +1,4 @@
-using API.Models;
+﻿using API.Models;
 using Core.Attribute;
 using Core.Data;
 using Core.DTO.Dish;
@@ -69,21 +69,24 @@ public class DishController : ControllerBase
         });
     }
 
-    public async Task<IActionResult> GetDishes(
+    // --- ADMIN ENDPOINT ---
+    [HttpGet("management")]
+    //[HasPermission(Permissions.ViewDish)]
+    [ProducesResponseType(typeof(ApiResponse<PagedResult<DishManagementDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetDishesForAdmin(
         [FromQuery] GetDishesRequest request,
         CancellationToken cancellationToken)
     {
-        // 1. Get data from service (Pass cancellationToken down)
-        var (items, totalCount) = await _dishService.GetAllDishesAsync(request, cancellationToken);
+        // 1. Lấy data raw và count từ Service
+        var (items, totalCount) = await _dishService.GetDishesForAdminAsync(request, cancellationToken);
 
-        // 2. Calculate total pages
-        // Optimization: Handle potential DivideByZero if PageSize is 0 (though DTO validation usually handles this)
+        // 2. Tính toán phân trang tại Controller
         var totalPage = request.PageSize > 0
             ? (int)Math.Ceiling((double)totalCount / request.PageSize)
             : 0;
 
-        // 3. Encapsulate data into PagedResult
-        var pagedResult = new PagedResult<Dish>
+        // 3. Đóng gói PagedResult
+        var pagedResult = new PagedResult<DishManagementDto>
         {
             PageData = items,
             PageIndex = request.PageIndex,
@@ -92,12 +95,45 @@ public class DishController : ControllerBase
             TotalPage = totalPage
         };
 
-        // 4. Return standard ApiResponse
-        return Ok(new ApiResponse<PagedResult<Dish>>
+        // 4. Trả về ApiResponse
+        return Ok(new ApiResponse<PagedResult<DishManagementDto>>
         {
             Success = true,
             Code = 200,
-            UserMessage = "Get dish list successfully.",
+            UserMessage = "Get dish list for admin successfully.",
+            Data = pagedResult,
+            ServerTime = DateTimeOffset.UtcNow
+        });
+    }
+
+    // --- CUSTOMER ENDPOINT ---
+    [HttpGet("menu")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(ApiResponse<PagedResult<DishDisplayDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetMenuForCustomer(
+        [FromQuery] GetDishesRequest request,
+        CancellationToken cancellationToken)
+    {
+        var (items, totalCount) = await _dishService.GetDishesForCustomerAsync(request, cancellationToken);
+
+        var totalPage = request.PageSize > 0
+            ? (int)Math.Ceiling((double)totalCount / request.PageSize)
+            : 0;
+
+        var pagedResult = new PagedResult<DishDisplayDto>
+        {
+            PageData = items,
+            PageIndex = request.PageIndex,
+            PageSize = request.PageSize,
+            TotalCount = totalCount,
+            TotalPage = totalPage
+        };
+
+        return Ok(new ApiResponse<PagedResult<DishDisplayDto>>
+        {
+            Success = true,
+            Code = 200,
+            UserMessage = "Get menu successfully.",
             Data = pagedResult,
             ServerTime = DateTimeOffset.UtcNow
         });

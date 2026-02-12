@@ -14,11 +14,14 @@ namespace Core.DTO.Dish
 
         // filtering and searching
         public string? Search { get; set; }     
-        public string? Category { get; set; }   
-        public string? Status { get; set; }
+        public string? Category { get; set; }
+        public DishStatusCode? Status { get; set; }
 
         // sorting
         public string? SortBy { get; set; }     
-        public bool IsDescending { get; set; } = false; 
+        public bool IsDescending { get; set; } = false;
+
+        // view context
+        public bool IsCustomerView { get; set; } = false;
     }
 }

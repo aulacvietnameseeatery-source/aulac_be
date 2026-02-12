@@ -24,61 +24,59 @@ public class DishRepository : IDishRepository
         _context = context;
     }
 
-        public async Task<(List<Dish> Items, int TotalCount)> GetDishesAsync(GetDishesRequest request)
-        {
-            // Base query
-            var dish = _context.Dishes
-                .Include(d => d.Category)       // Take related Category
-                .Include(d => d.DishStatusLv)   // Take related Status
-                .AsNoTracking()                 // Make query read-only
-                .AsQueryable();
-
-            // Apply filters
-            // Filter by category
-            if (!string.IsNullOrWhiteSpace(request.Category) && request.Category != "All")
-            {
-                dish = dish.Where(d => d.Category.CategoryName == request.Category);
-            }
-
-            // Filter by search term
-            if (!string.IsNullOrWhiteSpace(request.Status) && request.Status != "All")
-            {
-                // Filter by status
-                dish = dish.Where(d => d.DishStatusLv.ValueCode == request.Status);
-            }
-
-            // Sorting
-            if(string .IsNullOrWhiteSpace( request.SortBy))
-            {
-                dish = dish.OrderBy(d => d.DishId); // Default sort by DishId
-            }
-            else
-            {
-                switch (request.SortBy.ToLower())
+    public async Task<(List<Dish> Items, int TotalCount)> GetDishesAsync(GetDishesRequest request, CancellationToken cancellationToken = default)
     {
-                    case "price":
-                        dish = request.IsDescending
-                            ? dish.OrderByDescending(d => d.Price)
-                            : dish.OrderBy(d => d.Price);
-                        break;
-                    case "name":
-                        dish = request.IsDescending
-                            ? dish.OrderByDescending(d => d.DishName)
-                            : dish.OrderBy(d => d.DishName);
-                        break;
-                    default:
-                        dish = dish.OrderByDescending(d => d.CreatedAt);
-                        break;
-                }
-            }
+        var dish = _context.Dishes
+            .Include(d => d.Category)
+            .Include(d => d.DishStatusLv)
+            .Include(d => d.DishMedia) 
+            .AsNoTracking()
+            .AsQueryable();
 
-            // Get total count before pagination
-            var totalCount = await dish.CountAsync();
-            // Apply pagination
-            var items = await dish
-                .Skip((request.PageIndex - 1) * request.PageSize)
-                .Take(request.PageSize)
-                .ToListAsync();
+        if (request.IsCustomerView)
+        {
+            //khách chỉ lấy món ăn với status available (42)
+            dish = dish.Where(d => d.IsOnline == true &&
+                                     d.DishStatusLvId == (long)DishStatusCode.AVAILABLE);
+        }
+        else
+        {
+            if (request.Status.HasValue)
+            {
+                dish = dish.Where(d => d.DishStatusLvId == (long)request.Status.Value);
+            }
+        }
+
+        // Sorting logic 
+        if (string.IsNullOrWhiteSpace(request.SortBy))
+        {
+            dish = dish.OrderByDescending(d => d.DishId); 
+        }
+        else
+        {
+            switch (request.SortBy.ToLower())
+            {
+                case "price":
+                    dish = request.IsDescending ? dish.OrderByDescending(d => d.Price) : dish.OrderBy(d => d.Price);
+                    break;
+                case "name":
+                    dish = request.IsDescending ? dish.OrderByDescending(d => d.DishName) : dish.OrderBy(d => d.DishName);
+                    break;
+                default:
+                    dish = dish.OrderByDescending(d => d.CreatedAt);
+                    break;
+            }
+        }
+
+        var totalCount = await dish.CountAsync(cancellationToken);
+
+        var items = await dish
+            .Skip((request.PageIndex - 1) * request.PageSize)
+            .Take(request.PageSize)
+            .ToListAsync(cancellationToken);
+
+        return (items, totalCount);
+    }
 
     public async Task<Dish?> GetDishByIdAsync(long dishId, CancellationToken cancellationToken = default)
     {

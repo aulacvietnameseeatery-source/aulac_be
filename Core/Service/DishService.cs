@@ -67,10 +67,6 @@ public class DishService : IDishService
                 .ToList()
         };
     }
-    public async Task<(List<Dish> Items, int TotalCount)> GetAllDishesAsync(GetDishesRequest request, CancellationToken cancellationToken = default)
-    {
-        return await _dishRepository.GetDishesAsync(request, cancellationToken);
-    }
 
     /// <inheritdoc />
     public async Task<DishStatusDto> UpdateDishStatusAsync(
@@ -119,5 +115,43 @@ public class DishService : IDishService
             _logger.LogError(ex, "Error updating dish status for dish ID {DishId}", dishId);
             throw new InvalidOperationException($"Failed to update dish status: {ex.Message}", ex);
         }
+    }
+
+    public async Task<(List<DishManagementDto> Items, int TotalCount)> GetDishesForAdminAsync(GetDishesRequest request, CancellationToken cancellationToken = default)
+    {
+        var (entities, totalCount) = await _dishRepository.GetDishesAsync(request, cancellationToken);
+
+        // Chỉ map sang DTO
+        var dtos = entities.Select(d => new DishManagementDto
+        {
+            DishId = d.DishId,
+            DishName = d.DishName,
+            CategoryName = d.Category?.CategoryName ?? "Uncategorized",
+            Price = d.Price,
+            Status = d.DishStatusLv?.ValueCode,
+            IsOnline = d.IsOnline ?? false,
+            CreatedAt = d.CreatedAt
+        }).ToList();
+
+        return (dtos, totalCount);
+    }
+
+    public async Task<(List<DishDisplayDto> Items, int TotalCount)> GetDishesForCustomerAsync(GetDishesRequest request, CancellationToken cancellationToken = default)
+    {
+        // Có thể thêm logic filter nghiệp vụ ở đây nếu cần (ví dụ chỉ lấy Active)
+        var (entities, totalCount) = await _dishRepository.GetDishesAsync(request, cancellationToken);
+
+        var dtos = entities.Select(d => new DishDisplayDto
+        {
+            DishId = d.DishId,
+            DishName = d.DishName,
+            Price = d.Price,
+            CategoryName = d.Category?.CategoryName,
+            Tagline = d.Slogan ?? d.ShortDescription,
+            IsChefRecommended = d.ChefRecommended ?? false,
+            ImageUrl = d.DishMedia.FirstOrDefault()?.Media?.Url
+        }).ToList();
+
+        return (dtos, totalCount);
     }
 }

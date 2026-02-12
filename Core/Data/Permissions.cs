@@ -26,6 +26,17 @@ namespace Core.Data
         public const string EditDish = "DISH:EDIT";
         public const string DeleteDish = "DISH:DELETE";
 
-        //...
+        //Role
+        public const string ViewRole = "ROLE:READ";
+        public const string CreateRole = "ROLE:CREATE";
+        public const string EditRole = "ROLE:EDIT";
+        public const string DeleteRole = "ROLE:DELETE";
+
+        //Reservation
+        public const string ViewReservation = "RESERVATION:READ";
+        public const string CreateReservation = "RESERVATION:CREATE";
+        public const string EditReservation = "RESERVATION:EDIT";
+        public const string DeleteReservation = "RESERVATION:DELETE";
+
     }
 }
