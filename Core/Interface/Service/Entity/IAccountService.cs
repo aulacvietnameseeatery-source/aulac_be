@@ -35,6 +35,18 @@ public interface IAccountService
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Updates the status of an account (Active/Inactive/Locked).
+    /// </summary>
+    /// <param name="accountId">Account ID to update</param>
+    /// <param name="newStatusCode">The new status code (ACTIVE, INACTIVE, LOCKED)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>True if successful</returns>
+    Task<bool> UpdateAccountStatusAsync(
+        long accountId,
+        AccountStatusCode newStatusCode,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Gets detailed account information with status names resolved.
     /// </summary>
     Task<AccountDetailDto?> GetAccountDetailAsync(

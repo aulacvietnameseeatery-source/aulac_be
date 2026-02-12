@@ -7,8 +7,7 @@ namespace Core.DTO.Reservation;
 /// </summary>
 public class CreateReservationRequest
 {
-    [Required]
-    public string LockToken { get; set; } = null!;
+    public string? LockToken { get; set; }
 
     [Required]
     public long TableId { get; set; }

@@ -17,6 +17,7 @@ public class PublicReservationService : IPublicReservationService
     private readonly ITableRepository _tableRepository;
     private readonly IReservationRepository _reservationRepository;
     private readonly ICacheService _cacheService;
+    private readonly IReservationBroadcastService _broadcastService;
     private readonly ILogger<PublicReservationService> _logger;
 
     // Reservation source lookup value ID for ONLINE
@@ -33,11 +34,13 @@ public class PublicReservationService : IPublicReservationService
         ITableRepository tableRepository,
         IReservationRepository reservationRepository,
         ICacheService cacheService,
+        IReservationBroadcastService broadcastService,
         ILogger<PublicReservationService> logger)
     {
         _tableRepository = tableRepository;
         _reservationRepository = reservationRepository;
         _cacheService = cacheService;
+        _broadcastService = broadcastService;
         _logger = logger;
     }
 
@@ -45,6 +48,7 @@ public class PublicReservationService : IPublicReservationService
     public async Task<List<TableAvailabilityDto>> GetAvailableTablesAsync(
         DateTime? reservedTime,
         int? partySize,
+        string? zone,
         CancellationToken ct = default)
     {
         // Get all non-maintenance tables
@@ -56,13 +60,45 @@ public class PublicReservationService : IPublicReservationService
             tables = tables.Where(t => t.Capacity >= partySize.Value).ToList();
         }
 
+        // Filter by zone if specified and not "All"
+        if (!string.IsNullOrEmpty(zone) && !zone.Equals("All", StringComparison.OrdinalIgnoreCase))
+        {
+            tables = tables.Where(t => t.ZoneLv?.ValueName?.Equals(zone, StringComparison.OrdinalIgnoreCase) == true).ToList();
+        }
+
         var result = new List<TableAvailabilityDto>();
 
         foreach (var table in tables)
         {
             // Check if table is soft-locked in Redis
             var lockKey = $"{LockKeyPrefix}{table.TableId}";
-            var isLocked = await _cacheService.ExistsAsync(lockKey);
+            var lockDataJson = await _cacheService.GetAsync<string>(lockKey);
+            var isLocked = !string.IsNullOrEmpty(lockDataJson);
+            DateTime? lockedUntil = null;
+
+            if (isLocked)
+            {
+                try
+                {
+                    var lockData = JsonSerializer.Deserialize<TableLockData>(lockDataJson!);
+                    if (lockData != null)
+                    {
+                        lockedUntil = lockData.CreatedAt.AddMinutes(LockDurationMinutes);
+                        // If it's already past, treat as available? 
+                        // Redis should have expired the key, but just in case.
+                        if (lockedUntil <= DateTime.UtcNow)
+                        {
+                            isLocked = false;
+                            lockedUntil = null;
+                        }
+                    }
+                }
+                catch
+                {
+                    // Ignore deserialization errors, treat as locked but unknown time? 
+                    // Or just treat as locked.
+                }
+            }
 
             // Check for existing reservations at the specified time
             var hasConflict = false;
@@ -79,7 +115,10 @@ public class PublicReservationService : IPublicReservationService
                 TableCode = table.TableCode,
                 Capacity = table.Capacity,
                 TableType = table.TableTypeLv?.ValueName ?? "Standard",
-                IsAvailable = !isLocked && !hasConflict
+                Zone = table.ZoneLv?.ValueName ?? "Indoor",
+                IsAvailable = !isLocked && !hasConflict,
+                LockedUntil = isLocked ? lockedUntil : null,
+                ImageUrl = table.TableMedia?.FirstOrDefault()?.Media?.Url
             });
         }
 
@@ -141,6 +180,9 @@ public class PublicReservationService : IPublicReservationService
             JsonSerializer.Serialize(lockData),
             TimeSpan.FromMinutes(LockDurationMinutes));
 
+        // Broadcast lock event
+        await _broadcastService.BroadcastTableLockedAsync(table.TableId, expiresAt);
+
         _logger.LogInformation(
             "Table {TableId} ({TableCode}) locked for {CustomerName} until {ExpiresAt}",
             table.TableId, table.TableCode, request.CustomerName, expiresAt);
@@ -159,30 +201,56 @@ public class PublicReservationService : IPublicReservationService
         CreateReservationRequest request,
         CancellationToken ct = default)
     {
-        // Validate lock token
-        var lockKey = $"{LockKeyPrefix}{request.TableId}";
-         // Replace this line:
-
-        // With this line:
-        var lockDataJson = await _cacheService.GetAsync<string>(lockKey);
-        if (string.IsNullOrEmpty(lockDataJson))
-        {
-            throw new InvalidOperationException(
-                "Lock has expired or is invalid. Please lock the table again.");
-        }
-
-        var lockData = JsonSerializer.Deserialize<TableLockData>(lockDataJson);
-        if (lockData == null || lockData.LockToken != request.LockToken)
-        {
-            throw new InvalidOperationException(
-                "Invalid lock token. Please lock the table again.");
-        }
-
-        // Get table for response
+        // Get table for validation and response
         var table = await _tableRepository.GetByIdAsync(request.TableId, ct);
         if (table == null)
         {
             throw new KeyNotFoundException($"Table with ID {request.TableId} not found.");
+        }
+
+        // Check if table is under maintenance
+        if (table.TableStatusLvId == 17) // LOCKED status
+        {
+            throw new InvalidOperationException($"Table {table.TableCode} is under maintenance.");
+        }
+
+        var lockKey = $"{LockKeyPrefix}{request.TableId}";
+
+        // If lock token is provided, validate it (legacy flow)
+        if (!string.IsNullOrEmpty(request.LockToken))
+        {
+            var lockDataJson = await _cacheService.GetAsync<string>(lockKey);
+            if (string.IsNullOrEmpty(lockDataJson))
+            {
+                throw new InvalidOperationException(
+                    "Lock has expired or is invalid. Please try booking again.");
+            }
+
+            var lockData = JsonSerializer.Deserialize<TableLockData>(lockDataJson);
+            if (lockData == null || lockData.LockToken != request.LockToken)
+            {
+                throw new InvalidOperationException(
+                    "Invalid lock token. Please try booking again.");
+            }
+        }
+        else
+        {
+            // Direct reservation flow (no lock token)
+            // Check if table is currently soft-locked by someone else
+            if (await _cacheService.ExistsAsync(lockKey))
+            {
+                throw new InvalidOperationException(
+                    $"Table {table.TableCode} is currently being reserved by another customer. Please try again.");
+            }
+
+            // Check for existing reservations at the requested time
+            var conflicts = await _reservationRepository.GetTableReservationsForTimeAsync(
+                request.TableId, request.ReservedTime, 120, ct);
+            if (conflicts.Any())
+            {
+                throw new InvalidOperationException(
+                    $"Table {table.TableCode} already has a reservation around the requested time.");
+            }
         }
 
         // Create reservation
@@ -201,8 +269,11 @@ public class PublicReservationService : IPublicReservationService
 
         var created = await _reservationRepository.CreateAsync(reservation, ct);
 
-        // Remove lock from Redis
+        // Remove lock from Redis if it exists
         await _cacheService.RemoveAsync(lockKey);
+
+        // Broadcast reservation created event
+        await _broadcastService.BroadcastReservationCreatedAsync(created.ReservationId, table.TableId);
 
         _logger.LogInformation(
             "Reservation {ReservationId} created for {CustomerName} at table {TableCode}",
@@ -217,6 +288,7 @@ public class PublicReservationService : IPublicReservationService
             PartySize = created.PartySize,
             ReservedTime = created.ReservedTime,
             TableCode = table.TableCode,
+            Zone = table.ZoneLv?.ValueName ?? "Indoor",
             Status = "Pending",
             CreatedAt = created.CreatedAt ?? DateTime.UtcNow
         };
