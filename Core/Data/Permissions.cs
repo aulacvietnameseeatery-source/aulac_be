@@ -39,6 +39,10 @@ namespace Core.Data
         public const string DeleteRole = "ROLE:DELETE";
 
 
-        //...
+        //Reservatione
+        public const string ViewReservation = "RESERVATION:READ";
+        public const string CreateReservation = "RESERVATION:CREATE";
+        public const string UpdateReservation = "RESERVATION:UPDATE";
+        public const string DeleteReservation = "RESERVATION:DELETE";
     }
 }

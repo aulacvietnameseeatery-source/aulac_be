@@ -208,6 +208,8 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IPublicReservationService, PublicReservationService>();
 builder.Services.AddScoped<IRoleService, RoleService>();
 
+builder.Services.AddScoped<IAdminReservationService, AdminReservationService>();
+
 builder.Services.AddScoped<IFileStorage, LocalFileStorage>();
 builder.Services.AddScoped<IDishI18nService, DishI18nService>();
 builder.Services.AddScoped<Ii18nService, I18nService>();
