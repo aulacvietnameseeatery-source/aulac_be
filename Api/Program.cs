@@ -28,6 +28,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Api.Hubs;
 using Api.SignalR;
+using Core.Interface.Service.Customer;
 
 var builder = WebApplication.CreateBuilder(args);
 // Do NOT stop the whole API if a BackgroundService throws
@@ -204,7 +205,7 @@ builder.Services.AddScoped<IUsernameGenerator, UsernameGeneratorService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IPublicReservationService, PublicReservationService>();
 builder.Services.AddScoped<IRoleService, RoleService>();
-
+builder.Services.AddScoped<ICustomerService, CustomerService>();
 
 #endregion
 
@@ -224,6 +225,7 @@ builder.Services.AddScoped<ISystemSettingRepository, SystemSettingRepository>();
 builder.Services.AddScoped<IDishRepository, DishRepository>();
 builder.Services.AddScoped<IReservationRepository, ReservationRepository>();
 builder.Services.AddScoped<ITableRepository, TableRepository>();
+builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
 
 #endregion
 

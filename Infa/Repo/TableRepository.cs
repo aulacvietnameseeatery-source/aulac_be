@@ -55,4 +55,17 @@ public class TableRepository : ITableRepository
             .AsNoTracking()
             .AnyAsync(t => t.TableId == tableId, ct);
     }
+
+    public async Task<List<RestaurantTable>> GetManualAvailableTablesAsync(CancellationToken ct = default)
+    {
+        // Get tables that are not under maintenance (LOCKED)
+        return await _context.RestaurantTables
+            .AsNoTracking()
+            .Include(t => t.TableTypeLv)
+            .Include(t => t.ZoneLv)
+            .Where(t => t.TableStatusLvId != TableStatusLocked)
+            .OrderBy(t => t.Capacity)
+            .ThenBy(t => t.TableCode)
+            .ToListAsync(ct);
+    }
 }
