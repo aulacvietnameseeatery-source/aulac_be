@@ -13,9 +13,9 @@ public static class RefreshTokenCookieHelper
     public const string CookieName = "refresh_token";
 
     /// <summary>
-    /// Cookie path - restricted to the refresh endpoint for security.
+    /// Cookie path - available to all endpoints.
     /// </summary>
-    public const string CookiePath = "/api/auth/refresh";
+    public const string CookiePath = "/";
 
     /// <summary>
     /// Creates standardized cookie options for the refresh token.
@@ -29,7 +29,7 @@ public static class RefreshTokenCookieHelper
         {
             HttpOnly = true,     // Prevents JavaScript access
             Secure = isProduction,     // HTTPS only in production, allow HTTP in dev
-            SameSite = SameSiteMode.Strict, // CSRF protection
+            SameSite = isProduction ? SameSiteMode.Strict : SameSiteMode.Unspecified, // CSRF protection
             Path = CookiePath,            // Restrict to refresh endpoint only
             Expires = expiresAt,     // Align with refresh token lifetime
             IsEssential = true       // Not subject to consent policies
@@ -47,7 +47,7 @@ public static class RefreshTokenCookieHelper
         {
             HttpOnly = true,
             Secure = isProduction,
-            SameSite = SameSiteMode.Strict,
+            SameSite = isProduction ? SameSiteMode.Lax : SameSiteMode.None,
             Path = CookiePath,
             Expires = DateTime.UtcNow.AddDays(-1), // Expire in the past
             IsEssential = true
