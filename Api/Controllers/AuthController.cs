@@ -53,8 +53,7 @@ public class AuthController : ControllerBase
     /// - HttpOnly: true (JavaScript cannot access)
     /// - Secure: true in production (HTTPS only)
     /// - SameSite: Strict (CSRF protection)
-    /// - Path: `/api/auth/refresh` (restricted scope)
-    /// - Expires: Aligned with refresh token lifetime
+    /// - Path: `/` (available to all endpoints)
     /// 
     /// </remarks>
     [HttpPost("login")]
@@ -262,36 +261,39 @@ public class AuthController : ControllerBase
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Logout confirmation</returns>
     /// <response code="200">Logout successful</response>
-    /// <response code="401">Not authenticated</response>
     /// <remarks>
     /// **Security:** Deletes the refresh token cookie and revokes the session in the database.
+    /// Works even if the access token is expired (allows users to always logout).
     /// </remarks>
     [HttpPost("logout")]
-    [Authorize]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> Logout(CancellationToken cancellationToken)
     {
-        var sessionId = GetCurrentSessionId();
-        if (!sessionId.HasValue)
-        {
-            return Unauthorized();
-        }
+   var sessionId = TryGetSessionIdFromToken();
 
-        var success = await _authService.LogoutAsync(sessionId.Value, cancellationToken);
+        if (sessionId.HasValue)
+        {
+            await _authService.LogoutAsync(sessionId.Value, cancellationToken);
+            _logger.LogInformation("Session revoked during logout. SessionId: {SessionId}", sessionId);
+  }
+        else
+        {
+        _logger.LogInformation("Logout called without valid session (expired token or no token)");
+      }
 
         // Delete refresh token cookie
         RefreshTokenCookieHelper.DeleteCookie(Response, _isProduction);
 
-        _logger.LogInformation("User logged out. SessionId: {SessionId}", sessionId);
+        _logger.LogInformation("Logout completed. Cookie deleted. SessionId: {SessionId}", sessionId);
 
         return Ok(new ApiResponse<object>
-        {
-            Success = success,
-            Code = 200,
-            UserMessage = "Logout successful.",
+   {
+          Success = true,
+        Code = 200,
+      UserMessage = "Logout successful.",
             Data = new { },
-            ServerTime = DateTimeOffset.UtcNow
+          ServerTime = DateTimeOffset.UtcNow
         });
     }
 
@@ -499,8 +501,8 @@ public class AuthController : ControllerBase
             // Execute the password reset
             await _authService.ResetPasswordAsync(
                  request.Token,
-             request.NewPassword,
-               cancellationToken);
+                 request.NewPassword,
+                 cancellationToken);
 
             _logger.LogInformation(
                 "Password reset completed successfully from IP {IP}",
@@ -593,6 +595,46 @@ public class AuthController : ControllerBase
             return sessionId;
         }
         return null;
+    }
+
+    /// <summary>
+    /// Tries to get session ID from token without throwing exception if token is expired.
+    /// </summary>
+/// <returns>Session ID if found, otherwise null</returns>
+    private long? TryGetSessionIdFromToken()
+    {
+        try
+        {
+     // Try to get from currently authenticated user first
+            var sessionIdFromAuth = GetCurrentSessionId();
+      if (sessionIdFromAuth.HasValue)
+            {
+ return sessionIdFromAuth;
+}
+
+            // If not authenticated, try to extract from expired token
+            var authHeader = Request.Headers.Authorization.ToString();
+          if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer "))
+       {
+          return null;
+    }
+
+            var token = authHeader.Substring("Bearer ".Length).Trim();
+            var principal = _tokenService.GetPrincipalFromExpiredToken(token);
+
+            var sessionIdClaim = principal?.FindFirst("session_id");
+      if (sessionIdClaim != null && long.TryParse(sessionIdClaim.Value, out var sessionId))
+   {
+       return sessionId;
+   }
+      }
+        catch (Exception ex)
+      {
+  // Token parsing failed - that's okay, we'll still delete the cookie
+     _logger.LogDebug(ex, "Could not extract session ID from token during logout");
+        }
+
+  return null;
     }
 
     /// <summary>
