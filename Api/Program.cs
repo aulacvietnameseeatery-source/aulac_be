@@ -186,6 +186,8 @@ builder.Services.AddAuthorization(options =>
 
 builder.Services.AddScoped<ISystemSettingService, SystemSettingService>();
 builder.Services.AddScoped<IAccountService, AccountService>();
+// Forgot password token store uses cache
+builder.Services.AddSingleton<IPasswordResetTokenStore, CachePasswordResetTokenStore>();
 
 builder.Services.AddScoped<IDishService, DishService>();
 builder.Services.AddScoped<IDishCategoryService, DishCategoryService>();
@@ -244,10 +246,6 @@ builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();
 
 #endregion
 
-// Forgot password token store uses cache
-builder.Services.AddSingleton<IPasswordResetTokenStore, CachePasswordResetTokenStore>();
-
-
 #region SignalR
 
 builder.Services.AddSignalR();
@@ -293,15 +291,20 @@ builder.Services.AddSwaggerGen(options =>
 
 #region CORS
 
-// Add CORS services
+// Get allowed origins from configuration (supports multiple environments)
+var allowedOrigins = builder.Configuration
+    .GetSection("AllowedOrigins")
+    .Get<string[]>()
+    ?? new[] { "http://localhost:3000" }; // Fallback to localhost if not configured
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins("http://localhost:3000")
-              .AllowAnyMethod()
-              .AllowAnyHeader()
-              .AllowCredentials();
+        policy.WithOrigins(allowedOrigins)
+        .AllowAnyMethod()
+        .AllowAnyHeader()
+        .AllowCredentials();
     });
 });
 
@@ -349,7 +352,6 @@ using (var scope = app.Services.CreateScope())
 #endregion
 
 #region Middleware Pipeline
-
 // Register global exception handling middleware
 // Must be first in the pipeline to catch all exceptions
 app.UseMiddleware<HandleExceptionMiddleware>();

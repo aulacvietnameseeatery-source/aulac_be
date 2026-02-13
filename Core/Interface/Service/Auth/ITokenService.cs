@@ -32,7 +32,7 @@ public interface ITokenService
     /// <returns>A random, URL-safe refresh token string</returns>
     string GenerateRefreshToken();
 
-/// <summary>
+    /// <summary>
     /// Hashes a refresh token for secure storage.
     /// Raw tokens should never be stored in the database.
     /// </summary>
