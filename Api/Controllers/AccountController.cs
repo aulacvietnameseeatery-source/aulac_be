@@ -281,15 +281,6 @@ namespace Api.Controllers
                 ServerTime = DateTimeOffset.UtcNow
             });
         }
-
-        [HttpGet("status")]
-        [HasPermission(Permissions.ViewAccount)]
-        public IActionResult GetAccountStatus()
-        {
-            // Placeholder implementation
-            return Ok(new { Status = "account is active" });
-        }
-
         /// <summary>
         /// Resets a staff account password to the system's default password.
         /// </summary>
