@@ -17,6 +17,8 @@ public partial class RestaurantTable
 
     public uint TableTypeLvId { get; set; }
 
+    public uint ZoneLvId { get; set; }
+
     public bool? IsOnline { get; set; }
 
     public virtual ICollection<Order> Orders { get; set; } = new List<Order>();
@@ -30,6 +32,8 @@ public partial class RestaurantTable
     public virtual LookupValue TableStatusLv { get; set; } = null!;
 
     public virtual LookupValue TableTypeLv { get; set; } = null!;
+
+    public virtual LookupValue ZoneLv { get; set; } = null!;
 
     public virtual ICollection<Reservation> Reservations { get; set; } = new List<Reservation>();
 }

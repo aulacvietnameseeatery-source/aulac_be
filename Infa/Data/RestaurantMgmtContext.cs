@@ -92,8 +92,9 @@ public partial class RestaurantMgmtContext : DbContext
     public virtual DbSet<TableMedium> TableMedia { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
-        => optionsBuilder.UseMySql("server=localhost;database=restaurant_mgmt;user=root;password=1234", ServerVersion.Parse("8.0.44-mysql"));
+    {
+        
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -378,6 +379,7 @@ public partial class RestaurantMgmtContext : DbContext
         modelBuilder.Entity<DishTag>(entity =>
         {
             entity.HasKey(e => e.DishTagId).HasName("PRIMARY");
+
             entity.ToTable("dish_tag");
 
             entity.HasIndex(e => e.DishId, "FK_dish_tag_dish_dish_id");
@@ -1248,6 +1250,7 @@ public partial class RestaurantMgmtContext : DbContext
             entity.Property(e => e.TableQrImg).HasColumnName("table_qr_img");
             entity.Property(e => e.TableStatusLvId).HasColumnName("table_status_lv_id");
             entity.Property(e => e.TableTypeLvId).HasColumnName("table_type_lv_id");
+            entity.Property(e => e.ZoneLvId).HasColumnName("zone_lv_id");
 
             entity.HasOne(d => d.TableQrImgNavigation).WithMany(p => p.RestaurantTables)
                 .HasForeignKey(d => d.TableQrImg)
@@ -1263,6 +1266,11 @@ public partial class RestaurantMgmtContext : DbContext
                 .HasForeignKey(d => d.TableTypeLvId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("fk_restaurant_table_type_lv");
+
+            entity.HasOne(d => d.ZoneLv).WithMany(p => p.RestaurantTableZoneLvs)
+                .HasForeignKey(d => d.ZoneLvId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_restaurant_table_zone_lv");
         });
 
         modelBuilder.Entity<Role>(entity =>
@@ -1280,6 +1288,12 @@ public partial class RestaurantMgmtContext : DbContext
             entity.Property(e => e.RoleName)
                 .HasMaxLength(100)
                 .HasColumnName("role_name");
+            entity.Property(e => e.RoleStatusLvId)
+                .HasColumnName("role_status_lv_id");
+
+            entity.HasOne(d => d.RoleStatusLv)
+                .WithMany()
+                .HasForeignKey(d => d.RoleStatusLvId);
 
             entity.HasMany(d => d.Permissions).WithMany(p => p.Roles)
                 .UsingEntity<Dictionary<string, object>>(

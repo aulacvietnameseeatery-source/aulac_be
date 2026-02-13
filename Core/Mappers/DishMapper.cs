@@ -11,9 +11,9 @@ namespace Core.Mappers
 {
     public static class DishMapper
     {
-        public static DishDetailDto ToDetailDto(Dish dish, DishTag dishTag)
+        public static DishDetailForActionsDto ToDetailDto(Dish dish, DishTag dishTag, DishTag? dishDiet)
         {
-            return new DishDetailDto
+            return new DishDetailForActionsDto
             {
                 DishId = dish.DishId,
                 CategoryId = dish.CategoryId,
@@ -23,6 +23,8 @@ namespace Core.Mappers
                 DishStatus = dish.DishStatusLv.ValueCode,
                 TagId = dishTag.TagId,
                 TagName = dishTag.Tag.ValueCode,
+                DietId = dishDiet?.TagId,
+                DietName = dishDiet?.Tag.ValueCode,
                 IsOnline = dish.IsOnline ?? false,
                 ChefRecommended = dish.ChefRecommended ?? false,
                 DisplayOrder = dish.DisplayOrder,

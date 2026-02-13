@@ -26,5 +26,7 @@ namespace Core.Enum
         PromotionStatus = 16, // PROMOTION_STATUS
         IngredientType = 17,  // INGREDIENT_TYPE
         Tag = 18,         // TAG
+        TableZone = 19,   // TABLE_ZONE
+        DishDiet = 20,   // DISH_DIET
     }
 }

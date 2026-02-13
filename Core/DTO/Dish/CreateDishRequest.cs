@@ -20,6 +20,7 @@ namespace Core.DTO.Dish
 
         public uint DishStatusLvId { get; set; }
         public uint TagId { get; set; }
+        public uint? DietId { get; set; }
 
         public Dictionary<string, DishI18nDto> I18n { get; set; } = new();
     }

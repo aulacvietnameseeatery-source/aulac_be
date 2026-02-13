@@ -1,24 +1,19 @@
-﻿using Core.DTO.Email;
+using Core.DTO.Email;
 using Core.Interface.Service.Email;
 using Core.Interface.Service.Others;
-using Microsoft.EntityFrameworkCore.Storage;
-using StackExchange.Redis;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Text.Json;
-using System.Threading.Tasks;
-using IDatabase = StackExchange.Redis.IDatabase;
 
 namespace Infa.Email
 {
-    public sealed class RedisEmailQueue : IEmailQueue
+    /// <summary>
+    /// Cache-based email queue implementation.
+    /// Works with any ICacheService implementation (Redis, In-Memory, etc.)
+    /// </summary>
+    public sealed class CacheEmailQueue : IEmailQueue
     {
         private readonly ICacheService _cache;
         private readonly string _queueKey;
 
-        public RedisEmailQueue(ICacheService cache, string queueKey = "email:queue")
+        public CacheEmailQueue(ICacheService cache, string queueKey = "email:queue")
         {
             _cache = cache;
             _queueKey = queueKey;
@@ -41,5 +36,4 @@ namespace Infa.Email
             throw new OperationCanceledException(ct);
         }
     }
-
 }
