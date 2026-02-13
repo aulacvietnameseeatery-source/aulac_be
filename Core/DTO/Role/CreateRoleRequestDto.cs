@@ -10,14 +10,8 @@ namespace Core.DTO.Role
     public class CreateRoleRequestDto
     {
         /// <summary>
-        /// The unique code for the role (e.g., "MANAGER", "STAFF").
-        /// </summary>
-        [Required(ErrorMessage = "Role code is required.")]
-        [StringLength(50, ErrorMessage = "Role code must not exceed 50 characters.")]
-        public string RoleCode { get; set; } = null!;
-
-        /// <summary>
         /// The name of the role to create.
+        /// Role code will be auto-generated from this name (uppercase with underscores).
         /// </summary>
         [Required(ErrorMessage = "Role name is required.")]
         [StringLength(100, ErrorMessage = "Role name must not exceed 100 characters.")]
@@ -25,9 +19,9 @@ namespace Core.DTO.Role
 
         /// <summary>
         /// Indicates whether the role should be active upon creation.
+        /// Default is true (always active on creation).
         /// </summary>
-        [Required]
-        public bool IsActive { get; set; }
+        public bool IsActive { get; set; } = true;
 
         /// <summary>
         /// List of permission IDs to assign to the role.
