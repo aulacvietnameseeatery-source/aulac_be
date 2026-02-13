@@ -30,6 +30,7 @@ using Api.Hubs;
 using Api.SignalR;
 
 var builder = WebApplication.CreateBuilder(args);
+
 // Do NOT stop the whole API if a BackgroundService throws
 builder.Services.Configure<HostOptions>(options =>
 {
@@ -41,16 +42,14 @@ builder.Services.Configure<HostOptions>(options =>
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
-        // Serialize enums as strings in JSON responses (e.g., "Active" instead of 1)
+        // Serialize enums as strings in JSON responses
         options.JsonSerializerOptions.Converters.Add(
             new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
 
-        // Keep existing Unicode handling
         options.JsonSerializerOptions.Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping;
     })
     .ConfigureApiBehaviorOptions(options =>
     {
-        // Unified validation error response
         options.InvalidModelStateResponseFactory = context =>
         {
             var errors = context.ModelState
@@ -83,7 +82,6 @@ builder.Services.AddControllers()
 
 #region Options (Bind from configuration)
 
-// Load Options from configuration
 builder.Services.Configure<ForgotPasswordRulesOptions>(
     builder.Configuration.GetSection("ForgotPasswordRules"));
 
@@ -97,7 +95,6 @@ builder.Services.Configure<SmtpOptions>(
 
 #region Database (DbContext)
 
-// Configure DbContext with connection string per environment
 var connectionString = builder.Configuration.GetConnectionString("Default")
     ?? throw new InvalidOperationException("Missing Default connection string.");
 
@@ -163,17 +160,10 @@ switch (cacheMode)
 
 #region Authentication / Authorization
 
-// Authentication Infrastructure
-// Register auth services (token service, session repository, password hasher, etc.)
 builder.Services.AddAuthInfrastructure(builder.Configuration);
-
-// Configure JWT Bearer authentication with session validation
 builder.Services.AddJwtAuthentication(builder.Configuration);
-
-// Register Custom Authorization Handler
 builder.Services.AddSingleton<IAuthorizationMiddlewareResultHandler, CustomAuthorizationMiddlewareResultHandler>();
 
-// Dynamic Permission-Based Authorization permissions from Permissions class
 builder.Services.AddAuthorization(options =>
 {
     var permissionFields = typeof(Permissions)
@@ -198,6 +188,7 @@ builder.Services.AddScoped<ISystemSettingService, SystemSettingService>();
 builder.Services.AddScoped<IAccountService, AccountService>();
 
 builder.Services.AddScoped<IDishService, DishService>();
+builder.Services.AddScoped<IDishCategoryService, DishCategoryService>();
 
 builder.Services.AddScoped<IPasswordGenerator, PasswordGeneratorService>();
 builder.Services.AddScoped<IUsernameGenerator, UsernameGeneratorService>();
@@ -210,7 +201,6 @@ builder.Services.AddScoped<IRoleService, RoleService>();
 
 #region Lookup System
 
-// Lookup System: ILookupLoader (SCOPED) + ILookupResolver (SINGLETON)
 builder.Services.AddScoped<ILookupRepo, LookupRepo>();
 builder.Services.AddSingleton<ILookupResolver, LookupResolver>();
 
@@ -222,6 +212,7 @@ builder.Services.AddScoped<IAccountRepository, AccountRepository>();
 builder.Services.AddScoped<IRoleRepository, RoleRepository>();
 builder.Services.AddScoped<ISystemSettingRepository, SystemSettingRepository>();
 builder.Services.AddScoped<IDishRepository, DishRepository>();
+builder.Services.AddScoped<IDishCategoryRepository, DishCategoryRepository>();
 builder.Services.AddScoped<IReservationRepository, ReservationRepository>();
 builder.Services.AddScoped<ITableRepository, TableRepository>();
 
@@ -250,15 +241,19 @@ else
 builder.Services.AddSingleton<IDeadLetterSink, CacheDeadLetterSink>();
 builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();
 
+
+#endregion
+
 // Forgot password token store uses cache
 builder.Services.AddSingleton<IPasswordResetTokenStore, CachePasswordResetTokenStore>();
 
-#endregion
 
 #region SignalR
 
 builder.Services.AddSignalR();
 builder.Services.AddScoped<IReservationBroadcastService, SignalRReservationBroadcastService>();
+builder.Services.AddScoped<IDishRepository, Infa.Repo.DishRepository>();
+builder.Services.AddScoped<IDishService, Core.Service.DishService>();
 
 #endregion
 
@@ -303,7 +298,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins("http://localhost:3000") // Frontend URL
+        policy.WithOrigins("http://localhost:3000")
               .AllowAnyMethod()
               .AllowAnyHeader()
               .AllowCredentials();

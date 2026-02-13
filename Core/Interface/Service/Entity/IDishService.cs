@@ -1,4 +1,5 @@
-using Core.DTO.Dish;
+﻿using Core.DTO.Dish;
+using Core.Entity;
 
 namespace Core.Interface.Service.Entity;
 
@@ -28,4 +29,9 @@ public interface IDishService
         long dishId,
         DishStatusCode newStatus,
         CancellationToken ct = default);
+    // Trả về List DTO và TotalCount
+    Task<(List<DishManagementDto> Items, int TotalCount)> GetDishesForAdminAsync(GetDishesRequest request, CancellationToken cancellationToken = default);
+
+    Task<(List<DishDisplayDto> Items, int TotalCount)> GetDishesForCustomerAsync(GetDishesRequest request, CancellationToken cancellationToken = default);
 }
+
