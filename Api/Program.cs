@@ -3,11 +3,14 @@ using Api.Middleware;
 using API.Middleware;
 using API.Models;
 using Core.Data;
+using Core.DTO.General;
 using Core.Interface.Repo;
 using Core.Interface.Service;
 using Core.Interface.Service.Auth;
 using Core.Interface.Service.Email;
 using Core.Interface.Service.Entity;
+using Core.Interface.Service.FileStorage;
+using Core.Interface.Service.I18n;
 using Core.Interface.Service.Others;
 using Core.Interface.Service.Role;
 using Core.Service;
@@ -28,6 +31,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Api.Hubs;
 using Api.SignalR;
+using Core.Interface.Service.LookUp;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -90,6 +94,12 @@ builder.Services.Configure<BaseUrlOptions>(
 
 builder.Services.Configure<SmtpOptions>(
     builder.Configuration.GetSection("Smtp"));
+
+builder.Services.Configure<FileStorageOptions>(
+    builder.Configuration.GetSection("FileStorage"));
+
+builder.Services.Configure<GoogleTranslateOptions>(
+    builder.Configuration.GetSection("GoogleTranslate"));
 
 #endregion
 
@@ -200,6 +210,13 @@ builder.Services.AddScoped<IRoleService, RoleService>();
 
 builder.Services.AddScoped<IAdminReservationService, AdminReservationService>();
 
+builder.Services.AddScoped<IFileStorage, LocalFileStorage>();
+builder.Services.AddScoped<IDishI18nService, DishI18nService>();
+builder.Services.AddScoped<Ii18nService, I18nService>();
+builder.Services.AddScoped<ILookupService, LookupService>();
+
+builder.Services.AddHttpClient<ITranslationService, GoogleTranslationService>();
+
 
 #endregion
 
@@ -219,6 +236,10 @@ builder.Services.AddScoped<IDishRepository, DishRepository>();
 builder.Services.AddScoped<IDishCategoryRepository, DishCategoryRepository>();
 builder.Services.AddScoped<IReservationRepository, ReservationRepository>();
 builder.Services.AddScoped<ITableRepository, TableRepository>();
+
+builder.Services.AddScoped<II18nRepository, I18nRepository>();
+builder.Services.AddScoped<IMediaRepository, MediaRepository>();
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
 #endregion
 
@@ -372,6 +393,8 @@ app.UseHttpsRedirection();
 // Must be before UseAuthorization
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.UseStaticFiles();
 
 app.MapControllers();
 app.MapHub<ReservationHub>("/hubs/reservation");

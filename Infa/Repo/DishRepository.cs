@@ -1,5 +1,6 @@
 ﻿using Core.DTO.Dish;
 using Core.Entity;
+using Core.Enum;
 using Core.Interface.Repo;
 using Infa.Data;
 using Microsoft.EntityFrameworkCore;
@@ -7,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 
@@ -184,6 +186,83 @@ public class DishRepository : IDishRepository
         return await _context.Dishes
             .AsNoTracking()
             .AnyAsync(d => d.DishId == dishId, ct);
+    }
+
+    public async Task AddAsync(Dish dish, CancellationToken ct)
+    {
+        _context.Dishes.Add(dish); // Add new Dish entity to the context
+        await _context.SaveChangesAsync(ct); // Persist changes to the database
+    }
+
+    public async Task<Dish?> FindByIdForActionAsync(long id, CancellationToken ct)
+    {
+        // Retrieve a Dish by ID, including related entities for full details
+        return await _context.Dishes
+        .Include(x => x.DishNameText).ThenInclude(x => x.I18nTranslations)
+        .Include(x => x.DescriptionText).ThenInclude(x => x.I18nTranslations)
+        .Include(x => x.ShortDescriptionText).ThenInclude(x => x.I18nTranslations)
+        .Include(x => x.SloganText).ThenInclude(x => x.I18nTranslations)
+        .Include(x => x.NoteText).ThenInclude(x => x.I18nTranslations)
+        .Include(x => x.DishStatusLv)
+        .Include(x => x.Category)
+        .Include(x => x.DishMedia)
+            .ThenInclude(x => x.Media)
+                .ThenInclude(x => x.MediaTypeLv)
+        .FirstOrDefaultAsync(x => x.DishId == id, ct); // Return the first match or null
+    }
+
+    public async Task<List<LookupValue>> GetActiveDishStatusEntitiesAsync()
+    {
+        // Get all active dish status lookup values
+        return await _context.LookupValues
+        .AsNoTracking() // No tracking for read-only query
+        .Where(lv =>
+            lv.TypeId == (ushort)Core.Enum.LookupType.DishStatus &&
+            lv.IsActive == true &&
+            lv.DeletedAt == null
+        )
+        .OrderBy(lv => lv.ValueId) // Order by ValueId
+        .ToListAsync();
+    }
+
+    public async Task<List<DishCategory>> GetAllDishCategoriesAsync()
+    {
+        // Retrieve all dish categories, ordered by CategoryId
+        return await _context.DishCategories
+            .AsNoTracking()
+            .Include(c => c.CategoryNameText)
+                .ThenInclude(t => t.I18nTranslations)
+            .Where(c => !c.IsDisabled)
+            .OrderBy(c => c.CategoryId)
+            .ToListAsync();
+    }
+
+    public async Task<List<LookupValue>> GetAllActiveTagsAsync()
+    {
+        // Get all active tag lookup values
+        return await _context.LookupValues
+            .AsNoTracking()
+            .Where(lv =>
+                lv.TypeId == (ushort)Core.Enum.LookupType.Tag &&
+                lv.IsActive == true &&
+                lv.DeletedAt == null
+            )
+            .OrderBy(lv => lv.SortOrder)
+            .ToListAsync();
+    }
+
+    public async Task AddDishTagAsync(DishTag dishTag, CancellationToken ct)
+    {
+        _context.DishTags.Add(dishTag); // Add new DishTag entity to the context
+        await _context.SaveChangesAsync(ct); // Persist changes to the database
+    }
+
+    public async Task<DishTag?> FindTagByDishIdAsync(long id, ushort typeId, CancellationToken ct)
+    {
+        // Find the DishTag for a given DishId, including the related Tag
+        return await _context.DishTags
+            .Include(x => x.Tag)
+        .FirstOrDefaultAsync(x => x.DishId == id && x.Tag.TypeId == typeId, ct);
     }
 }
 
