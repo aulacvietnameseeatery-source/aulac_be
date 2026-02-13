@@ -10,13 +10,6 @@ namespace Core.DTO.Role
     public class UpdateRoleRequestDto
     {
         /// <summary>
-        /// The unique code for the role (e.g., "MANAGER", "STAFF").
-        /// </summary>
-        [Required(ErrorMessage = "Role code is required.")]
-        [StringLength(50, ErrorMessage = "Role code must not exceed 50 characters.")]
-        public string RoleCode { get; set; } = null!;
-
-        /// <summary>
         /// The name of the role to update.
         /// </summary>
         [Required(ErrorMessage = "Role name is required.")]
