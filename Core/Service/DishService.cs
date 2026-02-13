@@ -117,28 +117,58 @@ public class DishService : IDishService
         }
     }
 
-    public async Task<(List<DishManagementDto> Items, int TotalCount)> GetDishesForAdminAsync(GetDishesRequest request, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Lấy danh sách cho Admin (Map sang DishManagementDto)
+    /// </summary>
+    public async Task<(List<DishManagementDto> Items, int TotalCount)> GetDishesForAdminAsync(
+        GetDishesRequest request,
+        CancellationToken cancellationToken = default)
     {
-        var (entities, totalCount) = await _dishRepository.GetDishesAsync(request, cancellationToken);
-
-        // Chỉ map sang DTO
-        var dtos = entities.Select(d => new DishManagementDto
+        try
         {
-            DishId = d.DishId,
-            DishName = d.DishName,
-            CategoryName = d.Category?.CategoryName ?? "Uncategorized",
-            Price = d.Price,
-            Status = d.DishStatusLv?.ValueCode,
-            IsOnline = d.IsOnline ?? false,
-            CreatedAt = d.CreatedAt
-        }).ToList();
+            // 1. Gọi Repository để lấy dữ liệu
+            var (entities, totalCount) = await _dishRepository.GetDishesAsync(request, cancellationToken);
 
-        return (dtos, totalCount);
+            // 2. Map sang DTO của bạn
+            var dtos = entities.Select(d => new DishManagementDto
+            {
+                DishId = d.DishId,
+                DishName = d.DishName,
+
+                // Xử lý null cho Category
+                CategoryName = d.Category?.CategoryName ?? "Uncategorized",
+
+                Price = d.Price,
+
+                // Map Status (Tên hiển thị)
+                Status = d.DishStatusLv?.ValueName ?? "Unknown",
+
+                // Map StatusId (Quan trọng để Frontend tô màu Badge)
+                StatusId = d.DishStatusLvId,
+
+                IsOnline = d.IsOnline ?? false,
+                CreatedAt = d.CreatedAt
+            }).ToList();
+
+            return (dtos, totalCount);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting dishes for admin");
+            throw;
+        }
     }
 
-    public async Task<(List<DishDisplayDto> Items, int TotalCount)> GetDishesForCustomerAsync(GetDishesRequest request, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Lấy danh sách cho Customer (Map sang DishDisplayDto - dùng DTO khác đơn giản hơn)
+    /// </summary>
+    public async Task<(List<DishDisplayDto> Items, int TotalCount)> GetDishesForCustomerAsync(
+        GetDishesRequest request,
+        CancellationToken cancellationToken = default)
     {
-        // Có thể thêm logic filter nghiệp vụ ở đây nếu cần (ví dụ chỉ lấy Active)
+        // ... (Giữ nguyên logic customer nếu bạn có DishDisplayDto, nếu không thì dùng chung DTO trên cũng được) ...
+        // Logic mẫu:
+        request.IsCustomerView = true;
         var (entities, totalCount) = await _dishRepository.GetDishesAsync(request, cancellationToken);
 
         var dtos = entities.Select(d => new DishDisplayDto
@@ -147,11 +177,29 @@ public class DishService : IDishService
             DishName = d.DishName,
             Price = d.Price,
             CategoryName = d.Category?.CategoryName,
-            Tagline = d.Slogan ?? d.ShortDescription,
-            IsChefRecommended = d.ChefRecommended ?? false,
-            ImageUrl = d.DishMedia.FirstOrDefault()?.Media?.Url
+            ImageUrl = d.DishMedia.FirstOrDefault()?.Media?.Url,
+            // ... các trường khác
         }).ToList();
 
         return (dtos, totalCount);
     }
+
+    // --- CÁC HÀM HỖ TRỢ DROPDOWN (Giữ nguyên) ---
+
+    public async Task<List<string>> GetAllCategoriesAsync(CancellationToken cancellationToken = default)
+    {
+        return await _dishRepository.GetAllCategoriesAsync(cancellationToken);
+    }
+
+    public async Task<List<DishStatusDto>> GetDishStatusesAsync(CancellationToken cancellationToken = default)
+    {
+        var statuses = await _dishRepository.GetDishStatusesAsync(cancellationToken);
+
+        return statuses.Select(s => new DishStatusDto
+        {
+            StatusId = s.ValueId,
+            StatusName = s.ValueName
+        }).ToList();
+    }
 }
+

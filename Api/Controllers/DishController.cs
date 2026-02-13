@@ -69,46 +69,42 @@ public class DishController : ControllerBase
         });
     }
 
-    // --- ADMIN ENDPOINT ---
+    // --- 1. ADMIN ENDPOINT (Quản lý món ăn) ---
     [HttpGet("management")]
-    //[HasPermission(Permissions.ViewDish)]
+    // [HasPermission(Permissions.ViewDish)] // Bật lại khi có Auth
     [ProducesResponseType(typeof(ApiResponse<PagedResult<DishManagementDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetDishesForAdmin(
         [FromQuery] GetDishesRequest request,
         CancellationToken cancellationToken)
     {
-        // 1. Lấy data raw và count từ Service
+        // Gọi Service
         var (items, totalCount) = await _dishService.GetDishesForAdminAsync(request, cancellationToken);
 
-        // 2. Tính toán phân trang tại Controller
-        var totalPage = request.PageSize > 0
-            ? (int)Math.Ceiling((double)totalCount / request.PageSize)
-            : 0;
-
-        // 3. Đóng gói PagedResult
+        // Đóng gói PagedResult (Nên tách ra helper để tái sử dụng)
         var pagedResult = new PagedResult<DishManagementDto>
         {
             PageData = items,
             PageIndex = request.PageIndex,
             PageSize = request.PageSize,
             TotalCount = totalCount,
-            TotalPage = totalPage
+            TotalPage = request.PageSize > 0
+                ? (int)Math.Ceiling((double)totalCount / request.PageSize)
+                : 0
         };
 
-        // 4. Trả về ApiResponse
         return Ok(new ApiResponse<PagedResult<DishManagementDto>>
         {
             Success = true,
             Code = 200,
-            UserMessage = "Get dish list for admin successfully.",
+            UserMessage = "Dishes retrieved successfully.", // Message nên tổng quát
             Data = pagedResult,
             ServerTime = DateTimeOffset.UtcNow
         });
     }
 
-    // --- CUSTOMER ENDPOINT ---
+    // --- 2. CUSTOMER ENDPOINT (Menu hiển thị) ---
     [HttpGet("menu")]
-    [AllowAnonymous]
+    [AllowAnonymous] // Khách không cần login
     [ProducesResponseType(typeof(ApiResponse<PagedResult<DishDisplayDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMenuForCustomer(
         [FromQuery] GetDishesRequest request,
@@ -116,28 +112,63 @@ public class DishController : ControllerBase
     {
         var (items, totalCount) = await _dishService.GetDishesForCustomerAsync(request, cancellationToken);
 
-        var totalPage = request.PageSize > 0
-            ? (int)Math.Ceiling((double)totalCount / request.PageSize)
-            : 0;
-
         var pagedResult = new PagedResult<DishDisplayDto>
         {
             PageData = items,
             PageIndex = request.PageIndex,
             PageSize = request.PageSize,
             TotalCount = totalCount,
-            TotalPage = totalPage
+            TotalPage = request.PageSize > 0
+                ? (int)Math.Ceiling((double)totalCount / request.PageSize)
+                : 0
         };
 
         return Ok(new ApiResponse<PagedResult<DishDisplayDto>>
         {
             Success = true,
             Code = 200,
-            UserMessage = "Get menu successfully.",
+            UserMessage = "Menu retrieved successfully.",
             Data = pagedResult,
             ServerTime = DateTimeOffset.UtcNow
         });
     }
+
+    // --- 3. FILTER DROPDOWNS (Dữ liệu cho Frontend Dropdown) ---
+
+    [HttpGet("categories")]
+    [AllowAnonymous] // Hoặc authorize tùy nghiệp vụ
+    [ProducesResponseType(typeof(ApiResponse<List<string>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAllCategories(CancellationToken cancellationToken)
+    {
+        var categories = await _dishService.GetAllCategoriesAsync(cancellationToken);
+
+        return Ok(new ApiResponse<List<string>>
+        {
+            Success = true,
+            Code = 200,
+            Data = categories,
+            ServerTime = DateTimeOffset.UtcNow
+        });
+    }
+
+    [HttpGet("statuses")]
+    // [HasPermission(Permissions.ViewDish)] // Chỉ Admin mới cần lọc status
+    [ProducesResponseType(typeof(ApiResponse<List<DishStatusDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetDishStatuses(CancellationToken cancellationToken)
+    {
+        // Lưu ý: DTO trả về ở đây phụ thuộc vào cái bạn chọn ở bước trước (DishStatusDto hoặc DishStatusFilterDto)
+        var statuses = await _dishService.GetDishStatusesAsync(cancellationToken);
+
+        return Ok(new ApiResponse<List<DishStatusDto>> // Hoặc List<DishStatusFilterDto>
+        {
+            Success = true,
+            Code = 200,
+            Data = statuses,
+            ServerTime = DateTimeOffset.UtcNow
+        });
+    }
+
+
     /// <summary>
     /// Updates the status of a dish.
     /// </summary>

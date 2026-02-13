@@ -38,4 +38,13 @@ public interface IDishRepository
     Task<bool> ExistsAsync(long dishId, CancellationToken ct = default);
     Task<Dish?> GetDishByIdAsync(long dishId, CancellationToken cancellationToken = default);
     Task<(List<Dish> Items, int TotalCount)> GetDishesAsync(GetDishesRequest request, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Lấy danh sách tất cả các Category Name để hiển thị trong Filter Dropdown.
+    /// </summary>
+    Task<List<string>> GetAllCategoriesAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Lấy danh sách các Status của Dish từ bảng LookupValues để hiển thị trong Filter Dropdown.
+    /// </summary>
+    Task<List<LookupValue>> GetDishStatusesAsync(CancellationToken cancellationToken = default);
 }

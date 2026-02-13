@@ -29,9 +29,32 @@ public interface IDishService
         long dishId,
         DishStatusCode newStatus,
         CancellationToken ct = default);
-    // Trả về List DTO và TotalCount
-    Task<(List<DishManagementDto> Items, int TotalCount)> GetDishesForAdminAsync(GetDishesRequest request, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Lấy danh sách món ăn cho trang quản trị (Admin).
+    /// Bao gồm đầy đủ thông tin để quản lý (Status, IsOnline, CreatedAt...)
+    /// </summary>
+    Task<(List<DishManagementDto> Items, int TotalCount)> GetDishesForAdminAsync(
+        GetDishesRequest request,
+        CancellationToken cancellationToken = default);
 
-    Task<(List<DishDisplayDto> Items, int TotalCount)> GetDishesForCustomerAsync(GetDishesRequest request, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Lấy danh sách món ăn cho trang khách hàng (Customer/Menu).
+    /// Chỉ bao gồm các thông tin hiển thị (Name, Price, Image...)
+    /// </summary>
+    Task<(List<DishDisplayDto> Items, int TotalCount)> GetDishesForCustomerAsync(
+        GetDishesRequest request,
+        CancellationToken cancellationToken = default);
+
+    // --- CÁC PHƯƠNG THỨC HỖ TRỢ FILTER (DROPDOWN) ---
+
+    /// <summary>
+    /// Lấy danh sách tất cả danh mục để hiển thị Dropdown lọc.
+    /// </summary>
+    Task<List<string>> GetAllCategoriesAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Lấy danh sách trạng thái món ăn để hiển thị Dropdown lọc.
+    /// </summary>
+    Task<List<DishStatusDto>> GetDishStatusesAsync(CancellationToken cancellationToken = default);
 }
 
