@@ -1,3 +1,4 @@
+﻿using Core.DTO.Reservation;
 using Core.Entity;
 
 namespace Core.Interface.Repo;
@@ -37,4 +38,13 @@ public interface IReservationRepository
         DateTime reservedTime, 
         int durationMinutes = 120,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Lấy danh sách Reservation có phân trang, lọc theo ngày và trạng thái.
+    /// </summary>
+    Task<(List<ReservationManagementDto> Items, int TotalCount)> GetReservationsAsync(
+        GetReservationsRequest request,
+        CancellationToken cancellationToken = default);
+    // Thêm vào interface repo
+    Task<List<LookupValue>> GetReservationStatusesAsync(CancellationToken cancellationToken = default);
 }

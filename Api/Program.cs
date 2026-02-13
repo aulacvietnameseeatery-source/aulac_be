@@ -198,6 +198,8 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IPublicReservationService, PublicReservationService>();
 builder.Services.AddScoped<IRoleService, RoleService>();
 
+builder.Services.AddScoped<IAdminReservationService, AdminReservationService>();
+
 
 #endregion
 
