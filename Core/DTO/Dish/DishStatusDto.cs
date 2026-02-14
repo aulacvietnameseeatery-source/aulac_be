@@ -29,4 +29,6 @@ public record DishStatusDto
     /// When the status was updated.
     /// </summary>
     public DateTime UpdatedAt { get; init; }
+
+    public string StatusName { get; init; } = string.Empty;
 }

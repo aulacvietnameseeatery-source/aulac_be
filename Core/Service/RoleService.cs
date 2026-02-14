@@ -124,14 +124,17 @@ namespace Core.Service
 
         public async Task<RoleDetailDto> CreateRoleAsync(CreateRoleRequestDto request)
         {
+            // Auto-generate RoleCode from RoleName (uppercase with underscores)
+            var roleCode = request.RoleName.Trim().ToUpperInvariant().Replace(" ", "_");
+
             // Check if role code already exists
-            if (await _roleRepository.RoleCodeExistsAsync(request.RoleCode))
+            if (await _roleRepository.RoleCodeExistsAsync(roleCode))
             {
-                throw new ConflictException($"A role with code '{request.RoleCode}' already exists. Please use a different role code.");
+                throw new ConflictException($"A role with code '{roleCode}' already exists. Please use a different role name.");
             }
 
-            // Get the appropriate status ID based on IsActive flag
-            var statusCode = request.IsActive ? RoleStatusCode.ACTIVE.ToString() : RoleStatusCode.INACTIVE.ToString();
+            // Always set to ACTIVE on creation
+            var statusCode = RoleStatusCode.ACTIVE.ToString();
             var roleStatusId = await _roleRepository.GetRoleStatusIdAsync(statusCode);
             if (roleStatusId == null)
             {
@@ -153,8 +156,8 @@ namespace Core.Service
             // Create the new role entity
             var newRole = new Role
             {
-                RoleCode = request.RoleCode,
-                RoleName = request.RoleName,
+                RoleCode = roleCode,
+                RoleName = request.RoleName.Trim(),
                 RoleStatusLvId = roleStatusId.Value,
                 Permissions = validPermissions.ToList()
             };
@@ -173,13 +176,6 @@ namespace Core.Service
             if (existingRole == null)
             {
                 throw new KeyNotFoundException($"Role with ID {roleId} not found.");
-            }
-
-            // Check if role code already exists for another role
-            var roleWithSameCode = await _roleRepository.FindByCodeAsync(request.RoleCode);
-            if (roleWithSameCode != null && roleWithSameCode.RoleId != roleId)
-            {
-                throw new ConflictException($"A role with code '{request.RoleCode}' already exists. Please use a different role code.");
             }
 
             // Get the appropriate status ID based on IsActive flag
@@ -202,9 +198,18 @@ namespace Core.Service
                 throw new InvalidOperationException($"Invalid permission IDs: {string.Join(", ", invalidIds)}");
             }
 
-            // Update role properties
-            existingRole.RoleCode = request.RoleCode;
-            existingRole.RoleName = request.RoleName;
+            // Auto-generate new RoleCode from RoleName (uppercase with underscores)
+            var newRoleCode = request.RoleName.Trim().ToUpperInvariant().Replace(" ", "_");
+
+            // Check if new RoleCode conflicts with another existing role (exclude current role)
+            if (existingRole.RoleCode != newRoleCode && await _roleRepository.RoleCodeExistsAsync(newRoleCode))
+            {
+                throw new ConflictException($"A role with code '{newRoleCode}' already exists. Please use a different role name.");
+            }
+
+            // Update role properties (RoleCode auto-updated from RoleName)
+            existingRole.RoleCode = newRoleCode;
+            existingRole.RoleName = request.RoleName.Trim();
             existingRole.RoleStatusLvId = roleStatusId.Value;
 
             // Differential update: only add/remove what's necessary

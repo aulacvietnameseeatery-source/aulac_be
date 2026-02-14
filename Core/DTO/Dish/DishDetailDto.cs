@@ -1,4 +1,4 @@
-namespace Core.DTO.Dish;
+﻿namespace Core.DTO.Dish;
 
 /// <summary>
 /// Dish detail response DTO

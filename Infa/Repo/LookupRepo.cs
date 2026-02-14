@@ -1,3 +1,4 @@
+using Core.Entity;
 using Core.Interface.Repo;
 using Infa.Data;
 using Microsoft.EntityFrameworkCore;
@@ -116,5 +117,20 @@ public class LookupRepo : ILookupRepo
     private static string BuildCacheKey(ushort typeId, string normalizedValueCode)
     {
         return $"{typeId}|{normalizedValueCode}";
+    }
+
+    public async Task<List<LookupValue>> GetAllActiveByTypeAsync(ushort typeId, CancellationToken ct)
+    {
+        return await _context.LookupValues
+        .AsNoTracking()
+        .Where(lv =>
+            lv.TypeId == typeId &&
+            lv.IsActive == true &&
+            lv.DeletedAt == null
+        )
+        .Include(lv => lv.ValueNameText)
+            .ThenInclude(t => t.I18nTranslations)
+        .OrderBy(lv => lv.SortOrder)
+        .ToListAsync(ct);
     }
 }

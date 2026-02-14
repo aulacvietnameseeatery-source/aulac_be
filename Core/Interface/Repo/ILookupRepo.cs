@@ -1,3 +1,5 @@
+using Core.Entity;
+
 namespace Core.Interface.Repo;
 
 /// <summary>
@@ -28,4 +30,9 @@ public interface ILookupRepo
  /// <param name="ct">Cancellation token</param>
     /// <returns>True if UpdatedAt column exists; otherwise false</returns>
     Task<bool> HasUpdatedAtColumnAsync(CancellationToken ct = default);
+
+    Task<List<LookupValue>> GetAllActiveByTypeAsync(
+        ushort typeId,
+        CancellationToken ct
+    );
 }
