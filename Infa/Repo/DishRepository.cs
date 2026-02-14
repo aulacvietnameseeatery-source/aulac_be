@@ -52,7 +52,17 @@ public class DishRepository : IDishRepository
         // 3a. Filter cho Customer (Logic nghiệp vụ đặc thù)
         if (request.IsCustomerView)
         {
-            var availableId = (long)DishStatusCode.AVAILABLE; // Ép kiểu Enum sang ID DB (42)
+            // 1. Chuyển Enum thành chữ "AVAILABLE"
+            var availableCode = DishStatusCode.AVAILABLE.ToString();
+            var lookupTypeId = (long)Core.Enum.LookupType.DishStatus;
+
+            // 2. Query DB để tìm ID thực tế của trạng thái này
+            var availableId = await _context.LookupValues
+                .Where(lv => lv.TypeId == lookupTypeId && lv.ValueCode == availableCode)
+                .Select(lv => lv.ValueId)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            // 3. Filter bằng ID vừa tìm được
             query = query.Where(d => d.IsOnline == true &&
                                      d.DishStatusLvId == availableId);
         }
@@ -64,12 +74,6 @@ public class DishRepository : IDishRepository
                 var statusId = (long)request.Status.Value;
                 query = query.Where(d => d.DishStatusLvId == statusId);
             }
-        }
-
-        // 3c. Filter theo Category (Nếu không phải "All")
-        if (!string.IsNullOrWhiteSpace(request.Category) && request.Category != "All")
-        {
-            query = query.Where(d => d.Category.CategoryName == request.Category);
         }
 
         // 4. Logic Sorting (Sắp xếp)
