@@ -7,6 +7,11 @@ namespace Core.DTO.Reservation;
 /// </summary>
 public class CreateReservationLockRequest
 {
+    /// <summary>
+    /// List of table IDs to lock. If provided, TableId is ignored (or used as fallback/first item).
+    /// </summary>
+    public List<long>? TableIds { get; set; }
+
     [Required]
     public long TableId { get; set; }
 

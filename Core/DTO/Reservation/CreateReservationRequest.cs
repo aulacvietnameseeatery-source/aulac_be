@@ -8,6 +8,11 @@ namespace Core.DTO.Reservation;
 public class CreateReservationRequest
 {
     public string? LockToken { get; set; }
+    
+    /// <summary>
+    /// List of table IDs to reserve. If provided, TableId is ignored (or used as fallback/first item).
+    /// </summary>
+    public List<long>? TableIds { get; set; }
 
     [Required]
     public long TableId { get; set; }
