@@ -22,6 +22,18 @@ public interface IPublicReservationService
         CancellationToken ct = default);
 
     /// <summary>
+    /// Gets available tables for manual reservation.
+    /// </summary>
+    /// <param name="reservedTime">Optional filter by reservation time</param>
+    /// <param name="partySize">Optional filter by minimum capacity</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>List of available tables</returns>
+    Task<List<ManualTableAvailabilityDto>> GetManualAvailableTablesAsync(
+        DateTime? reservedTime,
+        int? partySize,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// Creates a soft lock on a table for 10 minutes.
     /// </summary>
     /// <param name="request">Lock request details</param>
@@ -39,5 +51,15 @@ public interface IPublicReservationService
     /// <returns>Confirmed reservation details</returns>
     Task<ReservationResponseDto> CreateReservationAsync(
         CreateReservationRequest request,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Submits a final reservation using a valid lock token.
+    /// </summary>
+    /// <param name="request">Reservation details with lock token</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>Confirmed reservation details</returns>
+    Task<ReservationResponseDto> CreateManualReservationAsync(
+        CreateManualReservationRequest request,
         CancellationToken ct = default);
 }
