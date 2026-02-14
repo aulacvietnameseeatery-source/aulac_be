@@ -28,8 +28,8 @@ public static class RefreshTokenCookieHelper
         return new CookieOptions
         {
             HttpOnly = true,     // Prevents JavaScript access
-            Secure = isProduction,     // HTTPS only in production, allow HTTP in dev
-            SameSite = isProduction ? SameSiteMode.Strict : SameSiteMode.Unspecified, // CSRF protection
+            Secure = true,     // HTTPS only in production, allow HTTP in dev
+            SameSite = isProduction ? SameSiteMode.Strict : SameSiteMode.None, // CSRF protection
             Path = CookiePath,            // Restrict to refresh endpoint only
             Expires = expiresAt,     // Align with refresh token lifetime
             IsEssential = true       // Not subject to consent policies
@@ -46,8 +46,8 @@ public static class RefreshTokenCookieHelper
         return new CookieOptions
         {
             HttpOnly = true,
-            Secure = isProduction,
-            SameSite = isProduction ? SameSiteMode.Lax : SameSiteMode.None,
+            Secure = true,
+            SameSite = isProduction ? SameSiteMode.Strict : SameSiteMode.None,
             Path = CookiePath,
             Expires = DateTime.UtcNow.AddDays(-1), // Expire in the past
             IsEssential = true
