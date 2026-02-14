@@ -16,6 +16,14 @@ public interface ITableRepository
     Task<List<RestaurantTable>> GetAvailableTablesAsync(CancellationToken ct = default);
 
     /// <summary>
+    /// Gets all tables that are available for reservation.
+    /// Filters out tables under maintenance (LOCKED status).
+    /// </summary>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>List of available tables</returns>
+    Task<List<RestaurantTable>> GetManualAvailableTablesAsync(CancellationToken ct = default);
+
+    /// <summary>
     /// Finds a table by its ID.
     /// </summary>
     /// <param name="tableId">The table ID</param>
