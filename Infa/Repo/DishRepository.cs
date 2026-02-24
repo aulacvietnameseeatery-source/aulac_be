@@ -30,11 +30,17 @@ public class DishRepository : IDishRepository
         GetDishesRequest request,
         CancellationToken cancellationToken = default)
     {
-        // 1. Khởi tạo Queryable với các Include cần thiết
         var query = _context.Dishes
             .Include(d => d.Category)
+                .ThenInclude(c => c.CategoryNameText)       
+                    .ThenInclude(t => t.I18nTranslations)   
             .Include(d => d.DishStatusLv)
             .Include(d => d.DishMedia)
+                .ThenInclude(dm => dm.Media)                
+            .Include(d => d.DishNameText)                   
+                .ThenInclude(t => t.I18nTranslations)       
+            .Include(d => d.DescriptionText)                
+                .ThenInclude(t => t.I18nTranslations)       
             .AsNoTracking() // Tối ưu hiệu năng cho việc chỉ đọc (Read-only)
             .AsQueryable();
 

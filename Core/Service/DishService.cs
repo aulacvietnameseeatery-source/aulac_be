@@ -173,25 +173,55 @@ public class DishService : IDishService
     }
 
     /// <summary>
-    /// Lấy danh sách cho Customer (Map sang DishDisplayDto - dùng DTO khác đơn giản hơn)
+    /// Hàm hỗ trợ: Trích xuất 3 ngôn ngữ từ Entity i18nText sang DTO
+    /// </summary>
+    private I18nTextDto MapTranslations(I18nText? textEntity, string fallbackStr)
+    {
+        if (textEntity == null || textEntity.I18nTranslations == null || !textEntity.I18nTranslations.Any())
+        {
+            return new I18nTextDto { Vi = fallbackStr, En = fallbackStr, Fr = fallbackStr };
+        }
+
+        return new I18nTextDto
+        {
+            Vi = textEntity.I18nTranslations.FirstOrDefault(t => t.LangCode == "vi")?.TranslatedText ?? fallbackStr,
+            En = textEntity.I18nTranslations.FirstOrDefault(t => t.LangCode == "en")?.TranslatedText ?? fallbackStr,
+            Fr = textEntity.I18nTranslations.FirstOrDefault(t => t.LangCode == "fr")?.TranslatedText ?? fallbackStr
+        };
+    }
+
+    /// <summary>
+    /// Lấy danh sách cho Customer (Đã hỗ trợ Đa ngôn ngữ trọn gói)
     /// </summary>
     public async Task<(List<DishDisplayDto> Items, int TotalCount)> GetDishesForCustomerAsync(
         GetDishesRequest request,
         CancellationToken cancellationToken = default)
     {
-        // ... (Giữ nguyên logic customer nếu bạn có DishDisplayDto, nếu không thì dùng chung DTO trên cũng được) ...
-        // Logic mẫu:
         request.IsCustomerView = true;
         var (entities, totalCount) = await _dishRepository.GetDishesAsync(request, cancellationToken);
 
         var dtos = entities.Select(d => new DishDisplayDto
         {
             DishId = d.DishId,
-            DishName = d.DishName,
+
+            // Map Đa ngôn ngữ Tên món
+            DishName = MapTranslations(d.DishNameText, d.DishName),
+
             Price = d.Price,
-            CategoryName = d.Category?.CategoryName,
-            ImageUrl = d.DishMedia.FirstOrDefault()?.Media?.Url,
-            // ... các trường khác
+
+            // Map Đa ngôn ngữ Tên Category
+            CategoryName = d.Category != null
+                ? MapTranslations(d.Category.CategoryNameText, d.Category.CategoryName)
+                : new I18nTextDto(),
+
+            // Map Đa ngôn ngữ Mô tả
+            Description = MapTranslations(d.DescriptionText, string.Empty),
+
+            // Lấy ảnh Primary, nếu không có thì lấy ảnh đầu tiên
+            ImageUrl = d.DishMedia.FirstOrDefault(dm => dm.IsPrimary == true)?.Media?.Url
+                    ?? d.DishMedia.FirstOrDefault()?.Media?.Url,
+
+            IsChefRecommended = d.ChefRecommended ?? false
         }).ToList();
 
         return (dtos, totalCount);
