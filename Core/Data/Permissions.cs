@@ -44,5 +44,8 @@ namespace Core.Data
         public const string CreateReservation = "RESERVATION:CREATE";
         public const string UpdateReservation = "RESERVATION:UPDATE";
         public const string DeleteReservation = "RESERVATION:DELETE";
+
+        //Order
+        public const string ViewOrder = "ORDER:READ";
     }
 }

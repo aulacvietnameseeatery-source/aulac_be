@@ -216,6 +216,7 @@ builder.Services.AddScoped<IDishI18nService, DishI18nService>();
 builder.Services.AddScoped<Ii18nService, I18nService>();
 builder.Services.AddScoped<ILookupService, LookupService>();
 builder.Services.AddScoped<ICustomerService, CustomerService>();
+builder.Services.AddScoped<IOrderService, OrderService>();
 
 builder.Services.AddHttpClient<ITranslationService, GoogleTranslationService>();
 
@@ -243,6 +244,7 @@ builder.Services.AddScoped<II18nRepository, I18nRepository>();
 builder.Services.AddScoped<IMediaRepository, MediaRepository>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
+builder.Services.AddScoped<IOrderRepository, OrderRepository>();
 
 #endregion
 
