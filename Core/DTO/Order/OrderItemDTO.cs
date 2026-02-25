@@ -9,4 +9,5 @@ public class OrderItemDTO
 	public decimal Price { get; set; }
 	public string ItemStatus { get; set; } = "";
 	public string? RejectReason { get; set; }
+	public string? Note { get; set; }
 }

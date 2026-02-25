@@ -889,6 +889,9 @@ public partial class RestaurantMgmtContext : DbContext
             entity.Property(e => e.RejectReason)
                 .HasMaxLength(255)
                 .HasColumnName("reject_reason");
+            entity.Property(e => e.Note)
+                .HasMaxLength(500)
+                .HasColumnName("note");
 
             entity.HasOne(d => d.Dish).WithMany(p => p.OrderItems)
                 .HasForeignKey(d => d.DishId)

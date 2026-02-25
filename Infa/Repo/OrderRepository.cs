@@ -24,6 +24,7 @@ public class OrderRepository : IOrderRepository
 			.Include(o => o.Staff)
 			.Include(o => o.Table)
 			.Include(o => o.OrderItems)
+			.Include(o => o.Payments)
 			.AsQueryable();
 
 		// Filter by order status
@@ -79,6 +80,7 @@ public class OrderRepository : IOrderRepository
 				Source = o.SourceLv.ValueName,
 				CreatedAt = o.CreatedAt,
 				UpdatedAt = o.UpdatedAt,
+				IsPaid = o.Payments.Any(),
 				OrderItems = o.OrderItems.Select(oi => new OrderItemDTO
 				{
 					OrderItemId = oi.OrderItemId,
@@ -87,7 +89,8 @@ public class OrderRepository : IOrderRepository
 					Quantity = oi.Quantity,
 					Price = oi.Price,
 					ItemStatus = oi.ItemStatusLv.ValueName,
-					RejectReason = oi.RejectReason
+					RejectReason = oi.RejectReason,
+					Note = oi.Note
 				}).ToList()
 			})
 			.ToListAsync(cancellationToken);
@@ -128,5 +131,103 @@ public class OrderRepository : IOrderRepository
 			Completed  = completed,
 			Cancelled  = cancelled,
 		};
+	}
+
+	public async Task<List<KitchenOrderDTO>> GetKitchenOrdersAsync(CancellationToken cancellationToken = default)
+	{
+		const uint pendingId    = 28;
+		const uint inProgressId = 29;
+
+		var orders = await _context.Orders
+			.Include(o => o.OrderStatusLv)
+			.Include(o => o.Table)
+			.Include(o => o.OrderItems)
+				.ThenInclude(oi => oi.Dish)
+			.Include(o => o.OrderItems)
+				.ThenInclude(oi => oi.ItemStatusLv)
+			.Where(o => o.OrderStatusLvId == pendingId || o.OrderStatusLvId == inProgressId)
+			.OrderBy(o => o.CreatedAt)
+			.Select(o => new KitchenOrderDTO
+			{
+				OrderId = o.OrderId,
+				TableCode = o.Table.TableCode,
+				OrderStatus = o.OrderStatusLv.ValueName,
+				CreatedAt = o.CreatedAt,
+				Items = o.OrderItems.Select(oi => new KitchenOrderItemDTO
+				{
+					OrderItemId = oi.OrderItemId,
+					DishName = oi.Dish.DishName,
+					Quantity = oi.Quantity,
+					ItemStatus = oi.ItemStatusLv.ValueName,
+					Note = oi.Note,
+					RejectReason = oi.RejectReason
+				}).ToList()
+			})
+			.ToListAsync(cancellationToken);
+
+		return orders;
+	}
+
+	public async Task UpdateOrderItemStatusAsync(long orderItemId, uint newStatusLvId, string? rejectReason, CancellationToken cancellationToken = default)
+	{
+		var item = await _context.OrderItems
+			.FirstOrDefaultAsync(oi => oi.OrderItemId == orderItemId, cancellationToken)
+			?? throw new KeyNotFoundException($"OrderItem {orderItemId} not found");
+
+		item.ItemStatusLvId = newStatusLvId;
+		item.RejectReason = rejectReason;
+
+		await _context.SaveChangesAsync(cancellationToken);
+
+		// ─── Auto-update Order Status based on Items ──────────────────────
+		const uint inProgressItemLvId = 36;
+		const uint servedItemLvId     = 38;
+		const uint rejectedItemLvId   = 39;
+
+		const uint pendingOrderLvId    = 28;
+		const uint inProgressOrderLvId = 29;
+		const uint completedOrderLvId  = 30;
+		const uint cancelledOrderLvId  = 31;
+
+		var order = await _context.Orders
+			.FirstOrDefaultAsync(o => o.OrderId == item.OrderId, cancellationToken);
+
+		if (order != null)
+		{
+			bool orderStatusChanged = false;
+
+			// 1. Move from PENDING to IN_PROGRESS if an item starts
+			if (newStatusLvId == inProgressItemLvId && order.OrderStatusLvId == pendingOrderLvId)
+			{
+				order.OrderStatusLvId = inProgressOrderLvId;
+				orderStatusChanged = true;
+			}
+
+			// 2. Auto-complete or auto-cancel when ALL items are finished
+			var allItems = await _context.OrderItems
+				.Where(oi => oi.OrderId == item.OrderId)
+				.Select(oi => oi.ItemStatusLvId)
+				.ToListAsync(cancellationToken);
+
+			bool allFinished = allItems.All(lvId => lvId == servedItemLvId || lvId == rejectedItemLvId);
+
+			if (allFinished)
+			{
+				bool hasServed = allItems.Any(lvId => lvId == servedItemLvId);
+				uint targetStatusId = hasServed ? completedOrderLvId : cancelledOrderLvId;
+
+				if (order.OrderStatusLvId != targetStatusId)
+				{
+					order.OrderStatusLvId = targetStatusId;
+					orderStatusChanged = true;
+				}
+			}
+
+			if (orderStatusChanged)
+			{
+				order.UpdatedAt = DateTime.UtcNow;
+				await _context.SaveChangesAsync(cancellationToken);
+			}
+		}
 	}
 }
