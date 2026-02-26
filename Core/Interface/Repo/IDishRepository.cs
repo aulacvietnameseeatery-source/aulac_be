@@ -94,5 +94,9 @@ public interface IDishRepository
     /// <param name="id">The unique identifier of the Dish.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The DishTag entity if found; otherwise, null.</returns>
-    Task<DishTag?> FindTagByDishIdAsync(long id, ushort typeId, CancellationToken ct);
+    Task<List<DishTag>> FindTagByDishIdAsync(long id, CancellationToken ct);
+
+    Task<List<uint>> GetTagIdsByDishIdAsync(long dishId, CancellationToken ct);
+
+    Task RemoveDishTagsAsync(long dishId, List<uint> tagIds, CancellationToken ct);
 }

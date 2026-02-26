@@ -30,11 +30,17 @@ public class DishRepository : IDishRepository
         GetDishesRequest request,
         CancellationToken cancellationToken = default)
     {
-        // 1. Khởi tạo Queryable với các Include cần thiết
         var query = _context.Dishes
             .Include(d => d.Category)
+                .ThenInclude(c => c.CategoryNameText)       
+                    .ThenInclude(t => t.I18nTranslations)   
             .Include(d => d.DishStatusLv)
             .Include(d => d.DishMedia)
+                .ThenInclude(dm => dm.Media)                
+            .Include(d => d.DishNameText)                   
+                .ThenInclude(t => t.I18nTranslations)       
+            .Include(d => d.DescriptionText)                
+                .ThenInclude(t => t.I18nTranslations)       
             .AsNoTracking() // Tối ưu hiệu năng cho việc chỉ đọc (Read-only)
             .AsQueryable();
 
@@ -208,7 +214,11 @@ public class DishRepository : IDishRepository
         .Include(x => x.SloganText).ThenInclude(x => x.I18nTranslations)
         .Include(x => x.NoteText).ThenInclude(x => x.I18nTranslations)
         .Include(x => x.DishStatusLv)
+            .ThenInclude(s => s.ValueNameText)
+                .ThenInclude(t => t.I18nTranslations)
         .Include(x => x.Category)
+            .ThenInclude(c => c.CategoryNameText)
+                .ThenInclude(t => t.I18nTranslations)
         .Include(x => x.DishMedia)
             .ThenInclude(x => x.Media)
                 .ThenInclude(x => x.MediaTypeLv)
@@ -261,12 +271,30 @@ public class DishRepository : IDishRepository
         await _context.SaveChangesAsync(ct); // Persist changes to the database
     }
 
-    public async Task<DishTag?> FindTagByDishIdAsync(long id, ushort typeId, CancellationToken ct)
+    public async Task<List<DishTag>> FindTagByDishIdAsync(long id, CancellationToken ct)
     {
-        // Find the DishTag for a given DishId, including the related Tag
+        // Find all DishTag for a given DishId, including the related Tag
         return await _context.DishTags
             .Include(x => x.Tag)
-        .FirstOrDefaultAsync(x => x.DishId == id && x.Tag.TypeId == typeId, ct);
+                .ThenInclude(t => t.ValueNameText)
+                    .ThenInclude(t => t.I18nTranslations)
+            .Where(x => x.DishId == id)
+            .ToListAsync(ct);
+    }
+
+    public async Task<List<uint>> GetTagIdsByDishIdAsync(long dishId, CancellationToken ct)
+    {
+        return await _context.DishTags
+        .Where(x => x.DishId == dishId)
+        .Select(x => x.TagId)
+        .ToListAsync(ct);
+    }
+
+    public async Task RemoveDishTagsAsync(long dishId, List<uint> tagIds, CancellationToken ct)
+    {
+        await _context.DishTags
+        .Where(x => x.DishId == dishId && tagIds.Contains(x.TagId))
+        .ExecuteDeleteAsync(ct);
     }
 }
 

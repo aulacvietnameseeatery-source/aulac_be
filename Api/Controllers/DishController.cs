@@ -87,7 +87,7 @@ public class DishController : ControllerBase
         // Gọi Service
         var (items, totalCount) = await _dishService.GetDishesForAdminAsync(request, cancellationToken);
 
-        // Đóng gói PagedResult (Nên tách ra helper để tái sử dụng)
+        // Đóng gói PagedResult 
         var pagedResult = new PagedResult<DishManagementDto>
         {
             PageData = items,

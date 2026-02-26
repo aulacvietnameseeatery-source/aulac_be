@@ -38,4 +38,9 @@ public interface ITableRepository
     /// <param name="ct">Cancellation token</param>
     /// <returns>True if the table exists; otherwise false</returns>
     Task<bool> ExistsAsync(long tableId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Gets tables with dynamic filters for POS/Table Management screen.
+    /// </summary>
+    Task<(List<RestaurantTable> Items, int TotalCount)> GetTablesForManagementAsync(DTO.Table.GetTableManagementRequest request, CancellationToken ct = default);
 }

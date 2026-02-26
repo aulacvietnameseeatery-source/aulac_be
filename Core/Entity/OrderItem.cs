@@ -22,6 +22,8 @@ public partial class OrderItem
 
     public string? RejectReason { get; set; }
 
+    public string? Note { get; set; }
+
     public uint ItemStatusLvId { get; set; }
 
     public virtual Dish Dish { get; set; } = null!;

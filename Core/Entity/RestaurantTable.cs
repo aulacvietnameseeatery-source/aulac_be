@@ -21,6 +21,14 @@ public partial class RestaurantTable
 
     public bool? IsOnline { get; set; }
 
+    public string? QrToken { get; set; }
+
+    public DateTime CreatedAt { get; set; }
+
+    public DateTime UpdatedAt { get; set; }
+
+    public long? UpdatedByStaffId { get; set; }
+
     public virtual ICollection<Order> Orders { get; set; } = new List<Order>();
 
     public virtual ICollection<ServiceError> ServiceErrors { get; set; } = new List<ServiceError>();
@@ -34,6 +42,8 @@ public partial class RestaurantTable
     public virtual LookupValue TableTypeLv { get; set; } = null!;
 
     public virtual LookupValue ZoneLv { get; set; } = null!;
+
+    public virtual StaffAccount? UpdatedByStaff { get; set; }
 
     public virtual ICollection<Reservation> Reservations { get; set; } = new List<Reservation>();
 }
