@@ -33,6 +33,7 @@ using Api.Hubs;
 using Api.SignalR;
 using Core.Interface.Service.LookUp;
 using Core.Interface.Service.Customer;
+using Core.Interface.Service.Table;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -218,8 +219,10 @@ builder.Services.AddScoped<ILookupService, LookupService>();
 builder.Services.AddScoped<ICustomerService, CustomerService>();
 builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<IPaymentService, PaymentService>();
+builder.Services.AddScoped<ITableService, TableService>();
 
 builder.Services.AddHttpClient<ITranslationService, GoogleTranslationService>();
+
 
 
 #endregion
