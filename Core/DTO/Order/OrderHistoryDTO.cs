@@ -15,6 +15,7 @@ public class OrderHistoryDTO
 	public string Source { get; set; } = "";
 	public DateTime? CreatedAt { get; set; }
 	public DateTime? UpdatedAt { get; set; }
+	public bool IsPaid { get; set; }
 	public List<OrderItemDTO> OrderItems { get; set; } = new();
 	public int ItemCount => OrderItems.Count;
 }

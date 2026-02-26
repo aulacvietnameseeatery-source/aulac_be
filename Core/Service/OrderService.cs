@@ -19,5 +19,11 @@ public class OrderService : IOrderService
 
 	public Task<OrderStatusCountDTO> GetOrderStatusCountAsync(CancellationToken cancellationToken = default)
 		=> _orderRepository.GetOrderStatusCountAsync(cancellationToken);
+
+	public Task<List<KitchenOrderDTO>> GetKitchenOrdersAsync(CancellationToken cancellationToken = default)
+		=> _orderRepository.GetKitchenOrdersAsync(cancellationToken);
+
+	public Task UpdateOrderItemStatusAsync(long orderItemId, uint newStatusLvId, string? rejectReason, CancellationToken cancellationToken = default)
+		=> _orderRepository.UpdateOrderItemStatusAsync(orderItemId, newStatusLvId, rejectReason, cancellationToken);
 }
 

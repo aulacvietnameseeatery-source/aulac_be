@@ -47,5 +47,7 @@ namespace Core.Data
 
         //Order
         public const string ViewOrder = "ORDER:READ";
+        public const string UpdateOrderItemStatus = "ORDER:UPDATE_ITEM_STATUS";
+        public const string ProcessPayment = "ORDER:PROCESS_PAYMENT";
     }
 }
