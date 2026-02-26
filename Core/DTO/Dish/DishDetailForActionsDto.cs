@@ -10,15 +10,12 @@ namespace Core.DTO.Dish
     {
         public long DishId { get; set; }
         public long CategoryId { get; set; }
-        public string CategoryName { get; set; } = null!;
+        public Dictionary<string, string> CategoryName { get; set; } = new();
         public decimal Price { get; set; }
         public uint DishStatusLvId { get; set; }
-        public string DishStatus { get; set; } = null!;
-        public uint TagId { get; set; }
-        public string TagName { get; set; } = null!;
-
-        public uint? DietId { get; set; }
-        public string? DietName { get; set; }
+        public Dictionary<string, string> DishStatus { get; set; } = new();
+        public List<uint> TagIds { get; set; } = new();
+        public List<TagMultiLangDto> Tags { get; set; } = new();
 
         public bool IsOnline { get; set; }
         public bool ChefRecommended { get; set; }
@@ -32,5 +29,12 @@ namespace Core.DTO.Dish
             = new();
 
         public List<DishMediaDto> Media { get; set; } = new();
+    }
+
+    public class TagMultiLangDto
+    {
+        public uint TagId { get; set; }
+
+        public Dictionary<string, string> Names { get; set; } = new();
     }
 }

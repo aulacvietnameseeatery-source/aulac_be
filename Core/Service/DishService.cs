@@ -283,18 +283,12 @@ public class DishService : IDishService
             await _dishRepository.AddAsync(dish, ct); // Save dish to DB
 
             // Add tag to dish
-            await _dishRepository.AddDishTagAsync(new DishTag
-            {
-                DishId = dish.DishId,
-                TagId = request.TagId
-            }, ct);
-
-            if (request.DietId != null)
+            foreach (var tagId in request.TagIds.Distinct())
             {
                 await _dishRepository.AddDishTagAsync(new DishTag
                 {
                     DishId = dish.DishId,
-                    TagId = (uint)request.DietId
+                    TagId = tagId
                 }, ct);
             }
 
@@ -382,16 +376,12 @@ public class DishService : IDishService
     public async Task<DishDetailForActionsDto> GetDishByIdAsync(long dishId, CancellationToken cancellationToken)
     {
         var dish = await _dishRepository.FindByIdForActionAsync(dishId, cancellationToken); // Find dish by id
-        var dishTag = await _dishRepository.FindTagByDishIdAsync(dishId, (ushort)Core.Enum.LookupType.Tag, cancellationToken); // Find tag for dish
-        var dishDiet = await _dishRepository.FindTagByDishIdAsync(dishId, (ushort)Core.Enum.LookupType.DishDiet, cancellationToken); // Find diet for dish
+        var dishTags = await _dishRepository.FindTagByDishIdAsync(dishId, cancellationToken); // Find tag for dish
 
         if (dish == null)
             throw new KeyNotFoundException($"Dish with ID {dishId} not found!");
 
-        if (dishTag == null)
-            throw new KeyNotFoundException($"Dish Tag with ID {dishId} not found!");
-
-        return DishMapper.ToDetailDto(dish, dishTag, dishDiet); // Map to DTO
+        return DishMapper.ToDetailDto(dish, dishTags); // Map to DTO
     }
 
     public async Task UpdateDishAsync(
@@ -423,23 +413,41 @@ public class DishService : IDishService
             dish.DishStatusLvId = request.DishStatusLvId;
             dish.DishName = request.I18n["en"].DishName;
 
-            var dishTag = await _dishRepository.FindTagByDishIdAsync(request.DishId, (ushort)Core.Enum.LookupType.Tag, ct);
-            if (dishTag != null) dishTag.TagId = request.TagId;
+            // 2.1 Update tags (many-to-many)
+            var existingTagIds = await _dishRepository
+                .GetTagIdsByDishIdAsync(dish.DishId, ct);
 
-            if (request.DietId != null)
+            var newTagIds = request.TagIds
+                .Distinct()
+                .ToList();
+
+            // Tags to remove
+            var tagsToRemove = existingTagIds
+                .Where(id => !newTagIds.Contains(id))
+                .ToList();
+
+            // Tags to add
+            var tagsToAdd = newTagIds
+                .Where(id => !existingTagIds.Contains(id))
+                .ToList();
+
+            // Remove old tags
+            if (tagsToRemove.Any())
             {
-                var dishDiet = await _dishRepository.FindTagByDishIdAsync(request.DishId, (ushort)Core.Enum.LookupType.DishDiet, ct);
-                if (dishDiet != null)
+                await _dishRepository.RemoveDishTagsAsync(
+                    dish.DishId,
+                    tagsToRemove,
+                    ct);
+            }
+
+            // Add new tags
+            foreach (var tagId in tagsToAdd)
+            {
+                await _dishRepository.AddDishTagAsync(new DishTag
                 {
-                    dishDiet.TagId = (uint)request.DietId;
-                } else
-                {
-                    await _dishRepository.AddDishTagAsync(new DishTag
-                    {
-                        DishId = dish.DishId,
-                        TagId = (uint)request.DietId
-                    }, ct);
-                }
+                    DishId = dish.DishId,
+                    TagId = tagId
+                }, ct);
             }
 
             // 3. Update I18n

@@ -6,25 +6,37 @@ using System.Linq;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace Core.Mappers
 {
     public static class DishMapper
     {
-        public static DishDetailForActionsDto ToDetailDto(Dish dish, DishTag dishTag, DishTag? dishDiet)
+        public static DishDetailForActionsDto ToDetailDto(Dish dish, List<DishTag> dishTags)
         {
             return new DishDetailForActionsDto
             {
                 DishId = dish.DishId,
                 CategoryId = dish.CategoryId,
-                CategoryName = dish.Category.CategoryName,
+                CategoryName = dish.Category.CategoryNameText != null
+                    ? BuildI18nDictionary(dish.Category.CategoryNameText)
+                : new Dictionary<string, string>{
+                        { "en", dish.Category.CategoryName }
+                },
                 Price = dish.Price,
                 DishStatusLvId = dish.DishStatusLvId,
-                DishStatus = dish.DishStatusLv.ValueCode,
-                TagId = dishTag.TagId,
-                TagName = dishTag.Tag.ValueCode,
-                DietId = dishDiet?.TagId,
-                DietName = dishDiet?.Tag.ValueCode,
+                DishStatus = dish.DishStatusLv.ValueNameText != null ? BuildI18nDictionary(dish.DishStatusLv.ValueNameText) : new Dictionary<string, string> { {"en", dish.DishStatusLv.ValueName } },
+                TagIds = dishTags
+                    .Select(x => x.TagId)
+                    .ToList(),
+
+                Tags = dishTags
+                    .Select(x => new TagMultiLangDto
+                    {
+                        TagId = x.TagId,
+                        Names = x.Tag.ValueNameText != null ? BuildI18nDictionary(x.Tag.ValueNameText) : new Dictionary<string, string> { { "en", x.Tag.ValueName } }
+                    })
+                    .ToList(),
                 IsOnline = dish.IsOnline ?? false,
                 ChefRecommended = dish.ChefRecommended ?? false,
                 DisplayOrder = dish.DisplayOrder,
@@ -82,5 +94,21 @@ namespace Core.Mappers
 
             return result;
         }
+
+        private static Dictionary<string, string> BuildI18nDictionary(I18nText text)
+        {
+            var result = new Dictionary<string, string>
+            {
+                { text.SourceLangCode, text.SourceText }
+            };
+
+            foreach (var tr in text.I18nTranslations)
+            {
+                result[tr.LangCode] = tr.TranslatedText;
+            }
+
+            return result;
+        }
     }
 }
+

@@ -19,8 +19,7 @@ namespace Core.DTO.Dish
         public int? CookTimeMinutes { get; set; }
 
         public uint DishStatusLvId { get; set; }
-        public uint TagId { get; set; }
-        public uint? DietId { get; set; }
+        public List<uint> TagIds { get; set; } = new();
 
         public Dictionary<string, DishI18nDto> I18n { get; set; } = new();
     }
