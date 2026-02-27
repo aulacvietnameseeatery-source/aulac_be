@@ -43,4 +43,7 @@ public interface ITableRepository
     /// Gets tables with dynamic filters for POS/Table Management screen.
     /// </summary>
     Task<(List<RestaurantTable> Items, int TotalCount)> GetTablesForManagementAsync(DTO.Table.GetTableManagementRequest request, CancellationToken ct = default);
+
+    Task<List<RestaurantTable>> GetTablesWithRelationsAsync(CancellationToken ct = default);
+    Task UpdateAsync(RestaurantTable table, CancellationToken ct);
 }

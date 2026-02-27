@@ -296,5 +296,38 @@ public class DishRepository : IDishRepository
         .Where(x => x.DishId == dishId && tagIds.Contains(x.TagId))
         .ExecuteDeleteAsync(ct);
     }
+
+    public async Task<List<Dish>> GetActiveDishesAsync()
+    {
+        return await _context.Dishes
+            .AsNoTracking()
+            .Include(d => d.DishStatusLv)
+            .Include(d => d.DishNameText)
+                .ThenInclude(t => t.I18nTranslations)
+            .Include(d => d.DescriptionText)
+                .ThenInclude(t => t.I18nTranslations)
+            .Include(d => d.SloganText)
+                .ThenInclude(t => t.I18nTranslations)
+            .Include(d => d.NoteText)
+                .ThenInclude(t => t.I18nTranslations)
+            .Include(d => d.ShortDescriptionText)
+                .ThenInclude(t => t.I18nTranslations)
+            .Where(d =>
+                d.IsOnline == true &&
+                d.DishStatusLv.ValueCode == DishStatusCode.AVAILABLE.ToString())
+            .OrderBy(d => d.DisplayOrder)
+            .ToListAsync();
+    }
+
+    public async Task<List<Dish>> GetByIdsAsync(List<long> ids, CancellationToken ct)
+    {
+        if (ids == null || ids.Count == 0)
+            return new List<Dish>();
+
+        return await _context.Dishes
+            .AsNoTracking()
+            .Where(d => ids.Contains(d.DishId))
+            .ToListAsync(ct);
+    }
 }
 

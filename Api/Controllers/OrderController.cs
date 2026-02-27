@@ -7,6 +7,7 @@ using Core.Extensions;
 using Core.Interface.Service.Entity;
 using API.Models;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace Api.Controllers
 {
@@ -152,5 +153,75 @@ namespace Api.Controllers
 				ServerTime = DateTimeOffset.Now
 			});
 		}
-	}
+
+        [HttpPost]
+        public async Task<IActionResult> CreateOrder(
+			CreateOrderRequest request,
+			CancellationToken ct)
+		{
+			var staffId = long.Parse(User.FindFirstValue("user_id")!);
+
+			var result = await _orderService.CreateOrderAsync(
+				staffId,
+				request,
+				ct);
+
+            return Ok(new ApiResponse<object>
+            {
+                Success = true,
+                Code = 200,
+                SubCode = 0,
+                UserMessage = "Order created successfully",
+                ServerTime = DateTimeOffset.Now
+            });
+        }
+
+        /// <summary>
+        /// Gets order detail by id.
+        /// </summary>
+        /// <param name="id">Order id</param>
+        /// <param name="cancellationToken">Cancellation token</param>
+        /// <returns>Order detail</returns>
+        /// <response code="200">Order retrieved successfully</response>
+        /// <response code="404">Order not found</response>
+        [HttpGet("{id:long}")]
+        //[HasPermission(Permissions.ViewOrder)]
+        [ProducesResponseType(typeof(ApiResponse<OrderHistoryDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetOrderById(
+            long id,
+            CancellationToken cancellationToken = default)
+        {
+            var result = await _orderService.GetOrderByIdAsync(id, cancellationToken);
+
+            return Ok(new ApiResponse<OrderHistoryDTO>
+            {
+                Success = true,
+                Code = StatusCodes.Status200OK,
+                SubCode = 0,
+                UserMessage = "Get order detail successfully",
+                Data = result,
+                ServerTime = DateTimeOffset.UtcNow
+            });
+        }
+
+        [HttpPost("{id:long}/items")]
+        //[HasPermission(Permissions.UpdateOrderItemStatus)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> AddItems(
+			long id,
+			[FromBody] AddOrderItemsRequest request,
+			CancellationToken ct)
+        {
+            await _orderService.AddItemsAsync(id, request, ct);
+
+            return Ok(new ApiResponse<object>
+            {
+                Success = true,
+                Code = 200,
+                UserMessage = "Items added successfully",
+                ServerTime = DateTimeOffset.UtcNow
+            });
+        }
+    }
 }

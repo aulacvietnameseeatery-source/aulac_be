@@ -33,7 +33,7 @@ public sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         entity.Property(e => e.OrderStatusLvId).HasColumnName("order_status_lv_id");
         entity.Property(e => e.SourceLvId).HasColumnName("source_lv_id");
         entity.Property(e => e.StaffId).HasColumnName("staff_id");
-        entity.Property(e => e.TableId).HasColumnName("table_id");
+        entity.Property(e => e.TableId).HasColumnName("table_id").IsRequired(false);
         entity.Property(e => e.TipAmount)
         .HasPrecision(14, 2)
         .HasColumnName("tip_amount");
