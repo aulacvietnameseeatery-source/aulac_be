@@ -7,7 +7,7 @@ public partial class Order
 {
     public long OrderId { get; set; }
 
-    public long TableId { get; set; }
+    public long? TableId { get; set; }
 
     public long StaffId { get; set; }
 
@@ -41,5 +41,5 @@ public partial class Order
 
     public virtual StaffAccount Staff { get; set; } = null!;
 
-    public virtual RestaurantTable Table { get; set; } = null!;
+    public virtual RestaurantTable? Table { get; set; }
 }

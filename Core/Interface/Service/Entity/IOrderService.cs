@@ -10,4 +10,7 @@ public interface IOrderService
 	Task<List<KitchenOrderDTO>> GetKitchenOrdersAsync(CancellationToken cancellationToken = default);
 	Task UpdateOrderItemStatusAsync(long orderItemId, uint newStatusLvId, string? rejectReason, CancellationToken cancellationToken = default);
 
+    Task<long> CreateOrderAsync(long staffId, CreateOrderRequest request, CancellationToken ct);
+    Task<OrderHistoryDTO> GetOrderByIdAsync(long orderId, CancellationToken cancellationToken = default);
+    Task AddItemsAsync(long orderId, AddOrderItemsRequest request, CancellationToken ct);
 }

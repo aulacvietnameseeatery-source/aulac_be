@@ -115,4 +115,21 @@ public class TableRepository : ITableRepository
 
         return (items, totalCount);
     }
+
+    public async Task<List<RestaurantTable>> GetTablesWithRelationsAsync(CancellationToken ct = default)
+    {
+        return await _context.RestaurantTables
+            .Include(t => t.TableStatusLv)
+            .Include(t => t.ZoneLv)
+            .Include(t => t.Orders)
+                .ThenInclude(o => o.OrderStatusLv)
+            .Include(t => t.Reservations)
+            .AsQueryable().ToListAsync(ct);
+    }
+
+    public async Task UpdateAsync(RestaurantTable table, CancellationToken ct)
+    {
+        _context.RestaurantTables.Update(table);
+        await _context.SaveChangesAsync(ct);
+    }
 }

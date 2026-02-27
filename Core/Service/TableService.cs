@@ -2,6 +2,7 @@
 using Core.Interface.Repo;
 using Core.Interface.Service.Table;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -45,6 +46,44 @@ namespace Core.Service
             }).ToList();
 
             return (dtos, totalCount);
+        }
+
+        public async Task<List<TableSelectDto>> GetTablesForSelectAsync(CancellationToken ct = default)
+        {
+            var tables = await _tableRepository.GetTablesWithRelationsAsync(ct);
+
+            var now = DateTime.UtcNow;
+
+            if (tables == null || !tables.Any())
+            {
+                return new List<TableSelectDto>();
+            }
+
+            return tables.Select(t =>
+            {
+                var activeOrder = t.Orders
+                    .FirstOrDefault(o =>
+                        o.OrderStatusLv.ValueCode != OrderStatusCode.CANCELLED.ToString() &&
+                        o.OrderStatusLv.ValueCode != OrderStatusCode.COMPLETED.ToString());
+
+                var upcomingReservation = t.Reservations
+                    .Where(r => r.ReservedTime > now)
+                    .OrderBy(r => r.ReservedTime)
+                    .FirstOrDefault();
+
+                return new TableSelectDto
+                {
+                    TableId = t.TableId,
+                    TableCode = t.TableCode,
+                    Capacity = t.Capacity,
+                    ZoneId = t.ZoneLvId,
+                    ZoneName = t.ZoneLv.ValueName,
+                    StatusCode = t.TableStatusLv.ValueCode,
+                    HasActiveOrder = activeOrder != null,
+                    ActiveOrderId = activeOrder?.OrderId,
+                    UpcomingReservationTime = upcomingReservation?.ReservedTime
+                };
+            }).ToList();
         }
     }
 }
