@@ -59,12 +59,12 @@ public class TableRepository : ITableRepository
 
     public async Task<List<RestaurantTable>> GetManualAvailableTablesAsync(CancellationToken ct = default)
     {
-        // Get tables that are not under maintenance (LOCKED)
+        // Only return tables that are truly available (not LOCKED/maintenance and not OCCUPIED)
         return await _context.RestaurantTables
             .AsNoTracking()
             .Include(t => t.TableTypeLv)
             .Include(t => t.ZoneLv)
-            .Where(t => t.TableStatusLvId != TableStatusLocked)
+            .Where(t => t.TableStatusLvId != TableStatusLocked && t.TableStatusLvId != TableStatusOccupied)
             .OrderBy(t => t.Capacity)
             .ThenBy(t => t.TableCode)
             .ToListAsync(ct);
@@ -114,6 +114,18 @@ public class TableRepository : ITableRepository
             .ToListAsync(ct);
 
         return (items, totalCount);
+    }
+
+    /// <inheritdoc />
+    public async Task UpdateStatusAsync(long tableId, uint statusLvId, CancellationToken ct = default)
+    {
+        var table = await _context.RestaurantTables
+            .FirstOrDefaultAsync(t => t.TableId == tableId, ct);
+
+        if (table is null) return;
+
+        table.TableStatusLvId = statusLvId;
+        await _context.SaveChangesAsync(ct);
     }
 
     /// <inheritdoc />

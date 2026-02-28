@@ -1,6 +1,7 @@
 using Core.DTO.General;
 using Core.DTO.Order;
 using Core.Entity;
+using Core.Enum;
 using Core.Extensions;
 using Core.Interface.Repo;
 using Core.Interface.Service.Customer;
@@ -45,6 +46,26 @@ public class OrderService : IOrderService
 
 	public Task<CustomerOrderHistoryDTO> GetCustomerOrderHistoryAsync(string tableCode, CancellationToken cancellationToken = default)
 		=> _orderRepository.GetCustomerOrderHistoryAsync(tableCode, cancellationToken);
+
+	public Task<CustomerOrderHistoryDTO> GetCustomerOrderByIdAsync(long orderId, CancellationToken cancellationToken = default)
+		=> _orderRepository.GetCustomerOrderByIdAsync(orderId, cancellationToken);
+
+	public async Task AddItemsToOrderAsync(long orderId, AddOrderItemsRequestDTO request, CancellationToken cancellationToken = default)
+	{
+		var createdItemLvId = await OrderItemStatusCode.CREATED.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
+
+		var orderItems = request.Items.Select(i => new OrderItem
+		{
+			DishId         = i.DishId,
+			Quantity       = i.Quantity,
+			Price          = i.Price,
+			Note           = i.Note,
+			ItemStatus     = 1,
+			ItemStatusLvId = createdItemLvId,
+		}).ToList();
+
+		await _orderRepository.AddItemsToOrderAsync(orderId, orderItems, cancellationToken);
+	}
 
 	public async Task<CreateOrderResponseDTO> CreateOrderAsync(CreateOrderRequestDTO request, CancellationToken cancellationToken = default)
 	{
@@ -104,6 +125,10 @@ public class OrderService : IOrderService
 
 		// 7. Save to DB
 		var orderId = await _orderRepository.CreateOrderAsync(order, orderItems, cancellationToken);
+
+		// 8. Mark the table as OCCUPIED so other customers cannot select it
+		var occupiedLvId = await TableStatusCode.OCCUPIED.ToTableStatusIdAsync(_lookupResolver, cancellationToken);
+		await _tableRepository.UpdateStatusAsync(table.TableId, occupiedLvId, cancellationToken);
 
 		return new CreateOrderResponseDTO
 		{

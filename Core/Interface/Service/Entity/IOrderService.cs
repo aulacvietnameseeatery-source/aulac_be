@@ -18,4 +18,14 @@ public interface IOrderService
 	/// Public endpoint – no authentication required.
 	/// </summary>
 	Task<CustomerOrderHistoryDTO> GetCustomerOrderHistoryAsync(string tableCode, CancellationToken cancellationToken = default);
+
+	/// <summary>
+	/// Appends more items to an existing order (same table / same customer session).
+	/// </summary>
+	Task AddItemsToOrderAsync(long orderId, AddOrderItemsRequestDTO request, CancellationToken cancellationToken = default);
+
+	/// <summary>
+	/// Returns history for a single specific order (customer-facing).
+	/// </summary>
+	Task<CustomerOrderHistoryDTO> GetCustomerOrderByIdAsync(long orderId, CancellationToken cancellationToken = default);
 }

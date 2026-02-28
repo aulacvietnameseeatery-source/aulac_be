@@ -178,6 +178,84 @@ namespace Api.Controllers
 	}
 
 	/// <summary>
+	/// Returns all items for a specific order (customer-facing history panel).
+	/// PUBLIC – no authentication required.
+	/// </summary>
+	[HttpGet("{orderId}/customer")]
+	[ProducesResponseType(typeof(ApiResponse<CustomerOrderHistoryDTO>), StatusCodes.Status200OK)]
+	[ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+	public async Task<IActionResult> GetCustomerOrderById(
+		long orderId,
+		CancellationToken cancellationToken = default)
+	{
+		try
+		{
+			var result = await _orderService.GetCustomerOrderByIdAsync(orderId, cancellationToken);
+
+			return Ok(new ApiResponse<CustomerOrderHistoryDTO>
+			{
+				Success = true,
+				Code = 200,
+				SubCode = 0,
+				UserMessage = "Customer order retrieved successfully",
+				Data = result,
+				ServerTime = DateTimeOffset.Now
+			});
+		}
+		catch (KeyNotFoundException ex)
+		{
+			return NotFound(new ApiResponse<object>
+			{
+				Success = false,
+				Code = 404,
+				SubCode = 1,
+				UserMessage = ex.Message,
+				ServerTime = DateTimeOffset.Now
+			});
+		}
+	}
+
+	/// <summary>
+	/// Adds more items to an existing order (same table / same customer session).
+	/// Called when the customer already has an active order and wants to order additional dishes.
+	/// </summary>
+	/// <param name="orderId">ID of the existing order to append items to</param>
+	/// <param name="dto">List of items to add</param>
+	[HttpPost("{orderId}/items")]
+	[ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+	[ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+	public async Task<IActionResult> AddItemsToOrder(
+		long orderId,
+		[FromBody] AddOrderItemsRequestDTO dto,
+		CancellationToken cancellationToken = default)
+	{
+		try
+		{
+			await _orderService.AddItemsToOrderAsync(orderId, dto, cancellationToken);
+
+			return Ok(new ApiResponse<object>
+			{
+				Success = true,
+				Code = 200,
+				SubCode = 0,
+				UserMessage = "Items added to order successfully",
+				ServerTime = DateTimeOffset.Now
+			});
+		}
+		catch (KeyNotFoundException ex)
+		{
+			return NotFound(new ApiResponse<object>
+			{
+				Success = false,
+				Code = 404,
+				SubCode = 1,
+				UserMessage = ex.Message,
+				ServerTime = DateTimeOffset.Now
+			});
+		}
+	}
+
+	/// <summary>
 	/// Creates a new order from the customer-facing menu (QR / DINE_IN flow).
 	/// The customer either provides their info or skips (guest account).
 	/// </summary>

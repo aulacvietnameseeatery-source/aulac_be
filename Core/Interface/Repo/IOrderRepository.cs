@@ -19,4 +19,14 @@ public interface IOrderRepository
 	/// Used by the public customer-facing history endpoint – no authentication required.
 	/// </summary>
 	Task<CustomerOrderHistoryDTO> GetCustomerOrderHistoryAsync(string tableCode, CancellationToken cancellationToken = default);
+
+	/// <summary>
+	/// Appends new items to an existing order and updates its total amount.
+	/// </summary>
+	Task AddItemsToOrderAsync(long orderId, List<OrderItem> items, CancellationToken cancellationToken = default);
+
+	/// <summary>
+	/// Returns history for a single specific order (used by customer history panel).
+	/// </summary>
+	Task<CustomerOrderHistoryDTO> GetCustomerOrderByIdAsync(long orderId, CancellationToken cancellationToken = default);
 }
