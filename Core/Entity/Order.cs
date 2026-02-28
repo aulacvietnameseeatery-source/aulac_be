@@ -9,7 +9,7 @@ public partial class Order
 
     public long? TableId { get; set; }
 
-    public long StaffId { get; set; }
+    public long? StaffId { get; set; }
 
     public DateTime? CreatedAt { get; set; }
 
@@ -39,7 +39,7 @@ public partial class Order
 
     public virtual LookupValue SourceLv { get; set; } = null!;
 
-    public virtual StaffAccount Staff { get; set; } = null!;
+    public virtual StaffAccount? Staff { get; set; }
 
     public virtual RestaurantTable? Table { get; set; }
 }

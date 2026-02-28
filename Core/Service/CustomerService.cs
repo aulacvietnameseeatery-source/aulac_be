@@ -36,5 +36,11 @@ namespace Core.Service
                 CreatedAt = customer.CreatedAt
             };
         }
+
+        public async Task<long> FindOrCreateCustomerIdAsync(string phone, string? fullName, string? email, CancellationToken ct = default)
+        {
+            var customer = await _customerRepository.FindOrCreateAsync(phone, fullName, email, ct);
+            return customer.CustomerId;
+        }
     }
 }

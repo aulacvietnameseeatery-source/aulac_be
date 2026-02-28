@@ -25,5 +25,31 @@ namespace Infa.Repo
                 .AsNoTracking()
                 .FirstOrDefaultAsync(c => c.Phone == phone);
         }
+
+        public async Task<Customer> FindOrCreateAsync(string phone, string? fullName, string? email, CancellationToken ct = default)
+        {
+            // Try to find by phone first (unique key)
+            var existing = await _context.Customers
+                .FirstOrDefaultAsync(c => c.Phone == phone, ct);
+
+            if (existing != null)
+                return existing;
+
+            // Create new customer
+            var newCustomer = new Customer
+            {
+                Phone = phone,
+                FullName = string.IsNullOrWhiteSpace(fullName) ? null : fullName.Trim(),
+                Email = string.IsNullOrWhiteSpace(email) ? null : email.Trim(),
+                IsMember = false,
+                LoyaltyPoints = 0,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _context.Customers.Add(newCustomer);
+            await _context.SaveChangesAsync(ct);
+
+            return newCustomer;
+        }
     }
 }

@@ -44,6 +44,19 @@ public interface ITableRepository
     /// </summary>
     Task<(List<RestaurantTable> Items, int TotalCount)> GetTablesForManagementAsync(DTO.Table.GetTableManagementRequest request, CancellationToken ct = default);
 
+
+    /// <summary>Finds a table by its code (e.g. "TB-002"). Returns null if not found.</summary>
+    Task<RestaurantTable?> GetByCodeAsync(string tableCode, CancellationToken ct = default);
+
+    /// <summary>
+    /// Updates the status of a table by setting its status lookup value ID.
+    /// </summary>
+    /// <param name="tableId">The table ID</param>
+    /// <param name="statusLvId">The new status lookup value ID</param>
+    /// <param name="ct">Cancellation token</param>
+    Task UpdateStatusAsync(long tableId, uint statusLvId, CancellationToken ct = default);
+
     Task<List<RestaurantTable>> GetTablesWithRelationsAsync(CancellationToken ct = default);
     Task UpdateAsync(RestaurantTable table, CancellationToken ct);
+
 }
