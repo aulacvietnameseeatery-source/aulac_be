@@ -152,5 +152,82 @@ namespace Api.Controllers
 				ServerTime = DateTimeOffset.Now
 			});
 		}
+
+	/// <summary>
+	/// Returns all orders placed at a given table today, grouped as rounds.
+	/// PUBLIC – no authentication required (called from the customer QR menu).
+	/// </summary>
+	/// <param name="tableCode">The table code from the QR URL, e.g. T1</param>
+	[HttpGet("customer/table/{tableCode}")]
+	[ProducesResponseType(typeof(ApiResponse<CustomerOrderHistoryDTO>), StatusCodes.Status200OK)]
+	public async Task<IActionResult> GetCustomerOrderHistory(
+		string tableCode,
+		CancellationToken cancellationToken = default)
+	{
+		var result = await _orderService.GetCustomerOrderHistoryAsync(tableCode, cancellationToken);
+
+		return Ok(new ApiResponse<CustomerOrderHistoryDTO>
+		{
+			Success = true,
+			Code = 200,
+			SubCode = 0,
+			UserMessage = "Customer order history retrieved successfully",
+			Data = result,
+			ServerTime = DateTimeOffset.Now
+		});
 	}
+
+	/// <summary>
+	/// Creates a new order from the customer-facing menu (QR / DINE_IN flow).
+	/// The customer either provides their info or skips (guest account).
+	/// </summary>
+	/// <param name="dto">Order creation request from the cart</param>
+	/// <param name="cancellationToken">Cancellation token</param>
+	/// <returns>Created order details</returns>
+	[HttpPost]
+	[ProducesResponseType(typeof(ApiResponse<CreateOrderResponseDTO>), StatusCodes.Status201Created)]
+	[ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+	[ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+	public async Task<IActionResult> CreateOrder(
+		[FromBody] CreateOrderRequestDTO dto,
+		CancellationToken cancellationToken = default)
+	{
+		try
+		{
+			var result = await _orderService.CreateOrderAsync(dto, cancellationToken);
+
+			return StatusCode(StatusCodes.Status201Created, new ApiResponse<CreateOrderResponseDTO>
+			{
+				Success = true,
+				Code = 201,
+				SubCode = 0,
+				UserMessage = "Order created successfully",
+				Data = result,
+				ServerTime = DateTimeOffset.Now
+			});
+		}
+		catch (KeyNotFoundException ex)
+		{
+			return NotFound(new ApiResponse<object>
+			{
+				Success = false,
+				Code = 404,
+				SubCode = 1,
+				UserMessage = ex.Message,
+				ServerTime = DateTimeOffset.Now
+			});
+		}
+		catch (ArgumentException ex)
+		{
+			return BadRequest(new ApiResponse<object>
+			{
+				Success = false,
+				Code = 400,
+				SubCode = 1,
+				UserMessage = ex.Message,
+				ServerTime = DateTimeOffset.Now
+			});
+		}
+	}
+}
 }

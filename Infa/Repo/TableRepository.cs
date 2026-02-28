@@ -115,4 +115,12 @@ public class TableRepository : ITableRepository
 
         return (items, totalCount);
     }
+
+    /// <inheritdoc />
+    public async Task<RestaurantTable?> GetByCodeAsync(string tableCode, CancellationToken ct = default)
+    {
+        return await _context.RestaurantTables
+            .AsNoTracking()
+            .FirstOrDefaultAsync(t => t.TableCode == tableCode, ct);
+    }
 }
