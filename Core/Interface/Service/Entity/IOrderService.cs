@@ -28,4 +28,9 @@ public interface IOrderService
 	/// Returns history for a single specific order (customer-facing).
 	/// </summary>
 	Task<CustomerOrderHistoryDTO> GetCustomerOrderByIdAsync(long orderId, CancellationToken cancellationToken = default);
+
+    Task<long> CreateOrderAsync(long staffId, CreateOrderRequest request, CancellationToken ct);
+    Task<OrderHistoryDTO> GetOrderByIdAsync(long orderId, CancellationToken cancellationToken = default);
+    Task AddItemsAsync(long orderId, AddOrderItemsRequest request, CancellationToken ct);
+
 }

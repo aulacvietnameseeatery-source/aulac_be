@@ -117,5 +117,7 @@ public interface IDishService
     /// </summary>
     /// <returns>A list of active dish tag DTOs.</returns>
     Task<List<DishTagDto>> GetAllActiveTagsAsync();
+
+    Task<List<DishPosResponseDto>> GetPosDishesAsync(bool active);
 }
 

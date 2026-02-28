@@ -1,6 +1,7 @@
 using Core.DTO.General;
 using Core.DTO.Order;
 using Core.Entity;
+using Core.Exceptions;
 using Core.Interface.Repo;
 using Infa.Data;
 using Microsoft.EntityFrameworkCore;
@@ -41,7 +42,7 @@ public class OrderRepository : IOrderRepository
 			queryable = queryable.Where(o =>
 				o.OrderId.ToString().Contains(searchTerm) ||
 				(o.Customer != null && o.Customer.FullName != null && o.Customer.FullName.ToLower().Contains(searchTerm)) ||
-				(o.Staff != null && o.Staff.FullName != null && o.Staff.FullName.ToLower().Contains(searchTerm)) ||
+				o.Staff.FullName.ToLower().Contains(searchTerm) ||
 				o.Table.TableCode.ToLower().Contains(searchTerm)
 			);
 		}
@@ -232,6 +233,7 @@ public class OrderRepository : IOrderRepository
 		}
 	}
 
+
 	public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, CancellationToken cancellationToken = default)
 	{
 		_context.Orders.Add(order);
@@ -369,4 +371,72 @@ public class OrderRepository : IOrderRepository
 			Rounds         = rounds
 		};
 	}
+
+    public async Task AddAsync(Order order, CancellationToken ct)
+    {
+        await _context.Orders.AddAsync(order, ct);
+        await _context.SaveChangesAsync(ct);
+    }
+
+    public async Task<OrderHistoryDTO> GetOrderByIdAsync(
+    long orderId,
+    CancellationToken cancellationToken = default)
+    {
+        var order = await _context.Orders
+            .AsNoTracking()
+            .Where(o => o.OrderId == orderId)
+            .Select(o => new OrderHistoryDTO
+            {
+                OrderId = o.OrderId,
+                TableId = o.TableId,
+                TableCode = o.Table != null ? o.Table.TableCode : "",
+
+                StaffId = o.StaffId,
+                StaffName = o.Staff.FullName,
+
+                CustomerId = o.CustomerId,
+                CustomerName = o.Customer != null ? o.Customer.FullName : null,
+
+                TotalAmount = o.TotalAmount,
+                TipAmount = o.TipAmount,
+
+                OrderStatus = o.OrderStatusLv.ValueName,
+                Source = o.SourceLv.ValueName,
+
+                CreatedAt = o.CreatedAt,
+                UpdatedAt = o.UpdatedAt,
+
+                IsPaid = o.Payments.Any(),
+
+                OrderItems = o.OrderItems
+                    .Select(oi => new OrderItemDTO
+                    {
+                        OrderItemId = oi.OrderItemId,
+                        DishId = oi.DishId,
+                        DishName = oi.Dish.DishName,
+                        Quantity = oi.Quantity,
+                        Price = oi.Price,
+                        ItemStatus = oi.ItemStatusLv.ValueName,
+                        RejectReason = oi.RejectReason,
+                        Note = oi.Note
+                    })
+                    .ToList()
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (order == null)
+            throw new NotFoundException($"Order with id {orderId} was not found.");
+
+        return order;
+    }
+
+    public async Task<Order?> GetByIdForUpdateAsync(long orderId, CancellationToken ct)
+    {
+        return await _context.Orders
+        .Include(x => x.OrderStatusLv)
+        .Include(x => x.Payments)
+        .Include(x => x.OrderItems)
+        .FirstOrDefaultAsync(x => x.OrderId == orderId, ct);
+    }
+
 }

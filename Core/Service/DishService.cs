@@ -27,6 +27,8 @@ public class DishService : IDishService
     private readonly IUnitOfWork _uow;
     private readonly IFileStorage _fileStorage;
 
+    private static readonly string[] SupportedLangs = { "en", "vi", "fr" };
+
     public DishService(IDishRepository dishRepository, ILookupResolver lookupResolver, ILogger<DishService> logger, IDishI18nService dishI18NService, IMediaRepository mediaRepository, IUnitOfWork unitOfWork, IFileStorage fileStorage)
     {
         _dishRepository = dishRepository;
@@ -549,6 +551,54 @@ public class DishService : IDishService
                 // Ignore file deletion errors
             }
         }
+    }
+
+    public async Task<List<DishPosResponseDto>> GetPosDishesAsync(bool active)
+    {
+        var dishes = active
+            ? await _dishRepository.GetActiveDishesAsync()
+            : new List<Dish>();
+
+        return dishes.Select(MapToDto).ToList();
+    }
+
+    private DishPosResponseDto MapToDto(Dish dish)
+    {
+        var dto = new DishPosResponseDto
+        {
+            DishId = dish.DishId,
+            CategoryId = dish.CategoryId,
+            Price = dish.Price,
+            ChefRecommended = dish.ChefRecommended,
+            DisplayOrder = dish.DisplayOrder
+        };
+
+        foreach (var lang in SupportedLangs)
+        {
+            dto.I18n[lang] = new DishI18nDto
+            {
+                DishName = GetTranslation(dish.DishNameText, lang),
+                Description = GetTranslation(dish.DescriptionText, lang),
+                Slogan = GetTranslation(dish.SloganText, lang),
+                Note = GetTranslation(dish.NoteText, lang),
+                ShortDescription = GetTranslation(dish.ShortDescriptionText, lang)
+            };
+        }
+
+        return dto;
+    }
+
+    private string? GetTranslation(I18nText? text, string lang)
+    {
+        if (text == null) return null;
+
+        if (text.SourceLangCode == lang)
+            return text.SourceText;
+
+        return text.I18nTranslations
+            .FirstOrDefault(t => t.LangCode == lang)
+            ?.TranslatedText
+            ?? text.SourceText;
     }
 }
 

@@ -11,6 +11,7 @@ public interface IOrderRepository
 	Task<List<KitchenOrderDTO>> GetKitchenOrdersAsync(CancellationToken cancellationToken = default);
 	Task UpdateOrderItemStatusAsync(long orderItemId, uint newStatusLvId, string? rejectReason, CancellationToken cancellationToken = default);
 
+
 	/// <summary>Persists a new order together with its items. Returns the generated order_id.</summary>
 	Task<long> CreateOrderAsync(Order order, List<OrderItem> items, CancellationToken cancellationToken = default);
 
@@ -29,4 +30,9 @@ public interface IOrderRepository
 	/// Returns history for a single specific order (used by customer history panel).
 	/// </summary>
 	Task<CustomerOrderHistoryDTO> GetCustomerOrderByIdAsync(long orderId, CancellationToken cancellationToken = default);
+
+    Task AddAsync(Order order, CancellationToken ct);
+    Task<OrderHistoryDTO> GetOrderByIdAsync(long orderId, CancellationToken cancellationToken = default);
+    Task<Order?> GetByIdForUpdateAsync(long orderId, CancellationToken ct);
+
 }

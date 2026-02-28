@@ -7,6 +7,7 @@ using Core.Extensions;
 using Core.Interface.Service.Entity;
 using API.Models;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace Api.Controllers
 {
@@ -152,6 +153,7 @@ namespace Api.Controllers
 				ServerTime = DateTimeOffset.Now
 			});
 		}
+
 
 	/// <summary>
 	/// Returns all orders placed at a given table today, grouped as rounds.
@@ -307,5 +309,95 @@ namespace Api.Controllers
 			});
 		}
 	}
+
+        /// <summary>
+        /// Creates a new order by staff member (for dine-in or takeaway orders entered by restaurant staff).
+        /// Requires authentication. Automatically captures the staff member ID from the authenticated user.
+        /// </summary>
+        /// <param name="request">Order creation request including table, customer, source, and items</param>
+        /// <param name="ct">Cancellation token</param>
+        /// <returns>Success response with order creation confirmation</returns>
+        /// <response code="200">Order created successfully by staff</response>
+        [HttpPost("staff")]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> CreateStaffOrder(
+			CreateOrderRequest request,
+			CancellationToken ct)
+		{
+			var staffId = long.Parse(User.FindFirstValue("user_id")!);
+
+			var result = await _orderService.CreateOrderAsync(
+				staffId,
+				request,
+				ct);
+
+            return Ok(new ApiResponse<object>
+            {
+                Success = true,
+                Code = 200,
+                SubCode = 0,
+                UserMessage = "Order created successfully",
+                ServerTime = DateTimeOffset.Now
+            });
+        }
+
+        /// <summary>
+        /// Gets order detail by id.
+        /// </summary>
+        /// <param name="id">Order id</param>
+        /// <param name="cancellationToken">Cancellation token</param>
+        /// <returns>Order detail</returns>
+        /// <response code="200">Order retrieved successfully</response>
+        /// <response code="404">Order not found</response>
+        [HttpGet("{id:long}")]
+        //[HasPermission(Permissions.ViewOrder)]
+        [ProducesResponseType(typeof(ApiResponse<OrderHistoryDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetOrderById(
+            long id,
+            CancellationToken cancellationToken = default)
+        {
+            var result = await _orderService.GetOrderByIdAsync(id, cancellationToken);
+
+            return Ok(new ApiResponse<OrderHistoryDTO>
+            {
+                Success = true,
+                Code = StatusCodes.Status200OK,
+                SubCode = 0,
+                UserMessage = "Get order detail successfully",
+                Data = result,
+                ServerTime = DateTimeOffset.UtcNow
+            });
+        }
+
+        /// <summary>
+        /// Adds items to an existing order (staff operation).
+        /// Used by restaurant staff to add more dishes to an order after it has been created.
+        /// Requires authentication.
+        /// </summary>
+        /// <param name="id">The ID of the order to add items to</param>
+        /// <param name="request">List of items to add</param>
+        /// <param name="ct">Cancellation token</param>
+        /// <returns>Success response</returns>
+        /// <response code="200">Items added successfully</response>
+        [HttpPost("staff/{id:long}/items")]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> AddStaffOrderItems(
+			long id,
+			[FromBody] AddOrderItemsRequest request,
+			CancellationToken ct)
+        {
+            await _orderService.AddItemsAsync(id, request, ct);
+
+            return Ok(new ApiResponse<object>
+            {
+                Success = true,
+                Code = 200,
+                UserMessage = "Items added successfully",
+                ServerTime = DateTimeOffset.UtcNow
+            });
+        }
+    }
+
 }
-}
+
