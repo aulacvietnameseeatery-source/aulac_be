@@ -133,4 +133,74 @@ public class LookupRepo : ILookupRepo
         .OrderBy(lv => lv.SortOrder)
         .ToListAsync(ct);
     }
+
+    /// <inheritdoc />
+    public async Task<LookupValue?> GetByIdAsync(uint valueId, CancellationToken ct = default)
+    {
+        return await _context.LookupValues
+      .FirstOrDefaultAsync(lv => lv.ValueId == valueId && lv.DeletedAt == null, ct);
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> ValueNameExistsAsync(ushort typeId, string valueName, uint? excludeId = null, CancellationToken ct = default)
+    {
+        var query = _context.LookupValues
+        .AsNoTracking()
+            .Where(lv => lv.TypeId == typeId
+              && lv.ValueName == valueName
+       && lv.DeletedAt == null);
+
+        if (excludeId.HasValue)
+            query = query.Where(lv => lv.ValueId != excludeId.Value);
+
+  return await query.AnyAsync(ct);
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> ValueCodeExistsAsync(ushort typeId, string valueCode, uint? excludeId = null, CancellationToken ct = default)
+    {
+        var query = _context.LookupValues
+            .AsNoTracking()
+            .Where(lv => lv.TypeId == typeId
+               && lv.ValueCode == valueCode
+           && lv.DeletedAt == null);
+
+        if (excludeId.HasValue)
+            query = query.Where(lv => lv.ValueId != excludeId.Value);
+
+return await query.AnyAsync(ct);
+    }
+
+    /// <inheritdoc />
+    public async Task<short> GetMaxSortOrderAsync(ushort typeId, CancellationToken ct = default)
+    {
+        var hasAny = await _context.LookupValues
+            .AsNoTracking()
+          .Where(lv => lv.TypeId == typeId && lv.DeletedAt == null)
+            .AnyAsync(ct);
+
+        if (!hasAny) return 0;
+
+      return await _context.LookupValues
+       .AsNoTracking()
+            .Where(lv => lv.TypeId == typeId && lv.DeletedAt == null)
+.MaxAsync(lv => lv.SortOrder, ct);
+    }
+
+    /// <inheritdoc />
+    public void Add(LookupValue entity)
+    {
+        _context.LookupValues.Add(entity);
+    }
+
+    /// <inheritdoc />
+ public async Task<int> CountTablesUsingLookupValueAsync(uint valueId, CancellationToken ct = default)
+    {
+  return await _context.RestaurantTables
+    .AsNoTracking()
+            .Where(t => t.ZoneLvId == valueId
+        || t.TableTypeLvId == valueId
+|| t.TableStatusLvId == valueId)
+            .CountAsync(ct);
+ }
 }

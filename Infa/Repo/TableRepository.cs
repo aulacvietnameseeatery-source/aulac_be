@@ -27,8 +27,6 @@ public class TableRepository : ITableRepository
     /// <inheritdoc />
     public async Task<List<RestaurantTable>> GetAvailableTablesAsync(CancellationToken ct = default)
     {
-        // Get tables that are not under maintenance (LOCKED)
-        // and are online
         return await _context.RestaurantTables
             .AsNoTracking()
             .Include(t => t.TableTypeLv)
@@ -44,8 +42,27 @@ public class TableRepository : ITableRepository
     public async Task<RestaurantTable?> GetByIdAsync(long tableId, CancellationToken ct = default)
     {
         return await _context.RestaurantTables
+            .Include(t => t.TableStatusLv)
             .Include(t => t.TableTypeLv)
             .Include(t => t.ZoneLv)
+            .FirstOrDefaultAsync(t => t.TableId == tableId, ct);
+    }
+
+    /// <inheritdoc />
+    public async Task<RestaurantTable?> GetByIdWithDetailsAsync(long tableId, CancellationToken ct = default)
+    {
+        return await _context.RestaurantTables
+            .Include(t => t.TableStatusLv)
+            .Include(t => t.TableTypeLv)
+            .Include(t => t.ZoneLv)
+            .Include(t => t.TableMedia)
+                .ThenInclude(tm => tm.Media)
+            .Include(t => t.TableQrImgNavigation)
+            .Include(t => t.Orders)
+                .ThenInclude(o => o.OrderStatusLv)
+            .Include(t => t.Reservations)
+                .ThenInclude(r => r.ReservationStatusLv)
+            .Include(t => t.ServiceErrors)
             .FirstOrDefaultAsync(t => t.TableId == tableId, ct);
     }
 
@@ -55,6 +72,43 @@ public class TableRepository : ITableRepository
         return await _context.RestaurantTables
             .AsNoTracking()
             .AnyAsync(t => t.TableId == tableId, ct);
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> TableCodeExistsAsync(string code, long? excludeId = null, CancellationToken ct = default)
+    {
+        var query = _context.RestaurantTables
+            .AsNoTracking()
+            .Where(t => t.TableCode == code);
+
+        if (excludeId.HasValue)
+            query = query.Where(t => t.TableId != excludeId.Value);
+
+        return await query.AnyAsync(ct);
+    }
+
+    /// <inheritdoc />
+    public async Task<int> CountActiveOrdersAsync(long tableId, CancellationToken ct = default)
+    {
+        return await _context.Orders
+            .AsNoTracking()
+            .Where(o => o.TableId == tableId)
+            .Where(o => o.OrderStatusLv.ValueCode == nameof(OrderStatusCode.PENDING)
+                      || o.OrderStatusLv.ValueCode == nameof(OrderStatusCode.IN_PROGRESS))
+            .CountAsync(ct);
+    }
+
+    /// <inheritdoc />
+    public async Task<int> CountUpcomingReservationsAsync(long tableId, CancellationToken ct = default)
+    {
+        var now = DateTime.UtcNow;
+        return await _context.Reservations
+            .AsNoTracking()
+            .Where(r => r.Tables.Any(t => t.TableId == tableId))
+            .Where(r => r.ReservedTime > now)
+            .Where(r => r.ReservationStatusLv.ValueCode == nameof(ReservationStatusCode.PENDING)
+                      || r.ReservationStatusLv.ValueCode == nameof(ReservationStatusCode.CONFIRMED))
+            .CountAsync(ct);
     }
 
     public async Task<List<RestaurantTable>> GetManualAvailableTablesAsync(CancellationToken ct = default)
@@ -70,11 +124,10 @@ public class TableRepository : ITableRepository
             .ToListAsync(ct);
     }
 
-
     /// <inheritdoc />
     public async Task<(List<RestaurantTable> Items, int TotalCount)> GetTablesForManagementAsync(GetTableManagementRequest request, CancellationToken ct = default)
     {
-        
+
         var query = _context.RestaurantTables
             .Include(t => t.TableStatusLv)
             .Include(t => t.TableTypeLv)
@@ -108,7 +161,7 @@ public class TableRepository : ITableRepository
         var pageSize = request.PageSize < 1 ? 50 : request.PageSize;
 
         var items = await query
-            .OrderBy(t => t.TableCode) 
+            .OrderBy(t => t.TableCode)
             .Skip((pageIndex - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(ct);
@@ -148,10 +201,74 @@ public class TableRepository : ITableRepository
             .AsQueryable().ToListAsync(ct);
     }
 
+    /// <inheritdoc />
+    public void Add(RestaurantTable table)
+    {
+        _context.RestaurantTables.Add(table);
+    }
+
     public async Task UpdateAsync(RestaurantTable table, CancellationToken ct)
     {
         _context.RestaurantTables.Update(table);
         await _context.SaveChangesAsync(ct);
 
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> IsValidLookupAsync(uint valueId, ushort typeId, CancellationToken ct = default)
+    {
+        return await _context.LookupValues
+         .AsNoTracking()
+                .AnyAsync(lv => lv.ValueId == valueId
+       && lv.TypeId == typeId
+             && lv.IsActive == true
+                   && lv.DeletedAt == null, ct);
+    }
+
+    /// <inheritdoc />
+    public async Task<string?> GetLookupValueCodeAsync(uint valueId, CancellationToken ct = default)
+    {
+        return await _context.LookupValues
+           .AsNoTracking()
+ .Where(lv => lv.ValueId == valueId && lv.IsActive == true && lv.DeletedAt == null)
+    .Select(lv => lv.ValueCode)
+  .FirstOrDefaultAsync(ct);
+    }
+
+    /// <inheritdoc />
+    public async Task<int> BulkSetOnlineByZoneAsync(uint zoneLvId, bool isOnline, CancellationToken ct = default)
+    {
+        var tables = await _context.RestaurantTables
+      .Where(t => t.ZoneLvId == zoneLvId)
+     .ToListAsync(ct);
+
+        foreach (var table in tables)
+        {
+            table.IsOnline = isOnline;
+            table.UpdatedAt = DateTime.UtcNow;
+        }
+
+        await _context.SaveChangesAsync(ct);
+        return tables.Count;
+    }
+
+    /// <inheritdoc />
+    public async Task<TableMedium?> GetTableMediaAsync(long tableId, long mediaId, CancellationToken ct = default)
+    {
+        return await _context.TableMedia
+               .Include(tm => tm.Media)
+               .FirstOrDefaultAsync(tm => tm.TableId == tableId && tm.MediaId == mediaId, ct);
+    }
+
+    /// <inheritdoc />
+    public void AddTableMedia(TableMedium tableMedium)
+    {
+        _context.TableMedia.Add(tableMedium);
+    }
+
+    /// <inheritdoc />
+    public void RemoveTableMedia(TableMedium tableMedium)
+    {
+        _context.TableMedia.Remove(tableMedium);
     }
 }

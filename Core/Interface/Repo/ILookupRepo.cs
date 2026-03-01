@@ -35,4 +35,35 @@ public interface ILookupRepo
         ushort typeId,
         CancellationToken ct
     );
+
+    /// <summary>
+    /// Gets a single lookup value by its ID. Returns null if not found or deleted.
+    /// </summary>
+    Task<LookupValue?> GetByIdAsync(uint valueId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Checks if a lookup value with the given name already exists for the specified type.
+    /// </summary>
+  Task<bool> ValueNameExistsAsync(ushort typeId, string valueName, uint? excludeId = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// Checks if a lookup value with the given code already exists for the specified type.
+    /// </summary>
+    Task<bool> ValueCodeExistsAsync(ushort typeId, string valueCode, uint? excludeId = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// Gets the maximum sort order for a given lookup type. Returns 0 if none exist.
+    /// </summary>
+    Task<short> GetMaxSortOrderAsync(ushort typeId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Adds a new lookup value entity to the context (does not save).
+    /// </summary>
+    void Add(LookupValue entity);
+
+    /// <summary>
+    /// Counts the number of restaurant tables that reference a given lookup value ID
+ /// in any of the table's lookup foreign keys (zone, type, status).
+    /// </summary>
+    Task<int> CountTablesUsingLookupValueAsync(uint valueId, CancellationToken ct = default);
 }
