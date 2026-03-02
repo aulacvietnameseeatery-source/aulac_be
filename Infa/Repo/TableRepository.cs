@@ -31,10 +31,11 @@ public class TableRepository : ITableRepository
             .AsNoTracking()
             .Include(t => t.TableTypeLv)
             .Include(t => t.ZoneLv)
+            .Where(t => !t.IsDeleted)
             .Where(t => t.TableStatusLvId != TableStatusLocked)
             .Where(t => t.IsOnline == true)
             .OrderBy(t => t.Capacity)
-            .ThenBy(t => t.TableCode)
+                .ThenBy(t => t.TableCode)
             .ToListAsync(ct);
     }
 
@@ -45,7 +46,7 @@ public class TableRepository : ITableRepository
             .Include(t => t.TableStatusLv)
             .Include(t => t.TableTypeLv)
             .Include(t => t.ZoneLv)
-            .FirstOrDefaultAsync(t => t.TableId == tableId, ct);
+            .FirstOrDefaultAsync(t => t.TableId == tableId && !t.IsDeleted, ct);
     }
 
     /// <inheritdoc />
@@ -63,7 +64,7 @@ public class TableRepository : ITableRepository
             .Include(t => t.Reservations)
                 .ThenInclude(r => r.ReservationStatusLv)
             .Include(t => t.ServiceErrors)
-            .FirstOrDefaultAsync(t => t.TableId == tableId, ct);
+            .FirstOrDefaultAsync(t => t.TableId == tableId && !t.IsDeleted, ct);
     }
 
     /// <inheritdoc />
@@ -71,7 +72,7 @@ public class TableRepository : ITableRepository
     {
         return await _context.RestaurantTables
             .AsNoTracking()
-            .AnyAsync(t => t.TableId == tableId, ct);
+            .AnyAsync(t => t.TableId == tableId && !t.IsDeleted, ct);
     }
 
     /// <inheritdoc />
@@ -79,7 +80,7 @@ public class TableRepository : ITableRepository
     {
         var query = _context.RestaurantTables
             .AsNoTracking()
-            .Where(t => t.TableCode == code);
+            .Where(t => t.TableCode == code && !t.IsDeleted);
 
         if (excludeId.HasValue)
             query = query.Where(t => t.TableId != excludeId.Value);
@@ -113,26 +114,26 @@ public class TableRepository : ITableRepository
 
     public async Task<List<RestaurantTable>> GetManualAvailableTablesAsync(CancellationToken ct = default)
     {
-        // Only return tables that are truly available (not LOCKED/maintenance and not OCCUPIED)
         return await _context.RestaurantTables
             .AsNoTracking()
             .Include(t => t.TableTypeLv)
             .Include(t => t.ZoneLv)
+            .Where(t => !t.IsDeleted)
             .Where(t => t.TableStatusLvId != TableStatusLocked && t.TableStatusLvId != TableStatusOccupied)
             .OrderBy(t => t.Capacity)
-            .ThenBy(t => t.TableCode)
+                .ThenBy(t => t.TableCode)
             .ToListAsync(ct);
     }
 
     /// <inheritdoc />
     public async Task<(List<RestaurantTable> Items, int TotalCount)> GetTablesForManagementAsync(GetTableManagementRequest request, CancellationToken ct = default)
     {
-
         var query = _context.RestaurantTables
             .Include(t => t.TableStatusLv)
             .Include(t => t.TableTypeLv)
             .Include(t => t.ZoneLv)
             .AsNoTracking()
+            .Where(t => !t.IsDeleted)
             .AsQueryable();
 
         //  Search by table code
@@ -173,8 +174,7 @@ public class TableRepository : ITableRepository
     /// <inheritdoc />
     public async Task UpdateStatusAsync(long tableId, uint statusLvId, CancellationToken ct = default)
     {
-        var table = await _context.RestaurantTables
-            .FirstOrDefaultAsync(t => t.TableId == tableId, ct);
+        var table = await _context.RestaurantTables.FirstOrDefaultAsync(t => t.TableId == tableId, ct);
 
         if (table is null) return;
 
@@ -198,7 +198,8 @@ public class TableRepository : ITableRepository
             .Include(t => t.Orders)
                 .ThenInclude(o => o.OrderStatusLv)
             .Include(t => t.Reservations)
-            .AsQueryable().ToListAsync(ct);
+            .Where(t => !t.IsDeleted)
+            .ToListAsync(ct);
     }
 
     /// <inheritdoc />
@@ -218,11 +219,8 @@ public class TableRepository : ITableRepository
     public async Task<bool> IsValidLookupAsync(uint valueId, ushort typeId, CancellationToken ct = default)
     {
         return await _context.LookupValues
-         .AsNoTracking()
-                .AnyAsync(lv => lv.ValueId == valueId
-       && lv.TypeId == typeId
-             && lv.IsActive == true
-                   && lv.DeletedAt == null, ct);
+            .AsNoTracking()
+            .AnyAsync(lv => lv.ValueId == valueId && lv.TypeId == typeId && lv.IsActive == true && lv.DeletedAt == null, ct);
     }
 
     /// <inheritdoc />
@@ -230,17 +228,17 @@ public class TableRepository : ITableRepository
     {
         return await _context.LookupValues
            .AsNoTracking()
- .Where(lv => lv.ValueId == valueId && lv.IsActive == true && lv.DeletedAt == null)
-    .Select(lv => lv.ValueCode)
-  .FirstOrDefaultAsync(ct);
+           .Where(lv => lv.ValueId == valueId && lv.IsActive == true && lv.DeletedAt == null)
+           .Select(lv => lv.ValueCode)
+           .FirstOrDefaultAsync(ct);
     }
 
     /// <inheritdoc />
     public async Task<int> BulkSetOnlineByZoneAsync(uint zoneLvId, bool isOnline, CancellationToken ct = default)
     {
         var tables = await _context.RestaurantTables
-      .Where(t => t.ZoneLvId == zoneLvId)
-     .ToListAsync(ct);
+       .Where(t => t.ZoneLvId == zoneLvId && !t.IsDeleted)
+            .ToListAsync(ct);
 
         foreach (var table in tables)
         {

@@ -38,13 +38,16 @@ public class TableController : ControllerBase
     {
         var (items, totalCount) = await _tableService.GetTablesForManagementAsync(request, ct);
 
+        var pageIndex = request.PageIndex > 0 ? request.PageIndex : 1;
+        var pageSize = request.PageSize > 0 ? request.PageSize : 30;
+
         var paged = new PagedResult<TableManagementDto>
         {
             PageData = items,
-            PageIndex = request.PageIndex > 0 ? request.PageIndex : 1,
-            PageSize = request.PageSize > 0 ? request.PageSize : 30,
+            PageIndex = pageIndex,
+            PageSize = pageSize,
             TotalCount = totalCount,
-            TotalPage = request.PageSize > 0 ? (int)Math.Ceiling((double)totalCount / request.PageSize) : 1
+            TotalPage = pageSize > 0 ? (int)Math.Ceiling((double)totalCount / pageSize) : 1
         };
 
         return Ok(new ApiResponse<PagedResult<TableManagementDto>>
@@ -59,7 +62,6 @@ public class TableController : ControllerBase
 
     /// <summary>
     /// Gets a lightweight table list for dropdown / order-creation usage.
-    /// Includes active order and upcoming reservation info per table.
     /// </summary>
     /// <param name="ct">Cancellation token</param>
     /// <returns>List of tables for selection</returns>
@@ -110,6 +112,7 @@ public class TableController : ControllerBase
     /// <summary>
     /// Creates a new restaurant table.
     /// Validates table code uniqueness and all lookup references (status, type, zone).
+    /// QR code is automatically generated.
     /// </summary>
     /// <param name="request">Table creation details</param>
     /// <param name="ct">Cancellation token</param>
@@ -174,45 +177,31 @@ public class TableController : ControllerBase
     /// </summary>
     /// <param name="id">Table ID</param>
     /// <param name="ct">Cancellation token</param>
-    /// <response code="200">Table deleted successfully</response>
+    /// <response code="204">Table deleted successfully</response>
     /// <response code="404">Table not found</response>
     /// <response code="409">Table has active orders or upcoming reservations</response>
     [HttpDelete("{id:long}")]
     [HasPermission(Permissions.DeleteTable)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> DeleteTable(long id, CancellationToken ct)
     {
         await _tableService.DeleteTableAsync(id, ct);
-
-        return Ok(new ApiResponse<object>
-        {
-            Success = true,
-            Code = 200,
-            UserMessage = "Table deleted successfully.",
-            Data = new { },
-            ServerTime = DateTimeOffset.UtcNow
-        });
+        return NoContent();
     }
 
     /// <summary>
     /// Transitions a table to a new status.
     /// Valid paths: AVAILABLE→OCCUPIED/RESERVED/LOCKED · OCCUPIED→LOCKED ·
     /// RESERVED→OCCUPIED/AVAILABLE · LOCKED→AVAILABLE.
+    /// Returns 422 if the transition is not allowed.
     /// </summary>
-    /// <param name="id">Table ID</param>
-    /// <param name="request">New status lookup value ID</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>Updated table</returns>
-    /// <response code="200">Status updated successfully</response>
-    /// <response code="400">Invalid transition or unknown status ID</response>
-    /// <response code="404">Table not found</response>
     [HttpPatch("{id:long}/status")]
     [HasPermission(Permissions.UpdateTableStatus)]
     [ProducesResponseType(typeof(ApiResponse<TableManagementDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status422UnprocessableEntity)]
     public async Task<IActionResult> UpdateTableStatus(long id, [FromBody] UpdateTableStatusRequest request, CancellationToken ct)
     {
         var dto = await _tableService.UpdateStatusAsync(id, request, ct);
@@ -255,9 +244,8 @@ public class TableController : ControllerBase
     }
 
     /// <summary>
-    /// Regenerates the QR code for a table from its current table code.
-    /// Use this when a table code changes after creation or the operator wants a fresh QR link.
-    /// The initial QR is generated automatically on table creation — no separate call is needed.
+    /// Regenerates the QR code for a table.
+    /// Use when a table code changes or the operator wants a fresh QR link.
     /// </summary>
     /// <param name="id">Table ID</param>
     /// <param name="ct">Cancellation token</param>
@@ -283,8 +271,7 @@ public class TableController : ControllerBase
     }
 
     /// <summary>
-    /// Uploads images for a table. Accepts up to 5 files, max 5 MB each (multipart/form-data).
-    /// Files are persisted via the file-storage service and linked to the table record.
+    /// Uploads images for a table. Accepts up to 5 files, max 5 MB each.
     /// </summary>
     /// <param name="id">Table ID</param>
     /// <param name="files">Image files</param>
@@ -331,28 +318,19 @@ public class TableController : ControllerBase
 
     /// <summary>
     /// Removes a specific image from a table.
-    /// Deletes both the database record and the stored file.
     /// </summary>
     /// <param name="id">Table ID</param>
     /// <param name="mediaId">Media asset ID to remove</param>
     /// <param name="ct">Cancellation token</param>
-    /// <response code="200">Media deleted successfully</response>
+    /// <response code="204">Media deleted successfully</response>
     /// <response code="404">Table not found or media not linked to this table</response>
     [HttpDelete("{id:long}/media/{mediaId:long}")]
     [HasPermission(Permissions.ManageTableMedia)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteTableMedia(long id, long mediaId, CancellationToken ct)
     {
         await _tableService.DeleteTableMediaAsync(id, mediaId, ct);
-
-        return Ok(new ApiResponse<object>
-        {
-            Success = true,
-            Code = 200,
-            UserMessage = "Media deleted successfully.",
-            Data = new { },
-            ServerTime = DateTimeOffset.UtcNow
-        });
+        return NoContent();
     }
 }

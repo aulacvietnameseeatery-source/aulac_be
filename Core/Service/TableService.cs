@@ -19,7 +19,13 @@ public class TableService : ITableService
     private readonly IFileStorage _fileStorage;
     private readonly IMediaRepository _mediaRepository;
 
-    // Allowed status transitions — key: current code, value: set of permitted next codes
+    /// <summary>
+    /// Allowed status transitions — key: current code, value: set of permitted next codes.
+    /// AVAILABLE → OCCUPIED, RESERVED, LOCKED
+    /// OCCUPIED  → LOCKED
+    /// RESERVED  → OCCUPIED, AVAILABLE
+    /// LOCKED    → AVAILABLE
+    /// </summary>
     private static readonly Dictionary<string, HashSet<string>> AllowedTransitions = new()
     {
         [nameof(TableStatusCode.AVAILABLE)] = [nameof(TableStatusCode.OCCUPIED), nameof(TableStatusCode.RESERVED), nameof(TableStatusCode.LOCKED)],
@@ -29,12 +35,12 @@ public class TableService : ITableService
     };
 
     public TableService(
-      ITableRepository tableRepository,
-           IUnitOfWork unitOfWork,
-           ILookupResolver lookupResolver,
-           ILookupService lookupService,
-           IFileStorage fileStorage,
-         IMediaRepository mediaRepository)
+        ITableRepository tableRepository,
+        IUnitOfWork unitOfWork,
+        ILookupResolver lookupResolver,
+        ILookupService lookupService,
+        IFileStorage fileStorage,
+        IMediaRepository mediaRepository)
     {
         _tableRepository = tableRepository;
         _unitOfWork = unitOfWork;
@@ -58,10 +64,10 @@ public class TableService : ITableService
     public async Task<List<TableSelectDto>> GetTablesForSelectAsync(CancellationToken ct = default)
     {
         var tables = await _tableRepository.GetTablesWithRelationsAsync(ct);
-        var now = DateTime.UtcNow;
-
         if (tables is not { Count: > 0 })
             return [];
+
+        var now = DateTime.UtcNow;
 
         return tables.Select(t =>
         {
@@ -72,7 +78,7 @@ public class TableService : ITableService
             var upcomingReservation = t.Reservations
                     .Where(r => r.ReservedTime > now)
                 .OrderBy(r => r.ReservedTime)
-             .FirstOrDefault();
+                .FirstOrDefault();
 
             return new TableSelectDto
             {
@@ -162,6 +168,12 @@ public class TableService : ITableService
     /// <inheritdoc />
     public async Task<TableManagementDto> CreateTableAsync(CreateTableRequest request, CancellationToken ct = default)
     {
+        if (string.IsNullOrWhiteSpace(request.TableCode))
+            throw new ValidationException("Table code is required");
+
+        if (request.Capacity <= 0)
+            throw new ValidationException("Capacity must be a positive integer");
+
         if (await _tableRepository.TableCodeExistsAsync(request.TableCode, ct: ct))
             throw new ConflictException($"Table code '{request.TableCode}' already exists");
 
@@ -171,12 +183,13 @@ public class TableService : ITableService
 
         var entity = new Entity.RestaurantTable
         {
-            TableCode = request.TableCode,
+            TableCode = request.TableCode.Trim(),
             Capacity = request.Capacity,
             IsOnline = request.IsOnline,
             TableStatusLvId = request.StatusLvId,
             TableTypeLvId = request.TypeLvId,
             ZoneLvId = request.ZoneLvId,
+            QrToken = Guid.NewGuid().ToString("N"),
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -185,7 +198,7 @@ public class TableService : ITableService
         await _unitOfWork.SaveChangesAsync(ct);
 
         var saved = await _tableRepository.GetByIdAsync(entity.TableId, ct)
-       ?? throw new NotFoundException("Table not found after creation");
+            ?? throw new NotFoundException("Table not found after creation");
 
         return MapToManagementDto(saved);
     }
@@ -194,18 +207,29 @@ public class TableService : ITableService
     public async Task<TableManagementDto> UpdateTableAsync(long id, UpdateTableRequest request, CancellationToken ct = default)
     {
         var table = await _tableRepository.GetByIdAsync(id, ct)
-                ?? throw new NotFoundException("Table not found");
+            ?? throw new NotFoundException("Table not found");
 
         if (request.TableCode is not null && request.TableCode != table.TableCode)
         {
-            if (await _tableRepository.TableCodeExistsAsync(request.TableCode, excludeId: id, ct: ct))
-                throw new ConflictException($"Table code '{request.TableCode}' already exists");
+            var trimmed = request.TableCode.Trim();
+            if (string.IsNullOrWhiteSpace(trimmed))
+                throw new ValidationException("Table code cannot be blank");
 
-            table.TableCode = request.TableCode;
+            if (await _tableRepository.TableCodeExistsAsync(trimmed, excludeId: id, ct: ct))
+                throw new ConflictException($"Table code '{trimmed}' already exists");
+
+            table.TableCode = trimmed;
         }
 
-        if (request.Capacity.HasValue) table.Capacity = request.Capacity.Value;
-        if (request.IsOnline.HasValue) table.IsOnline = request.IsOnline.Value;
+        if (request.Capacity.HasValue)
+        {
+            if (request.Capacity.Value <= 0)
+                throw new ValidationException("Capacity must be a positive integer");
+            table.Capacity = request.Capacity.Value;
+        }
+
+        if (request.IsOnline.HasValue)
+            table.IsOnline = request.IsOnline.Value;
 
         if (request.StatusLvId.HasValue)
         {
@@ -235,8 +259,7 @@ public class TableService : ITableService
     /// <inheritdoc />
     public async Task DeleteTableAsync(long id, CancellationToken ct = default)
     {
-        var table = await _tableRepository.GetByIdAsync(id, ct)
-       ?? throw new NotFoundException("Table not found");
+        var table = await _tableRepository.GetByIdAsync(id, ct) ?? throw new NotFoundException("Table not found");
 
         var activeOrders = await _tableRepository.CountActiveOrdersAsync(id, ct);
         var upcomingReservations = await _tableRepository.CountUpcomingReservationsAsync(id, ct);
@@ -259,7 +282,7 @@ public class TableService : ITableService
     public async Task<TableManagementDto> UpdateStatusAsync(long id, UpdateTableStatusRequest request, CancellationToken ct = default)
     {
         var table = await _tableRepository.GetByIdAsync(id, ct)
-      ?? throw new NotFoundException("Table not found");
+         ?? throw new NotFoundException("Table not found");
 
         await ValidateLookupAsync(request.StatusLvId, (ushort)LookupType.TableStatus, "table status", ct);
 
@@ -268,9 +291,8 @@ public class TableService : ITableService
 
         if (AllowedTransitions.TryGetValue(currentCode, out var allowed) && !allowed.Contains(newCode))
         {
-            throw new ValidationException(
-            $"Invalid status transition: {currentCode} → {newCode}. " +
-                  $"Allowed from {currentCode}: {string.Join(", ", allowed)}");
+            throw new UnprocessableEntityException($"Invalid status transition: {currentCode} → {newCode}. " 
+                +$"Allowed from {currentCode}: {string.Join(", ", allowed)}");
         }
 
         table.TableStatusLvId = request.StatusLvId;
@@ -287,15 +309,15 @@ public class TableService : ITableService
 
     /// <inheritdoc />
     public Task<List<LookupValueI18nDto>> GetZonesAsync(CancellationToken ct = default)
-   => _lookupService.GetAllActiveByTypeAsync((ushort)LookupType.TableZone, ct);
+        => _lookupService.GetAllActiveByTypeAsync((ushort)LookupType.TableZone, ct);
 
     /// <inheritdoc />
     public Task<List<LookupValueI18nDto>> GetTableTypesAsync(CancellationToken ct = default)
-          => _lookupService.GetAllActiveByTypeAsync((ushort)LookupType.TableType, ct);
+    => _lookupService.GetAllActiveByTypeAsync((ushort)LookupType.TableType, ct);
 
     /// <inheritdoc />
     public Task<LookupValueI18nDto> CreateZoneAsync(CreateLookupValueRequest request, CancellationToken ct = default)
-        => _lookupService.CreateAsync((ushort)LookupType.TableZone, request, ct);
+ => _lookupService.CreateAsync((ushort)LookupType.TableZone, request, ct);
 
     /// <inheritdoc />
     public Task<LookupValueI18nDto> CreateTableTypeAsync(CreateLookupValueRequest request, CancellationToken ct = default)
@@ -303,7 +325,7 @@ public class TableService : ITableService
 
     /// <inheritdoc />
     public Task<LookupValueI18nDto> UpdateZoneAsync(uint valueId, UpdateLookupValueRequest request, CancellationToken ct = default)
-      => _lookupService.UpdateAsync((ushort)LookupType.TableZone, valueId, request, ct);
+        => _lookupService.UpdateAsync((ushort)LookupType.TableZone, valueId, request, ct);
 
     /// <inheritdoc />
     public Task<LookupValueI18nDto> UpdateTableTypeAsync(uint valueId, UpdateLookupValueRequest request, CancellationToken ct = default)
@@ -311,11 +333,11 @@ public class TableService : ITableService
 
     /// <inheritdoc />
     public Task DeleteZoneAsync(uint valueId, CancellationToken ct = default)
-       => _lookupService.DeleteAsync((ushort)LookupType.TableZone, valueId, "zone", ct);
+        => _lookupService.DeleteAsync((ushort)LookupType.TableZone, valueId, "zone", ct);
 
     /// <inheritdoc />
     public Task DeleteTableTypeAsync(uint valueId, CancellationToken ct = default)
-   => _lookupService.DeleteAsync((ushort)LookupType.TableType, valueId, "type", ct);
+        => _lookupService.DeleteAsync((ushort)LookupType.TableType, valueId, "type", ct);
 
     #endregion
 
@@ -336,7 +358,7 @@ public class TableService : ITableService
     public async Task<QrCodeDto> RegenerateQrCodeAsync(long tableId, CancellationToken ct = default)
     {
         var table = await _tableRepository.GetByIdAsync(tableId, ct)
-                    ?? throw new NotFoundException("Table not found");
+            ?? throw new NotFoundException("Table not found");
 
         table.QrToken = Guid.NewGuid().ToString("N");
         table.UpdatedAt = DateTime.UtcNow;
@@ -362,7 +384,9 @@ public class TableService : ITableService
         if (files.Count > 5)
             throw new ValidationException("Maximum 5 files allowed per upload");
 
-        var imageTypeLvId = await _lookupResolver.GetIdAsync((ushort)LookupType.MediaType, nameof(MediaTypeCode.IMAGE), ct);
+        var imageTypeLvId = await _lookupResolver.GetIdAsync(
+             (ushort)LookupType.MediaType, nameof(MediaTypeCode.IMAGE), ct);
+
         var result = new List<TableMediaDto>(files.Count);
 
         await _unitOfWork.BeginTransactionAsync(ct);
@@ -373,7 +397,8 @@ public class TableService : ITableService
                 if (file.Stream.Length > 5 * 1024 * 1024)
                     throw new ValidationException($"File '{file.FileName}' exceeds the 5 MB size limit");
 
-                var relativePath = await _fileStorage.SaveAsync(file.Stream, $"{Guid.NewGuid():N}_{file.FileName}", "table-media", ct);
+                var relativePath = await _fileStorage.SaveAsync(
+               file.Stream, $"{Guid.NewGuid():N}_{file.FileName}", "table-media", ct);
 
                 var asset = await _mediaRepository.AddMediaAsync(new Entity.MediaAsset
                 {
@@ -390,7 +415,12 @@ public class TableService : ITableService
                     IsPrimary = false
                 });
 
-                result.Add(new TableMediaDto { MediaId = asset.MediaId, Url = relativePath, IsPrimary = false });
+                result.Add(new TableMediaDto
+                {
+                    MediaId = asset.MediaId,
+                    Url = relativePath,
+                    IsPrimary = false
+                });
             }
 
             await _unitOfWork.SaveChangesAsync(ct);
@@ -409,10 +439,10 @@ public class TableService : ITableService
     public async Task DeleteTableMediaAsync(long tableId, long mediaId, CancellationToken ct = default)
     {
         _ = await _tableRepository.GetByIdAsync(tableId, ct)
-            ?? throw new NotFoundException("Table not found");
+                    ?? throw new NotFoundException("Table not found");
 
         var link = await _tableRepository.GetTableMediaAsync(tableId, mediaId, ct)
-         ?? throw new NotFoundException("Media not found for this table");
+                   ?? throw new NotFoundException("Media not found for this table");
 
         _tableRepository.RemoveTableMedia(link);
         await _mediaRepository.RemoveMediaAsync(link.Media, ct);

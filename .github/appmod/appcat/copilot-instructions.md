@@ -1,0 +1,528 @@
+# AI Agent — Backend Coding Instructions
+
+> This document defines the structure, rules, and coding conventions for this .NET 8 / C# 12 restaurant management backend. Follow these instructions strictly when generating or modifying code.
+
+---
+
+## 1. Solution Structure
+
+```
+??? Api/       # ASP.NET Core Web API — controllers, middleware, models, Program.cs
+?   ??? Controllers/
+?   ??? Middleware/
+?   ??? Models/       # ApiResponse<T>, PagedResult<T>
+?   ??? Background/
+?   ??? Hubs/
+?   ??? Program.cs
+??? Core/    # Domain layer — entities, DTOs, interfaces, services, enums, exceptions
+?   ??? Attribute/
+?   ??? Data/      # Permissions, LookupTypeInfo, options classes
+?   ??? DTO/      # Grouped by feature (Table/, LookUpValue/, Dish/, etc.)
+?   ??? Entity/
+?   ??? Enum/
+?   ??? Exceptions/
+?   ??? Extensions/
+?   ??? Interface/
+?   ?   ??? Repo/       # Repository interfaces
+?   ?   ??? Service/    # Service interfaces (grouped by domain)
+?   ??? Mappers/
+?   ??? Service/        # Service implementations
+??? Infa/       # Infrastructure layer — EF Core, repositories, external services
+?   ??? Auth/
+?   ??? Data/           # DbContext, Configurations/, Migrations/
+?   ??? Email/
+?   ??? Others/
+?   ??? Repo/           # Repository implementations
+?   ??? Service/        # Infrastructure service implementations
+```
+
+### Layer Rules
+
+| Layer | May Reference | Must NOT Reference |
+|-------|--------------|-------------------|
+| `Api` | `Core` | `Infa` directly (only via DI) |
+| `Core` | Nothing (self-contained) | `Api`, `Infa` |
+| `Infa` | `Core` | `Api` |
+
+- **Core** is the domain heart: all DTOs, entities, interfaces, enums, business services live here.
+- **Infa** implements Core interfaces (repositories, external services like file storage, email, lookup resolver).
+- **Api** wires everything via DI in `Program.cs` and exposes HTTP endpoints.
+
+---
+
+## 2. Naming Conventions
+
+### Files & Classes
+
+| Item | Convention | Example |
+|------|-----------|---------|
+| Entity | `PascalCase`, singular | `RestaurantTable`, `LookupValue` |
+| DTO | `PascalCase` + suffix `Dto`/`Request` | `TableManagementDto`, `CreateTableRequest` |
+| Interface | `I` prefix | `ITableService`, `ITableRepository` |
+| Service | `PascalCase` + `Service` | `TableService`, `LookupService` |
+| Repository | `PascalCase` + `Repository`/`Repo` | `TableRepository`, `LookupRepo` |
+| Controller | `PascalCase` + `Controller` | `TableController` |
+| Enum | `PascalCase` | `LookupType`, `TableStatusCode` |
+| Permission | `SCREAMING_SNAKE_CASE` string | `"TABLE:READ"`, `"TABLE:MANAGE_ZONE"` |
+
+### DTO Folder Organization
+
+DTOs are grouped by feature domain inside `Core/DTO/`:
+
+```
+Core/DTO/
+??? Table/  # Table-related DTOs
+?   ??? TableManagementDto.cs
+?   ??? TableDetailDto.cs
+?   ??? CreateTableRequest.cs
+?   ??? ...
+??? LookUpValue/        # Generic lookup DTOs (shared across features)
+?   ??? LookupValueI18nDto.cs
+?   ??? CreateLookupValueRequest.cs
+?   ??? UpdateLookupValueRequest.cs
+??? Dish/
+??? Account/
+??? ...
+```
+
+### C# Style
+
+- Use **file-scoped namespaces** (`namespace X;`) for new files.
+- Use **primary constructors** or concise constructor patterns.
+- Prefer **collection expressions** (`[]`) and **target-typed new** (`new()`).
+- Use `nameof()` for enum-to-string comparisons.
+- Use `is not null` / `is null` pattern matching.
+- Fields: `_camelCase` with underscore prefix.
+
+---
+
+## 3. API Response Envelope
+
+**Every** endpoint wraps its payload in `ApiResponse<T>`:
+
+```csharp
+public class ApiResponse<T>
+{
+    public bool Success { get; set; }
+    public int Code { get; set; }      // HTTP status code
+    public int SubCode { get; set; }
+    public string? UserMessage { get; set; }
+    public string? SystemMessage { get; set; }
+  public IReadOnlyList<string> ValidateInfo { get; set; } = Array.Empty<string>();
+    public T Data { get; set; } = default!;
+    public bool GetLastData { get; set; }
+    public DateTimeOffset ServerTime { get; set; }
+}
+```
+
+### Paginated Endpoints
+
+Use `PagedResult<T>` as the `Data` payload:
+
+```csharp
+public class PagedResult<T>
+{
+    public List<T> PageData { get; set; } = new();
+    public int PageIndex { get; set; }
+    public int PageSize { get; set; }
+    public int TotalCount { get; set; }
+    public int TotalPage { get; set; }
+}
+```
+
+### Standard Response Patterns
+
+| Action | HTTP Status | Response |
+|--------|------------|----------|
+| GET (single) | 200 | `ApiResponse<TDto>` |
+| GET (list) | 200 | `ApiResponse<PagedResult<TDto>>` or `ApiResponse<List<TDto>>` |
+| POST (create) | 201 | `StatusCode(201, ApiResponse<TDto>)` |
+| PUT (update) | 200 | `ApiResponse<TDto>` |
+| DELETE | 204 | `NoContent()` |
+| PATCH | 200 | `ApiResponse<TDto>` |
+
+---
+
+## 4. Error Handling
+
+### Business Exceptions
+
+All business errors are modeled as typed exceptions in `Core/Exceptions/BusinessException.cs`:
+
+| Exception | HTTP Status | ErrorCode |
+|-----------|------------|-----------|
+| `ValidationException` | 400 | `VALIDATION_ERROR` |
+| `NotFoundException` | 404 | `NOT_FOUND` |
+| `ConflictException` | 409 | `CONFLICT` |
+| `ForbiddenException` | 403 | `FORBIDDEN` |
+| `UnprocessableEntityException` | 422 | `UNPROCESSABLE_ENTITY` |
+
+**Throw these from services.** The global `HandleExceptionMiddleware` catches them and converts to `ApiResponse<object>` with the correct HTTP status code.
+
+### Rules
+
+- **Never** return error status codes manually from controllers — throw the appropriate exception from the service layer.
+- **Never** catch exceptions in controllers unless absolutely necessary (e.g., file upload stream handling).
+- Controllers should be thin — delegate all business logic to services.
+
+---
+
+## 5. Authorization & Permissions
+
+### Permission Constants
+
+Defined in `Core/Data/Permissions.cs` as `public const string` fields:
+
+```csharp
+public const string ViewTable = "TABLE:READ";
+public const string CreateTable = "TABLE:CREATE";
+```
+
+### Usage
+
+Apply via `[HasPermission]` attribute on controller actions:
+
+```csharp
+[HasPermission(Permissions.ViewTable)]
+public async Task<IActionResult> GetTables(...)
+```
+
+`HasPermission` extends `AuthorizeAttribute` and maps to a policy registered in `Program.cs`.
+
+### Adding New Permissions
+
+1. Add the constant to `Permissions.cs`.
+2. The `Program.cs` auto-discovers all public static string fields and registers them as policies.
+3. Apply `[HasPermission(...)]` on the controller action.
+
+---
+
+## 6. Lookup System
+
+The application uses a generic **lookup value** system for configurable enumerations (zones, table types, statuses, etc.).
+
+### Key Types
+
+| Type | Location | Purpose |
+|------|---------|---------|
+| `LookupType` enum | `Core/Enum/LookupTypeEnum.cs` | Maps type names to `type_id` |
+| `LookupTypeInfo` record | `Core/Data/LookupTypeInfor.cs` | Extended metadata per type |
+| `LookupValue` entity | `Core/Entity/LookupValue.cs` | Database entity |
+| `ILookupResolver` | `Core/Interface/Service/Entity/` | Cached code?ID resolution |
+| `ILookupService` | `Core/Interface/Service/LookUp/` | CRUD operations on lookup values |
+| `ILookupRepo` | `Core/Interface/Repo/` | Data access for lookup values |
+
+### i18n Support
+
+Lookup values support internationalization via the `i18n_text` / `i18n_translation` tables:
+
+- `LookupValue.ValueNameTextId` ? `I18nText` ? `I18nTranslation[]`
+- `LookupValue.ValueDescTextId` ? `I18nText` ? `I18nTranslation[]`
+
+#### Response DTO
+
+```csharp
+public class LookupValueI18nDto
+{
+    public uint ValueId { get; set; }
+    public string ValueCode { get; set; }
+    public short SortOrder { get; set; }
+    public LookupValueTranslationDto I18n { get; set; }      // name translations
+public LookupValueTranslationDto? DescriptionI18n { get; set; } // description translations
+}
+
+public class LookupValueTranslationDto
+{
+    public string? Vi { get; set; }
+    public string? En { get; set; }
+public string? Fr { get; set; }
+}
+```
+
+#### Request DTOs
+
+Create/Update requests accept `LookupI18nMap` for per-locale translations:
+
+```csharp
+public class LookupI18nMap
+{
+    public string? Vi { get; set; }
+    public string? En { get; set; }
+  public string? Fr { get; set; }
+}
+```
+
+### Adding a New Lookup-Based Feature
+
+1. Add enum value to `LookupType` in `Core/Enum/LookupTypeEnum.cs`.
+2. Add `LookupTypeInfo` record to `Core/Data/LookupTypeInfor.cs`.
+3. Seed rows in the `lookup_value` table.
+4. Expose GET/POST/PUT/DELETE endpoints following the generic lookup pattern (see `TableLookupController`).
+5. In services, delegate to `ILookupService.GetAllActiveByTypeAsync / CreateAsync / UpdateAsync / DeleteAsync`.
+
+---
+
+## 7. Repository Pattern
+
+### Interface Location
+
+`Core/Interface/Repo/I{Name}Repository.cs` or `I{Name}Repo.cs`
+
+### Implementation Location
+
+`Infa/Repo/{Name}Repository.cs` or `{Name}Repo.cs`
+
+### Rules
+
+- Repositories receive `RestaurantMgmtContext` via DI.
+- Use `AsNoTracking()` for read-only queries.
+- **Always filter soft-deleted records** (`!t.IsDeleted` or `lv.DeletedAt == null`).
+- Use `Include/ThenInclude` judiciously — only load what the caller needs.
+- Repository methods should be data-access only — no business logic.
+- Use `IUnitOfWork` for transactions spanning multiple repositories.
+
+### IUnitOfWork
+
+```csharp
+public interface IUnitOfWork
+{
+    Task BeginTransactionAsync(CancellationToken ct);
+    Task CommitAsync(CancellationToken ct);
+    Task RollbackAsync(CancellationToken ct);
+    Task SaveChangesAsync(CancellationToken ct);
+}
+```
+
+Pattern for transactional operations:
+
+```csharp
+await _unitOfWork.BeginTransactionAsync(ct);
+try
+{
+// ... multiple repository operations ...
+    await _unitOfWork.SaveChangesAsync(ct);
+    await _unitOfWork.CommitAsync(ct);
+}
+catch
+{
+    await _unitOfWork.RollbackAsync(ct);
+    throw;
+}
+```
+
+---
+
+## 8. Service Layer
+
+### Interface Location
+
+`Core/Interface/Service/{Domain}/I{Name}Service.cs`
+
+### Implementation Location
+
+`Core/Service/{Name}Service.cs`
+
+### Rules
+
+- Services contain all **business logic** and **validation**.
+- Services call repositories for data access and `IUnitOfWork` for persistence.
+- Services throw `BusinessException` subtypes for error conditions.
+- Services should be **stateless** — no instance-level mutable state.
+- Use `CancellationToken ct = default` on all async methods.
+- When creating/updating entities with i18n, use `II18nRepository` to manage translations.
+
+### Validation Pattern
+
+```csharp
+if (string.IsNullOrWhiteSpace(request.Name))
+    throw new ValidationException("Name is required");
+
+if (await _repo.NameExistsAsync(request.Name, ct: ct))
+  throw new ConflictException($"A value with name '{request.Name}' already exists");
+```
+
+---
+
+## 9. Controller Conventions
+
+### Rules
+
+- Controllers are **thin** — no business logic, just request/response mapping.
+- Always accept `CancellationToken ct` as the last parameter.
+- Always use `[HasPermission]` for authorization.
+- Use `[ProducesResponseType]` attributes for Swagger documentation.
+- Route parameters use `:long` or `:int` constraints.
+- All controllers require `[Authorize]` at class level.
+
+### Controller Template
+
+```csharp
+[ApiController]
+[Route("api/{resource}")]
+[Authorize]
+public class {Resource}Controller : ControllerBase
+{
+  private readonly I{Resource}Service _service;
+
+    public {Resource}Controller(I{Resource}Service service)
+ {
+        _service = service;
+    }
+
+    [HttpGet]
+    [HasPermission(Permissions.View{Resource})]
+    [ProducesResponseType(typeof(ApiResponse<List<{Resource}Dto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAll(CancellationToken ct)
+    {
+   var data = await _service.GetAllAsync(ct);
+        return Ok(new ApiResponse<List<{Resource}Dto>>
+        {
+     Success = true,
+     Code = 200,
+  UserMessage = "{Resource}s retrieved successfully.",
+     Data = data,
+            ServerTime = DateTimeOffset.UtcNow
+        });
+    }
+}
+```
+
+---
+
+## 10. Entity Conventions
+
+### Location
+
+`Core/Entity/{EntityName}.cs`
+
+### Rules
+
+- Entities are `partial class` (generated via EF scaffold + manual extensions).
+- Navigation properties are `virtual`.
+- Collections initialize to `new List<T>()`.
+- Soft delete uses either `bool IsDeleted` or `DateTime? DeletedAt`.
+- Audit fields: `CreatedAt`, `UpdatedAt`, `UpdatedByStaffId`.
+- FK properties use `uint` for lookup value IDs, `long` for entity PKs.
+
+---
+
+## 11. DI Registration
+
+All registrations are in `Api/Program.cs`, grouped by concern:
+
+```csharp
+#region Business Services
+builder.Services.AddScoped<ITableService, TableService>();
+#endregion
+
+#region Repositories
+builder.Services.AddScoped<ITableRepository, TableRepository>();
+#endregion
+```
+
+### Lifetime Rules
+
+| Type | Lifetime | Example |
+|------|---------|---------|
+| Services | `Scoped` | `ITableService` |
+| Repositories | `Scoped` | `ITableRepository` |
+| Cache services | `Singleton` | `ICacheService` |
+| Lookup resolver | `Singleton` | `ILookupResolver` |
+| Token stores | `Singleton` | `IPasswordResetTokenStore` |
+
+---
+
+## 12. Soft Delete
+
+### Entity-Level
+
+Tables use `bool IsDeleted`, lookup values use `DateTime? DeletedAt` + `bool? IsActive`.
+
+### Repository Rules
+
+- **Always** filter out deleted records in queries.
+- For `RestaurantTable`: `Where(t => !t.IsDeleted)`
+- For `LookupValue`: `Where(lv => lv.DeletedAt == null)` or `Where(lv => lv.IsActive == true && lv.DeletedAt == null)`
+- Delete operations set the flag/timestamp — never hard-delete.
+
+---
+
+## 13. Status Transition Pattern
+
+For entities with finite-state status (e.g., tables, orders):
+
+1. Define allowed transitions as a static dictionary in the service:
+
+```csharp
+private static readonly Dictionary<string, HashSet<string>> AllowedTransitions = new()
+{
+    ["AVAILABLE"] = ["OCCUPIED", "RESERVED", "LOCKED"],
+    ["OCCUPIED"]  = ["LOCKED"],
+    ["RESERVED"]  = ["OCCUPIED", "AVAILABLE"],
+    ["LOCKED"]    = ["AVAILABLE"],
+};
+```
+
+2. Validate in the service method and throw `UnprocessableEntityException` (422) on invalid transitions:
+
+```csharp
+if (AllowedTransitions.TryGetValue(currentCode, out var allowed) && !allowed.Contains(newCode))
+    throw new UnprocessableEntityException(
+  $"Invalid status transition: {currentCode} ? {newCode}. Allowed: {string.Join(", ", allowed)}");
+```
+
+---
+
+## 14. Checklist — Before Submitting Code
+
+- [ ] All async methods accept `CancellationToken`.
+- [ ] Soft-delete filters applied in all repository queries.
+- [ ] Business exceptions used instead of manual HTTP status returns.
+- [ ] `[HasPermission]` applied with correct permission constant.
+- [ ] DTOs are in the correct `Core/DTO/{Feature}/` folder.
+- [ ] No business logic in controllers.
+- [ ] `IUnitOfWork` used for multi-step writes.
+- [ ] i18n maps used for lookup value name/description (not flat strings in responses).
+- [ ] New services/repos registered in `Program.cs`.
+- [ ] Build succeeds with `dotnet build`.
+
+---
+
+## 15. Common Patterns Reference
+
+### Lookup CRUD via Feature Controller
+
+When a feature needs lookup management (e.g., zones, types), follow this pattern:
+
+**Controller** (under the feature's route, e.g., `api/tables/zones`):
+```csharp
+[HttpGet("zones")]
+public async Task<IActionResult> GetZones(CancellationToken ct)
+{
+    var data = await _service.GetZonesAsync(ct);
+    return Ok(new ApiResponse<List<LookupValueI18nDto>> { ... });
+}
+```
+
+**Service** (delegates to `ILookupService`):
+```csharp
+public Task<List<LookupValueI18nDto>> GetZonesAsync(CancellationToken ct)
+  => _lookupService.GetAllActiveByTypeAsync((ushort)LookupType.TableZone, ct);
+```
+
+This keeps lookup CRUD centralized in `LookupService` while exposing it through feature-specific routes.
+
+### File Upload Pattern
+
+```csharp
+[HttpPost("{id}/media")]
+public async Task<IActionResult> Upload(long id, [FromForm] List<IFormFile> files, CancellationToken ct)
+{
+    if (files is not { Count: > 0 })
+        return BadRequest(new ApiResponse<object> { ... });
+
+    var inputs = files.Select(f => new MediaFileInput { ... }).ToList();
+    var result = await _service.UploadMediaAsync(id, inputs, ct);
+    return StatusCode(201, new ApiResponse<List<MediaDto>> { ... });
+}
+```

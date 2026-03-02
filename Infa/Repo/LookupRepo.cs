@@ -7,17 +7,14 @@ using Microsoft.Extensions.Logging;
 namespace Infa.Repo;
 
 /// <summary>
-/// SCOPED service for loading lookup data from database via DbContext.
-/// Handles all database access operations for lookup values.
+/// Repository implementation for lookup value data access operations.
 /// </summary>
 public class LookupRepo : ILookupRepo
 {
     private readonly RestaurantMgmtContext _context;
     private readonly ILogger<LookupRepo> _logger;
 
-    public LookupRepo(
-        RestaurantMgmtContext context,
-        ILogger<LookupRepo> logger)
+    public LookupRepo(RestaurantMgmtContext context, ILogger<LookupRepo> logger)
     {
         _context = context;
         _logger = logger;
@@ -27,14 +24,9 @@ public class LookupRepo : ILookupRepo
     public async Task<Dictionary<string, uint>> LoadAllAsync(CancellationToken ct = default)
     {
         var lookupValues = await _context.LookupValues
-   .AsNoTracking()
-      .Where(lv => lv.IsActive == true && lv.DeletedAt == null)
-      .Select(lv => new
-      {
-          lv.TypeId,
-          lv.ValueCode,
-          lv.ValueId
-      })
+            .AsNoTracking()
+            .Where(lv => lv.IsActive == true && lv.DeletedAt == null)
+            .Select(lv => new { lv.TypeId, lv.ValueCode, lv.ValueId })
             .ToListAsync(ct);
 
         var dictionary = new Dictionary<string, uint>(StringComparer.Ordinal);
@@ -44,28 +36,22 @@ public class LookupRepo : ILookupRepo
             if (string.IsNullOrWhiteSpace(lv.ValueCode))
             {
                 _logger.LogWarning(
-                      "Skipping lookup value with null/empty value_code: value_id={ValueId}, type_id={TypeId}",
-                          lv.ValueId,
-             lv.TypeId);
+                    "Skipping lookup value with null/empty value_code: value_id={ValueId}, type_id={TypeId}",
+                    lv.ValueId,
+                    lv.TypeId);
                 continue;
             }
 
-            // Normalize: Trim + ToUpperInvariant
             var normalizedCode = lv.ValueCode.Trim().ToUpperInvariant();
-            var key = BuildCacheKey(lv.TypeId, normalizedCode);
+            var key = $"{lv.TypeId}|{normalizedCode}";
 
-            // Handle duplicates: keep first, log warning
-            if (dictionary.ContainsKey(key))
+            if (!dictionary.TryAdd(key, lv.ValueId))
             {
                 _logger.LogWarning(
                     "Duplicate lookup value detected: type_id={TypeId}, value_code='{ValueCode}'. Using first occurrence.",
                     lv.TypeId,
-                    lv.ValueCode
-                    );
-                continue;
+                    lv.ValueCode);
             }
-
-            dictionary[key] = lv.ValueId;
         }
 
         _logger.LogDebug("Loaded {Count} lookup values from database", dictionary.Count);
@@ -77,11 +63,9 @@ public class LookupRepo : ILookupRepo
     {
         try
         {
-            var maxUpdatedAt = await _context.LookupValues
+            return await _context.LookupValues
                 .Where(lv => lv.DeletedAt == null)
                 .MaxAsync(lv => lv.UpdateAt, ct);
-
-            return maxUpdatedAt;
         }
         catch (Exception ex)
         {
@@ -95,65 +79,62 @@ public class LookupRepo : ILookupRepo
     {
         try
         {
-            // Try to query UpdateAt column
             await _context.LookupValues
-            .AsNoTracking()
-            .Select(lv => lv.UpdateAt)
-            .FirstOrDefaultAsync(ct);
+                .AsNoTracking()
+                .Select(lv => lv.UpdateAt)
+                .FirstOrDefaultAsync(ct);
 
             return true;
         }
-        catch (Exception)
+        catch
         {
-            // Column doesn't exist or other error
             return false;
         }
     }
 
-    /// <summary>
-    /// Builds a cache key from type_id and normalized value_code.
-    /// Format: "{typeId}|{normalizedValueCode}"
-    /// </summary>
-    private static string BuildCacheKey(ushort typeId, string normalizedValueCode)
-    {
-        return $"{typeId}|{normalizedValueCode}";
-    }
-
-    public async Task<List<LookupValue>> GetAllActiveByTypeAsync(ushort typeId, CancellationToken ct)
+    /// <inheritdoc />
+    public async Task<List<LookupValue>> GetAllActiveByTypeAsync(ushort typeId, CancellationToken ct = default)
     {
         return await _context.LookupValues
-        .AsNoTracking()
-        .Where(lv =>
-            lv.TypeId == typeId &&
-            lv.IsActive == true &&
-            lv.DeletedAt == null
-        )
-        .Include(lv => lv.ValueNameText)
-            .ThenInclude(t => t.I18nTranslations)
-        .OrderBy(lv => lv.SortOrder)
-        .ToListAsync(ct);
+            .AsNoTracking()
+            .Where(lv => lv.TypeId == typeId && lv.IsActive == true && lv.DeletedAt == null)
+            .Include(lv => lv.ValueNameText)
+                .ThenInclude(t => t!.I18nTranslations)
+            .Include(lv => lv.ValueDescText)
+                .ThenInclude(t => t!.I18nTranslations)
+            .OrderBy(lv => lv.SortOrder)
+            .ToListAsync(ct);
     }
 
     /// <inheritdoc />
     public async Task<LookupValue?> GetByIdAsync(uint valueId, CancellationToken ct = default)
     {
         return await _context.LookupValues
-      .FirstOrDefaultAsync(lv => lv.ValueId == valueId && lv.DeletedAt == null, ct);
+            .FirstOrDefaultAsync(lv => lv.ValueId == valueId && lv.DeletedAt == null, ct);
+    }
+
+    /// <inheritdoc />
+    public async Task<LookupValue?> GetByIdWithI18nAsync(uint valueId, CancellationToken ct = default)
+    {
+        return await _context.LookupValues
+            .Include(lv => lv.ValueNameText)
+                .ThenInclude(t => t!.I18nTranslations)
+            .Include(lv => lv.ValueDescText)
+                .ThenInclude(t => t!.I18nTranslations)
+            .FirstOrDefaultAsync(lv => lv.ValueId == valueId && lv.DeletedAt == null, ct);
     }
 
     /// <inheritdoc />
     public async Task<bool> ValueNameExistsAsync(ushort typeId, string valueName, uint? excludeId = null, CancellationToken ct = default)
     {
         var query = _context.LookupValues
-        .AsNoTracking()
-            .Where(lv => lv.TypeId == typeId
-              && lv.ValueName == valueName
-       && lv.DeletedAt == null);
+            .AsNoTracking()
+            .Where(lv => lv.TypeId == typeId && lv.ValueName == valueName && lv.DeletedAt == null);
 
         if (excludeId.HasValue)
             query = query.Where(lv => lv.ValueId != excludeId.Value);
 
-  return await query.AnyAsync(ct);
+        return await query.AnyAsync(ct);
     }
 
     /// <inheritdoc />
@@ -161,14 +142,12 @@ public class LookupRepo : ILookupRepo
     {
         var query = _context.LookupValues
             .AsNoTracking()
-            .Where(lv => lv.TypeId == typeId
-               && lv.ValueCode == valueCode
-           && lv.DeletedAt == null);
+            .Where(lv => lv.TypeId == typeId && lv.ValueCode == valueCode && lv.DeletedAt == null);
 
         if (excludeId.HasValue)
             query = query.Where(lv => lv.ValueId != excludeId.Value);
 
-return await query.AnyAsync(ct);
+        return await query.AnyAsync(ct);
     }
 
     /// <inheritdoc />
@@ -176,15 +155,15 @@ return await query.AnyAsync(ct);
     {
         var hasAny = await _context.LookupValues
             .AsNoTracking()
-          .Where(lv => lv.TypeId == typeId && lv.DeletedAt == null)
+            .Where(lv => lv.TypeId == typeId && lv.DeletedAt == null)
             .AnyAsync(ct);
 
         if (!hasAny) return 0;
 
-      return await _context.LookupValues
-       .AsNoTracking()
+        return await _context.LookupValues
+            .AsNoTracking()
             .Where(lv => lv.TypeId == typeId && lv.DeletedAt == null)
-.MaxAsync(lv => lv.SortOrder, ct);
+            .MaxAsync(lv => lv.SortOrder, ct);
     }
 
     /// <inheritdoc />
@@ -194,13 +173,14 @@ return await query.AnyAsync(ct);
     }
 
     /// <inheritdoc />
- public async Task<int> CountTablesUsingLookupValueAsync(uint valueId, CancellationToken ct = default)
+    public async Task<int> CountTablesUsingLookupValueAsync(uint valueId, CancellationToken ct = default)
     {
-  return await _context.RestaurantTables
-    .AsNoTracking()
+        return await _context.RestaurantTables
+            .AsNoTracking()
+            .Where(t => !t.IsDeleted)
             .Where(t => t.ZoneLvId == valueId
-        || t.TableTypeLvId == valueId
-|| t.TableStatusLvId == valueId)
+                || t.TableTypeLvId == valueId
+                || t.TableStatusLvId == valueId)
             .CountAsync(ct);
- }
+    }
 }

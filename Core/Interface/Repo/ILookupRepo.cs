@@ -17,34 +17,42 @@ public interface ILookupRepo
     Task<Dictionary<string, uint>> LoadAllAsync(CancellationToken ct = default);
 
     /// <summary>
-  /// Gets the maximum UpdatedAt timestamp from active lookup values.
+    /// Gets the maximum UpdatedAt timestamp from active lookup values.
     /// Used for cache invalidation detection.
     /// </summary>
     /// <param name="ct">Cancellation token</param>
     /// <returns>Maximum UpdatedAt timestamp, or null if no values exist</returns>
-  Task<DateTime?> GetMaxUpdatedAtAsync(CancellationToken ct = default);
+    Task<DateTime?> GetMaxUpdatedAtAsync(CancellationToken ct = default);
 
     /// <summary>
     /// Checks if the lookup_value table has an UpdatedAt column.
     /// </summary>
- /// <param name="ct">Cancellation token</param>
+    /// <param name="ct">Cancellation token</param>
     /// <returns>True if UpdatedAt column exists; otherwise false</returns>
     Task<bool> HasUpdatedAtColumnAsync(CancellationToken ct = default);
 
-    Task<List<LookupValue>> GetAllActiveByTypeAsync(
-        ushort typeId,
-        CancellationToken ct
-    );
+    /// <summary>
+    /// Gets all active lookup values for a type, including i18n translations for both name and description.
+    /// Ordered by sort order.
+    /// </summary>
+    Task<List<LookupValue>> GetAllActiveByTypeAsync(ushort typeId, CancellationToken ct = default);
 
     /// <summary>
     /// Gets a single lookup value by its ID. Returns null if not found or deleted.
+    /// Does NOT include i18n relations — use <see cref="GetByIdWithI18nAsync"/> when translations are needed.
     /// </summary>
     Task<LookupValue?> GetByIdAsync(uint valueId, CancellationToken ct = default);
 
     /// <summary>
+    /// Gets a single lookup value by its ID, including i18n translations for name and description.
+    /// Returns null if not found or deleted.
+    /// </summary>
+    Task<LookupValue?> GetByIdWithI18nAsync(uint valueId, CancellationToken ct = default);
+
+    /// <summary>
     /// Checks if a lookup value with the given name already exists for the specified type.
     /// </summary>
-  Task<bool> ValueNameExistsAsync(ushort typeId, string valueName, uint? excludeId = null, CancellationToken ct = default);
+    Task<bool> ValueNameExistsAsync(ushort typeId, string valueName, uint? excludeId = null, CancellationToken ct = default);
 
     /// <summary>
     /// Checks if a lookup value with the given code already exists for the specified type.
@@ -62,8 +70,8 @@ public interface ILookupRepo
     void Add(LookupValue entity);
 
     /// <summary>
-    /// Counts the number of restaurant tables that reference a given lookup value ID
- /// in any of the table's lookup foreign keys (zone, type, status).
+    /// Counts the number of non-deleted restaurant tables that reference a given lookup value ID
+    /// in any of the table's lookup foreign keys (zone, type, status).
     /// </summary>
     Task<int> CountTablesUsingLookupValueAsync(uint valueId, CancellationToken ct = default);
 }

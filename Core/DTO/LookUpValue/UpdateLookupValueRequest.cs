@@ -3,13 +3,14 @@ using System.ComponentModel.DataAnnotations;
 namespace Core.DTO.LookUpValue;
 
 /// <summary>
-/// Request DTO for updating an existing lookup value (zone or table type).
+/// Request DTO for updating an existing lookup value (zone, table type, etc.).
+/// All fields are optional — only provided fields are updated.
 /// </summary>
 public class UpdateLookupValueRequest
 {
     /// <summary>
     /// Updated human-readable display name.
-  /// </summary>
+    /// </summary>
     [MaxLength(100, ErrorMessage = "Value name cannot exceed 100 characters")]
     public string? ValueName { get; set; }
 
@@ -19,8 +20,12 @@ public class UpdateLookupValueRequest
     public short? SortOrder { get; set; }
 
     /// <summary>
-    /// Updated description.
+    /// Per-locale display names. Replaces the entire i18n map if provided.
     /// </summary>
-    [MaxLength(500, ErrorMessage = "Description cannot exceed 500 characters")]
-    public string? Description { get; set; }
+    public LookupI18nMap? I18n { get; set; }
+
+    /// <summary>
+    /// Per-locale descriptions. Replaces the entire descriptionI18n map if provided.
+    /// </summary>
+    public LookupI18nMap? DescriptionI18n { get; set; }
 }

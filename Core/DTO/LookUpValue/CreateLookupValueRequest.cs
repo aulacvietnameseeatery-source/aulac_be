@@ -3,12 +3,12 @@ using System.ComponentModel.DataAnnotations;
 namespace Core.DTO.LookUpValue;
 
 /// <summary>
-/// Request DTO for creating a new lookup value (zone or table type).
+/// Request DTO for creating a new lookup value (zone, table type, etc.).
 /// </summary>
 public class CreateLookupValueRequest
 {
     /// <summary>
-    /// Human-readable display name (required).
+    /// Human-readable display name (required). Used as primary fallback and for ValueCode generation.
     /// </summary>
     [Required(ErrorMessage = "Value name is required")]
     [MaxLength(100, ErrorMessage = "Value name cannot exceed 100 characters")]
@@ -26,8 +26,22 @@ public class CreateLookupValueRequest
     public short? SortOrder { get; set; }
 
     /// <summary>
-    /// Optional description shown as helper text in dropdowns.
+    /// Per-locale display names. If provided, these override the flat ValueName for each locale.
     /// </summary>
-    [MaxLength(500, ErrorMessage = "Description cannot exceed 500 characters")]
-    public string? Description { get; set; }
+    public LookupI18nMap? I18n { get; set; }
+
+    /// <summary>
+    /// Per-locale descriptions shown as helper text in dropdowns.
+    /// </summary>
+    public LookupI18nMap? DescriptionI18n { get; set; }
+}
+
+/// <summary>
+/// Translatable text map with per-locale values.
+/// </summary>
+public class LookupI18nMap
+{
+    public string? Vi { get; set; }
+    public string? En { get; set; }
+    public string? Fr { get; set; }
 }

@@ -53,7 +53,7 @@ namespace Core.Data
         //Table
         public const string ViewTable = "TABLE:READ";
         public const string CreateTable = "TABLE:CREATE";
-        public const string UpdateTable = "TABLE:UPDATE";
+        public const string UpdateTable = "TABLE:EDIT";
         public const string DeleteTable = "TABLE:DELETE";
         public const string UpdateTableStatus = "TABLE:UPDATE_STATUS";
         public const string ManageTableZone = "TABLE:MANAGE_ZONE";
