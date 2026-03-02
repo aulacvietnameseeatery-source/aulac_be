@@ -1,5 +1,7 @@
 using Core.DTO.General;
 using Core.DTO.Order;
+using Core.Entity;
+using Core.Exceptions;
 using Core.Interface.Repo;
 using Infa.Data;
 using Microsoft.EntityFrameworkCore;
@@ -233,4 +235,211 @@ public class OrderRepository : IOrderRepository
 			}
 		}
 	}
+
+
+	public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, CancellationToken cancellationToken = default)
+	{
+		_context.Orders.Add(order);
+		await _context.SaveChangesAsync(cancellationToken);
+
+		foreach (var item in items)
+		{
+			item.OrderId = order.OrderId;
+		}
+
+		_context.OrderItems.AddRange(items);
+		await _context.SaveChangesAsync(cancellationToken);
+
+		return order.OrderId;
+	}
+
+	public async Task<CustomerOrderHistoryDTO> GetCustomerOrderByIdAsync(long orderId, CancellationToken cancellationToken = default)
+	{
+		var order = await _context.Orders
+			.Where(o => o.OrderId == orderId)
+			.Include(o => o.OrderStatusLv)
+			.Include(o => o.Table)
+			.Include(o => o.OrderItems)
+				.ThenInclude(oi => oi.Dish)
+			.Include(o => o.OrderItems)
+				.ThenInclude(oi => oi.ItemStatusLv)
+			.FirstOrDefaultAsync(cancellationToken)
+				?? throw new KeyNotFoundException($"Order {orderId} not found.");
+
+		var round = new CustomerOrderRoundDTO
+		{
+			OrderId     = order.OrderId,
+			RoundNumber = 1,
+			CreatedAt   = order.CreatedAt,
+			OrderStatus = order.OrderStatusLv.ValueName,
+			TotalAmount = order.TotalAmount,
+			Items = order.OrderItems.Select(oi => new OrderItemDTO
+			{
+				OrderItemId  = oi.OrderItemId,
+				DishId       = oi.DishId,
+				DishName     = oi.Dish.DishName,
+				Quantity     = oi.Quantity,
+				Price        = oi.Price,
+				ItemStatus   = oi.ItemStatusLv.ValueName,
+				RejectReason = oi.RejectReason,
+				Note         = oi.Note
+			}).ToList()
+		};
+
+		var totalItems     = round.Items.Sum(i => i.Quantity);
+		var estimatedTotal = round.Items.Sum(i => i.Price * i.Quantity);
+
+		return new CustomerOrderHistoryDTO
+		{
+			TableCode      = order.Table.TableCode,
+			TotalItems     = totalItems,
+			EstimatedTotal = estimatedTotal,
+			Rounds         = new List<CustomerOrderRoundDTO> { round }
+		};
+	}
+
+	public async Task AddItemsToOrderAsync(long orderId, List<OrderItem> items, CancellationToken cancellationToken = default)
+	{
+		var order = await _context.Orders
+			.FirstOrDefaultAsync(o => o.OrderId == orderId, cancellationToken)
+				?? throw new KeyNotFoundException($"Order {orderId} not found.");
+
+		foreach (var item in items)
+			item.OrderId = orderId;
+
+		_context.OrderItems.AddRange(items);
+
+		// Update total amount on the parent order
+		order.TotalAmount += items.Sum(i => i.Price * i.Quantity);
+		order.UpdatedAt = DateTime.UtcNow;
+
+		// If the order was completed/cancelled, reopen it to PENDING so kitchen sees the new items
+		const uint completedOrderLvId = 30;
+		const uint cancelledOrderLvId = 31;
+		const uint pendingOrderLvId   = 28;
+		if (order.OrderStatusLvId == completedOrderLvId || order.OrderStatusLvId == cancelledOrderLvId)
+			order.OrderStatusLvId = pendingOrderLvId;
+
+		await _context.SaveChangesAsync(cancellationToken);
+	}
+
+	public async Task<CustomerOrderHistoryDTO> GetCustomerOrderHistoryAsync(string tableCode, CancellationToken cancellationToken = default)
+	{
+		// Include all orders created within the last 24 h to cover late-night sessions
+		var since = DateTime.UtcNow.AddHours(-24);
+
+		var orders = await _context.Orders
+			.Where(o => o.Table.TableCode == tableCode && o.CreatedAt >= since)
+			.Include(o => o.OrderStatusLv)
+			.Include(o => o.Table)
+			.Include(o => o.OrderItems)
+				.ThenInclude(oi => oi.Dish)
+			.Include(o => o.OrderItems)
+				.ThenInclude(oi => oi.ItemStatusLv)
+			.OrderBy(o => o.CreatedAt)
+			.ToListAsync(cancellationToken);
+
+		// Assign round numbers (oldest = round 1), then reverse for display (newest first)
+		var rounds = orders
+			.Select((o, index) => new CustomerOrderRoundDTO
+			{
+				OrderId = o.OrderId,
+				RoundNumber = index + 1,
+				CreatedAt = o.CreatedAt,
+				OrderStatus = o.OrderStatusLv.ValueName,
+				TotalAmount = o.TotalAmount,
+				Items = o.OrderItems.Select(oi => new OrderItemDTO
+				{
+					OrderItemId = oi.OrderItemId,
+					DishId      = oi.DishId,
+					DishName    = oi.Dish.DishName,
+					Quantity    = oi.Quantity,
+					Price       = oi.Price,
+					ItemStatus  = oi.ItemStatusLv.ValueName,
+					RejectReason = oi.RejectReason,
+					Note        = oi.Note
+				}).ToList()
+			})
+			.OrderByDescending(r => r.RoundNumber) // newest round first
+			.ToList();
+
+		var totalItems     = rounds.SelectMany(r => r.Items).Sum(i => i.Quantity);
+		var estimatedTotal = rounds.SelectMany(r => r.Items).Sum(i => i.Price * i.Quantity);
+
+		return new CustomerOrderHistoryDTO
+		{
+			TableCode      = tableCode,
+			TotalItems     = totalItems,
+			EstimatedTotal = estimatedTotal,
+			Rounds         = rounds
+		};
+	}
+
+    public async Task AddAsync(Order order, CancellationToken ct)
+    {
+        await _context.Orders.AddAsync(order, ct);
+        await _context.SaveChangesAsync(ct);
+    }
+
+    public async Task<OrderHistoryDTO> GetOrderByIdAsync(
+    long orderId,
+    CancellationToken cancellationToken = default)
+    {
+        var order = await _context.Orders
+            .AsNoTracking()
+            .Where(o => o.OrderId == orderId)
+            .Select(o => new OrderHistoryDTO
+            {
+                OrderId = o.OrderId,
+                TableId = o.TableId,
+                TableCode = o.Table != null ? o.Table.TableCode : "",
+
+                StaffId = o.StaffId,
+                StaffName = o.Staff.FullName,
+
+                CustomerId = o.CustomerId,
+                CustomerName = o.Customer != null ? o.Customer.FullName : null,
+
+                TotalAmount = o.TotalAmount,
+                TipAmount = o.TipAmount,
+
+                OrderStatus = o.OrderStatusLv.ValueName,
+                Source = o.SourceLv.ValueName,
+
+                CreatedAt = o.CreatedAt,
+                UpdatedAt = o.UpdatedAt,
+
+                IsPaid = o.Payments.Any(),
+
+                OrderItems = o.OrderItems
+                    .Select(oi => new OrderItemDTO
+                    {
+                        OrderItemId = oi.OrderItemId,
+                        DishId = oi.DishId,
+                        DishName = oi.Dish.DishName,
+                        Quantity = oi.Quantity,
+                        Price = oi.Price,
+                        ItemStatus = oi.ItemStatusLv.ValueName,
+                        RejectReason = oi.RejectReason,
+                        Note = oi.Note
+                    })
+                    .ToList()
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (order == null)
+            throw new NotFoundException($"Order with id {orderId} was not found.");
+
+        return order;
+    }
+
+    public async Task<Order?> GetByIdForUpdateAsync(long orderId, CancellationToken ct)
+    {
+        return await _context.Orders
+        .Include(x => x.OrderStatusLv)
+        .Include(x => x.Payments)
+        .Include(x => x.OrderItems)
+        .FirstOrDefaultAsync(x => x.OrderId == orderId, ct);
+    }
+
 }

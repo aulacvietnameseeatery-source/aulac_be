@@ -40,5 +40,20 @@ namespace API.Controllers
                 ServerTime = DateTimeOffset.UtcNow
             });
         }
+
+        [HttpGet("select")]
+        public async Task<IActionResult> GetTablesForSelect(CancellationToken ct)
+        {
+            var result = await _tableService.GetTablesForSelectAsync(ct);
+
+            return Ok(new ApiResponse<List<TableSelectDto>>
+            {
+                Success = true,
+                Code = 200,
+                UserMessage = $"Get All Table For Create Order",
+                Data = result,
+                ServerTime = DateTimeOffset.UtcNow
+            });
+        }
     }
 }

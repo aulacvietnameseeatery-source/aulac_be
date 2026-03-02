@@ -1,5 +1,6 @@
 using Core.DTO.General;
 using Core.DTO.Order;
+using Core.Entity;
 
 namespace Core.Interface.Repo;
 
@@ -30,5 +31,29 @@ public interface IOrderRepository
 		uint completedOrderStatusId,
 		uint cancelledOrderStatusId,
 		CancellationToken cancellationToken = default);
+
+
+	/// <summary>Persists a new order together with its items. Returns the generated order_id.</summary>
+	Task<long> CreateOrderAsync(Order order, List<OrderItem> items, CancellationToken cancellationToken = default);
+
+	/// <summary>
+	/// Returns all orders (grouped as rounds) placed at a given table today.
+	/// Used by the public customer-facing history endpoint – no authentication required.
+	/// </summary>
+	Task<CustomerOrderHistoryDTO> GetCustomerOrderHistoryAsync(string tableCode, CancellationToken cancellationToken = default);
+
+	/// <summary>
+	/// Appends new items to an existing order and updates its total amount.
+	/// </summary>
+	Task AddItemsToOrderAsync(long orderId, List<OrderItem> items, CancellationToken cancellationToken = default);
+
+	/// <summary>
+	/// Returns history for a single specific order (used by customer history panel).
+	/// </summary>
+	Task<CustomerOrderHistoryDTO> GetCustomerOrderByIdAsync(long orderId, CancellationToken cancellationToken = default);
+
+    Task AddAsync(Order order, CancellationToken ct);
+    Task<OrderHistoryDTO> GetOrderByIdAsync(long orderId, CancellationToken cancellationToken = default);
+    Task<Order?> GetByIdForUpdateAsync(long orderId, CancellationToken ct);
 
 }
