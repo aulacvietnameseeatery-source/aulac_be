@@ -34,17 +34,7 @@ public interface IPublicReservationService
         CancellationToken ct = default);
 
     /// <summary>
-    /// Creates a soft lock on a table for 10 minutes.
-    /// </summary>
-    /// <param name="request">Lock request details</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>Lock token and expiry information</returns>
-    Task<ReservationLockResponseDto> LockTableAsync(
-        CreateReservationLockRequest request,
-        CancellationToken ct = default);
-
-    /// <summary>
-    /// Submits a final reservation using a valid lock token.
+    /// Submits a final reservation.
     /// </summary>
     /// <param name="request">Reservation details with lock token</param>
     /// <param name="ct">Cancellation token</param>
@@ -54,9 +44,9 @@ public interface IPublicReservationService
         CancellationToken ct = default);
 
     /// <summary>
-    /// Submits a final reservation using a valid lock token.
+    /// Submits a final reservation.
     /// </summary>
-    /// <param name="request">Reservation details with lock token</param>
+    /// <param name="request">Reservation details</param>
     /// <param name="ct">Cancellation token</param>
     /// <returns>Confirmed reservation details</returns>
     Task<ReservationResponseDto> CreateManualReservationAsync(

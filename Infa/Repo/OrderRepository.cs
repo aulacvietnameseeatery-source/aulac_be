@@ -103,7 +103,12 @@ public class OrderRepository : IOrderRepository
 			PageSize = pageSize
 		};
 	}
-	public async Task<OrderStatusCountDTO> GetOrderStatusCountAsync(CancellationToken cancellationToken = default)
+	public async Task<OrderStatusCountDTO> GetOrderStatusCountAsync(
+		uint pendingStatusId,
+		uint inProgressStatusId,
+		uint completedStatusId,
+		uint cancelledStatusId,
+		CancellationToken cancellationToken = default)
 	{
 		// Single query: group by statusLvId and count
 		var counts = await _context.Orders
@@ -113,15 +118,10 @@ public class OrderRepository : IOrderRepository
 
 		var dict = counts.ToDictionary(c => c.StatusLvId, c => c.Count);
 
-		const uint pendingId    = 28;
-		const uint inProgressId = 29;
-		const uint completedId  = 30;
-		const uint cancelledId  = 31;
-
-		int pending    = dict.GetValueOrDefault(pendingId,    0);
-		int inProgress = dict.GetValueOrDefault(inProgressId, 0);
-		int completed  = dict.GetValueOrDefault(completedId,  0);
-		int cancelled  = dict.GetValueOrDefault(cancelledId,  0);
+		int pending    = dict.GetValueOrDefault(pendingStatusId,    0);
+		int inProgress = dict.GetValueOrDefault(inProgressStatusId, 0);
+		int completed  = dict.GetValueOrDefault(completedStatusId,  0);
+		int cancelled  = dict.GetValueOrDefault(cancelledStatusId,  0);
 
 		return new OrderStatusCountDTO
 		{
@@ -133,11 +133,11 @@ public class OrderRepository : IOrderRepository
 		};
 	}
 
-	public async Task<List<KitchenOrderDTO>> GetKitchenOrdersAsync(CancellationToken cancellationToken = default)
+	public async Task<List<KitchenOrderDTO>> GetKitchenOrdersAsync(
+		uint pendingStatusId,
+		uint inProgressStatusId,
+		CancellationToken cancellationToken = default)
 	{
-		const uint pendingId    = 28;
-		const uint inProgressId = 29;
-
 		var orders = await _context.Orders
 			.Include(o => o.OrderStatusLv)
 			.Include(o => o.Table)
@@ -145,7 +145,7 @@ public class OrderRepository : IOrderRepository
 				.ThenInclude(oi => oi.Dish)
 			.Include(o => o.OrderItems)
 				.ThenInclude(oi => oi.ItemStatusLv)
-			.Where(o => o.OrderStatusLvId == pendingId || o.OrderStatusLvId == inProgressId)
+			.Where(o => o.OrderStatusLvId == pendingStatusId || o.OrderStatusLvId == inProgressStatusId)
 			.OrderBy(o => o.CreatedAt)
 			.Select(o => new KitchenOrderDTO
 			{
@@ -168,7 +168,18 @@ public class OrderRepository : IOrderRepository
 		return orders;
 	}
 
-	public async Task UpdateOrderItemStatusAsync(long orderItemId, uint newStatusLvId, string? rejectReason, CancellationToken cancellationToken = default)
+	public async Task UpdateOrderItemStatusAsync(
+		long orderItemId,
+		uint newStatusLvId,
+		string? rejectReason,
+		uint inProgressItemStatusId,
+		uint servedItemStatusId,
+		uint rejectedItemStatusId,
+		uint pendingOrderStatusId,
+		uint inProgressOrderStatusId,
+		uint completedOrderStatusId,
+		uint cancelledOrderStatusId,
+		CancellationToken cancellationToken = default)
 	{
 		var item = await _context.OrderItems
 			.FirstOrDefaultAsync(oi => oi.OrderItemId == orderItemId, cancellationToken)
@@ -180,14 +191,6 @@ public class OrderRepository : IOrderRepository
 		await _context.SaveChangesAsync(cancellationToken);
 
 		// ─── Auto-update Order Status based on Items ──────────────────────
-		const uint inProgressItemLvId = 36;
-		const uint servedItemLvId     = 38;
-		const uint rejectedItemLvId   = 39;
-
-		const uint pendingOrderLvId    = 28;
-		const uint inProgressOrderLvId = 29;
-		const uint completedOrderLvId  = 30;
-		const uint cancelledOrderLvId  = 31;
 
 		var order = await _context.Orders
 			.FirstOrDefaultAsync(o => o.OrderId == item.OrderId, cancellationToken);
@@ -197,9 +200,9 @@ public class OrderRepository : IOrderRepository
 			bool orderStatusChanged = false;
 
 			// 1. Move from PENDING to IN_PROGRESS if an item starts
-			if (newStatusLvId == inProgressItemLvId && order.OrderStatusLvId == pendingOrderLvId)
+			if (newStatusLvId == inProgressItemStatusId && order.OrderStatusLvId == pendingOrderStatusId)
 			{
-				order.OrderStatusLvId = inProgressOrderLvId;
+				order.OrderStatusLvId = inProgressOrderStatusId;
 				orderStatusChanged = true;
 			}
 
@@ -209,12 +212,12 @@ public class OrderRepository : IOrderRepository
 				.Select(oi => oi.ItemStatusLvId)
 				.ToListAsync(cancellationToken);
 
-			bool allFinished = allItems.All(lvId => lvId == servedItemLvId || lvId == rejectedItemLvId);
+			bool allFinished = allItems.All(lvId => lvId == servedItemStatusId || lvId == rejectedItemStatusId);
 
 			if (allFinished)
 			{
-				bool hasServed = allItems.Any(lvId => lvId == servedItemLvId);
-				uint targetStatusId = hasServed ? completedOrderLvId : cancelledOrderLvId;
+				bool hasServed = allItems.Any(lvId => lvId == servedItemStatusId);
+				uint targetStatusId = hasServed ? completedOrderStatusId : cancelledOrderStatusId;
 
 				if (order.OrderStatusLvId != targetStatusId)
 				{
