@@ -1,4 +1,5 @@
-﻿using Core.DTO.LookUpValue;
+﻿using Core.DTO.General;
+using Core.DTO.LookUpValue;
 using Core.DTO.Table;
 using Core.Enum;
 using Core.Exceptions;
@@ -291,8 +292,8 @@ public class TableService : ITableService
 
         if (AllowedTransitions.TryGetValue(currentCode, out var allowed) && !allowed.Contains(newCode))
         {
-            throw new UnprocessableEntityException($"Invalid status transition: {currentCode} → {newCode}. " 
-                +$"Allowed from {currentCode}: {string.Join(", ", allowed)}");
+            throw new UnprocessableEntityException($"Invalid status transition: {currentCode} → {newCode}. "
+                + $"Allowed from {currentCode}: {string.Join(", ", allowed)}");
         }
 
         table.TableStatusLvId = request.StatusLvId;
@@ -381,29 +382,35 @@ public class TableService : ITableService
         _ = await _tableRepository.GetByIdAsync(tableId, ct)
           ?? throw new NotFoundException("Table not found");
 
-        if (files.Count > 5)
-            throw new ValidationException("Maximum 5 files allowed per upload");
+        // Convert to FileUploadRequest and let IFileStorage handle all validation
+        var uploadRequests = files.Select(f => new FileUploadRequest
+        {
+            Stream = f.Stream,
+            FileName = f.FileName,
+            ContentType = f.ContentType
+        }).ToList();
+
+        // SaveManyAsync validates batch count, file size, MIME type, extension — then saves all
+        var uploadResults = await _fileStorage.SaveManyAsync(
+   uploadRequests,
+            "table-media",
+            FileValidationOptions.ImageUpload,
+        ct);
 
         var imageTypeLvId = await _lookupResolver.GetIdAsync(
-             (ushort)LookupType.MediaType, nameof(MediaTypeCode.IMAGE), ct);
+      (ushort)LookupType.MediaType, nameof(MediaTypeCode.IMAGE), ct);
 
-        var result = new List<TableMediaDto>(files.Count);
+        var result = new List<TableMediaDto>(uploadResults.Count);
 
         await _unitOfWork.BeginTransactionAsync(ct);
         try
         {
-            foreach (var file in files)
+            foreach (var uploaded in uploadResults)
             {
-                if (file.Stream.Length > 5 * 1024 * 1024)
-                    throw new ValidationException($"File '{file.FileName}' exceeds the 5 MB size limit");
-
-                var relativePath = await _fileStorage.SaveAsync(
-               file.Stream, $"{Guid.NewGuid():N}_{file.FileName}", "table-media", ct);
-
                 var asset = await _mediaRepository.AddMediaAsync(new Entity.MediaAsset
                 {
-                    Url = relativePath,
-                    MimeType = file.ContentType,
+                    Url = uploaded.PublicUrl,
+                    MimeType = files.First(f => f.FileName == uploaded.OriginalFileName).ContentType,
                     MediaTypeLvId = imageTypeLvId,
                     CreatedAt = DateTime.UtcNow
                 }, ct);
@@ -418,7 +425,7 @@ public class TableService : ITableService
                 result.Add(new TableMediaDto
                 {
                     MediaId = asset.MediaId,
-                    Url = relativePath,
+                    Url = uploaded.PublicUrl,
                     IsPrimary = false
                 });
             }
@@ -429,6 +436,8 @@ public class TableService : ITableService
         catch
         {
             await _unitOfWork.RollbackAsync(ct);
+            // Clean up already-saved files since DB transaction failed
+            await _fileStorage.DeleteManyAsync(uploadResults.Select(r => r.RelativePath));
             throw;
         }
 
@@ -439,17 +448,19 @@ public class TableService : ITableService
     public async Task DeleteTableMediaAsync(long tableId, long mediaId, CancellationToken ct = default)
     {
         _ = await _tableRepository.GetByIdAsync(tableId, ct)
-                    ?? throw new NotFoundException("Table not found");
+                ?? throw new NotFoundException("Table not found");
 
         var link = await _tableRepository.GetTableMediaAsync(tableId, mediaId, ct)
-                   ?? throw new NotFoundException("Media not found for this table");
+                ?? throw new NotFoundException("Media not found for this table");
+
+        var fileUrl = link.Media.Url;
 
         _tableRepository.RemoveTableMedia(link);
         await _mediaRepository.RemoveMediaAsync(link.Media, ct);
         await _unitOfWork.SaveChangesAsync(ct);
 
-        // Best-effort: orphaned files can be swept up by a cleanup job if this throws
-        try { await _fileStorage.DeleteAsync(link.Media.Url); } catch { /* ignored */ }
+        // Best-effort file cleanup — orphaned files can be swept by a cleanup job
+        try { await _fileStorage.DeleteAsync(fileUrl); } catch { /* ignored */ }
     }
 
     #endregion
