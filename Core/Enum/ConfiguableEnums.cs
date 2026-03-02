@@ -30,7 +30,10 @@ public enum TableTypeCode
     NORMAL,
     VIP,
     OUTDOOR,
-    BOOTH
+    BOOTH,
+    REGULAR,
+    BAR,
+    HIGH_TOP
 }
 
 public enum SeverityCode

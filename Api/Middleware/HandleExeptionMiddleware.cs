@@ -200,6 +200,7 @@ namespace API.Middleware
                 "CONFLICT" => 409,
                 "FORBIDDEN" => 403,
                 "VALIDATION_ERROR" => 400,
+                "UNPROCESSABLE_ENTITY" => 422,
                 _ => 400
             };
         }

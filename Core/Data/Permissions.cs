@@ -49,5 +49,15 @@ namespace Core.Data
         public const string ViewOrder = "ORDER:READ";
         public const string UpdateOrderItemStatus = "ORDER:UPDATE_ITEM_STATUS";
         public const string ProcessPayment = "ORDER:PROCESS_PAYMENT";
+
+        //Table
+        public const string ViewTable = "TABLE:READ";
+        public const string CreateTable = "TABLE:CREATE";
+        public const string UpdateTable = "TABLE:EDIT";
+        public const string DeleteTable = "TABLE:DELETE";
+        public const string UpdateTableStatus = "TABLE:UPDATE_STATUS";
+        public const string ManageTableZone = "TABLE:MANAGE_ZONE";
+        public const string ManageTableType = "TABLE:MANAGE_TYPE";
+        public const string ManageTableMedia = "TABLE:MANAGE_MEDIA";
     }
 }

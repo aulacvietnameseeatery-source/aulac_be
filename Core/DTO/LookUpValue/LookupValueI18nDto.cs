@@ -13,6 +13,7 @@ namespace Core.DTO.LookUpValue
         public short SortOrder { get; set; }
 
         public LookupValueTranslationDto I18n { get; set; } = new();
+        public LookupValueTranslationDto? DescriptionI18n { get; set; }
     }
 
     public class LookupValueTranslationDto

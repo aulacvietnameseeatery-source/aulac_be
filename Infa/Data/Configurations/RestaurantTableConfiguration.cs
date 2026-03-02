@@ -12,6 +12,9 @@ public sealed class RestaurantTableConfiguration : IEntityTypeConfiguration<Rest
 
         entity.ToTable("restaurant_table");
 
+        // Global soft-delete filter
+        entity.HasQueryFilter(e => !e.IsDeleted);
+
         entity.HasIndex(e => e.TableQrImg, "FK_restaurant_table_table_qr_img");
 
         entity.HasIndex(e => e.TableStatusLvId, "idx_restaurant_table_status_lv");
@@ -51,6 +54,11 @@ public sealed class RestaurantTableConfiguration : IEntityTypeConfiguration<Rest
 
         entity.Property(e => e.UpdatedByStaffId)
         .HasColumnName("updated_by_staff_id");
+
+        entity.Property(e => e.IsDeleted)
+        .IsRequired()
+        .HasDefaultValue(false)
+        .HasColumnName("is_deleted");
 
         entity.HasOne(d => d.UpdatedByStaff)
         .WithMany()

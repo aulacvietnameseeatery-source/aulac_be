@@ -63,3 +63,15 @@ public class ValidationException : BusinessException
     {
     }
 }
+
+/// <summary>
+/// Exception thrown when a business rule prevents processing (e.g. invalid state transition).
+/// Maps to HTTP 422 Unprocessable Entity.
+/// </summary>
+public class UnprocessableEntityException : BusinessException
+{
+    public UnprocessableEntityException(string message)
+        : base("UNPROCESSABLE_ENTITY", message, 422)
+    {
+    }
+}
