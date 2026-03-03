@@ -8,6 +8,14 @@ namespace Core.Interface.Service.Others
 {
     public interface ICacheService
     {
+        /// <summary>
+        /// Indicates whether this cache implementation actually stores data.
+        /// Returns <c>false</c> for no-op implementations (e.g. <c>NoCacheService</c>),
+        /// allowing callers to fall back to direct database access instead of
+        /// relying on cache read-back after a write.
+        /// </summary>
+        bool IsAvailable { get; }
+
         // key-value (string/json)
         Task SetAsync<T>(string key, T value, TimeSpan? ttl = null, CancellationToken ct = default);
         Task<T?> GetAsync<T>(string key, CancellationToken ct = default);

@@ -9,6 +9,9 @@ namespace Infa.Others;
 /// </summary>
 public sealed class NoCacheService : ICacheService
 {
+    /// <inheritdoc />
+    public bool IsAvailable => false;
+
     public Task SetAsync<T>(string key, T value, TimeSpan? ttl = null, CancellationToken ct = default)
     {
         // Do nothing - no caching
