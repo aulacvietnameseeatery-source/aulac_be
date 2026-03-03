@@ -20,6 +20,9 @@ namespace Infa.Others
         public RedisCacheService(IConnectionMultiplexer mux)
             => _db = mux.GetDatabase();
 
+        /// <inheritdoc />
+        public bool IsAvailable => true;
+
         public async Task SetAsync<T>(string key, T value, TimeSpan? ttl = null, CancellationToken ct = default)
         {
             var payload = JsonSerializer.Serialize(value, JsonOpt);

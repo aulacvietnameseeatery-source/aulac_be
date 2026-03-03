@@ -29,6 +29,8 @@ public partial class RestaurantTable
 
     public long? UpdatedByStaffId { get; set; }
 
+    public bool IsDeleted { get; set; }
+
     public virtual ICollection<Order> Orders { get; set; } = new List<Order>();
 
     public virtual ICollection<ServiceError> ServiceErrors { get; set; } = new List<ServiceError>();

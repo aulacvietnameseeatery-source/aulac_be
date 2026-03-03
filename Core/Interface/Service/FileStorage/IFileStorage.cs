@@ -1,35 +1,83 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using Core.DTO.General;
 
-namespace Core.Interface.Service.FileStorage
+namespace Core.Interface.Service.FileStorage;
+
+/// <summary>
+/// Abstraction for file storage operations with built-in validation.
+/// Implementations handle physical storage (local disk, blob, S3, etc.).
+/// </summary>
+public interface IFileStorage
 {
-    public interface IFileStorage
-    {
-        /// <summary>
-        /// Asynchronously saves a file stream to the specified folder with the given file name.
-        /// Returns the relative path of the saved file.
-        /// </summary>
-        /// <param name="fileStream">The stream containing the file data to save.</param>
-        /// <param name="fileName">The name to assign to the saved file.</param>
-        /// <param name="folder">The folder where the file should be saved.</param>
-        /// <param name="ct">A cancellation token to observe while waiting for the task to complete.</param>
-        /// <returns>A task that represents the asynchronous save operation. The task result contains the relative path of the saved file.</returns>
-        Task<string> SaveAsync(
-            Stream fileStream,
-            string fileName,
-            string folder,
-            CancellationToken ct
-        );
+    // ── Single file operations ────────────────────────────────────────
 
-        /// <summary>
-        /// Asynchronously deletes a file at the specified relative path.
-        /// </summary>
-        /// <param name="relativePath">The relative path of the file to delete.</param>
-        /// <returns>A task that represents the asynchronous delete operation.</returns>
-        Task DeleteAsync(string relativePath);
-    }
+    /// <summary>
+    /// Validates, saves a single file, and returns the result with both relative and public paths.
+    /// </summary>
+    /// <param name="file">The file to upload.</param>
+    /// <param name="folder">Target sub-folder (e.g. "dishes", "table-media").</param>
+    /// <param name="validation">Per-call validation overrides. Null = use global defaults.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Upload result containing relative path and public URL.</returns>
+    /// <exception cref="Core.Exceptions.ValidationException">
+    /// Thrown when the file fails validation (size, type, extension).
+    /// </exception>
+    Task<FileUploadResult> SaveAsync(
+        FileUploadRequest file,
+      string folder,
+        FileValidationOptions? validation = null,
+ CancellationToken ct = default);
 
+    // ── Batch operations ──────────────────────────────────────────────
+
+    /// <summary>
+    /// Validates and saves multiple files. Validates batch count first, then each file individually.
+    /// If any file fails, previously saved files in this batch are cleaned up.
+    /// </summary>
+    /// <param name="files">The files to upload.</param>
+    /// <param name="folder">Target sub-folder.</param>
+    /// <param name="validation">Per-call validation overrides. Null = use global defaults.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>List of upload results for all saved files.</returns>
+    Task<List<FileUploadResult>> SaveManyAsync(
+        IReadOnlyList<FileUploadRequest> files,
+     string folder,
+        FileValidationOptions? validation = null,
+     CancellationToken ct = default);
+
+    // ── Delete operations ─────────────────────────────────────────────
+
+    /// <summary>
+    /// Deletes a file by its relative path. No-op if the file does not exist.
+    /// </summary>
+    /// <param name="relativePath">Relative path as returned by <see cref="SaveAsync"/>.</param>
+    Task DeleteAsync(string relativePath);
+
+    /// <summary>
+    /// Best-effort deletion of multiple files. Logs but does not throw on individual failures.
+    /// Useful for cleanup after transaction rollback.
+    /// </summary>
+    /// <param name="relativePaths">Relative paths to delete.</param>
+    Task DeleteManyAsync(IEnumerable<string> relativePaths);
+
+    // ── Utility ───────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Checks whether a file exists at the given relative path.
+    /// </summary>
+    bool Exists(string relativePath);
+
+    /// <summary>
+    /// Builds the public URL for a given relative storage path.
+    /// E.g. "table-media/abc.jpg" → "/uploads/table-media/abc.jpg".
+    /// </summary>
+    string GetPublicUrl(string relativePath);
+
+    // ── Legacy compatibility ──────────────────────────────────────────
+
+    /// <summary>
+    /// Low-level save without validation. Prefer <see cref="SaveAsync(FileUploadRequest, string, FileValidationOptions?, CancellationToken)"/>.
+    /// Kept for backward compatibility with existing callers.
+    /// </summary>
+    [Obsolete("Use SaveAsync(FileUploadRequest, ...) with built-in validation instead.")]
+    Task<string> SaveAsync(Stream fileStream, string fileName, string folder, CancellationToken ct);
 }

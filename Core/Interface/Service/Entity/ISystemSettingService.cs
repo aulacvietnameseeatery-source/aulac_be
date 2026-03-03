@@ -7,7 +7,7 @@ namespace Core.Interface.Service.Entity;
 public interface ISystemSettingService
 {
     /// <summary>
-  /// Retrieves a string value from system settings.
+    /// Retrieves a string value from system settings.
     /// </summary>
     /// <param name="key">The setting key</param>
     /// <param name="defaultValue">Default value if setting not found</param>
@@ -19,11 +19,11 @@ public interface ISystemSettingService
         CancellationToken cancellationToken = default);
 
     /// <summary>
-  /// Retrieves an integer value from system settings.
+    /// Retrieves an integer value from system settings.
     /// </summary>
     /// <param name="key">The setting key</param>
     /// <param name="defaultValue">Default value if setting not found</param>
-  /// <param name="cancellationToken">Cancellation token</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The setting value or default value</returns>
     Task<long?> GetIntAsync(
         string key,
@@ -89,8 +89,8 @@ public interface ISystemSettingService
     /// </summary>
     /// <param name="key">The setting key</param>
     /// <param name="value">The value to set</param>
-  /// <param name="description">Optional description of the setting</param>
-  /// <param name="isSensitive">Whether the setting contains sensitive data</param>
+    /// <param name="description">Optional description of the setting</param>
+    /// <param name="isSensitive">Whether the setting contains sensitive data</param>
     /// <param name="updatedBy">The user ID who updated the setting</param>
     /// <param name="cancellationToken">Cancellation token</param>
     Task SetIntAsync(
@@ -175,8 +175,8 @@ CancellationToken cancellationToken = default);
     /// <summary>
     /// Clears the cache for a specific setting key.
     /// Should be called after updating a setting to ensure fresh data.
-/// </summary>
- /// <param name="key">The setting key</param>
+    /// </summary>
+    /// <param name="key">The setting key</param>
     Task ClearCacheAsync(string key);
 
     /// <summary>

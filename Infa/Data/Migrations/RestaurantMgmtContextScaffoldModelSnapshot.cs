@@ -752,7 +752,7 @@ namespace Infa.Data.Migrations
                     b.Property<bool>("IsConfigurable")
                         .HasColumnType("tinyint(1)")
                         .HasColumnName("is_configurable")
-                        .HasComment("1 = admin can add/remove values, 0 = controlled enum (statuses, workflows)");
+                        .HasComment("1 = admin can add/remove values,0 = controlled enum (statuses, workflows)");
 
                     b.Property<bool?>("IsSystem")
                         .IsRequired()
@@ -760,7 +760,7 @@ namespace Infa.Data.Migrations
                         .HasColumnType("tinyint(1)")
                         .HasColumnName("is_system")
                         .HasDefaultValueSql("'1'")
-                        .HasComment("1 = system-defined enum type, 0 = user-defined/custom type");
+                        .HasComment("1 = system-defined enum type,0 = user-defined/custom type");
 
                     b.Property<string>("TypeCode")
                         .IsRequired()
@@ -826,7 +826,7 @@ namespace Infa.Data.Migrations
                         .HasColumnType("tinyint(1)")
                         .HasColumnName("is_system")
                         .HasDefaultValueSql("'1'")
-                        .HasComment("1 = system/seeded value, 0 = user-added value");
+                        .HasComment("1 = system/seeded value,0 = user-added value");
 
                     b.Property<bool?>("Locked")
                         .IsRequired()
@@ -968,7 +968,7 @@ namespace Infa.Data.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("staff_id");
 
-                    b.Property<long>("TableId")
+                    b.Property<long?>("TableId")
                         .HasColumnType("bigint")
                         .HasColumnName("table_id");
 
@@ -1022,11 +1022,14 @@ namespace Infa.Data.Migrations
                         .HasColumnType("tinyint unsigned")
                         .HasColumnName("item_status")
                         .HasDefaultValueSql("'1'")
-                        .HasComment("OrderItemStatus: 1=CREATED,2=IN_PROGRESS,3=READY,4=SERVED,5=REJECTED");
+                        .HasComment("OrderItemStatus:1=CREATED,2=IN_PROGRESS,3=READY,4=SERVED,5=REJECTED");
 
                     b.Property<uint>("ItemStatusLvId")
                         .HasColumnType("int unsigned")
                         .HasColumnName("item_status_lv_id");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("longtext");
 
                     b.Property<long>("OrderId")
                         .HasColumnType("bigint")
@@ -1446,6 +1449,12 @@ namespace Infa.Data.Migrations
                         .HasColumnType("datetime")
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_deleted");
 
                     b.Property<bool?>("IsOnline")
                         .IsRequired()
@@ -2294,7 +2303,6 @@ namespace Infa.Data.Migrations
                     b.HasOne("Core.Entity.RestaurantTable", "Table")
                         .WithMany("Orders")
                         .HasForeignKey("TableId")
-                        .IsRequired()
                         .HasConstraintName("orders_ibfk_1");
 
                     b.Navigation("Customer");

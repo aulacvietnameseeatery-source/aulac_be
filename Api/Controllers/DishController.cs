@@ -9,6 +9,7 @@ using Core.Interface.Service.Entity;
 using Core.Interface.Service.LookUp;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Net;
 using System.Text.Json;
 
 namespace Api.Controllers;
@@ -393,6 +394,20 @@ public class DishController : ControllerBase
             Success = true,
             Code = 200,
             UserMessage = $"Get Active Dish Diets",
+            Data = result,
+            ServerTime = DateTimeOffset.UtcNow
+        });
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> GetDishes([FromQuery] bool active = true)
+    {
+        var result = await _dishService.GetPosDishesAsync(active);
+        return Ok(new ApiResponse<List<DishPosResponseDto>>
+        {
+            Success = true,
+            Code = 200,
+            UserMessage = $"Get List Dish For Pos",
             Data = result,
             ServerTime = DateTimeOffset.UtcNow
         });

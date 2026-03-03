@@ -3,9 +3,9 @@ namespace Core.DTO.Order;
 public class OrderHistoryDTO
 {
 	public long OrderId { get; set; }
-	public long TableId { get; set; }
+	public long? TableId { get; set; }
 	public string TableCode { get; set; } = "";
-	public long StaffId { get; set; }
+	public long? StaffId { get; set; }
 	public string StaffName { get; set; } = "";
 	public long CustomerId { get; set; }
 	public string? CustomerName { get; set; }

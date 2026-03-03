@@ -1,4 +1,4 @@
-﻿using Core.DTO.Reservation;
+using Core.DTO.Reservation;
 using Core.Entity;
 
 namespace Core.Interface.Repo;
@@ -34,9 +34,11 @@ public interface IReservationRepository
     /// <param name="ct">Cancellation token</param>
     /// <returns>List of conflicting reservations</returns>
     Task<List<Reservation>> GetTableReservationsForTimeAsync(
-        long tableId, 
-        DateTime reservedTime, 
-        int durationMinutes = 120,
+		long tableId,
+		DateTime reservedTime,
+		int durationMinutes,
+		uint cancelledStatusId,
+		uint noShowStatusId,
         CancellationToken ct = default);
 
     /// <summary>
