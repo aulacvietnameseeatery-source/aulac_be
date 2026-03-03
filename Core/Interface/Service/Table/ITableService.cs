@@ -89,6 +89,11 @@ namespace Core.Interface.Service.Table
         /// Soft-deletes a table type lookup value. Returns 409 if in use.
         /// </summary>
         Task DeleteTableTypeAsync(uint valueId, CancellationToken ct = default);
+
+        /// <summary>
+        /// Marks a table as occupied by table code. Used by customers via QR code.
+        /// </summary>
+        Task OccupyTableByCodeAsync(string tableCode, CancellationToken ct = default);
     }
 
     /// <summary>

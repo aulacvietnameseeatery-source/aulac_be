@@ -403,9 +403,8 @@ public class OrderService : IOrderService
         // 7. Save to DB
         var orderId = await _orderRepository.CreateOrderAsync(order, orderItems, cancellationToken);
 
-        // 8. Mark the table as OCCUPIED so other customers cannot select it
-        var occupiedLvId = await TableStatusCode.OCCUPIED.ToTableStatusIdAsync(_lookupResolver, cancellationToken);
-        await _tableRepository.UpdateStatusAsync(table.TableId, occupiedLvId, cancellationToken);
+        // Note: Table status is now updated to OCCUPIED when customer starts dining,
+        // not when the first order is created
 
         return new CreateOrderResponseDTO
         {

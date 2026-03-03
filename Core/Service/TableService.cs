@@ -3,6 +3,7 @@ using Core.DTO.LookUpValue;
 using Core.DTO.Table;
 using Core.Enum;
 using Core.Exceptions;
+using Core.Extensions;
 using Core.Interface.Repo;
 using Core.Interface.Service.Entity;
 using Core.Interface.Service.FileStorage;
@@ -486,6 +487,20 @@ public class TableService : ITableService
     {
         if (!await _tableRepository.IsValidLookupAsync(lvId, typeId, ct))
             throw new ValidationException($"Invalid {label} (LvId={lvId})");
+    }
+
+    /// <inheritdoc />
+    public async Task OccupyTableByCodeAsync(string tableCode, CancellationToken ct = default)
+    {
+        // 1. Find table by code
+        var table = await _tableRepository.GetByCodeAsync(tableCode, ct)
+            ?? throw new NotFoundException($"Table '{tableCode}' not found");
+
+        // 2. Get OCCUPIED status lookup ID
+        var occupiedLvId = await TableStatusCode.OCCUPIED.ToTableStatusIdAsync(_lookupResolver, ct);
+
+        // 3. Update table status to OCCUPIED
+        await _tableRepository.UpdateStatusAsync(table.TableId, occupiedLvId, ct);
     }
 
     #endregion
