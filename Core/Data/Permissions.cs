@@ -31,9 +31,16 @@ namespace Core.Data
         public const string ViewDishCategory = "DISH_CATEGORY:READ";
         public const string CreateDishCategory = "DISH_CATEGORY:CREATE";
         public const string EditDishCategory = "DISH_CATEGORY:EDIT";
+		public const string DeleteDishCategory = "DISH_CATEGORY:DELETE";
 
-        //Role
-        public const string ViewRole = "ROLE:READ";
+		//Supplier
+		public const string ViewSupplier = "SUPPLIER:READ";
+		public const string CreateSupplier = "SUPPLIER:CREATE";
+		public const string EditSupplier = "SUPPLIER:EDIT";
+		public const string DeleteSupplier = "SUPPLIER:DELETE";
+
+		//Role
+		public const string ViewRole = "ROLE:READ";
         public const string CreateRole = "ROLE:CREATE";
         public const string UpdateRole = "ROLE:UPDATE";
         public const string DeleteRole = "ROLE:DELETE";
