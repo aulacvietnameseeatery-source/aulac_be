@@ -368,3 +368,4 @@ CarRental-BE/Properties/serviceDependencies.json
 /Api/appsettings.Production.Development.json
 Api/appsettings.json
 /Docs
+/Api/wwwroot/uploads

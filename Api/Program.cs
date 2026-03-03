@@ -43,6 +43,7 @@ builder.Services.Configure<HostOptions>(options =>
     options.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.Ignore;
 });
 
+
 #region Controllers + JSON + Model Validation Response
 
 builder.Services.AddControllers()
@@ -409,5 +410,7 @@ app.MapControllers();
 app.MapHub<ReservationHub>("/hubs/reservation");
 
 #endregion
+
+app.UseStaticFiles();
 
 app.Run();

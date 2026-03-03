@@ -39,7 +39,7 @@ public class TableService : ITableService
         ITableRepository tableRepository,
         IUnitOfWork unitOfWork,
         ILookupResolver lookupResolver,
-        ILookupService lookupService,
+     ILookupService lookupService,
         IFileStorage fileStorage,
         IMediaRepository mediaRepository)
     {
@@ -71,29 +71,29 @@ public class TableService : ITableService
         var now = DateTime.UtcNow;
 
         return tables.Select(t =>
-        {
-            var activeOrder = t.Orders.FirstOrDefault(o =>
-           o.OrderStatusLv.ValueCode != nameof(OrderStatusCode.CANCELLED) &&
-           o.OrderStatusLv.ValueCode != nameof(OrderStatusCode.COMPLETED));
+              {
+                  var activeOrder = t.Orders.FirstOrDefault(o =>
+                      o.OrderStatusLv.ValueCode != nameof(OrderStatusCode.CANCELLED) &&
+                      o.OrderStatusLv.ValueCode != nameof(OrderStatusCode.COMPLETED));
 
-            var upcomingReservation = t.Reservations
-                    .Where(r => r.ReservedTime > now)
-                .OrderBy(r => r.ReservedTime)
-                .FirstOrDefault();
+                  var upcomingReservation = t.Reservations
+                  .Where(r => r.ReservedTime > now)
+                  .OrderBy(r => r.ReservedTime)
+                  .FirstOrDefault();
 
-            return new TableSelectDto
-            {
-                TableId = t.TableId,
-                TableCode = t.TableCode,
-                Capacity = t.Capacity,
-                ZoneId = t.ZoneLvId,
-                ZoneName = t.ZoneLv.ValueName,
-                StatusCode = t.TableStatusLv.ValueCode,
-                HasActiveOrder = activeOrder is not null,
-                ActiveOrderId = activeOrder?.OrderId,
-                UpcomingReservationTime = upcomingReservation?.ReservedTime
-            };
-        }).ToList();
+                  return new TableSelectDto
+                  {
+                      TableId = t.TableId,
+                      TableCode = t.TableCode,
+                      Capacity = t.Capacity,
+                      ZoneId = t.ZoneLvId,
+                      ZoneName = t.ZoneLv.ValueName,
+                      StatusCode = t.TableStatusLv.ValueCode,
+                      HasActiveOrder = activeOrder is not null,
+                      ActiveOrderId = activeOrder?.OrderId,
+                      UpcomingReservationTime = upcomingReservation?.ReservedTime
+                  };
+              }).ToList();
     }
 
     #endregion
@@ -104,71 +104,15 @@ public class TableService : ITableService
     public async Task<TableDetailDto> GetTableByIdAsync(long id, CancellationToken ct = default)
     {
         var table = await _tableRepository.GetByIdWithDetailsAsync(id, ct)
-    ?? throw new NotFoundException("Table not found");
+                    ?? throw new NotFoundException("Table not found");
 
-        var now = DateTime.UtcNow;
-
-        return new TableDetailDto
-        {
-            // ── base fields ──
-            TableId = table.TableId,
-            TableCode = table.TableCode,
-            Capacity = table.Capacity,
-            IsOnline = table.IsOnline ?? false,
-
-            // ── status ──
-            StatusId = table.TableStatusLvId,
-            StatusCode = table.TableStatusLv?.ValueCode ?? "UNKNOWN",
-            StatusName = table.TableStatusLv?.ValueName ?? "Unknown",
-
-            // ── type ──
-            TypeId = table.TableTypeLvId,
-            TypeName = table.TableTypeLv?.ValueName ?? "Unknown",
-
-            // ── zone ──
-            ZoneId = table.ZoneLvId,
-            ZoneName = table.ZoneLv?.ValueName ?? "Unknown",
-
-            // ── QR ──
-            QrCodeUrl = table.QrToken,
-            QrCodeImageUrl = table.TableQrImgNavigation?.Url,
-
-            // ── media ──
-            Images = table.TableMedia
-            .OrderByDescending(tm => tm.IsPrimary ?? false)
-            .Select(tm => new TableMediaDto
-            {
-                MediaId = tm.MediaId,
-                Url = tm.Media.Url,
-                IsPrimary = tm.IsPrimary ?? false
-            }).ToList(),
-
-            // ── operational state ──
-            ActiveOrdersCount = table.Orders.Count(o =>
-                o.OrderStatusLv.ValueCode == nameof(OrderStatusCode.PENDING) ||
-                o.OrderStatusLv.ValueCode == nameof(OrderStatusCode.IN_PROGRESS)),
-            HasErrors = table.ServiceErrors.Any(se => se.IsResolved == false),
-
-            UpcomingReservations = table.Reservations
-            .Where(r => r.ReservedTime > now &&
-                (r.ReservationStatusLv.ValueCode == nameof(ReservationStatusCode.PENDING) ||
-                r.ReservationStatusLv.ValueCode == nameof(ReservationStatusCode.CONFIRMED)))
-            .OrderBy(r => r.ReservedTime)
-            .Take(5)
-            .Select(r => new UpcomingReservationDto
-            {
-                ReservationId = r.ReservationId,
-                GuestName = r.CustomerName,
-                Pax = r.PartySize,
-                ReservedTime = r.ReservedTime,
-                StatusCode = r.ReservationStatusLv.ValueCode
-            }).ToList()
-        };
+        return MapToDetailDto(table);
     }
 
     /// <inheritdoc />
-    public async Task<TableManagementDto> CreateTableAsync(CreateTableRequest request, CancellationToken ct = default)
+    public async Task<TableDetailDto> CreateTableAsync(CreateTableFormRequest request, CancellationToken ct = default)
     {
+        // ── Validate data fields ──
         if (string.IsNullOrWhiteSpace(request.TableCode))
             throw new ValidationException("Table code is required");
 
@@ -182,6 +126,7 @@ public class TableService : ITableService
         await ValidateLookupAsync(request.TypeLvId, (ushort)LookupType.TableType, "table type", ct);
         await ValidateLookupAsync(request.ZoneLvId, (ushort)LookupType.TableZone, "table zone", ct);
 
+        // ── Build and save entity ──
         var entity = new Entity.RestaurantTable
         {
             TableCode = request.TableCode.Trim(),
@@ -195,21 +140,40 @@ public class TableService : ITableService
             UpdatedAt = DateTime.UtcNow
         };
 
-        _tableRepository.Add(entity);
-        await _unitOfWork.SaveChangesAsync(ct);
+        var savedImagePaths = new List<string>();
 
-        var saved = await _tableRepository.GetByIdAsync(entity.TableId, ct)
-            ?? throw new NotFoundException("Table not found after creation");
+        await _unitOfWork.BeginTransactionAsync(ct);
+        try
+        {
+            _tableRepository.Add(entity);
+            await _unitOfWork.SaveChangesAsync(ct); // get entity.TableId
 
-        return MapToManagementDto(saved);
+            // ── Upload images if provided ──
+            if (request.Images.Count > 0)
+                await SaveTableImagesAsync(entity.TableId, request.Images, savedImagePaths, ct);
+
+            await _unitOfWork.CommitAsync(ct);
+        }
+        catch
+        {
+            await _unitOfWork.RollbackAsync(ct);
+            await _fileStorage.DeleteManyAsync(savedImagePaths);
+            throw;
+        }
+
+        var saved = await _tableRepository.GetByIdWithDetailsAsync(entity.TableId, ct)
+                    ?? throw new NotFoundException("Table not found after creation");
+
+        return MapToDetailDto(saved);
     }
 
     /// <inheritdoc />
-    public async Task<TableManagementDto> UpdateTableAsync(long id, UpdateTableRequest request, CancellationToken ct = default)
+    public async Task<TableDetailDto> UpdateTableAsync(long id, UpdateTableFormRequest request, CancellationToken ct = default)
     {
-        var table = await _tableRepository.GetByIdAsync(id, ct)
-            ?? throw new NotFoundException("Table not found");
+        var table = await _tableRepository.GetByIdWithDetailsAsync(id, ct)
+                    ?? throw new NotFoundException("Table not found");
 
+        // ── Update scalar fields ──
         if (request.TableCode is not null && request.TableCode != table.TableCode)
         {
             var trimmed = request.TableCode.Trim();
@@ -251,16 +215,57 @@ public class TableService : ITableService
         }
 
         table.UpdatedAt = DateTime.UtcNow;
-        await _unitOfWork.SaveChangesAsync(ct);
 
-        var updated = await _tableRepository.GetByIdAsync(id, ct)!;
-        return MapToManagementDto(updated!);
+        var savedImagePaths = new List<string>();
+        var pathsToDeleteAfterCommit = new List<string>();
+
+        await _unitOfWork.BeginTransactionAsync(ct);
+        try
+        {
+            // ── Remove requested images ──
+            var removedIds = request.ParsedRemovedImageIds;
+            if (removedIds.Count > 0)
+            {
+                foreach (var mediaId in removedIds)
+                {
+                    var link = await _tableRepository.GetTableMediaAsync(id, mediaId, ct);
+                    if (link is null) continue; // already gone — ignore
+
+                    pathsToDeleteAfterCommit.Add(link.Media.Url); // RelativePath for DeleteAsync
+                    _tableRepository.RemoveTableMedia(link);
+                    await _mediaRepository.RemoveMediaAsync(link.Media, ct);
+                }
+            }
+
+            await _unitOfWork.SaveChangesAsync(ct);
+
+            // ── Upload new images ──
+            if (request.Images.Count > 0)
+                await SaveTableImagesAsync(id, request.Images, savedImagePaths, ct);
+
+            await _unitOfWork.CommitAsync(ct);
+        }
+        catch
+        {
+            await _unitOfWork.RollbackAsync(ct);
+            await _fileStorage.DeleteManyAsync(savedImagePaths);
+            throw;
+        }
+
+        // Best-effort: delete old files AFTER successful commit
+        await _fileStorage.DeleteManyAsync(pathsToDeleteAfterCommit);
+
+        var updated = await _tableRepository.GetByIdWithDetailsAsync(id, ct)
+                      ?? throw new NotFoundException("Table not found after update");
+
+        return MapToDetailDto(updated);
     }
 
     /// <inheritdoc />
     public async Task DeleteTableAsync(long id, CancellationToken ct = default)
     {
-        var table = await _tableRepository.GetByIdAsync(id, ct) ?? throw new NotFoundException("Table not found");
+        var table = await _tableRepository.GetByIdAsync(id, ct)
+                    ?? throw new NotFoundException("Table not found");
 
         var activeOrders = await _tableRepository.CountActiveOrdersAsync(id, ct);
         var upcomingReservations = await _tableRepository.CountUpcomingReservationsAsync(id, ct);
@@ -270,7 +275,6 @@ public class TableService : ITableService
             var parts = new List<string>();
             if (activeOrders > 0) parts.Add($"{activeOrders} active order(s)");
             if (upcomingReservations > 0) parts.Add($"{upcomingReservations} upcoming reservation(s)");
-
             throw new ConflictException($"Cannot delete table '{table.TableCode}': {string.Join(" and ", parts)}");
         }
 
@@ -283,7 +287,7 @@ public class TableService : ITableService
     public async Task<TableManagementDto> UpdateStatusAsync(long id, UpdateTableStatusRequest request, CancellationToken ct = default)
     {
         var table = await _tableRepository.GetByIdAsync(id, ct)
-         ?? throw new NotFoundException("Table not found");
+                    ?? throw new NotFoundException("Table not found");
 
         await ValidateLookupAsync(request.StatusLvId, (ushort)LookupType.TableStatus, "table status", ct);
 
@@ -291,10 +295,8 @@ public class TableService : ITableService
         var newCode = await _tableRepository.GetLookupValueCodeAsync(request.StatusLvId, ct) ?? "UNKNOWN";
 
         if (AllowedTransitions.TryGetValue(currentCode, out var allowed) && !allowed.Contains(newCode))
-        {
-            throw new UnprocessableEntityException($"Invalid status transition: {currentCode} → {newCode}. "
-                + $"Allowed from {currentCode}: {string.Join(", ", allowed)}");
-        }
+            throw new UnprocessableEntityException($"Invalid status transition: {currentCode} → {newCode}. " +
+                                                    $"Allowed from {currentCode}: {string.Join(", ", allowed)}");
 
         table.TableStatusLvId = request.StatusLvId;
         table.UpdatedAt = DateTime.UtcNow;
@@ -314,11 +316,11 @@ public class TableService : ITableService
 
     /// <inheritdoc />
     public Task<List<LookupValueI18nDto>> GetTableTypesAsync(CancellationToken ct = default)
-    => _lookupService.GetAllActiveByTypeAsync((ushort)LookupType.TableType, ct);
+        => _lookupService.GetAllActiveByTypeAsync((ushort)LookupType.TableType, ct);
 
     /// <inheritdoc />
     public Task<LookupValueI18nDto> CreateZoneAsync(CreateLookupValueRequest request, CancellationToken ct = default)
- => _lookupService.CreateAsync((ushort)LookupType.TableZone, request, ct);
+        => _lookupService.CreateAsync((ushort)LookupType.TableZone, request, ct);
 
     /// <inheritdoc />
     public Task<LookupValueI18nDto> CreateTableTypeAsync(CreateLookupValueRequest request, CancellationToken ct = default)
@@ -330,7 +332,7 @@ public class TableService : ITableService
 
     /// <inheritdoc />
     public Task<LookupValueI18nDto> UpdateTableTypeAsync(uint valueId, UpdateLookupValueRequest request, CancellationToken ct = default)
-  => _lookupService.UpdateAsync((ushort)LookupType.TableType, valueId, request, ct);
+        => _lookupService.UpdateAsync((ushort)LookupType.TableType, valueId, request, ct);
 
     /// <inheritdoc />
     public Task DeleteZoneAsync(uint valueId, CancellationToken ct = default)
@@ -359,7 +361,7 @@ public class TableService : ITableService
     public async Task<QrCodeDto> RegenerateQrCodeAsync(long tableId, CancellationToken ct = default)
     {
         var table = await _tableRepository.GetByIdAsync(tableId, ct)
-            ?? throw new NotFoundException("Table not found");
+           ?? throw new NotFoundException("Table not found");
 
         table.QrToken = Guid.NewGuid().ToString("N");
         table.UpdatedAt = DateTime.UtcNow;
@@ -368,21 +370,22 @@ public class TableService : ITableService
         return new QrCodeDto
         {
             QrCodeUrl = table.QrToken,
-            QrCodeImageUrl = table.TableQrImgNavigation?.Url
+            // Url stores RelativePath — resolve to public URL at read time
+            QrCodeImageUrl = table.TableQrImgNavigation is not null
+            ? _fileStorage.GetPublicUrl(table.TableQrImgNavigation.Url) : null
         };
     }
 
     #endregion
 
-    #region ── Table media ──
+    #region ── Table media (incremental) ──
 
     /// <inheritdoc />
     public async Task<List<TableMediaDto>> UploadTableMediaAsync(long tableId, List<MediaFileInput> files, CancellationToken ct = default)
     {
         _ = await _tableRepository.GetByIdAsync(tableId, ct)
-          ?? throw new NotFoundException("Table not found");
+            ?? throw new NotFoundException("Table not found");
 
-        // Convert to FileUploadRequest and let IFileStorage handle all validation
         var uploadRequests = files.Select(f => new FileUploadRequest
         {
             Stream = f.Stream,
@@ -390,15 +393,11 @@ public class TableService : ITableService
             ContentType = f.ContentType
         }).ToList();
 
-        // SaveManyAsync validates batch count, file size, MIME type, extension — then saves all
-        var uploadResults = await _fileStorage.SaveManyAsync(
-   uploadRequests,
-            "table-media",
-            FileValidationOptions.ImageUpload,
-        ct);
+        // SaveManyAsync validates batch count, size, MIME type and extension, then saves all.
+        // On any failure it cleans up already-written files automatically.
+        var uploadResults = await _fileStorage.SaveManyAsync(uploadRequests, "table-media", FileValidationOptions.ImageUpload, ct);
 
-        var imageTypeLvId = await _lookupResolver.GetIdAsync(
-      (ushort)LookupType.MediaType, nameof(MediaTypeCode.IMAGE), ct);
+        var imageTypeLvId = await _lookupResolver.GetIdAsync((ushort)LookupType.MediaType, nameof(MediaTypeCode.IMAGE), ct);
 
         var result = new List<TableMediaDto>(uploadResults.Count);
 
@@ -409,7 +408,8 @@ public class TableService : ITableService
             {
                 var asset = await _mediaRepository.AddMediaAsync(new Entity.MediaAsset
                 {
-                    Url = uploaded.PublicUrl,
+                    // Store RelativePath so DeleteAsync works without any string manipulation
+                    Url = uploaded.RelativePath,
                     MimeType = files.First(f => f.FileName == uploaded.OriginalFileName).ContentType,
                     MediaTypeLvId = imageTypeLvId,
                     CreatedAt = DateTime.UtcNow
@@ -425,6 +425,7 @@ public class TableService : ITableService
                 result.Add(new TableMediaDto
                 {
                     MediaId = asset.MediaId,
+                    // Resolve to PublicUrl only in the response DTO, never persisted
                     Url = uploaded.PublicUrl,
                     IsPrimary = false
                 });
@@ -436,7 +437,6 @@ public class TableService : ITableService
         catch
         {
             await _unitOfWork.RollbackAsync(ct);
-            // Clean up already-saved files since DB transaction failed
             await _fileStorage.DeleteManyAsync(uploadResults.Select(r => r.RelativePath));
             throw;
         }
@@ -448,26 +448,137 @@ public class TableService : ITableService
     public async Task DeleteTableMediaAsync(long tableId, long mediaId, CancellationToken ct = default)
     {
         _ = await _tableRepository.GetByIdAsync(tableId, ct)
-                ?? throw new NotFoundException("Table not found");
+            ?? throw new NotFoundException("Table not found");
 
         var link = await _tableRepository.GetTableMediaAsync(tableId, mediaId, ct)
-                ?? throw new NotFoundException("Media not found for this table");
+            ?? throw new NotFoundException("Media not found for this table");
 
-        var fileUrl = link.Media.Url;
+        // Url is RelativePath — pass directly to DeleteAsync
+        var relativePath = link.Media.Url;
 
         _tableRepository.RemoveTableMedia(link);
         await _mediaRepository.RemoveMediaAsync(link.Media, ct);
         await _unitOfWork.SaveChangesAsync(ct);
 
-        // Best-effort file cleanup — orphaned files can be swept by a cleanup job
-        try { await _fileStorage.DeleteAsync(fileUrl); } catch { /* ignored */ }
+        // Best-effort: orphaned files can be swept by a cleanup job if this throws
+        try { await _fileStorage.DeleteAsync(relativePath); } catch { /* ignored */ }
     }
 
     #endregion
 
     #region ── Private helpers ──
 
-    private static TableManagementDto MapToManagementDto(Entity.RestaurantTable t) => new()
+    /// <summary>
+    /// Saves a list of IFormFile images for a table inside the current transaction scope.
+    /// Appends written RelativePaths to <paramref name="savedPaths"/> for rollback cleanup.
+    /// </summary>
+    private async Task SaveTableImagesAsync(
+        long tableId,
+        IReadOnlyList<Microsoft.AspNetCore.Http.IFormFile> files,
+        List<string> savedPaths,
+        CancellationToken ct)
+    {
+        var imageTypeLvId = await _lookupResolver.GetIdAsync(
+            (ushort)LookupType.MediaType, nameof(MediaTypeCode.IMAGE), ct);
+
+        var uploadRequests = files.Select(f => new FileUploadRequest
+        {
+            Stream = f.OpenReadStream(),
+            FileName = f.FileName,
+            ContentType = f.ContentType
+        }).ToList();
+
+        var uploadResults = await _fileStorage.SaveManyAsync(uploadRequests, "table-media", FileValidationOptions.ImageUpload, ct);
+
+        savedPaths.AddRange(uploadResults.Select(r => r.RelativePath));
+
+        foreach (var uploaded in uploadResults)
+        {
+            var asset = await _mediaRepository.AddMediaAsync(new Entity.MediaAsset
+            {
+                // Store RelativePath so DeleteAsync works without any string manipulation
+                Url = uploaded.RelativePath,
+                MimeType = files.First(f => f.FileName == uploaded.OriginalFileName).ContentType,
+                MediaTypeLvId = imageTypeLvId,
+                CreatedAt = DateTime.UtcNow
+            }, ct);
+
+            _tableRepository.AddTableMedia(new Entity.TableMedium
+            {
+                TableId = tableId,
+                MediaId = asset.MediaId,
+                IsPrimary = false
+            });
+        }
+
+        await _unitOfWork.SaveChangesAsync(ct);
+    }
+
+    /// <summary>Maps a full entity with detail includes to <see cref="TableDetailDto"/>.</summary>
+    private TableDetailDto MapToDetailDto(Entity.RestaurantTable t)
+    {
+        var now = DateTime.UtcNow;
+        return new TableDetailDto
+        {
+            // ── base fields ──
+            TableId = t.TableId,
+            TableCode = t.TableCode,
+            Capacity = t.Capacity,
+            IsOnline = t.IsOnline ?? false,
+
+            // ── status ──
+            StatusId = t.TableStatusLvId,
+            StatusCode = t.TableStatusLv?.ValueCode ?? "UNKNOWN",
+            StatusName = t.TableStatusLv?.ValueName ?? "Unknown",
+
+            // ── type ──
+            TypeId = t.TableTypeLvId,
+            TypeName = t.TableTypeLv?.ValueName ?? "Unknown",
+
+            // ── zone ──
+            ZoneId = t.ZoneLvId,
+            ZoneName = t.ZoneLv?.ValueName ?? "Unknown",
+
+            // ── QR ──
+            QrCodeUrl = t.QrToken,
+            QrCodeImageUrl = t.TableQrImgNavigation is not null
+            ? _fileStorage.GetPublicUrl(t.TableQrImgNavigation.Url) : null,
+
+            // ── media — Url stores RelativePath, resolve to PublicUrl here ──
+            Images = t.TableMedia
+            .OrderByDescending(tm => tm.IsPrimary ?? false)
+            .Select(tm => new TableMediaDto
+            {
+                MediaId = tm.MediaId,
+                Url = _fileStorage.GetPublicUrl(tm.Media.Url),
+                IsPrimary = tm.IsPrimary ?? false
+            }).ToList(),
+
+            // ── operational state ──
+            ActiveOrdersCount = t.Orders.Count(o =>
+                o.OrderStatusLv.ValueCode == nameof(OrderStatusCode.PENDING) ||
+                o.OrderStatusLv.ValueCode == nameof(OrderStatusCode.IN_PROGRESS)),
+            HasErrors = t.ServiceErrors.Any(se => se.IsResolved == false),
+            UpcomingReservations = t.Reservations.Where(r => r.ReservedTime > now &&
+                (r.ReservationStatusLv.ValueCode == nameof(ReservationStatusCode.PENDING) ||
+                 r.ReservationStatusLv.ValueCode == nameof(ReservationStatusCode.CONFIRMED)))
+            .OrderBy(r => r.ReservedTime)
+            .Take(5)
+            .Select(r => new UpcomingReservationDto
+            {
+                ReservationId = r.ReservationId,
+                GuestName = r.CustomerName,
+                Pax = r.PartySize,
+                ReservedTime = r.ReservedTime,
+                StatusCode = r.ReservationStatusLv.ValueCode
+            }).ToList()
+        };
+    }
+
+    /// <summary>
+    /// Maps a lightweight table entity (status/type/zone/media loaded) to <see cref="TableManagementDto"/>.
+    /// </summary>
+    private TableManagementDto MapToManagementDto(Entity.RestaurantTable t) => new()
     {
         TableId = t.TableId,
         TableCode = t.TableCode,
@@ -479,7 +590,16 @@ public class TableService : ITableService
         TypeId = t.TableTypeLvId,
         TypeName = t.TableTypeLv?.ValueName ?? "Unknown",
         ZoneId = t.ZoneLvId,
-        ZoneName = t.ZoneLv?.ValueName ?? "Unknown"
+        ZoneName = t.ZoneLv?.ValueName ?? "Unknown",
+        // Url stores RelativePath — resolve to PublicUrl for display
+        Images = t.TableMedia
+              .OrderByDescending(tm => tm.IsPrimary ?? false)
+           .Select(tm => new TableMediaDto
+           {
+               MediaId = tm.MediaId,
+               Url = _fileStorage.GetPublicUrl(tm.Media.Url),
+               IsPrimary = tm.IsPrimary ?? false
+           }).ToList()
     };
 
     private async Task ValidateLookupAsync(uint lvId, ushort typeId, string label, CancellationToken ct)
