@@ -496,11 +496,22 @@ public class TableService : ITableService
         var table = await _tableRepository.GetByCodeAsync(tableCode, ct)
             ?? throw new NotFoundException($"Table '{tableCode}' not found");
 
-        // 2. Get OCCUPIED status lookup ID
+        // 2. Get status IDs
+        var availableLvId = await TableStatusCode.AVAILABLE.ToTableStatusIdAsync(_lookupResolver, ct);
         var occupiedLvId = await TableStatusCode.OCCUPIED.ToTableStatusIdAsync(_lookupResolver, ct);
 
-        // 3. Update table status to OCCUPIED
-        await _tableRepository.UpdateStatusAsync(table.TableId, occupiedLvId, ct);
+        // 3. Atomic update: Only allow AVAILABLE -> OCCUPIED
+        // This ensures only one customer can occupy the table (race condition safe)
+        var updated = await _tableRepository.TryOccupyIfAvailableAsync(
+            table.TableId,
+            availableLvId,
+            occupiedLvId,
+            ct);
+
+        if (!updated)
+        {
+            throw new ConflictException($"Table '{tableCode}' is already occupied by another customer. Please choose another available table.");
+        }
     }
 
     #endregion

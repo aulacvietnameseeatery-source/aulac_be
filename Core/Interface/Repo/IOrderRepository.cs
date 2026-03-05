@@ -45,7 +45,7 @@ public interface IOrderRepository
 	/// <summary>
 	/// Appends new items to an existing order and updates its total amount.
 	/// </summary>
-	Task AddItemsToOrderAsync(long orderId, List<OrderItem> items, CancellationToken cancellationToken = default);
+	Task AddItemsToOrderAsync(long orderId, List<OrderItem> items, uint completedOrderStatusId, uint cancelledOrderStatusId, uint pendingOrderStatusId, CancellationToken cancellationToken = default);
 
 	/// <summary>
 	/// Returns history for a single specific order (used by customer history panel).

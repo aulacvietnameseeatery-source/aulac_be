@@ -330,6 +330,9 @@ public class OrderService : IOrderService
     public async Task AddItemsToOrderAsync(long orderId, AddOrderItemsRequestDTO request, CancellationToken cancellationToken = default)
     {
         var createdItemLvId = await OrderItemStatusCode.CREATED.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
+        var completedOrderStatusId = await OrderStatusCode.COMPLETED.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+        var cancelledOrderStatusId = await OrderStatusCode.CANCELLED.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+        var pendingOrderStatusId = await OrderStatusCode.PENDING.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
 
         var orderItems = request.Items.Select(i => new OrderItem
         {
@@ -341,7 +344,7 @@ public class OrderService : IOrderService
             ItemStatusLvId = createdItemLvId,
         }).ToList();
 
-        await _orderRepository.AddItemsToOrderAsync(orderId, orderItems, cancellationToken);
+        await _orderRepository.AddItemsToOrderAsync(orderId, orderItems, completedOrderStatusId, cancelledOrderStatusId, pendingOrderStatusId, cancellationToken);
     }
 
     public async Task<CreateOrderResponseDTO> CreateOrderAsync(CreateOrderRequestDTO request, CancellationToken cancellationToken = default)
@@ -403,8 +406,7 @@ public class OrderService : IOrderService
         // 7. Save to DB
         var orderId = await _orderRepository.CreateOrderAsync(order, orderItems, cancellationToken);
 
-        // Note: Table status is now updated to OCCUPIED when customer starts dining,
-        // not when the first order is created
+       
 
         return new CreateOrderResponseDTO
         {

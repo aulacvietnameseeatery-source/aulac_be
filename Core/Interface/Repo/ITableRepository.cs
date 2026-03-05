@@ -124,4 +124,10 @@ public interface ITableRepository
     /// Removes a TableMedium join record from the context (does not save).
     /// </summary>
     void RemoveTableMedia(TableMedium tableMedium);
+
+     Task<bool> TryOccupyIfAvailableAsync(
+    long tableId,
+    uint availableLvId,
+    uint occupiedLvId,
+    CancellationToken ct);
 }
