@@ -132,6 +132,8 @@ public class TableRepository : ITableRepository
             .Include(t => t.TableStatusLv)
             .Include(t => t.TableTypeLv)
             .Include(t => t.ZoneLv)
+            .Include(t => t.TableMedia)
+                .ThenInclude(tm => tm.Media)
             .AsNoTracking()
             .Where(t => !t.IsDeleted)
             .AsQueryable();
