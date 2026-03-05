@@ -3,6 +3,7 @@ using Core.DTO.LookUpValue;
 using Core.DTO.Table;
 using Core.Enum;
 using Core.Exceptions;
+using Core.Extensions;
 using Core.Interface.Repo;
 using Core.Interface.Service.Entity;
 using Core.Interface.Service.FileStorage;
@@ -606,6 +607,31 @@ public class TableService : ITableService
     {
         if (!await _tableRepository.IsValidLookupAsync(lvId, typeId, ct))
             throw new ValidationException($"Invalid {label} (LvId={lvId})");
+    }
+
+    /// <inheritdoc />
+    public async Task OccupyTableByCodeAsync(string tableCode, CancellationToken ct = default)
+    {
+        // 1. Find table by code
+        var table = await _tableRepository.GetByCodeAsync(tableCode, ct)
+            ?? throw new NotFoundException($"Table '{tableCode}' not found");
+
+        // 2. Get status IDs
+        var availableLvId = await TableStatusCode.AVAILABLE.ToTableStatusIdAsync(_lookupResolver, ct);
+        var occupiedLvId = await TableStatusCode.OCCUPIED.ToTableStatusIdAsync(_lookupResolver, ct);
+
+        // 3. Atomic update: Only allow AVAILABLE -> OCCUPIED
+        // This ensures only one customer can occupy the table (race condition safe)
+        var updated = await _tableRepository.TryOccupyIfAvailableAsync(
+            table.TableId,
+            availableLvId,
+            occupiedLvId,
+            ct);
+
+        if (!updated)
+        {
+            throw new ConflictException($"Table '{tableCode}' is already occupied by another customer. Please choose another available table.");
+        }
     }
 
     #endregion

@@ -1,12 +1,12 @@
 ﻿using Core.DTO.LookUpValue;
 using Core.DTO.Table;
-using Microsoft.AspNetCore.Http;
+
 
 namespace Core.Interface.Service.Table;
 
 public interface ITableService
 {
-    // ── List / Select ─────────────────────────────────────────────────
+// ── List / Select ─────────────────────────────────────────────────
 
     /// <summary>
     /// Gets a paged list of tables for the management screen, including images.
@@ -98,6 +98,11 @@ public interface ITableService
     /// Removes a specific image from a table.
     /// </summary>
     Task DeleteTableMediaAsync(long tableId, long mediaId, CancellationToken ct = default);
+
+    /// <summary>
+        /// Marks a table as occupied by table code. Used by customers via QR code.
+        /// </summary>
+    Task OccupyTableByCodeAsync(string tableCode, CancellationToken ct = default);
 }
 
 /// <summary>

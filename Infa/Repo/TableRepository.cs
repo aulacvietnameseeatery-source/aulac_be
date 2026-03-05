@@ -271,4 +271,20 @@ public class TableRepository : ITableRepository
     {
         _context.TableMedia.Remove(tableMedium);
     }
+
+    public async Task<bool> TryOccupyIfAvailableAsync(
+        long tableId,
+        uint availableLvId,
+        uint occupiedLvId,
+        CancellationToken ct)
+    {
+        var affected = await _context.RestaurantTables
+            .Where(t => t.TableId == tableId && t.TableStatusLvId == availableLvId)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(t => t.TableStatusLvId, occupiedLvId)
+                .SetProperty(t => t.UpdatedAt, DateTime.UtcNow),
+                ct);
+
+        return affected == 1;
+    }
 }
