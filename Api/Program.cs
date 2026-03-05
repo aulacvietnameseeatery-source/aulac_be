@@ -204,6 +204,7 @@ builder.Services.AddSingleton<IPasswordResetTokenStore, CachePasswordResetTokenS
 
 builder.Services.AddScoped<IDishService, DishService>();
 builder.Services.AddScoped<IDishCategoryService, DishCategoryService>();
+builder.Services.AddScoped<ISupplierService, SupplierService>();
 
 builder.Services.AddScoped<IPasswordGenerator, PasswordGeneratorService>();
 builder.Services.AddScoped<IUsernameGenerator, UsernameGeneratorService>();
@@ -242,6 +243,7 @@ builder.Services.AddScoped<IRoleRepository, RoleRepository>();
 builder.Services.AddScoped<ISystemSettingRepository, SystemSettingRepository>();
 builder.Services.AddScoped<IDishRepository, DishRepository>();
 builder.Services.AddScoped<IDishCategoryRepository, DishCategoryRepository>();
+builder.Services.AddScoped<ISupplierRepository, SupplierRepository>();
 builder.Services.AddScoped<IReservationRepository, ReservationRepository>();
 builder.Services.AddScoped<ITableRepository, TableRepository>();
 
