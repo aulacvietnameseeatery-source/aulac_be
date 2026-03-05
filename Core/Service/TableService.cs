@@ -8,7 +8,6 @@ using Core.Interface.Repo;
 using Core.Interface.Service.Entity;
 using Core.Interface.Service.FileStorage;
 using Core.Interface.Service.LookUp;
-using Core.Interface.Service.Table;
 
 namespace Core.Service;
 

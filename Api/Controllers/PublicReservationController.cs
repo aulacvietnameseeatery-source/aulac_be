@@ -1,7 +1,6 @@
 using API.Models;
 using Core.DTO.Reservation;
 using Core.Interface.Service.Entity;
-using Core.Interface.Service.Table;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
