@@ -54,43 +54,9 @@ namespace Api.Controllers
         }
 
         /// <summary>
-        /// Creates a soft lock on a table for 10 minutes.
+        /// Submits a final reservation.
         /// </summary>
-        /// <param name="request">Lock request details</param>
-        /// <param name="cancellationToken">Cancellation token</param>
-        /// <returns>Lock token and expiry information</returns>
-        /// <response code="200">Table locked successfully</response>
-        /// <response code="404">Table not found</response>
-        /// <response code="409">Table already locked or has existing reservation</response>
-        [HttpPost("reservations/lock")]
-        [ProducesResponseType(typeof(ApiResponse<ReservationLockResponseDto>), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
-        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
-        public async Task<IActionResult> LockTable(
-            [FromBody] CreateReservationLockRequest request,
-            CancellationToken cancellationToken = default)
-        {
-            var result = await _reservationService.LockTableAsync(request, cancellationToken);
-
-            _logger.LogInformation(
-                "Table {TableId} locked by {CustomerName} until {ExpiresAt}",
-                result.TableId, request.CustomerName, result.ExpiresAt);
-
-            return Ok(new ApiResponse<ReservationLockResponseDto>
-            {
-                Success = true,
-                Code = 200,
-                UserMessage = $"Table {result.TableCode} locked for 10 minutes.",
-                SystemMessage = "Lock created successfully",
-                Data = result,
-                ServerTime = DateTimeOffset.UtcNow
-            });
-        }
-
-        /// <summary>
-        /// Submits a final reservation using a valid lock token.
-        /// </summary>
-        /// <param name="request">Reservation details with lock token</param>
+        /// <param name="request">Reservation details</param>
         /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>Confirmed reservation details</returns>
         /// <response code="200">Reservation created successfully</response>

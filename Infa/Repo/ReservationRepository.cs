@@ -1,4 +1,4 @@
-﻿using Core.DTO.Reservation;
+using Core.DTO.Reservation;
 using Core.Entity;
 using Core.Interface.Repo;
 using Infa.Data;
@@ -12,13 +12,6 @@ namespace Infa.Repo;
 public class ReservationRepository : IReservationRepository
 {
     private readonly RestaurantMgmtContext _context;
-
-    // Reservation status lookup value IDs
-    private const uint ReservationStatusPending = 21;
-    private const uint ReservationStatusConfirmed = 22;
-    private const uint ReservationStatusCheckedIn = 23;
-    private const uint ReservationStatusCancelled = 24;
-    private const uint ReservationStatusNoShow = 25;
 
     public ReservationRepository(RestaurantMgmtContext context)
     {
@@ -47,7 +40,9 @@ public class ReservationRepository : IReservationRepository
     public async Task<List<Reservation>> GetTableReservationsForTimeAsync(
         long tableId,
         DateTime reservedTime,
-        int durationMinutes = 120,
+        int durationMinutes,
+        uint cancelledStatusId,
+        uint noShowStatusId,
         CancellationToken ct = default)
     {
         // New reservation will occupy: [reservedTime, reservedTime + durationMinutes]
@@ -62,8 +57,8 @@ public class ReservationRepository : IReservationRepository
             .AsNoTracking()
             .Include(r => r.Tables)
             .Where(r => r.Tables.Any(t => t.TableId == tableId))
-            .Where(r => r.ReservationStatusLvId != ReservationStatusCancelled)
-            .Where(r => r.ReservationStatusLvId != ReservationStatusNoShow)
+            .Where(r => r.ReservationStatusLvId != cancelledStatusId)
+            .Where(r => r.ReservationStatusLvId != noShowStatusId)
             // Overlap check: existing reservation overlaps with new reservation window
             // Existing: [r.ReservedTime, r.ReservedTime + duration]
             // New: [reservedTime, reservedTime + duration]

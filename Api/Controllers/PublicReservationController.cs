@@ -1,6 +1,7 @@
 using API.Models;
 using Core.DTO.Reservation;
 using Core.Interface.Service.Entity;
+using Core.Interface.Service.Table;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -16,13 +17,16 @@ namespace Api.Controllers;
 public class PublicReservationController : ControllerBase
 {
     private readonly IPublicReservationService _reservationService;
+    private readonly ITableService _tableService;
     private readonly ILogger<PublicReservationController> _logger;
 
     public PublicReservationController(
         IPublicReservationService reservationService,
+        ITableService tableService,
         ILogger<PublicReservationController> logger)
     {
         _reservationService = reservationService;
+        _tableService = tableService;
         _logger = logger;
     }
 
@@ -57,43 +61,9 @@ public class PublicReservationController : ControllerBase
     }
 
     /// <summary>
-    /// Creates a soft lock on a table for 10 minutes.
+    /// Submits a final reservation.
     /// </summary>
-    /// <param name="request">Lock request details</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Lock token and expiry information</returns>
-    /// <response code="200">Table locked successfully</response>
-    /// <response code="404">Table not found</response>
-    /// <response code="409">Table already locked or has existing reservation</response>
-    [HttpPost("reservations/lock")]
-    [ProducesResponseType(typeof(ApiResponse<ReservationLockResponseDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> LockTable(
-        [FromBody] CreateReservationLockRequest request,
-        CancellationToken cancellationToken = default)
-    {
-        var result = await _reservationService.LockTableAsync(request, cancellationToken);
-
-        _logger.LogInformation(
-            "Table {TableId} locked by {CustomerName} until {ExpiresAt}",
-            result.TableId, request.CustomerName, result.ExpiresAt);
-
-        return Ok(new ApiResponse<ReservationLockResponseDto>
-        {
-            Success = true,
-            Code = 200,
-            UserMessage = $"Table {result.TableCode} locked for 10 minutes.",
-            SystemMessage = "Lock created successfully",
-            Data = result,
-            ServerTime = DateTimeOffset.UtcNow
-        });
-    }
-
-    /// <summary>
-    /// Submits a final reservation using a valid lock token.
-    /// </summary>
-    /// <param name="request">Reservation details with lock token</param>
+    /// <param name="request">Reservation details</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Confirmed reservation details</returns>
     /// <response code="200">Reservation created successfully</response>
@@ -120,6 +90,37 @@ public class PublicReservationController : ControllerBase
             UserMessage = "Reservation confirmed successfully.",
             SystemMessage = "Reservation created",
             Data = result,
+            ServerTime = DateTimeOffset.UtcNow
+        });
+    }
+
+    /// <summary>
+    /// Marks a table as occupied when a customer starts dining.
+    /// This is a public endpoint used by customers via QR code.
+    /// </summary>
+    /// <param name="tableCode">The table code (e.g., TB-R01)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Success response</returns>
+    /// <response code="200">Table marked as occupied successfully</response>
+    /// <response code="404">Table not found</response>
+    [HttpPost("tables/{tableCode}/occupy")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> OccupyTable(
+        string tableCode,
+        CancellationToken cancellationToken = default)
+    {
+        await _tableService.OccupyTableByCodeAsync(tableCode, cancellationToken);
+
+        _logger.LogInformation("Table {TableCode} marked as occupied by customer", tableCode);
+
+        return Ok(new ApiResponse<object>
+        {
+            Success = true,
+            Code = 200,
+            UserMessage = "Table marked as occupied successfully.",
+            SystemMessage = "Table status updated",
+            Data = new { },
             ServerTime = DateTimeOffset.UtcNow
         });
     }

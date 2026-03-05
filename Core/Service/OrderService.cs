@@ -2,8 +2,8 @@ using Core.DTO.General;
 using Core.DTO.Order;
 using Core.Entity;
 using Core.Enum;
-using Core.Extensions;
 using Core.Exceptions;
+using Core.Extensions;
 using Core.Interface.Repo;
 using Core.Interface.Service.Customer;
 using Core.Interface.Service.Entity;
@@ -13,46 +13,82 @@ namespace Core.Service;
 
 public class OrderService : IOrderService
 {
-	private readonly IOrderRepository _orderRepository;
-	private readonly ITableRepository _tableRepository;
-	private readonly ICustomerService _customerService;
-	private readonly ILookupResolver _lookupResolver;
+    private readonly IOrderRepository _orderRepository;
+    private readonly ITableRepository _tableRepository;
+    private readonly ICustomerService _customerService;
+    private readonly ILookupResolver _lookupResolver;
     private readonly IDishRepository _dishRepository;
     private readonly IUnitOfWork _uow;
 
-	public OrderService(
-		IOrderRepository orderRepository,
-		ITableRepository tableRepository,
-		ICustomerService customerService,
-		ILookupResolver lookupResolver,
-		IDishRepository dishRepository,
-		IUnitOfWork uow)
-	{
-		_orderRepository = orderRepository;
-		_tableRepository = tableRepository;
-		_customerService = customerService;
-		_dishRepository = dishRepository;
-		_lookupResolver = lookupResolver;
-		_uow = uow;
-	}
-
-
+    public OrderService(
+        IOrderRepository orderRepository,
+        ITableRepository tableRepository,
+        ICustomerService customerService,
+        ILookupResolver lookupResolver,
+        IDishRepository dishRepository,
+        IUnitOfWork uow)
+    {
+        _orderRepository = orderRepository;
+        _tableRepository = tableRepository;
+        _customerService = customerService;
+        _dishRepository = dishRepository;
+        _lookupResolver = lookupResolver;
+        _uow = uow;
+    }
     private const long GuestCustomerId = 68; // ID representing a visitor
-
- 
-
-	public Task<PagedResultDTO<OrderHistoryDTO>> GetOrderHistoryAsync(OrderHistoryQueryDTO query, CancellationToken cancellationToken = default)
+    public Task<PagedResultDTO<OrderHistoryDTO>> GetOrderHistoryAsync(OrderHistoryQueryDTO query, CancellationToken cancellationToken = default)
 		=> _orderRepository.GetOrderHistoryAsync(query, cancellationToken);
 
-	public Task<OrderStatusCountDTO> GetOrderStatusCountAsync(CancellationToken cancellationToken = default)
-		=> _orderRepository.GetOrderStatusCountAsync(cancellationToken);
+	public async Task<OrderStatusCountDTO> GetOrderStatusCountAsync(CancellationToken cancellationToken = default)
+	{
+		var pendingId    = await OrderStatusCode.PENDING.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+		var inProgressId = await OrderStatusCode.IN_PROGRESS.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+		var completedId  = await OrderStatusCode.COMPLETED.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+		var cancelledId  = await OrderStatusCode.CANCELLED.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
 
-	public Task<List<KitchenOrderDTO>> GetKitchenOrdersAsync(CancellationToken cancellationToken = default)
-		=> _orderRepository.GetKitchenOrdersAsync(cancellationToken);
+		return await _orderRepository.GetOrderStatusCountAsync(
+			pendingId,
+			inProgressId,
+			completedId,
+			cancelledId,
+			cancellationToken);
+	}
 
-	public Task UpdateOrderItemStatusAsync(long orderItemId, uint newStatusLvId, string? rejectReason, CancellationToken cancellationToken = default)
-		=> _orderRepository.UpdateOrderItemStatusAsync(orderItemId, newStatusLvId, rejectReason, cancellationToken);
+	public async Task<List<KitchenOrderDTO>> GetKitchenOrdersAsync(CancellationToken cancellationToken = default)
+	{
+		var pendingId    = await OrderStatusCode.PENDING.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+		var inProgressId = await OrderStatusCode.IN_PROGRESS.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
 
+		return await _orderRepository.GetKitchenOrdersAsync(
+			pendingId,
+			inProgressId,
+			cancellationToken);
+	}
+
+	public async Task UpdateOrderItemStatusAsync(long orderItemId, uint newStatusLvId, string? rejectReason, CancellationToken cancellationToken = default)
+	{
+		var inProgressItemId = await OrderItemStatusCode.IN_PROGRESS.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
+		var servedItemId     = await OrderItemStatusCode.SERVED.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
+		var rejectedItemId   = await OrderItemStatusCode.REJECTED.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
+
+		var pendingOrderId    = await OrderStatusCode.PENDING.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+		var inProgressOrderId = await OrderStatusCode.IN_PROGRESS.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+		var completedOrderId  = await OrderStatusCode.COMPLETED.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+		var cancelledOrderId  = await OrderStatusCode.CANCELLED.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+
+		await _orderRepository.UpdateOrderItemStatusAsync(
+			orderItemId,
+			newStatusLvId,
+			rejectReason,
+			inProgressItemId,
+			servedItemId,
+			rejectedItemId,
+			pendingOrderId,
+			inProgressOrderId,
+			completedOrderId,
+			cancelledOrderId,
+			cancellationToken);
+	}
 
     public Task<OrderHistoryDTO> GetOrderByIdAsync(long orderId, CancellationToken cancellationToken = default)
         => _orderRepository.GetOrderByIdAsync(orderId, cancellationToken);
@@ -285,101 +321,103 @@ public class OrderService : IOrderService
 
 
 
-	public Task<CustomerOrderHistoryDTO> GetCustomerOrderHistoryAsync(string tableCode, CancellationToken cancellationToken = default)
-		=> _orderRepository.GetCustomerOrderHistoryAsync(tableCode, cancellationToken);
+    public Task<CustomerOrderHistoryDTO> GetCustomerOrderHistoryAsync(string tableCode, CancellationToken cancellationToken = default)
+        => _orderRepository.GetCustomerOrderHistoryAsync(tableCode, cancellationToken);
 
-	public Task<CustomerOrderHistoryDTO> GetCustomerOrderByIdAsync(long orderId, CancellationToken cancellationToken = default)
-		=> _orderRepository.GetCustomerOrderByIdAsync(orderId, cancellationToken);
+    public Task<CustomerOrderHistoryDTO> GetCustomerOrderByIdAsync(long orderId, CancellationToken cancellationToken = default)
+        => _orderRepository.GetCustomerOrderByIdAsync(orderId, cancellationToken);
 
-	public async Task AddItemsToOrderAsync(long orderId, AddOrderItemsRequestDTO request, CancellationToken cancellationToken = default)
-	{
-		var createdItemLvId = await OrderItemStatusCode.CREATED.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
+    public async Task AddItemsToOrderAsync(long orderId, AddOrderItemsRequestDTO request, CancellationToken cancellationToken = default)
+    {
+        var createdItemLvId = await OrderItemStatusCode.CREATED.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
+        var completedOrderStatusId = await OrderStatusCode.COMPLETED.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+        var cancelledOrderStatusId = await OrderStatusCode.CANCELLED.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+        var pendingOrderStatusId = await OrderStatusCode.PENDING.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
 
-		var orderItems = request.Items.Select(i => new OrderItem
-		{
-			DishId         = i.DishId,
-			Quantity       = i.Quantity,
-			Price          = i.Price,
-			Note           = i.Note,
-			ItemStatus     = 1,
-			ItemStatusLvId = createdItemLvId,
-		}).ToList();
+        var orderItems = request.Items.Select(i => new OrderItem
+        {
+            DishId = i.DishId,
+            Quantity = i.Quantity,
+            Price = i.Price,
+            Note = i.Note,
+            ItemStatus = 1,
+            ItemStatusLvId = createdItemLvId,
+        }).ToList();
 
-		await _orderRepository.AddItemsToOrderAsync(orderId, orderItems, cancellationToken);
-	}
+        await _orderRepository.AddItemsToOrderAsync(orderId, orderItems, completedOrderStatusId, cancelledOrderStatusId, pendingOrderStatusId, cancellationToken);
+    }
 
-	public async Task<CreateOrderResponseDTO> CreateOrderAsync(CreateOrderRequestDTO request, CancellationToken cancellationToken = default)
-	{
-		// 1. Resolve table_id from table code
-		var table = await _tableRepository.GetByCodeAsync(request.TableCode.Trim(), cancellationToken)
-			?? throw new KeyNotFoundException($"Table '{request.TableCode}' not found.");
+    public async Task<CreateOrderResponseDTO> CreateOrderAsync(CreateOrderRequestDTO request, CancellationToken cancellationToken = default)
+    {
+        // 1. Resolve table_id from table code
+        var table = await _tableRepository.GetByCodeAsync(request.TableCode.Trim(), cancellationToken)
+            ?? throw new KeyNotFoundException($"Table '{request.TableCode}' not found.");
 
-		// 2. Resolve customer_id
-		long customerId;
-		if (request.IsGuest)
-		{
-			customerId = GuestCustomerId;
-		}
-		else
-		{
-			if (string.IsNullOrWhiteSpace(request.CustomerPhone))
-				throw new ArgumentException("CustomerPhone is required when IsGuest = false.");
+        // 2. Resolve customer_id
+        long customerId;
+        if (request.IsGuest)
+        {
+            customerId = GuestCustomerId;
+        }
+        else
+        {
+            if (string.IsNullOrWhiteSpace(request.CustomerPhone))
+                throw new ArgumentException("CustomerPhone is required when IsGuest = false.");
 
-			customerId = await _customerService.FindOrCreateCustomerIdAsync(
-				request.CustomerPhone.Trim(),
-				request.CustomerFullName,
-				request.CustomerEmail,
-				cancellationToken);
-		}
+            customerId = await _customerService.FindOrCreateCustomerIdAsync(
+                request.CustomerPhone.Trim(),
+                request.CustomerFullName,
+                request.CustomerEmail,
+                cancellationToken);
+        }
 
-		// 3. Calculate total amount from items
-		var totalAmount = request.Items.Sum(i => i.Price * i.Quantity);
+        // 3. Calculate total amount from items
+        var totalAmount = request.Items.Sum(i => i.Price * i.Quantity);
 
-		// 4. Resolve lookup value IDs from database
-		var pendingOrderLvId = await OrderStatusCode.PENDING.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
-		var dineInSourceLvId = await OrderSourceCode.DINE_IN.IdAsync(_lookupResolver, (ushort)LookupTypeEnum.OrderSource, cancellationToken);
-		var createdItemLvId = await OrderItemStatusCode.CREATED.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
+        // 4. Resolve lookup value IDs from database
+        var pendingOrderLvId = await OrderStatusCode.PENDING.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+        var dineInSourceLvId = await OrderSourceCode.DINE_IN.IdAsync(_lookupResolver, (ushort)LookupTypeEnum.OrderSource, cancellationToken);
+        var createdItemLvId = await OrderItemStatusCode.CREATED.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
 
-		// 5. Build Order entity (staff_id = null, status = PENDING, source = DINE_IN)
-		var order = new Order
-		{
-			TableId          = table.TableId,
-			CustomerId       = customerId,
-			StaffId          = null,
-			TotalAmount      = totalAmount,
-			SourceLvId       = dineInSourceLvId,
-			OrderStatusLvId  = pendingOrderLvId,
-			CreatedAt        = DateTime.UtcNow,
-			UpdatedAt        = DateTime.UtcNow,
-		};
+        // 5. Build Order entity (staff_id = null, status = PENDING, source = DINE_IN)
+        var order = new Order
+        {
+            TableId = table.TableId,
+            CustomerId = customerId,
+            StaffId = null,
+            TotalAmount = totalAmount,
+            SourceLvId = dineInSourceLvId,
+            OrderStatusLvId = pendingOrderLvId,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+        };
 
-		// 6. Build OrderItem entities
-		var orderItems = request.Items.Select(i => new OrderItem
-		{
-			DishId          = i.DishId,
-			Quantity        = i.Quantity,
-			Price           = i.Price,
-			Note            = i.Note,
-			ItemStatus      = 1, // CREATED
-			ItemStatusLvId  = createdItemLvId,
-		}).ToList();
+        // 6. Build OrderItem entities
+        var orderItems = request.Items.Select(i => new OrderItem
+        {
+            DishId = i.DishId,
+            Quantity = i.Quantity,
+            Price = i.Price,
+            Note = i.Note,
+            ItemStatus = 1, // CREATED
+            ItemStatusLvId = createdItemLvId,
+        }).ToList();
 
-		// 7. Save to DB
-		var orderId = await _orderRepository.CreateOrderAsync(order, orderItems, cancellationToken);
+        // 7. Save to DB
+        var orderId = await _orderRepository.CreateOrderAsync(order, orderItems, cancellationToken);
 
-		// 8. Mark the table as OCCUPIED so other customers cannot select it
-		var occupiedLvId = await TableStatusCode.OCCUPIED.ToTableStatusIdAsync(_lookupResolver, cancellationToken);
-		await _tableRepository.UpdateStatusAsync(table.TableId, occupiedLvId, cancellationToken);
+       
 
-		return new CreateOrderResponseDTO
-		{
-			OrderId      = orderId,
-			TableId      = table.TableId,
-			TableCode    = table.TableCode,
-			CustomerId   = customerId,
-			TotalAmount  = totalAmount,
-			OrderStatus  = "PENDING",
-			CreatedAt    = order.CreatedAt,
-		};
-	}
+        return new CreateOrderResponseDTO
+        {
+            OrderId = orderId,
+            TableId = table.TableId,
+            TableCode = table.TableCode,
+            CustomerId = customerId,
+            TotalAmount = totalAmount,
+            OrderStatus = "PENDING",
+            CreatedAt = order.CreatedAt,
+        };
+    }
 }
+

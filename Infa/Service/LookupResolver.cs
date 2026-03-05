@@ -39,8 +39,7 @@ public class LookupResolver : ILookupResolver
 
         if (id == null)
         {
-            throw new KeyNotFoundException(
-       $"Lookup value not found for type_id={typeId}, value_code='{valueCode}'");
+            throw new KeyNotFoundException($"Lookup value not found for type_id={typeId}, value_code='{valueCode}'");
         }
 
         return id.Value;
@@ -69,6 +68,13 @@ public class LookupResolver : ILookupResolver
         var normalizedCode = valueCode.Trim().ToUpperInvariant();
         var key = BuildCacheKey(typeId, normalizedCode);
 
+        // When cache is unavailable, query the database directly
+        if (!_cache.IsAvailable)
+        {
+            var dict = await LoadFromDatabaseAsync(ct);
+            return dict.TryGetValue(key, out var directId) ? directId : null;
+        }
+
         // Get the lookup dictionary from cache
         var lookupDict = await GetOrLoadCacheAsync(ct);
 
@@ -89,6 +95,13 @@ public class LookupResolver : ILookupResolver
     /// <inheritdoc />
     public async Task WarmUpAsync(CancellationToken cancellationToken = default)
     {
+        // Warmup is a no-op when cache is unavailable — data is always read from DB directly
+        if (!_cache.IsAvailable)
+        {
+            _logger.LogInformation("Lookup WarmUp skipped: cache is not available. Lookups will query the database directly.");
+            return;
+        }
+
         // Use semaphore to prevent concurrent warmup operations
         await _warmupLock.WaitAsync(cancellationToken);
         try
@@ -116,6 +129,13 @@ public class LookupResolver : ILookupResolver
     /// <inheritdoc />
     public async Task<bool> RefreshIfChangedAsync(CancellationToken cancellationToken = default)
     {
+        // Nothing to refresh when there is no cache
+        if (!_cache.IsAvailable)
+        {
+            _logger.LogDebug("Lookup RefreshIfChanged skipped: cache is not available.");
+            return false;
+        }
+
         try
         {
             // Check if the lookup_value table has an UpdatedAt column
@@ -178,8 +198,7 @@ public class LookupResolver : ILookupResolver
         }
 
         // Cache miss - trigger warmup
-        _logger.LogWarning(
-                "Lookup cache miss. Loading from database. Consider calling WarmUpAsync() at startup.");
+        _logger.LogWarning("Lookup cache miss. Loading from database. Consider calling WarmUpAsync() at startup.");
 
         await WarmUpAsync(ct);
 
