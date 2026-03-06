@@ -201,57 +201,64 @@ public class OrderRepository : IOrderRepository
 		{
 			bool orderStatusChanged = false;
 
-			// 1. Move from PENDING to IN_PROGRESS if an item starts
-			if (newStatusLvId == inProgressItemStatusId && order.OrderStatusLvId == pendingOrderStatusId)
+		// 1. Subtract rejected item from total amount
+		if (newStatusLvId == rejectedItemStatusId)
+		{
+			order.TotalAmount -= item.Price * item.Quantity;
+			orderStatusChanged = true;
+		}
+
+		// 2. Move from PENDING to IN_PROGRESS if an item starts
+		if (newStatusLvId == inProgressItemStatusId && order.OrderStatusLvId == pendingOrderStatusId)
+		{
+			order.OrderStatusLvId = inProgressOrderStatusId;
+			orderStatusChanged = true;
+		}
+
+		// 3. Auto-complete or auto-cancel when ALL items are finished
+		var allItems = await _context.OrderItems
+			.Where(oi => oi.OrderId == item.OrderId)
+			.Select(oi => oi.ItemStatusLvId)
+			.ToListAsync(cancellationToken);
+
+		bool allFinished = allItems.All(lvId => lvId == servedItemStatusId || lvId == rejectedItemStatusId);
+
+		if (allFinished)
+		{
+			bool hasServed = allItems.Any(lvId => lvId == servedItemStatusId);
+			uint targetStatusId = hasServed ? completedOrderStatusId : cancelledOrderStatusId;
+
+			if (order.OrderStatusLvId != targetStatusId)
 			{
-				order.OrderStatusLvId = inProgressOrderStatusId;
+				order.OrderStatusLvId = targetStatusId;
 				orderStatusChanged = true;
 			}
-
-			// 2. Auto-complete or auto-cancel when ALL items are finished
-			var allItems = await _context.OrderItems
-				.Where(oi => oi.OrderId == item.OrderId)
-				.Select(oi => oi.ItemStatusLvId)
-				.ToListAsync(cancellationToken);
-
-			bool allFinished = allItems.All(lvId => lvId == servedItemStatusId || lvId == rejectedItemStatusId);
-
-			if (allFinished)
-			{
-				bool hasServed = allItems.Any(lvId => lvId == servedItemStatusId);
-				uint targetStatusId = hasServed ? completedOrderStatusId : cancelledOrderStatusId;
-
-				if (order.OrderStatusLvId != targetStatusId)
-				{
-					order.OrderStatusLvId = targetStatusId;
-					orderStatusChanged = true;
-				}
-			}
-
-			if (orderStatusChanged)
-			{
-				order.UpdatedAt = DateTime.UtcNow;
-				await _context.SaveChangesAsync(cancellationToken);
-			}
 		}
-	}
 
-
-	public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, CancellationToken cancellationToken = default)
-	{
-		_context.Orders.Add(order);
-		await _context.SaveChangesAsync(cancellationToken);
-
-		foreach (var item in items)
+		if (orderStatusChanged)
 		{
-			item.OrderId = order.OrderId;
+			order.UpdatedAt = DateTime.UtcNow;
+			await _context.SaveChangesAsync(cancellationToken);
 		}
-
-		_context.OrderItems.AddRange(items);
-		await _context.SaveChangesAsync(cancellationToken);
-
-		return order.OrderId;
 	}
+}
+
+
+public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, CancellationToken cancellationToken = default)
+{
+	_context.Orders.Add(order);
+	await _context.SaveChangesAsync(cancellationToken);
+
+	foreach (var item in items)
+	{
+		item.OrderId = order.OrderId;
+	}
+
+	_context.OrderItems.AddRange(items);
+	await _context.SaveChangesAsync(cancellationToken);
+
+	return order.OrderId;
+}
 
 	public async Task<CustomerOrderHistoryDTO> GetCustomerOrderByIdAsync(long orderId, CancellationToken cancellationToken = default)
 	{
@@ -266,39 +273,33 @@ public class OrderRepository : IOrderRepository
 			.FirstOrDefaultAsync(cancellationToken)
 				?? throw new KeyNotFoundException($"Order {orderId} not found.");
 
-		var round = new CustomerOrderRoundDTO
+		var allItems = order.OrderItems.Select(oi => new OrderItemDTO
 		{
-			OrderId     = order.OrderId,
-			RoundNumber = 1,
-			CreatedAt   = order.CreatedAt,
-			OrderStatus = order.OrderStatusLv.ValueName,
-			TotalAmount = order.TotalAmount,
-			Items = order.OrderItems.Select(oi => new OrderItemDTO
-			{
-				OrderItemId  = oi.OrderItemId,
-				DishId       = oi.DishId,
-				DishName     = oi.Dish.DishName,
-				Quantity     = oi.Quantity,
-				Price        = oi.Price,
-				ItemStatus   = oi.ItemStatusLv.ValueName,
-				RejectReason = oi.RejectReason,
-				Note         = oi.Note
-			}).ToList()
-		};
+			OrderItemId  = oi.OrderItemId,
+			DishId       = oi.DishId,
+			DishName     = oi.Dish.DishName,
+			Quantity     = oi.Quantity,
+			Price        = oi.Price,
+			ItemStatus   = oi.ItemStatusLv.ValueName,
+			RejectReason = oi.RejectReason,
+			Note         = oi.Note
+		}).ToList();
 
-		var totalItems     = round.Items.Sum(i => i.Quantity);
-		var estimatedTotal = round.Items.Sum(i => i.Price * i.Quantity);
+		// Exclude rejected items from total calculations
+		var nonRejectedItems = allItems.Where(i => i.ItemStatus != "Rejected").ToList();
+		var totalItems     = nonRejectedItems.Sum(i => i.Quantity);
+		var estimatedTotal = nonRejectedItems.Sum(i => i.Price * i.Quantity);
 
 		return new CustomerOrderHistoryDTO
 		{
 			TableCode      = order.Table.TableCode,
 			TotalItems     = totalItems,
 			EstimatedTotal = estimatedTotal,
-			Rounds         = new List<CustomerOrderRoundDTO> { round }
+			Items          = allItems
 		};
 	}
 
-	public async Task AddItemsToOrderAsync(long orderId, List<OrderItem> items, CancellationToken cancellationToken = default)
+	public async Task AddItemsToOrderAsync(long orderId, List<OrderItem> items, uint completedOrderStatusId, uint cancelledOrderStatusId, uint pendingOrderStatusId, CancellationToken cancellationToken = default)
 	{
 		var order = await _context.Orders
 			.FirstOrDefaultAsync(o => o.OrderId == orderId, cancellationToken)
@@ -314,11 +315,8 @@ public class OrderRepository : IOrderRepository
 		order.UpdatedAt = DateTime.UtcNow;
 
 		// If the order was completed/cancelled, reopen it to PENDING so kitchen sees the new items
-		const uint completedOrderLvId = 30;
-		const uint cancelledOrderLvId = 31;
-		const uint pendingOrderLvId   = 28;
-		if (order.OrderStatusLvId == completedOrderLvId || order.OrderStatusLvId == cancelledOrderLvId)
-			order.OrderStatusLvId = pendingOrderLvId;
+		if (order.OrderStatusLvId == completedOrderStatusId || order.OrderStatusLvId == cancelledOrderStatusId)
+			order.OrderStatusLvId = pendingOrderStatusId;
 
 		await _context.SaveChangesAsync(cancellationToken);
 	}
@@ -336,42 +334,35 @@ public class OrderRepository : IOrderRepository
 				.ThenInclude(oi => oi.Dish)
 			.Include(o => o.OrderItems)
 				.ThenInclude(oi => oi.ItemStatusLv)
-			.OrderBy(o => o.CreatedAt)
+			.OrderByDescending(o => o.CreatedAt)
 			.ToListAsync(cancellationToken);
 
-		// Assign round numbers (oldest = round 1), then reverse for display (newest first)
-		var rounds = orders
-			.Select((o, index) => new CustomerOrderRoundDTO
+		// Flatten all items from all orders (newest first)
+		var allItems = orders
+			.SelectMany(o => o.OrderItems.Select(oi => new OrderItemDTO
 			{
-				OrderId = o.OrderId,
-				RoundNumber = index + 1,
-				CreatedAt = o.CreatedAt,
-				OrderStatus = o.OrderStatusLv.ValueName,
-				TotalAmount = o.TotalAmount,
-				Items = o.OrderItems.Select(oi => new OrderItemDTO
-				{
-					OrderItemId = oi.OrderItemId,
-					DishId      = oi.DishId,
-					DishName    = oi.Dish.DishName,
-					Quantity    = oi.Quantity,
-					Price       = oi.Price,
-					ItemStatus  = oi.ItemStatusLv.ValueName,
-					RejectReason = oi.RejectReason,
-					Note        = oi.Note
-				}).ToList()
-			})
-			.OrderByDescending(r => r.RoundNumber) // newest round first
+				OrderItemId = oi.OrderItemId,
+				DishId      = oi.DishId,
+				DishName    = oi.Dish.DishName,
+				Quantity    = oi.Quantity,
+				Price       = oi.Price,
+				ItemStatus  = oi.ItemStatusLv.ValueName,
+				RejectReason = oi.RejectReason,
+				Note        = oi.Note
+			}))
 			.ToList();
 
-		var totalItems     = rounds.SelectMany(r => r.Items).Sum(i => i.Quantity);
-		var estimatedTotal = rounds.SelectMany(r => r.Items).Sum(i => i.Price * i.Quantity);
+		// Exclude rejected items from total calculations
+		var nonRejectedItems = allItems.Where(i => i.ItemStatus != "Rejected").ToList();
+		var totalItems     = nonRejectedItems.Sum(i => i.Quantity);
+		var estimatedTotal = nonRejectedItems.Sum(i => i.Price * i.Quantity);
 
 		return new CustomerOrderHistoryDTO
 		{
 			TableCode      = tableCode,
 			TotalItems     = totalItems,
 			EstimatedTotal = estimatedTotal,
-			Rounds         = rounds
+			Items          = allItems
 		};
 	}
 
@@ -442,4 +433,13 @@ public class OrderRepository : IOrderRepository
         .FirstOrDefaultAsync(x => x.OrderId == orderId, ct);
     }
 
+    public async Task<Order?> GetOrderWithItemsAsync(
+        long orderId,
+        CancellationToken ct)
+    {
+        return await _context.Orders
+            .Include(o => o.OrderItems)
+            .ThenInclude(i => i.Dish)
+            .FirstOrDefaultAsync(o => o.OrderId == orderId, ct);
+    }
 }

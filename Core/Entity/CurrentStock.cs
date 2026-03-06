@@ -12,4 +12,6 @@ public partial class CurrentStock
     public DateTime? LastUpdatedAt { get; set; }
 
     public virtual Ingredient Ingredient { get; set; } = null!;
+
+    public decimal MinStockLevel { get; set; }
 }

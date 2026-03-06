@@ -134,6 +134,13 @@ namespace Infa.Data.Migrations
 
                     MySqlPropertyBuilderExtensions.UseMySqlComputedColumn(b.Property<DateTime?>("LastUpdatedAt"));
 
+                    b.Property<decimal>("MinStockLevel")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(14, 3)
+                        .HasColumnType("decimal(14,3)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("min_stock_level");
+
                     b.Property<decimal>("QuantityOnHand")
                         .HasPrecision(14, 3)
                         .HasColumnType("decimal(14,3)")
@@ -964,7 +971,7 @@ namespace Infa.Data.Migrations
                         .HasColumnType("int unsigned")
                         .HasColumnName("source_lv_id");
 
-                    b.Property<long>("StaffId")
+                    b.Property<long?>("StaffId")
                         .HasColumnType("bigint")
                         .HasColumnName("staff_id");
 
@@ -2297,7 +2304,6 @@ namespace Infa.Data.Migrations
                     b.HasOne("Core.Entity.StaffAccount", "Staff")
                         .WithMany("Orders")
                         .HasForeignKey("StaffId")
-                        .IsRequired()
                         .HasConstraintName("orders_ibfk_2");
 
                     b.HasOne("Core.Entity.RestaurantTable", "Table")

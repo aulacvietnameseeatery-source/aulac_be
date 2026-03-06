@@ -19,6 +19,9 @@ public sealed class InMemoryCacheService : ICacheService
     public InMemoryCacheService(IMemoryCache cache)
         => _cache = cache;
 
+    /// <inheritdoc />
+    public bool IsAvailable => true;
+
     public Task SetAsync<T>(string key, T value, TimeSpan? ttl = null, CancellationToken ct = default)
     {
         var options = new MemoryCacheEntryOptions();

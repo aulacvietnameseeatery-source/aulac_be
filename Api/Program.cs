@@ -33,7 +33,7 @@ using Api.Hubs;
 using Api.SignalR;
 using Core.Interface.Service.LookUp;
 using Core.Interface.Service.Customer;
-using Core.Interface.Service.Table;
+using Core.Interface.Service.Promotion;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -42,6 +42,7 @@ builder.Services.Configure<HostOptions>(options =>
 {
     options.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.Ignore;
 });
+
 
 #region Controllers + JSON + Model Validation Response
 
@@ -203,6 +204,7 @@ builder.Services.AddSingleton<IPasswordResetTokenStore, CachePasswordResetTokenS
 
 builder.Services.AddScoped<IDishService, DishService>();
 builder.Services.AddScoped<IDishCategoryService, DishCategoryService>();
+builder.Services.AddScoped<ISupplierService, SupplierService>();
 
 builder.Services.AddScoped<IPasswordGenerator, PasswordGeneratorService>();
 builder.Services.AddScoped<IUsernameGenerator, UsernameGeneratorService>();
@@ -220,8 +222,11 @@ builder.Services.AddScoped<ICustomerService, CustomerService>();
 builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<IPaymentService, PaymentService>();
 builder.Services.AddScoped<ITableService, TableService>();
+builder.Services.AddScoped<IPromotionService, PromotionService>();
 
 builder.Services.AddHttpClient<ITranslationService, GoogleTranslationService>();
+builder.Services.AddScoped<IIngredientService, IngredientService>();
+
 
 
 
@@ -241,6 +246,7 @@ builder.Services.AddScoped<IRoleRepository, RoleRepository>();
 builder.Services.AddScoped<ISystemSettingRepository, SystemSettingRepository>();
 builder.Services.AddScoped<IDishRepository, DishRepository>();
 builder.Services.AddScoped<IDishCategoryRepository, DishCategoryRepository>();
+builder.Services.AddScoped<ISupplierRepository, SupplierRepository>();
 builder.Services.AddScoped<IReservationRepository, ReservationRepository>();
 builder.Services.AddScoped<ITableRepository, TableRepository>();
 
@@ -249,6 +255,8 @@ builder.Services.AddScoped<IMediaRepository, MediaRepository>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
 builder.Services.AddScoped<IOrderRepository, OrderRepository>();
+builder.Services.AddScoped<IIngredientRepository, IngredientRepository>();
+builder.Services.AddScoped<IPromotionRepository, PromotionRepository>();
 
 #endregion
 
@@ -409,5 +417,7 @@ app.MapControllers();
 app.MapHub<ReservationHub>("/hubs/reservation");
 
 #endregion
+
+app.UseStaticFiles();
 
 app.Run();

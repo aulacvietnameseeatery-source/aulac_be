@@ -16,13 +16,16 @@ namespace Api.Controllers;
 public class PublicReservationController : ControllerBase
 {
     private readonly IPublicReservationService _reservationService;
+    private readonly ITableService _tableService;
     private readonly ILogger<PublicReservationController> _logger;
 
     public PublicReservationController(
         IPublicReservationService reservationService,
+        ITableService tableService,
         ILogger<PublicReservationController> logger)
     {
         _reservationService = reservationService;
+        _tableService = tableService;
         _logger = logger;
     }
 
@@ -86,6 +89,37 @@ public class PublicReservationController : ControllerBase
             UserMessage = "Reservation confirmed successfully.",
             SystemMessage = "Reservation created",
             Data = result,
+            ServerTime = DateTimeOffset.UtcNow
+        });
+    }
+
+    /// <summary>
+    /// Marks a table as occupied when a customer starts dining.
+    /// This is a public endpoint used by customers via QR code.
+    /// </summary>
+    /// <param name="tableCode">The table code (e.g., TB-R01)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Success response</returns>
+    /// <response code="200">Table marked as occupied successfully</response>
+    /// <response code="404">Table not found</response>
+    [HttpPost("tables/{tableCode}/occupy")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> OccupyTable(
+        string tableCode,
+        CancellationToken cancellationToken = default)
+    {
+        await _tableService.OccupyTableByCodeAsync(tableCode, cancellationToken);
+
+        _logger.LogInformation("Table {TableCode} marked as occupied by customer", tableCode);
+
+        return Ok(new ApiResponse<object>
+        {
+            Success = true,
+            Code = 200,
+            UserMessage = "Table marked as occupied successfully.",
+            SystemMessage = "Table status updated",
+            Data = new { },
             ServerTime = DateTimeOffset.UtcNow
         });
     }

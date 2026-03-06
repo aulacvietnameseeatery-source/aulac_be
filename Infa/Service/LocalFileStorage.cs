@@ -28,9 +28,9 @@ public class LocalFileStorage : IFileStorage
     /// <inheritdoc />
     public async Task<FileUploadResult> SaveAsync(
         FileUploadRequest file,
-            string folder,
-            FileValidationOptions? validation = null,
-          CancellationToken ct = default)
+        string folder,
+        FileValidationOptions? validation = null,
+        CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(file);
 
@@ -66,8 +66,7 @@ public class LocalFileStorage : IFileStorage
         // Validate batch count
         var maxCount = validation?.MaxFileCount;
         if (maxCount.HasValue && files.Count > maxCount.Value)
-            throw new ValidationException(
-                  $"Too many files. Maximum {maxCount.Value} file(s) allowed, but {files.Count} were provided.");
+            throw new ValidationException($"Too many files. Maximum {maxCount.Value} file(s) allowed, but {files.Count} were provided.");
 
         // Validate each file before saving any
         foreach (var file in files)
@@ -161,7 +160,16 @@ public class LocalFileStorage : IFileStorage
     {
         var prefix = _options.PublicUrlPrefix.TrimEnd('/');
         var path = relativePath.TrimStart('/');
-        return $"{prefix}/{path}";
+
+        // Server-relative path: "/uploads/dishes/abc.jpg"
+        var serverRelative = $"{prefix}/{path}";
+
+        // Prepend the API base URL when configured, e.g. "http://localhost:5000"
+        if (string.IsNullOrWhiteSpace(_options.BaseUrl))
+            return serverRelative;
+
+        var baseUrl = _options.BaseUrl.TrimEnd('/');
+        return $"{baseUrl}{serverRelative}";
     }
 
     #endregion
