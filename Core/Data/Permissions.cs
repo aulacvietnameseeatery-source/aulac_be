@@ -66,5 +66,10 @@ namespace Core.Data
         public const string ManageTableZone = "TABLE:MANAGE_ZONE";
         public const string ManageTableType = "TABLE:MANAGE_TYPE";
         public const string ManageTableMedia = "TABLE:MANAGE_MEDIA";
+
+        //Role
+        public const string ViewPromotion = "PROMOTION:READ";
+        public const string CreatePromotion = "PROMOTION:CREATE";
+        public const string UpdatePromotion = "PROMOTION:UPDATE";
     }
 }

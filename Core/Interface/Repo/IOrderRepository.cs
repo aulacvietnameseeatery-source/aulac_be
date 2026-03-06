@@ -55,5 +55,5 @@ public interface IOrderRepository
     Task AddAsync(Order order, CancellationToken ct);
     Task<OrderHistoryDTO> GetOrderByIdAsync(long orderId, CancellationToken cancellationToken = default);
     Task<Order?> GetByIdForUpdateAsync(long orderId, CancellationToken ct);
-
+    Task<Order?> GetOrderWithItemsAsync(long orderId, CancellationToken ct);
 }

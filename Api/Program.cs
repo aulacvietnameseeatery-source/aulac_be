@@ -33,6 +33,7 @@ using Api.Hubs;
 using Api.SignalR;
 using Core.Interface.Service.LookUp;
 using Core.Interface.Service.Customer;
+using Core.Interface.Service.Promotion;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -221,6 +222,7 @@ builder.Services.AddScoped<ICustomerService, CustomerService>();
 builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<IPaymentService, PaymentService>();
 builder.Services.AddScoped<ITableService, TableService>();
+builder.Services.AddScoped<IPromotionService, PromotionService>();
 
 builder.Services.AddHttpClient<ITranslationService, GoogleTranslationService>();
 builder.Services.AddScoped<IIngredientService, IngredientService>();
@@ -254,6 +256,7 @@ builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
 builder.Services.AddScoped<IOrderRepository, OrderRepository>();
 builder.Services.AddScoped<IIngredientRepository, IngredientRepository>();
+builder.Services.AddScoped<IPromotionRepository, PromotionRepository>();
 
 #endregion
 
