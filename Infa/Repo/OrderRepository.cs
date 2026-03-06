@@ -433,4 +433,13 @@ public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, Can
         .FirstOrDefaultAsync(x => x.OrderId == orderId, ct);
     }
 
+    public async Task<Order?> GetOrderWithItemsAsync(
+        long orderId,
+        CancellationToken ct)
+    {
+        return await _context.Orders
+            .Include(o => o.OrderItems)
+            .ThenInclude(i => i.Dish)
+            .FirstOrDefaultAsync(o => o.OrderId == orderId, ct);
+    }
 }

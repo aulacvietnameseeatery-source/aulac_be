@@ -47,6 +47,9 @@ public sealed class PromotionConfiguration : IEntityTypeConfiguration<Promotion>
         .HasColumnType("datetime")
         .HasColumnName("start_time");
         entity.Property(e => e.TypeLvId).HasColumnName("type_lv_id");
+        entity.Property(e => e.DiscountValue)
+        .HasPrecision(10, 2)
+        .HasColumnName("discount_value");
         entity.Property(e => e.UsedCount)
         .HasDefaultValueSql("'0'")
         .HasColumnName("used_count");
