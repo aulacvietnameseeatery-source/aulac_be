@@ -134,6 +134,7 @@ public class TableRepository : ITableRepository
             .Include(t => t.ZoneLv)
             .Include(t => t.TableMedia)
                 .ThenInclude(tm => tm.Media)
+            .Include(t => t.TableQrImgNavigation)
             .AsNoTracking()
             .Where(t => !t.IsDeleted)
             .AsQueryable();
@@ -270,6 +271,16 @@ public class TableRepository : ITableRepository
     public void RemoveTableMedia(TableMedium tableMedium)
     {
         _context.TableMedia.Remove(tableMedium);
+    }
+
+    /// <inheritdoc />
+    public async Task SetQrImageAsync(long tableId, long mediaId, CancellationToken ct = default)
+    {
+        var table = await _context.RestaurantTables
+  .FirstOrDefaultAsync(t => t.TableId == tableId, ct);
+
+  if (table is not null)
+  table.TableQrImg = mediaId;
     }
 
     public async Task<bool> TryOccupyIfAvailableAsync(

@@ -31,6 +31,7 @@
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.2" />
     <PackageReference Include="MimeKit" Version="4.14.0" />
     <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="8.0.3" />
+    <PackageReference Include="QRCoder" Version="1.6.0" />
     <PackageReference Include="StackExchange.Redis" Version="2.10.1" />
   </ItemGroup>
 
