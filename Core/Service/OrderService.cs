@@ -330,6 +330,9 @@ public class OrderService : IOrderService
     public async Task AddItemsToOrderAsync(long orderId, AddOrderItemsRequestDTO request, CancellationToken cancellationToken = default)
     {
         var createdItemLvId = await OrderItemStatusCode.CREATED.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
+        var completedOrderStatusId = await OrderStatusCode.COMPLETED.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+        var cancelledOrderStatusId = await OrderStatusCode.CANCELLED.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+        var pendingOrderStatusId = await OrderStatusCode.PENDING.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
 
         var orderItems = request.Items.Select(i => new OrderItem
         {
@@ -341,7 +344,7 @@ public class OrderService : IOrderService
             ItemStatusLvId = createdItemLvId,
         }).ToList();
 
-        await _orderRepository.AddItemsToOrderAsync(orderId, orderItems, cancellationToken);
+        await _orderRepository.AddItemsToOrderAsync(orderId, orderItems, completedOrderStatusId, cancelledOrderStatusId, pendingOrderStatusId, cancellationToken);
     }
 
     public async Task<CreateOrderResponseDTO> CreateOrderAsync(CreateOrderRequestDTO request, CancellationToken cancellationToken = default)
@@ -403,9 +406,7 @@ public class OrderService : IOrderService
         // 7. Save to DB
         var orderId = await _orderRepository.CreateOrderAsync(order, orderItems, cancellationToken);
 
-        // 8. Mark the table as OCCUPIED so other customers cannot select it
-        var occupiedLvId = await TableStatusCode.OCCUPIED.ToTableStatusIdAsync(_lookupResolver, cancellationToken);
-        await _tableRepository.UpdateStatusAsync(table.TableId, occupiedLvId, cancellationToken);
+       
 
         return new CreateOrderResponseDTO
         {

@@ -2,7 +2,7 @@
 using Core.Attribute;
 using Core.Data;
 using Core.DTO.Table;
-using Core.Interface.Service.Table;
+using Core.Interface.Service.Entity;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -23,9 +23,11 @@ public class TableController : ControllerBase
         _tableService = tableService;
     }
 
+    // ── List / Select ─────────────────────────────────────────────────────────
+
     /// <summary>
     /// Gets a paged list of tables for the management screen.
-    /// Supports filtering by zone, type, status, online flag, and search by table code.
+    /// Each table includes its images (public URLs), zone, type, and status.
     /// </summary>
     /// <param name="request">Paging and filter parameters</param>
     /// <param name="ct">Cancellation token</param>
@@ -41,21 +43,19 @@ public class TableController : ControllerBase
         var pageIndex = request.PageIndex > 0 ? request.PageIndex : 1;
         var pageSize = request.PageSize > 0 ? request.PageSize : 30;
 
-        var paged = new PagedResult<TableManagementDto>
-        {
-            PageData = items,
-            PageIndex = pageIndex,
-            PageSize = pageSize,
-            TotalCount = totalCount,
-            TotalPage = pageSize > 0 ? (int)Math.Ceiling((double)totalCount / pageSize) : 1
-        };
-
         return Ok(new ApiResponse<PagedResult<TableManagementDto>>
         {
             Success = true,
             Code = 200,
             UserMessage = "Tables retrieved successfully.",
-            Data = paged,
+            Data = new PagedResult<TableManagementDto>
+            {
+                PageData = items,
+                PageIndex = pageIndex,
+                PageSize = pageSize,
+                TotalCount = totalCount,
+                TotalPage = (int)Math.Ceiling((double)totalCount / pageSize)
+            },
             ServerTime = DateTimeOffset.UtcNow
         });
     }
@@ -109,11 +109,21 @@ public class TableController : ControllerBase
         });
     }
 
+    // ── Table CRUD ────────────────────────────────────────────────────────────
+
     /// <summary>
     /// Creates a new restaurant table.
-    /// Validates table code uniqueness and all lookup references (status, type, zone).
-    /// QR code is automatically generated.
+    /// Optionally attach up to 5 images in the same request (multipart/form-data).
+    /// All table fields are sent as normal form fields alongside the image files.
     /// </summary>
+    /// <remarks>
+    /// Example multipart fields:
+    /// - TableCode (string, required)
+    /// - Capacity (int, required, 1–50)
+    /// - IsOnline (bool, default false)
+    /// - StatusLvId, TypeLvId, ZoneLvId (uint, required)
+    /// - Images[] (file[], optional, max 5 × 5 MB, image types only)
+    /// </remarks>
     /// <param name="request">Table creation details</param>
     /// <param name="ct">Cancellation token</param>
     /// <returns>Created table</returns>
@@ -122,14 +132,15 @@ public class TableController : ControllerBase
     /// <response code="409">Table code already exists</response>
     [HttpPost]
     [HasPermission(Permissions.CreateTable)]
-    [ProducesResponseType(typeof(ApiResponse<TableManagementDto>), StatusCodes.Status201Created)]
+    [Consumes("multipart/form-data")]
+    [ProducesResponseType(typeof(ApiResponse<TableDetailDto>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> CreateTable([FromBody] CreateTableRequest request, CancellationToken ct)
+    public async Task<IActionResult> CreateTable([FromForm] CreateTableFormRequest request, CancellationToken ct)
     {
         var dto = await _tableService.CreateTableAsync(request, ct);
 
-        return StatusCode(201, new ApiResponse<TableManagementDto>
+        return StatusCode(StatusCodes.Status201Created, new ApiResponse<TableDetailDto>
         {
             Success = true,
             Code = 201,
@@ -140,9 +151,16 @@ public class TableController : ControllerBase
     }
 
     /// <summary>
-    /// Partially updates a table. All fields are optional.
-    /// Re-validates uniqueness and lookup references only for fields that are provided.
+    /// Updates a table's data and/or images in one request (multipart/form-data).
+    /// All data fields are optional — only provided fields are changed.
+    /// New images are uploaded; existing images listed in RemovedImageIds are deleted.
     /// </summary>
+    /// <remarks>
+    /// Example multipart fields:
+    /// - TableCode, Capacity, IsOnline, StatusLvId, TypeLvId, ZoneLvId (all optional)
+    /// - Images[] (file[], optional, new images to add, max 5 × 5 MB, image types only)
+    /// - RemovedImageIds (string, comma-separated MediaAsset IDs to delete, e.g. "10,11")
+    /// </remarks>
     /// <param name="id">Table ID</param>
     /// <param name="request">Fields to update</param>
     /// <param name="ct">Cancellation token</param>
@@ -153,15 +171,16 @@ public class TableController : ControllerBase
     /// <response code="409">Table code already exists</response>
     [HttpPut("{id:long}")]
     [HasPermission(Permissions.UpdateTable)]
-    [ProducesResponseType(typeof(ApiResponse<TableManagementDto>), StatusCodes.Status200OK)]
+    [Consumes("multipart/form-data")]
+    [ProducesResponseType(typeof(ApiResponse<TableDetailDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> UpdateTable(long id, [FromBody] UpdateTableRequest request, CancellationToken ct)
+    public async Task<IActionResult> UpdateTable(long id, [FromForm] UpdateTableFormRequest request, CancellationToken ct)
     {
         var dto = await _tableService.UpdateTableAsync(id, request, ct);
 
-        return Ok(new ApiResponse<TableManagementDto>
+        return Ok(new ApiResponse<TableDetailDto>
         {
             Success = true,
             Code = 200,
@@ -216,9 +235,10 @@ public class TableController : ControllerBase
         });
     }
 
+    // ── Bulk / QR ─────────────────────────────────────────────────────────────
+
     /// <summary>
     /// Bulk-sets the online/offline flag for every table in a zone.
-    /// Used by the zone section Wi-Fi toggle on the main page.
     /// </summary>
     /// <param name="request">Zone ID and target online state</param>
     /// <param name="ct">Cancellation token</param>
@@ -245,7 +265,6 @@ public class TableController : ControllerBase
 
     /// <summary>
     /// Regenerates the QR code for a table.
-    /// Use when a table code changes or the operator wants a fresh QR link.
     /// </summary>
     /// <param name="id">Table ID</param>
     /// <param name="ct">Cancellation token</param>
@@ -270,15 +289,19 @@ public class TableController : ControllerBase
         });
     }
 
+    // ── Incremental media ─────────────────────────────────────────────────────
+
     /// <summary>
-    /// Uploads images for a table. Accepts up to 5 files, max 5 MB each.
+    /// Adds images to an existing table without changing any other data.
+    /// Accepts up to 5 files, max 5 MB each, image types only.
+    /// Use the PUT /{id} endpoint to add/remove images together with data changes.
     /// </summary>
     /// <param name="id">Table ID</param>
     /// <param name="files">Image files</param>
     /// <param name="ct">Cancellation token</param>
-    /// <returns>List of created media records</returns>
+    /// <returns>List of created media records with public URLs</returns>
     /// <response code="201">Media uploaded successfully</response>
-    /// <response code="400">No files provided, too many files, or a file exceeds 5 MB</response>
+    /// <response code="400">No files provided, too many files, file too large, or unsupported type</response>
     /// <response code="404">Table not found</response>
     [HttpPost("{id:long}/media")]
     [HasPermission(Permissions.ManageTableMedia)]
@@ -306,7 +329,7 @@ public class TableController : ControllerBase
 
         var result = await _tableService.UploadTableMediaAsync(id, inputs, ct);
 
-        return StatusCode(201, new ApiResponse<List<TableMediaDto>>
+        return StatusCode(StatusCodes.Status201Created, new ApiResponse<List<TableMediaDto>>
         {
             Success = true,
             Code = 201,
@@ -318,6 +341,7 @@ public class TableController : ControllerBase
 
     /// <summary>
     /// Removes a specific image from a table.
+    /// To remove images together with data changes, use PUT /{id} with RemovedImageIds instead.
     /// </summary>
     /// <param name="id">Table ID</param>
     /// <param name="mediaId">Media asset ID to remove</param>

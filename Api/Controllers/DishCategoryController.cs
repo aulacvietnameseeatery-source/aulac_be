@@ -242,7 +242,7 @@ public class DishCategoryController : ControllerBase
     /// <response code="200">Status toggled successfully</response>
     /// <response code="404">Category not found</response>
     [HttpPatch("{id}/status")]
-    [HasPermission(Permissions.EditDishCategory)]
+    [HasPermission(Permissions.DeleteDishCategory)]
     [ProducesResponseType(typeof(ApiResponse<DishCategoryDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> ToggleCategoryStatus(

@@ -4,6 +4,7 @@ using Infa.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Infa.Data.Migrations
 {
     [DbContext(typeof(RestaurantMgmtContext))]
-    partial class RestaurantMgmtContextScaffoldModelSnapshot : ModelSnapshot
+    [Migration("20260305205500_AddMinStockLevelToCurrentStock")]
+    partial class AddMinStockLevelToCurrentStock
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -135,11 +138,7 @@ namespace Infa.Data.Migrations
                     MySqlPropertyBuilderExtensions.UseMySqlComputedColumn(b.Property<DateTime?>("LastUpdatedAt"));
 
                     b.Property<decimal>("MinStockLevel")
-                        .ValueGeneratedOnAdd()
-                        .HasPrecision(14, 3)
-                        .HasColumnType("decimal(14,3)")
-                        .HasDefaultValue(0m)
-                        .HasColumnName("min_stock_level");
+                        .HasColumnType("decimal(65,30)");
 
                     b.Property<decimal>("QuantityOnHand")
                         .HasPrecision(14, 3)

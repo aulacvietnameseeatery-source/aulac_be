@@ -13,25 +13,31 @@ namespace Core.DTO.General
     public class FileStorageOptions
     {
         /// <summary>
-        /// Absolute root path, e.g. "wwwroot/uploads"
+        /// Absolute root path on disk, e.g. "wwwroot/uploads".
         /// </summary>
         public string RootPath { get; set; } = null!;
 
         /// <summary>
-        /// Public URL prefix prepended to relative paths when building display URLs.
-        /// E.g. "/uploads" → stored path "dishes/abc.jpg" becomes "/uploads/dishes/abc.jpg".
+        /// API base URL prepended to every public asset URL.
+        /// When empty, URLs are returned as server-relative paths ("/uploads/...").
+        /// </summary>
+        public string BaseUrl { get; set; } = string.Empty;
+
+        /// <summary>
+        /// URL path prefix for served static files.
+        /// E.g. "/uploads" → full public URL becomes "{BaseUrl}/uploads/dishes/abc.jpg".
         /// Default: "/uploads"
         /// </summary>
         public string PublicUrlPrefix { get; set; } = "/uploads";
 
         /// <summary>
         /// Global maximum file size in bytes. Default: 10 MB.
-        /// Individual upload calls can specify a smaller limit.
+        /// Individual upload calls can specify a smaller limit via <see cref="FileValidationOptions"/>.
         /// </summary>
         public long MaxFileSizeBytes { get; set; } = 10 * 1024 * 1024;
 
         /// <summary>
-        /// Allowed MIME types. Empty = allow all.
+        /// Allowed MIME types. Empty set = allow all.
         /// Default: common image types.
         /// </summary>
         public HashSet<string> AllowedMimeTypes { get; set; } =
@@ -44,7 +50,7 @@ namespace Core.DTO.General
         ];
 
         /// <summary>
-        /// Allowed file extensions (with dot). Empty = allow all.
+        /// Allowed file extensions (with dot). Empty set = allow all.
         /// Default: common image extensions.
         /// </summary>
         public HashSet<string> AllowedExtensions { get; set; } =

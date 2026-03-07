@@ -17,6 +17,8 @@ public partial class Promotion
 
     public DateTime EndTime { get; set; }
 
+    public decimal DiscountValue { get; set; }
+
     public int? MaxUsage { get; set; }
 
     public int? UsedCount { get; set; }

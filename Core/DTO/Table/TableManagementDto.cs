@@ -25,5 +25,12 @@ namespace Core.DTO.Table
         // Khu vực (Indoor, Outdoor...)
         public uint ZoneId { get; set; }
         public string ZoneName { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Images associated with this table.
+        /// Contains public URLs ready for direct display.
+        /// Empty when loaded via the lightweight management query.
+        /// </summary>
+        public List<TableMediaDto> Images { get; set; } = new();
     }
 }

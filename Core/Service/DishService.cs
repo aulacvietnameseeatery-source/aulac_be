@@ -1,5 +1,5 @@
-﻿
-using Core.DTO.Dish;
+﻿using Core.DTO.Dish;
+using Core.DTO.General;
 using Core.Extensions;
 using Core.Entity;
 using Core.Enum;
@@ -44,14 +44,9 @@ public class DishService : IDishService
     public async Task<DishDetailDto?> GetDishByIdAsync(long id, string? langCode = null, CancellationToken cancellationToken = default)
     {
         var dish = await _dishRepository.GetDishByIdAsync(id, cancellationToken);
-
-        // Default to English if not specified. Supported: en (English), fr (French), vi (Vietnamese)
         var language = langCode ?? "en";
 
-        if (dish == null)
-        {
-            return null;
-        }
+        if (dish == null) return null;
 
         return new DishDetailDto
         {
@@ -65,21 +60,21 @@ public class DishService : IDishService
             Calories = dish.Calories,
             PrepTimeMinutes = dish.PrepTimeMinutes,
             CookTimeMinutes = dish.CookTimeMinutes,
+            // Url stores RelativePath — resolve to public URL at read time
             ImageUrls = dish.DishMedia
-                .Where(dm => dm.Media != null)
-                .Select(dm => dm.Media!.Url ?? string.Empty)
-                .Where(url => !string.IsNullOrEmpty(url))
-                .ToList(),
+             .Where(dm => dm.Media != null)
+      .Select(dm => _fileStorage.GetPublicUrl(dm.Media!.Url))
+ .ToList(),
             Composition = dish.Recipes
-                .Select(r => new RecipeItemDto
-                {
-                    IngredientId = r.IngredientId,
-                    IngredientName = r.Ingredient?.IngredientNameText?.GetTranslation(language) ?? r.Ingredient?.IngredientName ?? string.Empty,
-                    Quantity = r.Quantity,
-                    Unit = r.Unit,
-                    Note = r.Note
-                })
-                .ToList()
+       .Select(r => new RecipeItemDto
+       {
+           IngredientId = r.IngredientId,
+           IngredientName = r.Ingredient?.IngredientNameText?.GetTranslation(language) ?? r.Ingredient?.IngredientName ?? string.Empty,
+           Quantity = r.Quantity,
+           Unit = r.Unit,
+           Note = r.Note
+       })
+         .ToList()
         };
     }
 
@@ -197,7 +192,7 @@ public class DishService : IDishService
     /// </summary>
     public async Task<(List<DishDisplayDto> Items, int TotalCount)> GetDishesForCustomerAsync(
         GetDishesRequest request,
-        CancellationToken cancellationToken = default)
+   CancellationToken cancellationToken = default)
     {
         request.IsCustomerView = true;
         var (entities, totalCount) = await _dishRepository.GetDishesAsync(request, cancellationToken);
@@ -205,24 +200,15 @@ public class DishService : IDishService
         var dtos = entities.Select(d => new DishDisplayDto
         {
             DishId = d.DishId,
-
-            // Map Đa ngôn ngữ Tên món
             DishName = MapTranslations(d.DishNameText, d.DishName),
-
             Price = d.Price,
-
-            // Map Đa ngôn ngữ Tên Category
             CategoryName = d.Category != null
-                ? MapTranslations(d.Category.CategoryNameText, d.Category.CategoryName)
-                : new I18nTextDto(),
-
-            // Map Đa ngôn ngữ Mô tả
+            ? MapTranslations(d.Category.CategoryNameText, d.Category.CategoryName): new I18nTextDto(),
             Description = MapTranslations(d.DescriptionText, string.Empty),
-
-            // Lấy ảnh Primary, nếu không có thì lấy ảnh đầu tiên
-            ImageUrl = d.DishMedia.FirstOrDefault(dm => dm.IsPrimary == true)?.Media?.Url
-                    ?? d.DishMedia.FirstOrDefault()?.Media?.Url,
-
+            // Url stores RelativePath — resolve to public URL at read time
+            ImageUrl = d.DishMedia.FirstOrDefault(dm => dm.IsPrimary == true)?.Media?.Url is { } primaryUrl
+            ? _fileStorage.GetPublicUrl(primaryUrl)
+            : d.DishMedia.FirstOrDefault()?.Media?.Url is { } firstUrl ? _fileStorage.GetPublicUrl(firstUrl) : null,
             IsChefRecommended = d.ChefRecommended ?? false
         }).ToList();
 
@@ -248,21 +234,19 @@ public class DishService : IDishService
     }
 
     public async Task<long> CreateDishAsync(
-            CreateDishRequest request,
-            IReadOnlyList<IFormFile> staticImages,
-            IReadOnlyList<IFormFile> images360,
-            CancellationToken ct)
+        CreateDishRequest request,
+        IReadOnlyList<IFormFile> staticImages,
+        IReadOnlyList<IFormFile> images360,
+        CancellationToken ct)
     {
-        var uploadedFiles = new List<string>();
+        var savedFilePaths = new List<string>();
 
-        await _uow.BeginTransactionAsync(ct); // Start transaction
+        await _uow.BeginTransactionAsync(ct);
 
         try
         {
-            // Create i18n text records for the dish
             var textIds = await _dishI18nService.CreateDishI18nTextsAsync(request.I18n, ct);
 
-            // Create new Dish entity
             var dish = new Dish
             {
                 CategoryId = request.CategoryId,
@@ -282,31 +266,37 @@ public class DishService : IDishService
                 CreatedAt = DateTime.UtcNow
             };
 
-            await _dishRepository.AddAsync(dish, ct); // Save dish to DB
+            await _dishRepository.AddAsync(dish, ct);
 
-            // Add tag to dish
             foreach (var tagId in request.TagIds.Distinct())
             {
-                await _dishRepository.AddDishTagAsync(new DishTag
-                {
-                    DishId = dish.DishId,
-                    TagId = tagId
-                }, ct);
+                await _dishRepository.AddDishTagAsync(new DishTag { DishId = dish.DishId, TagId = tagId }, ct);
             }
 
-            // Save static images and link to dish
+            var imageTypeId = await _lookupResolver.GetIdAsync(
+            (ushort)Enum.LookupType.MediaType, MediaTypeCode.IMAGE, ct);
+
             foreach (var file in staticImages)
             {
-                var path = await _fileStorage.SaveAsync(file.OpenReadStream(), file.FileName, "dishes", ct); // Save file
-                uploadedFiles.Add(path);
+                var uploadResult = await _fileStorage.SaveAsync(
+               new FileUploadRequest
+               {
+                   Stream = file.OpenReadStream(),
+                   FileName = file.FileName,
+                   ContentType = file.ContentType
+               },
+              "dishes",
+                    FileValidationOptions.ImageUpload,
+             ct);
 
-                var mediaTypeid = _lookupResolver.GetIdAsync((ushort)Enum.LookupType.MediaType, MediaTypeCode.IMAGE, ct).Result; // Get media type id
+                savedFilePaths.Add(uploadResult.RelativePath);
 
                 var media = await _mediaRepo.AddMediaAsync(new MediaAsset
                 {
-                    Url = "/uploads/" + path,
+                    // Store RelativePath — resolve to PublicUrl at read time via _fileStorage.GetPublicUrl()
+                    Url = uploadResult.RelativePath,
                     MimeType = file.ContentType,
-                    MediaTypeLvId = mediaTypeid,
+                    MediaTypeLvId = imageTypeId,
                     CreatedAt = DateTime.UtcNow
                 }, ct);
 
@@ -318,17 +308,13 @@ public class DishService : IDishService
                 }, ct);
             }
 
-            await _uow.CommitAsync(ct); // Commit transaction
+            await _uow.CommitAsync(ct);
             return dish.DishId;
         }
         catch
         {
-            await _uow.RollbackAsync(ct); // Rollback transaction on error
-
-            // Delete uploaded files if error occurs
-            foreach (var f in uploadedFiles)
-                await _fileStorage.DeleteAsync(f);
-
+            await _uow.RollbackAsync(ct);
+            await _fileStorage.DeleteManyAsync(savedFilePaths);
             throw;
         }
     }
@@ -393,18 +379,16 @@ public class DishService : IDishService
         IReadOnlyList<long> removedMediaIds,
         CancellationToken ct)
     {
-        var uploadedFiles = new List<string>();
+        var savedFilePaths = new List<string>();
         var filesToDeleteAfterCommit = new List<string>();
 
-        await _uow.BeginTransactionAsync(ct); // Start transaction
+        await _uow.BeginTransactionAsync(ct);
 
         try
         {
-            // 1. Load Dish
             var dish = await _dishRepository.FindByIdForActionAsync(request.DishId, ct)
-                ?? throw new KeyNotFoundException($"Dish with ID {request.DishId} not found!");
+    ?? throw new KeyNotFoundException($"Dish with ID {request.DishId} not found!");
 
-            // 2. Update core fields
             dish.CategoryId = request.CategoryId;
             dish.Price = request.Price;
             dish.IsOnline = request.IsOnline;
@@ -415,103 +399,64 @@ public class DishService : IDishService
             dish.DishStatusLvId = request.DishStatusLvId;
             dish.DishName = request.I18n["en"].DishName;
 
-            // 2.1 Update tags (many-to-many)
-            var existingTagIds = await _dishRepository
-                .GetTagIdsByDishIdAsync(dish.DishId, ct);
+            var existingTagIds = await _dishRepository.GetTagIdsByDishIdAsync(dish.DishId, ct);
+            var newTagIds = request.TagIds.Distinct().ToList();
+            var tagsToRemove = existingTagIds.Where(id => !newTagIds.Contains(id)).ToList();
+            var tagsToAdd = newTagIds.Where(id => !existingTagIds.Contains(id)).ToList();
 
-            var newTagIds = request.TagIds
-                .Distinct()
-                .ToList();
-
-            // Tags to remove
-            var tagsToRemove = existingTagIds
-                .Where(id => !newTagIds.Contains(id))
-                .ToList();
-
-            // Tags to add
-            var tagsToAdd = newTagIds
-                .Where(id => !existingTagIds.Contains(id))
-                .ToList();
-
-            // Remove old tags
             if (tagsToRemove.Any())
-            {
-                await _dishRepository.RemoveDishTagsAsync(
-                    dish.DishId,
-                    tagsToRemove,
-                    ct);
-            }
+                await _dishRepository.RemoveDishTagsAsync(dish.DishId, tagsToRemove, ct);
 
-            // Add new tags
             foreach (var tagId in tagsToAdd)
-            {
-                await _dishRepository.AddDishTagAsync(new DishTag
-                {
-                    DishId = dish.DishId,
-                    TagId = tagId
-                }, ct);
-            }
+                await _dishRepository.AddDishTagAsync(new DishTag { DishId = dish.DishId, TagId = tagId }, ct);
 
-            // 3. Update I18n
-            var newTextIds =
-            await _dishI18nService.CreateOrUpdateDishI18nTextsAsync(
-                new DishI18nTextIds
-                {
-                    DishNameTextId = dish.DishNameTextId,
-                    DescriptionTextId = dish.DescriptionTextId,
-                    ShortDescriptionTextId = dish.ShortDescriptionTextId,
-                    SloganTextId = dish.SloganTextId,
-                    NoteTextId = dish.NoteTextId
-                },
-                request.I18n,
-                ct
-            );
-            // Assign new text ids to dish
+            var newTextIds = await _dishI18nService.CreateOrUpdateDishI18nTextsAsync(
+              new DishI18nTextIds
+              {
+                  DishNameTextId = dish.DishNameTextId,
+                  DescriptionTextId = dish.DescriptionTextId,
+                  ShortDescriptionTextId = dish.ShortDescriptionTextId,
+                  SloganTextId = dish.SloganTextId,
+                  NoteTextId = dish.NoteTextId
+              },request.I18n, ct);
+
             dish.DishNameTextId = newTextIds.DishNameTextId;
             dish.DescriptionTextId = newTextIds.DescriptionTextId;
             dish.ShortDescriptionTextId = newTextIds.ShortDescriptionTextId;
             dish.SloganTextId = newTextIds.SloganTextId;
             dish.NoteTextId = newTextIds.NoteTextId;
 
-            // 4. Remove old media (DB only)
             if (removedMediaIds.Any())
             {
-                var medias = await _mediaRepo.GetDishMediaByIdsAsync(
-                    dish.DishId,
-                    removedMediaIds,
-                    ct
-                );
-
+                var medias = await _mediaRepo.GetDishMediaByIdsAsync(dish.DishId, removedMediaIds, ct);
                 foreach (var m in medias)
                 {
-                    filesToDeleteAfterCommit.Add(m.Media.Url.Replace("/uploads/", "")); // Mark file for deletion after commit
-
-                    await _mediaRepo.RemoveDishMediaAsync(m, ct); // Remove dish-media link
-                    await _mediaRepo.RemoveMediaAsync(m.Media, ct); // Remove media record
+                    // Url is RelativePath — pass directly to DeleteAsync, no .Replace() needed
+                    filesToDeleteAfterCommit.Add(m.Media.Url);
+                    await _mediaRepo.RemoveDishMediaAsync(m, ct);
+                    await _mediaRepo.RemoveMediaAsync(m.Media, ct);
                 }
             }
 
-            // 5. Add new static images
-            var imageTypeId = await _lookupResolver.GetIdAsync(
-                (ushort)Enum.LookupType.MediaType,
-            MediaTypeCode.IMAGE,
-                ct
-            );
+            var imageTypeId = await _lookupResolver.GetIdAsync((ushort)Enum.LookupType.MediaType, MediaTypeCode.IMAGE, ct);
 
             foreach (var file in staticImages)
             {
-                var path = await _fileStorage.SaveAsync(
-                    file.OpenReadStream(),
-                    file.FileName,
-                    "dishes",
-                    ct
-                );
+                var uploadResult = await _fileStorage.SaveAsync(
+                    new FileUploadRequest
+                    {
+                        Stream = file.OpenReadStream(),
+                        FileName = file.FileName,
+                        ContentType = file.ContentType
+                    },
+                 "dishes",FileValidationOptions.ImageUpload,ct);
 
-                uploadedFiles.Add(path);
+                savedFilePaths.Add(uploadResult.RelativePath);
 
                 var media = await _mediaRepo.AddMediaAsync(new MediaAsset
                 {
-                    Url = "/uploads/" + path,
+                    // Store RelativePath — resolve to PublicUrl at read time via _fileStorage.GetPublicUrl()
+                    Url = uploadResult.RelativePath,
                     MimeType = file.ContentType,
                     MediaTypeLvId = imageTypeId,
                     CreatedAt = DateTime.UtcNow
@@ -525,32 +470,18 @@ public class DishService : IDishService
                 }, ct);
             }
 
-            await _uow.SaveChangesAsync(ct); // Save changes to DB
-
-            await _uow.CommitAsync(ct); // Commit transaction
+            await _uow.SaveChangesAsync(ct);
+            await _uow.CommitAsync(ct);
         }
         catch
         {
-            await _uow.RollbackAsync(ct); // Rollback transaction on error
-
-            // Delete uploaded files if error occurs
-            foreach (var f in uploadedFiles)
-                await _fileStorage.DeleteAsync(f);
-
+            await _uow.RollbackAsync(ct);
+            await _fileStorage.DeleteManyAsync(savedFilePaths);
             throw;
         }
-        // 7. Delete old files AFTER commit
-        foreach (var f in filesToDeleteAfterCommit)
-        {
-            try
-            {
-                await _fileStorage.DeleteAsync(f); // Delete file from storage
-            }
-            catch (Exception ex)
-            {
-                // Ignore file deletion errors
-            }
-        }
+
+        // Delete old files AFTER successful commit — best-effort, logged by DeleteManyAsync
+        await _fileStorage.DeleteManyAsync(filesToDeleteAfterCommit);
     }
 
     public async Task<List<DishPosResponseDto>> GetPosDishesAsync(bool active)
