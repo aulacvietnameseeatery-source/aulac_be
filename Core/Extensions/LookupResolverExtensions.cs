@@ -29,7 +29,7 @@ public static class LookupResolverExtensions
     {
         if (resolver == null)
         {
-       throw new ArgumentNullException(nameof(resolver));
+            throw new ArgumentNullException(nameof(resolver));
         }
 
         return await resolver.GetIdAsync(typeId, valueCodeEnum, ct);
@@ -39,9 +39,9 @@ public static class LookupResolverExtensions
     /// Attempts to get the lookup value_id for an enum value_code asynchronously.
     /// </summary>
     /// <param name="valueCodeEnum">The enum representing the value code</param>
- /// <param name="resolver">The lookup resolver instance</param>
-  /// <param name="typeId">The lookup type ID</param>
- /// <param name="ct">Cancellation token</param>
+    /// <param name="resolver">The lookup resolver instance</param>
+    /// <param name="typeId">The lookup type ID</param>
+    /// <param name="ct">Cancellation token</param>
     /// <returns>The value_id if found; otherwise null</returns>
     /// <example>
     /// var statusId = await OrderStatusCode.PENDING.TryIdAsync(_lookupResolver, typeId: 10);
@@ -55,10 +55,10 @@ public static class LookupResolverExtensions
     {
         if (resolver == null)
         {
-       throw new ArgumentNullException(nameof(resolver));
-     }
+            throw new ArgumentNullException(nameof(resolver));
+        }
 
-    return await resolver.TryGetIdAsync(typeId, valueCodeEnum, ct);
+        return await resolver.TryGetIdAsync(typeId, valueCodeEnum, ct);
     }
 
     /// <summary>
@@ -79,10 +79,10 @@ public static class LookupResolverExtensions
         ushort typeId,
       CancellationToken ct = default)
     {
-      if (resolver == null)
- {
-   throw new ArgumentNullException(nameof(resolver));
- }
+        if (resolver == null)
+        {
+            throw new ArgumentNullException(nameof(resolver));
+        }
 
         return await resolver.GetIdAsync(typeId, valueCode, ct);
     }
@@ -106,10 +106,10 @@ public static class LookupResolverExtensions
     {
         if (resolver == null)
         {
-       throw new ArgumentNullException(nameof(resolver));
+            throw new ArgumentNullException(nameof(resolver));
         }
 
-    return await resolver.TryGetIdAsync(typeId, valueCode, ct);
+        return await resolver.TryGetIdAsync(typeId, valueCode, ct);
     }
 
     #region Type-Specific Helper Extensions
@@ -153,7 +153,7 @@ this AccountStatusCode statusCode,
     /// Gets the lookup value_id for an OrderStatusCode enum asynchronously.
     /// Type-specific helper for Order Status lookups (type_id = 10).
     /// </summary>
-  /// <param name="statusCode">The order status code enum</param>
+    /// <param name="statusCode">The order status code enum</param>
     /// <param name="resolver">The lookup resolver instance</param>
     /// <param name="ct">Cancellation token</param>
     /// <returns>The value_id for the order status</returns>
@@ -166,7 +166,7 @@ this AccountStatusCode statusCode,
         ILookupResolver resolver,
      CancellationToken ct = default)
     {
-      return await statusCode.IdAsync(resolver, (ushort)LookupType.OrderStatus, ct);
+        return await statusCode.IdAsync(resolver, (ushort)LookupType.OrderStatus, ct);
     }
 
     /// <summary>
@@ -181,7 +181,7 @@ this AccountStatusCode statusCode,
         ILookupResolver resolver,
         CancellationToken ct = default)
     {
-   return await statusCode.TryIdAsync(resolver, (ushort)LookupType.OrderStatus, ct);
+        return await statusCode.TryIdAsync(resolver, (ushort)LookupType.OrderStatus, ct);
     }
 
     /// <summary>
@@ -203,7 +203,7 @@ this AccountStatusCode statusCode,
 
     /// <summary>
     /// Attempts to get the lookup value_id for a payment method enum asynchronously.
-  /// </summary>
+    /// </summary>
     /// <param name="methodCode">The payment method code enum</param>
     /// <param name="resolver">The lookup resolver instance</param>
     /// <param name="ct">Cancellation token</param>
@@ -228,7 +228,7 @@ this AccountStatusCode statusCode,
         this TableStatusCode statusCode,
         ILookupResolver resolver,
         CancellationToken ct = default)
-  {
+    {
         return await statusCode.IdAsync(resolver, (ushort)LookupType.TableStatus, ct);
     }
 
@@ -244,14 +244,14 @@ this AccountStatusCode statusCode,
         this ReservationStatusCode statusCode,
     ILookupResolver resolver,
         CancellationToken ct = default)
-  {
+    {
         return await statusCode.IdAsync(resolver, (ushort)LookupType.ReservationStatus, ct);
     }
 
     /// <summary>
     /// Gets the lookup value_id for a DishStatusCode enum asynchronously.
     /// Type-specific helper for Dish Status lookups (type_id = 12).
- /// </summary>
+    /// </summary>
     /// <param name="statusCode">The dish status code enum</param>
     /// <param name="resolver">The lookup resolver instance</param>
     /// <param name="ct">Cancellation token</param>
@@ -264,20 +264,20 @@ this AccountStatusCode statusCode,
         return await statusCode.IdAsync(resolver, (ushort)LookupType.DishStatus, ct);
     }
 
-  /// <summary>
+    /// <summary>
     /// Gets the lookup value_id for an OrderItemStatusCode enum asynchronously.
     /// Type-specific helper for Order Item Status lookups (type_id = 13).
     /// </summary>
     /// <param name="statusCode">The order item status code enum</param>
     /// <param name="resolver">The lookup resolver instance</param>
-  /// <param name="ct">Cancellation token</param>
+    /// <param name="ct">Cancellation token</param>
     /// <returns>The value_id for the order item status</returns>
     public static async Task<uint> ToOrderItemStatusIdAsync(
         this OrderItemStatusCode statusCode,
         ILookupResolver resolver,
         CancellationToken ct = default)
     {
- return await statusCode.IdAsync(resolver, (ushort)LookupType.OrderItemStatus, ct);
+        return await statusCode.IdAsync(resolver, (ushort)LookupType.OrderItemStatus, ct);
     }
 
     /// <summary>
@@ -298,8 +298,8 @@ this AccountStatusCode statusCode,
 
     /// <summary>
     /// Gets the lookup value_id for an InventoryTxStatusCode enum asynchronously.
-  /// Type-specific helper for Inventory Transaction Status lookups (type_id = 3).
- /// </summary>
+    /// Type-specific helper for Inventory Transaction Status lookups (type_id = 3).
+    /// </summary>
     /// <param name="statusCode">The inventory transaction status code enum</param>
     /// <param name="resolver">The lookup resolver instance</param>
     /// <param name="ct">Cancellation token</param>
@@ -309,11 +309,11 @@ this AccountStatusCode statusCode,
       ILookupResolver resolver,
   CancellationToken ct = default)
     {
-      return await statusCode.IdAsync(resolver, (ushort)LookupType.InventoryTxStatus, ct);
+        return await statusCode.IdAsync(resolver, (ushort)LookupType.InventoryTxStatus, ct);
     }
 
     /// <summary>
-  /// Gets the lookup value_id for an InventoryTxTypeCode enum asynchronously.
+    /// Gets the lookup value_id for an InventoryTxTypeCode enum asynchronously.
     /// Type-specific helper for Inventory Transaction Type lookups (type_id = 2).
     /// </summary>
     /// <param name="typeCode">The inventory transaction type code enum</param>
@@ -326,6 +326,39 @@ this AccountStatusCode statusCode,
  CancellationToken ct = default)
     {
         return await typeCode.IdAsync(resolver, (ushort)LookupType.InventoryTxType, ct);
+    }
+
+    /// <summary>
+    /// Gets the lookup value_id for a ShiftStatusCode enum asynchronously.
+    /// </summary>
+    public static async Task<uint> ToShiftStatusIdAsync(
+        this ShiftStatusCode statusCode,
+        ILookupResolver resolver,
+        CancellationToken ct = default)
+    {
+        return await statusCode.IdAsync(resolver, (ushort)LookupType.ShiftStatus, ct);
+    }
+
+    /// <summary>
+    /// Gets the lookup value_id for a ShiftAssignmentStatusCode enum asynchronously.
+    /// </summary>
+    public static async Task<uint> ToShiftAssignmentStatusIdAsync(
+        this ShiftAssignmentStatusCode statusCode,
+        ILookupResolver resolver,
+        CancellationToken ct = default)
+    {
+        return await statusCode.IdAsync(resolver, (ushort)LookupType.ShiftAssignmentStatus, ct);
+    }
+
+    /// <summary>
+    /// Gets the lookup value_id for an AttendanceStatusCode enum asynchronously.
+    /// </summary>
+    public static async Task<uint> ToAttendanceStatusIdAsync(
+        this AttendanceStatusCode statusCode,
+        ILookupResolver resolver,
+        CancellationToken ct = default)
+    {
+        return await statusCode.IdAsync(resolver, (ushort)LookupType.AttendanceStatus, ct);
     }
 
     #endregion
