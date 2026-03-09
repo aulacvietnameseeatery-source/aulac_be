@@ -1,4 +1,5 @@
 using Core.DTO.General;
+using Core.DTO.Ingredient;
 using Core.DTO.Supplier;
 using Core.Entity;
 using Core.Interface.Repo;
@@ -30,6 +31,35 @@ public class SupplierService : ISupplierService
     }
 
     /// <inheritdoc />
+    public async Task<SupplierDetailDto> GetSupplierDetailAsync(long id, CancellationToken cancellationToken = default)
+    {
+        var supplier = await _supplierRepository.GetByIdWithIngredientsAsync(id, cancellationToken);
+        
+        if (supplier == null)
+        {
+            _logger.LogWarning("Supplier with ID {SupplierId} not found", id);
+            throw new KeyNotFoundException($"Supplier with ID {id} not found.");
+        }
+
+        return new SupplierDetailDto
+        {
+            SupplierId = supplier.SupplierId,
+            SupplierName = supplier.SupplierName,
+            Phone = supplier.Phone,
+            Email = supplier.Email,
+            Ingredients = supplier.IngredientSuppliers
+                .Where(is_ => is_.Ingredient != null)
+                .Select(is_ => new IngredientDto
+                {
+                    IngredientId = is_.Ingredient!.IngredientId,
+                    IngredientName = is_.Ingredient.IngredientName,
+                    Unit = is_.Ingredient.Unit
+                })
+                .ToList()
+        };
+    }
+
+    /// <inheritdoc />
     public async Task<SupplierDto> CreateSupplierAsync(CreateSupplierRequest request, CancellationToken cancellationToken = default)
     {
         // Check if supplier name already exists
@@ -48,6 +78,12 @@ public class SupplierService : ISupplierService
         };
 
         var createdSupplier = await _supplierRepository.CreateAsync(supplier, cancellationToken);
+        
+        // Update ingredient relationships
+        if (request.IngredientIds.Any())
+        {
+            await _supplierRepository.UpdateSupplierIngredientsAsync(createdSupplier.SupplierId, request.IngredientIds, cancellationToken);
+        }
         
         _logger.LogInformation("Created new supplier: {SupplierName} (ID: {SupplierId})", 
             createdSupplier.SupplierName, createdSupplier.SupplierId);
@@ -80,6 +116,9 @@ public class SupplierService : ISupplierService
         supplier.Email = request.Email;
 
         var updatedSupplier = await _supplierRepository.UpdateAsync(supplier, cancellationToken);
+        
+        // Update ingredient relationships
+        await _supplierRepository.UpdateSupplierIngredientsAsync(id, request.IngredientIds, cancellationToken);
         
         _logger.LogInformation("Updated supplier: {SupplierName} (ID: {SupplierId})", 
             updatedSupplier.SupplierName, updatedSupplier.SupplierId);

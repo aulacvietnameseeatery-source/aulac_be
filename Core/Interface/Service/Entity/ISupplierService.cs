@@ -17,6 +17,15 @@ public interface ISupplierService
     Task<PagedResultDTO<SupplierDto>> GetAllSuppliersAsync(SupplierListQueryDTO query, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Get supplier detail with ingredients
+    /// </summary>
+    /// <param name="id">Supplier ID</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Supplier detail with ingredients</returns>
+    /// <exception cref="KeyNotFoundException">Thrown when supplier not found</exception>
+    Task<SupplierDetailDto> GetSupplierDetailAsync(long id, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Create a new supplier
     /// </summary>
     /// <param name="request">Create supplier request</param>
