@@ -369,3 +369,5 @@ CarRental-BE/Properties/serviceDependencies.json
 Api/appsettings.json
 /Docs
 /Api/wwwroot/uploads
+
+.idea 

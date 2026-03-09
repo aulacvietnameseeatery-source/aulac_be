@@ -2,7 +2,7 @@
 using Core.DTO.Table;
 
 
-namespace Core.Interface.Service.Table;
+namespace Core.Interface.Service.Entity;
 
 public interface ITableService
 {

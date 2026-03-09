@@ -4,6 +4,7 @@ using Infa.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Infa.Data.Migrations
 {
     [DbContext(typeof(RestaurantMgmtContext))]
-    partial class RestaurantMgmtContextScaffoldModelSnapshot : ModelSnapshot
+    [Migration("20260305214408_AddMinStockKebabLevelToCurrentStock")]
+    partial class AddMinStockKebabLevelToCurrentStock
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1197,11 +1200,6 @@ namespace Infa.Data.Migrations
                         .HasColumnType("varchar(255)")
                         .HasColumnName("description");
 
-                    b.Property<decimal>("DiscountValue")
-                        .HasPrecision(10, 2)
-                        .HasColumnType("decimal(10,2)")
-                        .HasColumnName("discount_value");
-
                     b.Property<DateTime>("EndTime")
                         .HasColumnType("datetime")
                         .HasColumnName("end_time");
@@ -1833,11 +1831,6 @@ namespace Infa.Data.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)")
                         .HasColumnName("setting_key");
-
-                    b.Property<string>("SettingName")
-                        .HasMaxLength(255)
-                        .HasColumnType("varchar(255)")
-                        .HasColumnName("setting_name");
 
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAddOrUpdate()

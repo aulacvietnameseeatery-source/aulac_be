@@ -1,3 +1,4 @@
+using Core.DTO.SystemSetting;
 using Core.Entity;
 using Core.Interface.Repo;
 using Core.Interface.Service.Others;
@@ -15,7 +16,7 @@ public class SystemSettingService : ISystemSettingService
     private readonly ISystemSettingRepository _repository;
     private readonly ICacheService _cacheService;
     private const string CacheKeyPrefix = "system_setting:";
-    private const int CacheExpirationMinutes = 60; // Cache for 1 hour
+    private const int CacheExpirationMinutes = 60;
 
     public SystemSettingService(
         ISystemSettingRepository repository,
@@ -32,12 +33,7 @@ public class SystemSettingService : ISystemSettingService
         CancellationToken cancellationToken = default)
     {
         var setting = await GetSettingWithCacheAsync(key, cancellationToken);
-
-        if (setting == null || setting.ValueType != "STRING")
-        {
-            return defaultValue;
-        }
-
+        if (setting == null || setting.ValueType != "STRING") return defaultValue;
         return setting.ValueString ?? defaultValue;
     }
 
@@ -48,12 +44,7 @@ public class SystemSettingService : ISystemSettingService
         CancellationToken cancellationToken = default)
     {
         var setting = await GetSettingWithCacheAsync(key, cancellationToken);
-
-        if (setting == null || setting.ValueType != "INT")
-        {
-            return defaultValue;
-        }
-
+        if (setting == null || setting.ValueType != "INT") return defaultValue;
         return setting.ValueInt ?? defaultValue;
     }
 
@@ -64,12 +55,7 @@ public class SystemSettingService : ISystemSettingService
         CancellationToken cancellationToken = default)
     {
         var setting = await GetSettingWithCacheAsync(key, cancellationToken);
-
-        if (setting == null || setting.ValueType != "DECIMAL")
-        {
-            return defaultValue;
-        }
-
+        if (setting == null || setting.ValueType != "DECIMAL") return defaultValue;
         return setting.ValueDecimal ?? defaultValue;
     }
 
@@ -80,12 +66,7 @@ public class SystemSettingService : ISystemSettingService
         CancellationToken cancellationToken = default)
     {
         var setting = await GetSettingWithCacheAsync(key, cancellationToken);
-
-        if (setting == null || setting.ValueType != "BOOL")
-        {
-            return defaultValue;
-        }
-
+        if (setting == null || setting.ValueType != "BOOL") return defaultValue;
         return setting.ValueBool ?? defaultValue;
     }
 
@@ -96,12 +77,8 @@ public class SystemSettingService : ISystemSettingService
         CancellationToken cancellationToken = default)
     {
         var setting = await GetSettingWithCacheAsync(key, cancellationToken);
-
         if (setting == null || setting.ValueType != "JSON" || string.IsNullOrWhiteSpace(setting.ValueJson))
-        {
             return defaultValue;
-        }
-
         try
         {
             return JsonSerializer.Deserialize<T>(setting.ValueJson);
@@ -114,131 +91,85 @@ public class SystemSettingService : ISystemSettingService
 
     /// <inheritdoc />
     public async Task SetStringAsync(
-        string key,
-        string value,
-        string? description = null,
-        bool isSensitive = false,
-        long? updatedBy = null,
-        CancellationToken cancellationToken = default)
+        string key, string value,
+        string? description = null, bool isSensitive = false,
+        long? updatedBy = null, CancellationToken cancellationToken = default)
     {
         var setting = new SystemSetting
         {
-            SettingKey = key,
-            ValueType = "STRING",
-            ValueString = value,
-            Description = description,
-            IsSensitive = isSensitive,
-            UpdatedBy = updatedBy
+            SettingKey = key, ValueType = "STRING", ValueString = value,
+            Description = description, IsSensitive = isSensitive, UpdatedBy = updatedBy
         };
-
         await _repository.SaveAsync(setting, cancellationToken);
         await ClearCacheAsync(key);
     }
 
     /// <inheritdoc />
     public async Task SetIntAsync(
-            string key,
-            long value,
-            string? description = null,
-            bool isSensitive = false,
-            long? updatedBy = null,
-            CancellationToken cancellationToken = default)
+        string key, long value,
+        string? description = null, bool isSensitive = false,
+        long? updatedBy = null, CancellationToken cancellationToken = default)
     {
         var setting = new SystemSetting
         {
-            SettingKey = key,
-            ValueType = "INT",
-            ValueInt = value,
-            Description = description,
-            IsSensitive = isSensitive,
-            UpdatedBy = updatedBy
+            SettingKey = key, ValueType = "INT", ValueInt = value,
+            Description = description, IsSensitive = isSensitive, UpdatedBy = updatedBy
         };
-
         await _repository.SaveAsync(setting, cancellationToken);
         await ClearCacheAsync(key);
     }
 
     /// <inheritdoc />
     public async Task SetDecimalAsync(
-        string key,
-        decimal value,
-        string? description = null,
-        bool isSensitive = false,
-        long? updatedBy = null,
-        CancellationToken cancellationToken = default)
+        string key, decimal value,
+        string? description = null, bool isSensitive = false,
+        long? updatedBy = null, CancellationToken cancellationToken = default)
     {
         var setting = new SystemSetting
         {
-            SettingKey = key,
-            ValueType = "DECIMAL",
-            ValueDecimal = value,
-            Description = description,
-            IsSensitive = isSensitive,
-            UpdatedBy = updatedBy
+            SettingKey = key, ValueType = "DECIMAL", ValueDecimal = value,
+            Description = description, IsSensitive = isSensitive, UpdatedBy = updatedBy
         };
-
         await _repository.SaveAsync(setting, cancellationToken);
         await ClearCacheAsync(key);
     }
 
     /// <inheritdoc />
     public async Task SetBoolAsync(
-        string key,
-        bool value,
-        string? description = null,
-        bool isSensitive = false,
-        long? updatedBy = null,
-        CancellationToken cancellationToken = default)
+        string key, bool value,
+        string? description = null, bool isSensitive = false,
+        long? updatedBy = null, CancellationToken cancellationToken = default)
     {
         var setting = new SystemSetting
         {
-            SettingKey = key,
-            ValueType = "BOOL",
-            ValueBool = value,
-            Description = description,
-            IsSensitive = isSensitive,
-            UpdatedBy = updatedBy
+            SettingKey = key, ValueType = "BOOL", ValueBool = value,
+            Description = description, IsSensitive = isSensitive, UpdatedBy = updatedBy
         };
-
         await _repository.SaveAsync(setting, cancellationToken);
         await ClearCacheAsync(key);
     }
 
     /// <inheritdoc />
     public async Task SetJsonAsync<T>(
-        string key,
-        T value,
-        string? description = null,
-        bool isSensitive = false,
-        long? updatedBy = null,
-        CancellationToken cancellationToken = default)
+        string key, T value,
+        string? description = null, bool isSensitive = false,
+        long? updatedBy = null, CancellationToken cancellationToken = default)
     {
         var jsonValue = JsonSerializer.Serialize(value);
-
         var setting = new SystemSetting
         {
-            SettingKey = key,
-            ValueType = "JSON",
-            ValueJson = jsonValue,
-            Description = description,
-            IsSensitive = isSensitive,
-            UpdatedBy = updatedBy
+            SettingKey = key, ValueType = "JSON", ValueJson = jsonValue,
+            Description = description, IsSensitive = isSensitive, UpdatedBy = updatedBy
         };
-
         await _repository.SaveAsync(setting, cancellationToken);
         await ClearCacheAsync(key);
     }
 
     /// <inheritdoc />
-    public async Task<bool> DeleteAsync(
-        string key,
-        CancellationToken cancellationToken = default)
+    public async Task<bool> DeleteAsync(string key, CancellationToken cancellationToken = default)
     {
         var result = await _repository.DeleteAsync(key, cancellationToken);
-        if (result)
-        {
-            await ClearCacheAsync(key);
-        }
+        if (result) await ClearCacheAsync(key);
         return result;
     }
 
@@ -248,23 +179,152 @@ public class SystemSettingService : ISystemSettingService
     {
         var settings = await _repository.GetAllNonSensitiveAsync(cancellationToken);
         var result = new Dictionary<string, object?>();
-
         foreach (var setting in settings)
         {
-            object? value = setting.ValueType switch
-            {
-                "STRING" => setting.ValueString,
-                "INT" => setting.ValueInt,
-                "DECIMAL" => setting.ValueDecimal,
-                "BOOL" => setting.ValueBool,
-                "JSON" => setting.ValueJson,
-                _ => null
-            };
+            result[setting.SettingKey] = ExtractValue(setting);
+        }
+        return result;
+    }
 
-            result[setting.SettingKey] = value;
+    /// <inheritdoc />
+    public async Task<Dictionary<string, List<SystemSettingDetailDto>>> GetAllGroupedAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var settings = await _repository.GetAllAsync(cancellationToken);
+        var grouped = new Dictionary<string, List<SystemSettingDetailDto>>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var s in settings)
+        {
+            var group = ExtractGroup(s.SettingKey);
+            if (!grouped.ContainsKey(group))
+                grouped[group] = new List<SystemSettingDetailDto>();
+            grouped[group].Add(MapToDetailDto(s));
         }
 
-        return result;
+        return grouped;
+    }
+
+    /// <inheritdoc />
+    public async Task<List<SystemSettingDetailDto>> GetGroupAsync(
+        string group,
+        CancellationToken cancellationToken = default)
+    {
+        var settings = await _repository.GetByGroupPrefixAsync(group, cancellationToken);
+        return settings.Select(MapToDetailDto).ToList();
+    }
+
+    /// <inheritdoc />
+    public async Task BulkUpdateGroupAsync(
+        string group,
+        List<BulkUpdateSettingItemDto> items,
+        long? updatedBy = null,
+        CancellationToken cancellationToken = default)
+    {
+        // Load existing settings for the group to preserve ValueType and IsSensitive
+        var existing = await _repository.GetByGroupPrefixAsync(group, cancellationToken);
+        var existingDict = existing.ToDictionary(s => s.SettingKey, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var item in items)
+        {
+            if (existingDict.TryGetValue(item.Key, out var existingSetting))
+            {
+                // Update – preserve ValueType and IsSensitive
+                var updated = new SystemSetting
+                {
+                    SettingKey = item.Key,
+                    SettingName = item.SettingName ?? existingSetting.SettingName,
+                    ValueType = existingSetting.ValueType,
+                    IsSensitive = existingSetting.IsSensitive,
+                    Description = item.Description ?? existingSetting.Description,
+                    UpdatedBy = updatedBy
+                };
+
+                // Parse value according to existing type
+                switch (existingSetting.ValueType)
+                {
+                    case "STRING":
+                        updated.ValueString = item.Value;
+                        break;
+                    case "INT":
+                        updated.ValueInt = long.TryParse(item.Value, out var l) ? l : existingSetting.ValueInt;
+                        break;
+                    case "DECIMAL":
+                        updated.ValueDecimal = decimal.TryParse(item.Value,
+                            System.Globalization.NumberStyles.Any,
+                            System.Globalization.CultureInfo.InvariantCulture,
+                            out var d) ? d : existingSetting.ValueDecimal;
+                        break;
+                    case "BOOL":
+                        updated.ValueBool = bool.TryParse(item.Value, out var b) ? b : existingSetting.ValueBool;
+                        break;
+                    case "JSON":
+                        updated.ValueJson = item.Value;
+                        break;
+                    default:
+                        updated.ValueString = item.Value;
+                        break;
+                }
+
+                await _repository.SaveAsync(updated, cancellationToken);
+            }
+            else
+            {
+                // New setting – default to STRING
+                var newSetting = new SystemSetting
+                {
+                    SettingKey = item.Key,
+                    SettingName = item.SettingName,
+                    ValueType = "STRING",
+                    ValueString = item.Value,
+                    Description = item.Description,
+                    IsSensitive = false,
+                    UpdatedBy = updatedBy
+                };
+                await _repository.SaveAsync(newSetting, cancellationToken);
+            }
+
+            await ClearCacheAsync(item.Key);
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task CreateSettingAsync(
+        string key, string? settingName, string valueType, string value,
+        string? description = null, bool isSensitive = false,
+        long? updatedBy = null, CancellationToken cancellationToken = default)
+    {
+        var setting = new SystemSetting
+        {
+            SettingKey = key,
+            SettingName = settingName,
+            ValueType = valueType.ToUpperInvariant(),
+            Description = description,
+            IsSensitive = isSensitive,
+            UpdatedBy = updatedBy
+        };
+
+        switch (setting.ValueType)
+        {
+            case "INT":
+                setting.ValueInt = long.TryParse(value, out var l) ? l : 0;
+                break;
+            case "DECIMAL":
+                setting.ValueDecimal = decimal.TryParse(value, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var d) ? d : 0m;
+                break;
+            case "BOOL":
+                setting.ValueBool = bool.TryParse(value, out var b) ? b : false;
+                break;
+            case "JSON":
+                setting.ValueJson = value;
+                break;
+            default:
+                setting.ValueType = "STRING";
+                setting.ValueString = value;
+                break;
+        }
+
+        await _repository.SaveAsync(setting, cancellationToken);
+        await ClearCacheAsync(key);
     }
 
     /// <inheritdoc />
@@ -280,38 +340,52 @@ public class SystemSettingService : ISystemSettingService
         await Task.CompletedTask;
     }
 
-    #region Private Helper Methods
+    #region Private Helpers
 
-    /// <summary>
-    /// Gets a setting from cache or database.
-    /// Implements cache-aside pattern.
-    /// </summary>
     private async Task<SystemSetting?> GetSettingWithCacheAsync(
-        string key,
-        CancellationToken cancellationToken)
+        string key, CancellationToken cancellationToken)
     {
         var cacheKey = $"{CacheKeyPrefix}{key}";
-
-        // Try to get from cache first
         var cachedSetting = await _cacheService.GetAsync<SystemSetting>(cacheKey);
-        if (cachedSetting != null)
-        {
-            return cachedSetting;
-        }
+        if (cachedSetting != null) return cachedSetting;
 
-        // If not in cache, get from database
         var setting = await _repository.GetByKeyAsync(key, cancellationToken);
         if (setting != null)
         {
-            // Store in cache for future requests
             await _cacheService.SetAsync(
-                cacheKey,
-                setting,
+                cacheKey, setting,
                 TimeSpan.FromMinutes(CacheExpirationMinutes));
         }
-
         return setting;
     }
+
+    private static object? ExtractValue(SystemSetting s) => s.ValueType switch
+    {
+        "STRING" => s.ValueString,
+        "INT" => s.ValueInt,
+        "DECIMAL" => s.ValueDecimal,
+        "BOOL" => s.ValueBool,
+        "JSON" => s.ValueJson,
+        _ => null
+    };
+
+    private static string ExtractGroup(string settingKey)
+    {
+        var dotIndex = settingKey.IndexOf('.');
+        return dotIndex > 0 ? settingKey[..dotIndex] : "general";
+    }
+
+    private static SystemSettingDetailDto MapToDetailDto(SystemSetting s) => new()
+    {
+        SettingKey = s.SettingKey,
+        SettingName = s.SettingName,
+        Group = ExtractGroup(s.SettingKey),
+        ValueType = s.ValueType,
+        Value = ExtractValue(s),
+        Description = s.Description,
+        IsSensitive = s.IsSensitive,
+        UpdatedAt = s.UpdatedAt
+    };
 
     #endregion
 }

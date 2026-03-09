@@ -2,7 +2,7 @@
 using Core.Attribute;
 using Core.Data;
 using Core.DTO.Table;
-using Core.Interface.Service.Table;
+using Core.Interface.Service.Entity;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
