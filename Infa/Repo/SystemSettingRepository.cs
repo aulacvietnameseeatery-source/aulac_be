@@ -50,6 +50,19 @@ public class SystemSettingRepository : ISystemSettingRepository
     }
 
     /// <inheritdoc />
+    public async Task<IEnumerable<SystemSetting>> GetByGroupPrefixAsync(
+        string groupPrefix,
+        CancellationToken cancellationToken = default)
+    {
+        var prefix = groupPrefix.TrimEnd('.') + ".";
+        return await _context.SystemSettings
+            .AsNoTracking()
+            .Where(s => s.SettingKey.StartsWith(prefix))
+            .OrderBy(s => s.SettingKey)
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
     public async Task SaveAsync(
         SystemSetting setting,
         CancellationToken cancellationToken = default)
