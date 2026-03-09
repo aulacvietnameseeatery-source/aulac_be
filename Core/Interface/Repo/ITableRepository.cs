@@ -125,9 +125,14 @@ public interface ITableRepository
     /// </summary>
     void RemoveTableMedia(TableMedium tableMedium);
 
-     Task<bool> TryOccupyIfAvailableAsync(
-    long tableId,
-    uint availableLvId,
-    uint occupiedLvId,
-    CancellationToken ct);
+    /// <summary>
+    /// Sets the QR image foreign key on a table row (does not save — caller must SaveChanges).
+    /// </summary>
+    Task SetQrImageAsync(long tableId, long mediaId, CancellationToken ct = default);
+
+    Task<bool> TryOccupyIfAvailableAsync(
+        long tableId,
+        uint availableLvId,
+        uint occupiedLvId,
+        CancellationToken ct);
 }

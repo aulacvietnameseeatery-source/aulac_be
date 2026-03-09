@@ -215,6 +215,7 @@ builder.Services.AddScoped<IRoleService, RoleService>();
 builder.Services.AddScoped<IAdminReservationService, AdminReservationService>();
 
 builder.Services.AddScoped<IFileStorage, LocalFileStorage>();
+builder.Services.AddScoped<IQrCodeGenerator, QrCodeGeneratorService>();
 builder.Services.AddScoped<IDishI18nService, DishI18nService>();
 builder.Services.AddScoped<Ii18nService, I18nService>();
 builder.Services.AddScoped<ILookupService, LookupService>();
@@ -226,7 +227,6 @@ builder.Services.AddScoped<IPromotionService, PromotionService>();
 
 builder.Services.AddHttpClient<ITranslationService, GoogleTranslationService>();
 builder.Services.AddScoped<IIngredientService, IngredientService>();
-
 
 
 

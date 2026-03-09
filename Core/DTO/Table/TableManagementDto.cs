@@ -26,6 +26,10 @@ namespace Core.DTO.Table
         public uint ZoneId { get; set; }
         public string ZoneName { get; set; } = string.Empty;
 
+        // ── QR ──
+        public string? QrCodeUrl { get; set; }
+        public string? QrCodeImageUrl { get; set; }
+
         /// <summary>
         /// Images associated with this table.
         /// Contains public URLs ready for direct display.
