@@ -49,7 +49,7 @@ public class SupplierService : ISupplierService
             Email = supplier.Email,
             Ingredients = supplier.IngredientSuppliers
                 .Where(is_ => is_.Ingredient != null)
-                .Select(is_ => new IngredientDto
+                .Select(is_ => new IngredientDTO
                 {
                     IngredientId = is_.Ingredient!.IngredientId,
                     IngredientName = is_.Ingredient.IngredientName,

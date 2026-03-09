@@ -11,5 +11,5 @@ public class SupplierDetailDto
     public string SupplierName { get; set; } = string.Empty;
     public string? Phone { get; set; }
     public string? Email { get; set; }
-    public List<IngredientDto> Ingredients { get; set; } = new();
+    public List<IngredientDTO> Ingredients { get; set; } = new();
 }
