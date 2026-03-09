@@ -26,6 +26,14 @@ public interface ISupplierRepository
     Task<Supplier?> GetByIdAsync(long id, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Get supplier by ID with ingredients
+    /// </summary>
+    /// <param name="id">Supplier ID</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Supplier with ingredients or null if not found</returns>
+    Task<Supplier?> GetByIdWithIngredientsAsync(long id, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Create a new supplier
     /// </summary>
     /// <param name="supplier">Supplier to create</param>
@@ -65,4 +73,12 @@ public interface ISupplierRepository
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>True if supplier has dependencies</returns>
     Task<bool> HasDependenciesAsync(long id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Update supplier's ingredient relationships
+    /// </summary>
+    /// <param name="supplierId">Supplier ID</param>
+    /// <param name="ingredientIds">List of ingredient IDs</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    Task UpdateSupplierIngredientsAsync(long supplierId, List<long> ingredientIds, CancellationToken cancellationToken = default);
 }

@@ -69,6 +69,15 @@ public class SupplierRepository : ISupplierRepository
     }
 
     /// <inheritdoc />
+    public async Task<Supplier?> GetByIdWithIngredientsAsync(long id, CancellationToken cancellationToken = default)
+    {
+        return await _context.Suppliers
+            .Include(s => s.IngredientSuppliers)
+                .ThenInclude(is_ => is_.Ingredient)
+            .FirstOrDefaultAsync(s => s.SupplierId == id, cancellationToken);
+    }
+
+    /// <inheritdoc />
     public async Task<Supplier> CreateAsync(Supplier supplier, CancellationToken cancellationToken = default)
     {
         _context.Suppliers.Add(supplier);
@@ -126,5 +135,31 @@ public class SupplierRepository : ISupplierRepository
             .AnyAsync(it => it.SupplierId == id, cancellationToken);
 
         return hasTransactions;
+    }
+
+    /// <inheritdoc />
+    public async Task UpdateSupplierIngredientsAsync(long supplierId, List<long> ingredientIds, CancellationToken cancellationToken = default)
+    {
+        // Remove existing relationships using ExecuteDeleteAsync to avoid tracking issues
+        await _context.IngredientSuppliers
+            .Where(is_ => is_.SupplierId == supplierId)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        // Clear the change tracker to avoid any tracking conflicts
+        _context.ChangeTracker.Clear();
+
+        // Add new relationships
+        if (ingredientIds.Any())
+        {
+            var newRelationships = ingredientIds.Select(ingredientId => new IngredientSupplier
+            {
+                SupplierId = supplierId,
+                IngredientId = ingredientId,
+                CreatedAt = DateTime.UtcNow
+            }).ToList();
+
+            await _context.IngredientSuppliers.AddRangeAsync(newRelationships, cancellationToken);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
     }
 }
