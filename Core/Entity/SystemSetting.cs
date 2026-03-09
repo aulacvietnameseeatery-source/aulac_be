@@ -9,6 +9,8 @@ public partial class SystemSetting
 
     public string SettingKey { get; set; } = null!;
 
+    public string? SettingName { get; set; }
+
     public string ValueType { get; set; } = null!;
 
     public string? ValueString { get; set; }
