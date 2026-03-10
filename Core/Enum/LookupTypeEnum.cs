@@ -28,5 +28,9 @@ namespace Core.Enum
         Tag = 18,         // TAG
         TableZone = 19,   // TABLE_ZONE
         DishDiet = 20,   // DISH_DIET
+        ShiftType = 21,             // SHIFT_TYPE
+        ShiftStatus = 22, // SHIFT_STATUS
+        ShiftAssignmentStatus = 23, // SHIFT_ASSIGNMENT_STATUS
+        AttendanceStatus = 24,      // ATTENDANCE_STATUS
     }
 }

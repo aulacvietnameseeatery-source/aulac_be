@@ -91,6 +91,14 @@ public partial class RestaurantMgmtContext : DbContext
 
     public virtual DbSet<TableMedium> TableMedia { get; set; }
 
+    public virtual DbSet<ShiftSchedule> ShiftSchedules { get; set; }
+
+    public virtual DbSet<ShiftAssignment> ShiftAssignments { get; set; }
+
+    public virtual DbSet<AttendanceRecord> AttendanceRecords { get; set; }
+
+    public virtual DbSet<LoginActivity> LoginActivities { get; set; }
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         

@@ -73,14 +73,28 @@ namespace Core.Data
         public static readonly LookupTypeInfo RoleStatus =
             new(20, "ROLE_STATUS", false);
 
-        // Convenience: list all
+        public static readonly LookupTypeInfo ShiftType =
+            new(21, "SHIFT_TYPE", true);
+
+        public static readonly LookupTypeInfo ShiftStatus =
+            new(22, "SHIFT_STATUS", false);
+
+        public static readonly LookupTypeInfo ShiftAssignmentStatus =
+   new(23, "SHIFT_ASSIGNMENT_STATUS", false);
+
+      public static readonly LookupTypeInfo AttendanceStatus =
+            new(24, "ATTENDANCE_STATUS", false);
+
+    // Convenience: list all
         public static IReadOnlyList<LookupTypeInfo> All { get; } = new[]
         {
-        AccountStatus, InventoryTxType, InventoryTxStatus, MediaType, TableStatus,
-        TableType, ReservationSource, ReservationStatus, OrderSource, OrderStatus,
-        PaymentMethod, DishStatus, OrderItemStatus, Severity, PromotionType,
-        PromotionStatus, IngredientType, RoleStatus
-    };
+    AccountStatus, InventoryTxType, InventoryTxStatus, MediaType, TableStatus,
+            TableType, ReservationSource, ReservationStatus, OrderSource, OrderStatus,
+            PaymentMethod, DishStatus, OrderItemStatus, Severity, PromotionType,
+  PromotionStatus, IngredientType, RoleStatus,
+    ShiftType, ShiftStatus, ShiftAssignmentStatus, AttendanceStatus
+        };
+
     }
 
 }
