@@ -201,8 +201,8 @@ public class OrderRepository : IOrderRepository
 		{
 			bool orderStatusChanged = false;
 
-		// 1. Subtract rejected item from total amount
-		if (newStatusLvId == rejectedItemStatusId)
+		// 1. Subtract rejected/cancelled item from total amount
+		if (newStatusLvId == rejectedItemStatusId || newStatusLvId == cancelledOrderStatusId)
 		{
 			order.TotalAmount -= item.Price * item.Quantity;
 			orderStatusChanged = true;
@@ -221,7 +221,7 @@ public class OrderRepository : IOrderRepository
 			.Select(oi => oi.ItemStatusLvId)
 			.ToListAsync(cancellationToken);
 
-		bool allFinished = allItems.All(lvId => lvId == servedItemStatusId || lvId == rejectedItemStatusId);
+		bool allFinished = allItems.All(lvId => lvId == servedItemStatusId || lvId == rejectedItemStatusId || lvId == cancelledOrderStatusId);
 
 		if (allFinished)
 		{
@@ -280,15 +280,15 @@ public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, Can
 			DishName     = oi.Dish.DishName,
 			Quantity     = oi.Quantity,
 			Price        = oi.Price,
-			ItemStatus   = oi.ItemStatusLv.ValueName,
+			ItemStatus   = oi.ItemStatusLv.ValueCode,
 			RejectReason = oi.RejectReason,
 			Note         = oi.Note
 		}).ToList();
 
-		// Exclude rejected items from total calculations
-		var nonRejectedItems = allItems.Where(i => i.ItemStatus != "Rejected").ToList();
-		var totalItems     = nonRejectedItems.Sum(i => i.Quantity);
-		var estimatedTotal = nonRejectedItems.Sum(i => i.Price * i.Quantity);
+		// Exclude rejected and cancelled items from total calculations
+		var activeItems = allItems.Where(i => i.ItemStatus != "REJECTED" && i.ItemStatus != "CANCELLED").ToList();
+		var totalItems     = activeItems.Sum(i => i.Quantity);
+		var estimatedTotal = activeItems.Sum(i => i.Price * i.Quantity);
 
 		return new CustomerOrderHistoryDTO
 		{
@@ -346,16 +346,16 @@ public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, Can
 				DishName    = oi.Dish.DishName,
 				Quantity    = oi.Quantity,
 				Price       = oi.Price,
-				ItemStatus  = oi.ItemStatusLv.ValueName,
+				ItemStatus  = oi.ItemStatusLv.ValueCode,
 				RejectReason = oi.RejectReason,
 				Note        = oi.Note
 			}))
 			.ToList();
 
-		// Exclude rejected items from total calculations
-		var nonRejectedItems = allItems.Where(i => i.ItemStatus != "Rejected").ToList();
-		var totalItems     = nonRejectedItems.Sum(i => i.Quantity);
-		var estimatedTotal = nonRejectedItems.Sum(i => i.Price * i.Quantity);
+		// Exclude rejected and cancelled items from total calculations
+		var activeItems = allItems.Where(i => i.ItemStatus != "REJECTED" && i.ItemStatus != "CANCELLED").ToList();
+		var totalItems     = activeItems.Sum(i => i.Quantity);
+		var estimatedTotal = activeItems.Sum(i => i.Price * i.Quantity);
 
 		return new CustomerOrderHistoryDTO
 		{

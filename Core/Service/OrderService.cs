@@ -90,6 +90,16 @@ public class OrderService : IOrderService
 			cancellationToken);
 	}
 
+	public async Task CancelOrderItemAsync(long orderItemId, CancellationToken cancellationToken = default)
+	{
+		// Get CREATED and CANCELLED status IDs
+		var createdStatusId = await OrderItemStatusCode.CREATED.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
+		var cancelledStatusId = await OrderItemStatusCode.CANCELLED.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
+
+		// Update to CANCELLED status (repository will validate if item is CREATED)
+		await UpdateOrderItemStatusAsync(orderItemId, cancelledStatusId, null, cancellationToken);
+	}
+
     public Task<OrderHistoryDTO> GetOrderByIdAsync(long orderId, CancellationToken cancellationToken = default)
         => _orderRepository.GetOrderByIdAsync(orderId, cancellationToken);
 
