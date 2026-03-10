@@ -121,6 +121,14 @@ public interface ISystemSettingService
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Retrieves ONLY non-sensitive settings for the specified group prefix.
+    /// Useful for public API endpoints.
+    /// </summary>
+    Task<List<SystemSettingDetailDto>> GetPublicGroupAsync(
+        string group,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Bulk-updates (upserts) all settings in a group.
     /// The value type is inferred from the existing setting; new keys default to STRING.
     /// </summary>

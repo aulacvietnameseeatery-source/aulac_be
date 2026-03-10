@@ -18,4 +18,9 @@ public class CreateSupplierRequest
     [MaxLength(150, ErrorMessage = "Email cannot exceed 150 characters")]
     [EmailAddress(ErrorMessage = "Invalid email format")]
     public string? Email { get; set; }
+
+    /// <summary>
+    /// List of ingredient IDs that this supplier provides
+    /// </summary>
+    public List<long> IngredientIds { get; set; } = new();
 }

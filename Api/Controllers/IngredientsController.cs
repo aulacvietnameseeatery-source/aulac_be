@@ -64,6 +64,40 @@ public class IngredientsController : ControllerBase
     }
 
     /// <summary>
+    /// Get all ingredients (simple list for dropdowns)
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Simple list of all ingredients</returns>
+    [HttpGet("all")]
+    [ProducesResponseType(typeof(ApiResponse<List<IngredientSimpleDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAllIngredients(CancellationToken cancellationToken)
+    {
+        var filter = new IngredientFilterParams 
+        { 
+            PageIndex = 1, 
+            PageSize = int.MaxValue 
+        };
+        
+        var (items, _) = await _ingredientService.GetListAsync(filter);
+        
+        var simpleList = items.Select(i => new IngredientSimpleDto
+        {
+            IngredientId = i.IngredientId,
+            IngredientName = i.IngredientName,
+            Unit = i.Unit
+        }).ToList();
+
+        return Ok(new ApiResponse<List<IngredientSimpleDto>>
+        {
+            Success = true,
+            Code = 200,
+            UserMessage = "All ingredients retrieved successfully.",
+            Data = simpleList,
+            ServerTime = DateTimeOffset.UtcNow
+        });
+    }
+
+    /// <summary>
     /// Get ingredient detail by ID
     /// </summary>
     /// <param name="id">Ingredient ID</param>

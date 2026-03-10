@@ -17,7 +17,7 @@ public sealed class IngredientSupplierConfiguration : IEntityTypeConfiguration<I
         entity.HasIndex(e => e.SupplierId, "FK_ingredient_supplier_supplier_supplier_id");
 
         entity.Property(e => e.IngredientSupplierId)
-        .ValueGeneratedNever()
+        .ValueGeneratedOnAdd()
         .HasColumnName("ingredient_supplier_id");
         entity.Property(e => e.CreatedAt)
         .HasColumnType("datetime")
