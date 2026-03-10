@@ -347,13 +347,15 @@ public class DishService : IDishService
 
     public async Task<List<DishTagDto>> GetAllActiveTagsAsync()
     {
-        var tags = await _dishRepository.GetAllActiveTagsAsync(); // Get all active tags
+        var tags = await _dishRepository.GetAllActiveTagsAsync();
 
         return tags.Select(t => new DishTagDto
         {
             TagId = t.ValueId,
             Code = t.ValueCode,
-            Name = t.ValueName
+            Name = t.ValueName,
+            NameI18n = MapTranslations(t.ValueNameText, t.ValueName),
+            DescriptionI18n = MapTranslations(t.ValueDescText, string.Empty)
         }).ToList();
     }
 

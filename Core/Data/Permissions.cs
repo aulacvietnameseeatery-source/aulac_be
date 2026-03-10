@@ -72,5 +72,15 @@ namespace Core.Data
         public const string CreatePromotion = "PROMOTION:CREATE";
         public const string UpdatePromotion = "PROMOTION:UPDATE";
 
+        // Shift
+        public const string ViewShift = "SHIFT:READ";
+        public const string ScheduleShift = "SHIFT:SCHEDULE";
+        public const string AssignShift = "SHIFT:ASSIGN";
+        public const string CheckInShift = "SHIFT:CHECK_IN";
+        public const string CheckOutShift = "SHIFT:CHECK_OUT";
+        public const string AdjustAttendance = "SHIFT:ADJUST_ATTENDANCE";
+        public const string ViewShiftReport = "SHIFT:REPORT_READ";
+        public const string CloseShift = "SHIFT:CLOSE";
+
     }
 }
