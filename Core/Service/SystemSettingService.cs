@@ -214,6 +214,18 @@ public class SystemSettingService : ISystemSettingService
     }
 
     /// <inheritdoc />
+    public async Task<List<SystemSettingDetailDto>> GetPublicGroupAsync(
+        string group,
+        CancellationToken cancellationToken = default)
+    {
+        var settings = await _repository.GetByGroupPrefixAsync(group, cancellationToken);
+        return settings
+            .Where(s => !s.IsSensitive)
+            .Select(MapToDetailDto)
+            .ToList();
+    }
+
+    /// <inheritdoc />
     public async Task BulkUpdateGroupAsync(
         string group,
         List<BulkUpdateSettingItemDto> items,
