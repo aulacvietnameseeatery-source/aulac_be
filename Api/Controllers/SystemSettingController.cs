@@ -6,6 +6,7 @@ using Core.Interface.Service.FileStorage;
 using Core.DTO.General;
 using Microsoft.AspNetCore.Mvc;
 using API.Models;
+using Microsoft.AspNetCore.Authorization;
 
 namespace Api.Controllers;
 
@@ -599,6 +600,45 @@ public class SystemSettingController : ControllerBase
                 Success = false,
                 Code = 500,
                 UserMessage = "An error occurred while retrieving group settings.",
+                SystemMessage = ex.Message,
+                Data = new { },
+                ServerTime = DateTimeOffset.UtcNow
+            });
+        }
+    }
+
+    /// <summary>
+    /// Retrieves only non-sensitive settings for a specific group.
+    /// This endpoint is public and does not require authentication.
+    /// </summary>
+    /// <param name="group">Group prefix, e.g. "store"</param>
+    /// <response code="200">Settings for the group returned</response>
+    [HttpGet("public/groups/{group}")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetPublicGroup(string group, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var settings = await _systemSettingService.GetPublicGroupAsync(group, cancellationToken);
+
+            return Ok(new ApiResponse<object>
+            {
+                Success = true,
+                Code = 200,
+                UserMessage = $"Public settings for group '{group}' retrieved successfully.",
+                Data = new { GroupName = group, Settings = settings },
+                ServerTime = DateTimeOffset.UtcNow
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving public settings for group {Group}", group);
+            return StatusCode(500, new ApiResponse<object>
+            {
+                Success = false,
+                Code = 500,
+                UserMessage = "An error occurred while retrieving public group settings.",
                 SystemMessage = ex.Message,
                 Data = new { },
                 ServerTime = DateTimeOffset.UtcNow

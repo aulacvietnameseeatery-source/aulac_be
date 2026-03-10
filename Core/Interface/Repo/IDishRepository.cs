@@ -101,4 +101,5 @@ public interface IDishRepository
     Task RemoveDishTagsAsync(long dishId, List<uint> tagIds, CancellationToken ct);
     Task<List<Dish>> GetActiveDishesAsync();
     Task<List<Dish>> GetByIdsAsync(List<long> ids, CancellationToken ct);
+
 }
