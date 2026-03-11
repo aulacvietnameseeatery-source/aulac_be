@@ -1,4 +1,6 @@
 ﻿using API.Models;
+using Core.Attribute;
+using Core.Data;
 using Core.DTO.General; // Chứa ApiResponse, PagedResult
 using Core.DTO.Reservation;
 using Core.Interface.Service.Entity;
@@ -71,6 +73,40 @@ namespace API.Controllers
                 Data = data,
                 ServerTime = DateTimeOffset.UtcNow
             });
+        }
+
+        // --- 3. GET RESERVATION DETAIL ---
+        // URL: GET /api/reservations/{id}
+        [HttpGet("{id:long}")]
+        [HasPermission(Permissions.ViewReservation)]
+        [ProducesResponseType(typeof(ApiResponse<ReservationDetailDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetReservationDetail(long id, CancellationToken cancellationToken)
+        {
+            try
+            {
+                var data = await _reservationService.GetReservationDetailAsync(id, cancellationToken);
+
+                return Ok(new ApiResponse<ReservationDetailDto>
+                {
+                    Success = true,
+                    Code = 200,
+                    UserMessage = "Reservation detail retrieved successfully.",
+                    Data = data,
+                    ServerTime = DateTimeOffset.UtcNow
+                });
+            }
+            catch (KeyNotFoundException)
+            {
+                return NotFound(new ApiResponse<object>
+                {
+                    Success = false,
+                    Code = 404,
+                    UserMessage = $"Reservation with ID {id} not found.",
+                    Data = null!,
+                    ServerTime = DateTimeOffset.UtcNow
+                });
+            }
         }
     }
 }
