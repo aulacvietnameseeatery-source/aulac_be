@@ -56,4 +56,5 @@ public interface IOrderRepository
     Task<OrderHistoryDTO> GetOrderByIdAsync(long orderId, CancellationToken cancellationToken = default);
     Task<Order?> GetByIdForUpdateAsync(long orderId, CancellationToken ct);
     Task<Order?> GetOrderWithItemsAsync(long orderId, CancellationToken ct);
+    Task<Order?> GetActiveOrderByTableAsync(long tableId, CancellationToken ct);
 }

@@ -442,4 +442,15 @@ public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, Can
             .ThenInclude(i => i.Dish)
             .FirstOrDefaultAsync(o => o.OrderId == orderId, ct);
     }
+
+    public async Task<Order?> GetActiveOrderByTableAsync(
+        long tableId,
+        CancellationToken ct)
+    {
+        return await _context.Orders
+            .Where(o => o.TableId == tableId &&
+                        o.OrderStatusLv.ValueCode != OrderStatusCode.COMPLETED.ToString() &&
+                        o.OrderStatusLv.ValueCode != OrderStatusCode.CANCELLED.ToString())
+            .FirstOrDefaultAsync(ct);
+    }
 }

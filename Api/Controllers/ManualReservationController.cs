@@ -86,5 +86,31 @@ namespace Api.Controllers
                 ServerTime = DateTimeOffset.UtcNow
             });
         }
+
+        /// <summary>
+        /// Update reservation status.
+        /// </summary>
+        [HttpPatch("reservations/{id}/status")]
+        public async Task<IActionResult> UpdateReservationStatus(
+            long id,
+            [FromBody] UpdateReservationStatusRequest request,
+            CancellationToken ct)
+        {
+            var staffId = long.Parse(User.FindFirst("user_id")!.Value);
+
+            var result = await _reservationService.UpdateReservationStatusAsync(
+                id,
+                staffId,
+                request,
+                ct);
+
+            return Ok(new ApiResponse<ReservationStatusResponseDTO>
+            {
+                Success = true,
+                Data = result,
+                Code = 200,
+                ServerTime = DateTimeOffset.UtcNow
+            });
+        }
     }
 }
