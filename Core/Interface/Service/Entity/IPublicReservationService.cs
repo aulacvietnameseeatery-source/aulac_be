@@ -52,4 +52,10 @@ public interface IPublicReservationService
     Task<ReservationResponseDto> CreateManualReservationAsync(
         CreateManualReservationRequest request,
         CancellationToken ct = default);
+
+    Task<ReservationStatusResponseDTO> UpdateReservationStatusAsync(
+        long reservationId,
+        long staffId,
+        UpdateReservationStatusRequest request,
+        CancellationToken ct);
 }

@@ -6,6 +6,7 @@ using Core.Interface.Repo;
 using Core.Interface.Service.Entity;
 using Core.Interface.Service.Others;
 using Microsoft.Extensions.Logging;
+using System;
 using System.Text.Json;
 
 namespace Core.Service;
@@ -16,24 +17,32 @@ namespace Core.Service;
 /// </summary>
 public class PublicReservationService : IPublicReservationService
 {
+    private const long GuestCustomerId = 68;
+
     private readonly ITableRepository _tableRepository;
     private readonly IReservationRepository _reservationRepository;
     private readonly IReservationBroadcastService _broadcastService;
     private readonly ILogger<PublicReservationService> _logger;
     private readonly ILookupResolver _lookupResolver;
+    private readonly IOrderRepository _orderRepository;
+    private readonly IUnitOfWork _uow;
 
     public PublicReservationService(
         ITableRepository tableRepository,
         IReservationRepository reservationRepository,
         IReservationBroadcastService broadcastService,
         ILogger<PublicReservationService> logger,
-        ILookupResolver lookupResolver)
+        ILookupResolver lookupResolver,
+        IUnitOfWork uow,
+        IOrderRepository orderRepository)
     {
         _tableRepository = tableRepository;
         _reservationRepository = reservationRepository;
         _broadcastService = broadcastService;
         _logger = logger;
         _lookupResolver = lookupResolver;
+        _uow = uow;
+        _orderRepository = orderRepository;
     }
 
     public async Task<List<TableAvailabilityDto>> GetAvailableTablesAsync(
@@ -304,5 +313,135 @@ public class PublicReservationService : IPublicReservationService
             Status = request.Status,
             CreatedAt = created.CreatedAt ?? DateTime.UtcNow
         };
+    }
+
+    public async Task<ReservationStatusResponseDTO> UpdateReservationStatusAsync(
+        long reservationId,
+        long staffId,
+        UpdateReservationStatusRequest request,
+        CancellationToken ct)
+    {
+        var reservation = await _reservationRepository
+            .GetByIdWithTablesAsync(reservationId, ct)
+            ?? throw new Exception("Reservation not found");
+
+        var currentStatus = System.Enum.Parse<ReservationStatusCode>(
+    reservation.ReservationStatusLv.ValueCode);
+
+        ValidateStatusTransition(currentStatus, request.Status);
+
+        await _uow.BeginTransactionAsync(ct);
+
+        try
+        {
+            long? createdOrderId = null;
+
+            if (request.Status == ReservationStatusCode.CHECKED_IN)
+            {
+                createdOrderId = await HandleCheckIn(
+                    reservation,
+                    staffId,
+                    ct);
+            }
+
+            var statusId = await _lookupResolver.GetIdAsync(
+                (ushort)Enum.LookupType.ReservationStatus,
+                request.Status,
+                ct);
+
+            reservation.ReservationStatusLvId = statusId;
+
+            await _reservationRepository.UpdateAsync(reservation, ct);
+
+            await _uow.CommitAsync(ct);
+
+            return new ReservationStatusResponseDTO
+            {
+                ReservationId = reservation.ReservationId,
+                Status = request.Status,
+                CreatedOrderId = createdOrderId
+            };
+        }
+        catch
+        {
+            await _uow.RollbackAsync(ct);
+            throw;
+        }
+    }
+
+    private void ValidateStatusTransition(
+    ReservationStatusCode current,
+    ReservationStatusCode target)
+    {
+        if (current == target)
+            throw new InvalidOperationException("Reservation already in this status.");
+
+        if (current == ReservationStatusCode.CANCELLED ||
+            current == ReservationStatusCode.NO_SHOW)
+            throw new InvalidOperationException("Reservation already closed.");
+    }
+
+    private void ValidateReservationTime(Reservation reservation)
+    {
+        var now = DateTime.UtcNow;
+
+        var start = reservation.ReservedTime.AddMinutes(-30);
+        var end = reservation.ReservedTime.AddMinutes(30);
+
+        if (now < start || now > end)
+            throw new InvalidOperationException(
+                "Check-in allowed only within reservation time window.");
+    }
+
+    private async Task<long> HandleCheckIn(
+    Reservation reservation,
+    long staffId,
+    CancellationToken ct)
+    {
+        ValidateReservationTime(reservation);
+
+        var table = reservation.Tables.FirstOrDefault()
+            ?? throw new InvalidOperationException("Reservation has no table.");
+
+        var existingOrder = await _orderRepository
+            .GetActiveOrderByTableAsync(table.TableId, ct);
+
+        if (existingOrder != null)
+            throw new InvalidOperationException("Table already has active order.");
+
+        var orderStatusId = await _lookupResolver.GetIdAsync(
+            (ushort)Enum.LookupType.OrderStatus,
+            OrderStatusCode.PENDING,
+            ct);
+
+        var sourceId = await _lookupResolver.GetIdAsync(
+            (ushort)Enum.LookupType.OrderSource,
+            OrderSourceCode.DINE_IN,
+            ct);
+
+        var occupiedStatusId = await _lookupResolver.GetIdAsync(
+            (ushort)Enum.LookupType.TableStatus,
+            TableStatusCode.OCCUPIED,
+            ct);
+
+        var order = new Order
+        {
+            StaffId = staffId,
+            CustomerId = reservation.CustomerId ?? GuestCustomerId,
+            TableId = table.TableId,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+            TotalAmount = 0,
+            SourceLvId = sourceId,
+            OrderStatusLvId = orderStatusId
+        };
+
+        await _orderRepository.AddAsync(order, ct);
+
+        table.TableStatusLvId = occupiedStatusId;
+
+        await _tableRepository.UpdateAsync(table, ct);
+
+        return order.OrderId;
     }
 }
