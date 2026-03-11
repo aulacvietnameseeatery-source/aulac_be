@@ -51,7 +51,8 @@ public enum OrderItemStatusCode
     IN_PROGRESS,
     READY,
     SERVED,
-    REJECTED
+    REJECTED,
+    CANCELLED
 }
 
 public enum DishStatusCode

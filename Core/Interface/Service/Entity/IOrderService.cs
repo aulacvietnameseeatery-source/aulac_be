@@ -10,6 +10,11 @@ public interface IOrderService
 	Task<List<KitchenOrderDTO>> GetKitchenOrdersAsync(CancellationToken cancellationToken = default);
 	Task UpdateOrderItemStatusAsync(long orderItemId, uint newStatusLvId, string? rejectReason, CancellationToken cancellationToken = default);
 
+	/// <summary>
+	/// Cancels an order item if it hasn't been started yet (CREATED status only).
+	/// </summary>
+	Task CancelOrderItemAsync(long orderItemId, CancellationToken cancellationToken = default);
+
 	/// <summary>Creates a new order from the customer-facing menu (QR flow).</summary>
 	Task<CreateOrderResponseDTO> CreateOrderAsync(CreateOrderRequestDTO request, CancellationToken cancellationToken = default);
 

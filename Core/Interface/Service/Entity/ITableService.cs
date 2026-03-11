@@ -101,8 +101,9 @@ public interface ITableService
 
     /// <summary>
         /// Marks a table as occupied by table code. Used by customers via QR code.
+        /// Optionally validates the QR token when provided.
         /// </summary>
-    Task OccupyTableByCodeAsync(string tableCode, CancellationToken ct = default);
+    Task OccupyTableByCodeAsync(string tableCode, string? qrToken = null, CancellationToken ct = default);
 }
 
 /// <summary>
