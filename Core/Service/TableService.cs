@@ -507,10 +507,14 @@ public class TableService : ITableService
     #region ── Customer flow ──
 
     /// <inheritdoc />
-    public async Task OccupyTableByCodeAsync(string tableCode, CancellationToken ct = default)
+    public async Task OccupyTableByCodeAsync(string tableCode, string? qrToken = null, CancellationToken ct = default)
     {
         var table = await _tableRepository.GetByCodeAsync(tableCode, ct)
               ?? throw new NotFoundException($"Table '{tableCode}' not found");
+
+        // Validate QR token if provided (QR scan flow)
+        if (qrToken is not null && !string.Equals(table.QrToken, qrToken, StringComparison.Ordinal))
+            throw new ValidationException("Invalid QR token. Please scan the QR code on the table again.");
 
         var availableLvId = await TableStatusCode.AVAILABLE.ToTableStatusIdAsync(_lookupResolver, ct);
         var occupiedLvId = await TableStatusCode.OCCUPIED.ToTableStatusIdAsync(_lookupResolver, ct);
@@ -528,12 +532,12 @@ public class TableService : ITableService
 
     /// <summary>
     /// Builds the customer-facing QR scan URL:
-    /// <c>{CustomerBaseUrl}/order?table={tableCode}&amp;token={qrToken}</c>
+    /// <c>{CustomerBaseUrl}/menu-listing?table={tableCode}&amp;token={qrToken}</c>
     /// </summary>
     private string BuildQrCodeUrl(string tableCode, string qrToken)
     {
         var baseUrl = _baseUrlOptions.Client.TrimEnd('/');
-        return $"{baseUrl}/order?table={Uri.EscapeDataString(tableCode)}&token={qrToken}";
+        return $"{baseUrl}/menu-listing?table={Uri.EscapeDataString(tableCode)}&token={qrToken}";
     }
 
     /// <summary>
