@@ -169,4 +169,16 @@ public class ReservationRepository : IReservationRepository
 
         await _context.SaveChangesAsync(ct);
     }
+
+    /// <inheritdoc />
+    public async Task<Reservation?> GetByIdWithFullDetailsAsync(long reservationId, CancellationToken ct = default)
+    {
+        return await _context.Reservations
+            .AsNoTracking()
+            .Include(r => r.Tables).ThenInclude(t => t.TableTypeLv)
+            .Include(r => r.Tables).ThenInclude(t => t.ZoneLv)
+            .Include(r => r.ReservationStatusLv)
+            .Include(r => r.SourceLv)
+            .FirstOrDefaultAsync(r => r.ReservationId == reservationId, ct);
+    }
 }

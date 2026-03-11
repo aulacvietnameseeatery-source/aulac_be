@@ -16,5 +16,8 @@ namespace Core.Interface.Service.Entity
 
         // Lấy danh sách Status từ DB để đổ vào Tabs trên Frontend
         Task<List<ReservationStatusDto>> GetReservationStatusesAsync(CancellationToken cancellationToken = default);
+
+        // Lấy chi tiết một đặt bàn theo ID
+        Task<ReservationDetailDto> GetReservationDetailAsync(long reservationId, CancellationToken cancellationToken = default);
     }
 }

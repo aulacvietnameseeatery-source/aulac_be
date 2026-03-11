@@ -49,5 +49,43 @@ namespace Core.Service
                 StatusCode = x.ValueCode    // "PENDING"...
             }).ToList();
         }
+
+        public async Task<ReservationDetailDto> GetReservationDetailAsync(long reservationId, CancellationToken cancellationToken = default)
+        {
+            var reservation = await _reservationRepository.GetByIdWithFullDetailsAsync(reservationId, cancellationToken);
+
+            if (reservation == null)
+            {
+                throw new KeyNotFoundException($"Reservation with ID {reservationId} not found.");
+            }
+
+            return new ReservationDetailDto
+            {
+                ReservationId = reservation.ReservationId,
+                CustomerName = reservation.CustomerName,
+                Phone = reservation.Phone,
+                Email = reservation.Email,
+                PartySize = reservation.PartySize,
+                ReservedTime = reservation.ReservedTime,
+                CreatedAt = reservation.CreatedAt,
+
+                StatusId = reservation.ReservationStatusLvId,
+                StatusName = reservation.ReservationStatusLv.ValueName,
+                StatusCode = reservation.ReservationStatusLv.ValueCode,
+
+                SourceId = reservation.SourceLvId,
+                SourceName = reservation.SourceLv.ValueName,
+                SourceCode = reservation.SourceLv.ValueCode,
+
+                Tables = reservation.Tables.Select(t => new ReservationTableDto
+                {
+                    TableId = t.TableId,
+                    TableCode = t.TableCode,
+                    Capacity = t.Capacity,
+                    TableType = t.TableTypeLv.ValueName,
+                    Zone = t.ZoneLv.ValueName
+                }).ToList()
+            };
+        }
     }
 }
