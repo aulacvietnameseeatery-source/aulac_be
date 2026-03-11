@@ -253,9 +253,12 @@ public class DishRepository : IDishRepository
 
     public async Task<List<LookupValue>> GetAllActiveTagsAsync()
     {
-        // Get all active tag lookup values
         return await _context.LookupValues
             .AsNoTracking()
+            .Include(lv => lv.ValueNameText)
+                .ThenInclude(t => t!.I18nTranslations)
+            .Include(lv => lv.ValueDescText) 
+                .ThenInclude(t => t!.I18nTranslations)
             .Where(lv =>
                 lv.TypeId == (ushort)Core.Enum.LookupType.Tag &&
                 lv.IsActive == true &&
@@ -329,5 +332,6 @@ public class DishRepository : IDishRepository
             .Where(d => ids.Contains(d.DishId))
             .ToListAsync(ct);
     }
+   
 }
 

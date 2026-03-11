@@ -263,6 +263,7 @@ namespace Core.Service
                 "DISH" => "Dish Management",
                 "PROMOTION" => "Promotion Management",
                 "SYSTEM_SETTING" => "System Settings",
+                "SHIFT" => "Shift Management",
                 _ => screenCode
             };
         }
@@ -278,6 +279,14 @@ namespace Core.Service
                 "DELETE" => "Delete",
                 "RESET_PASSWORD" => "Reset Password",
                 "ACTIVATE_DEACTIVATE" => "Activate/Deactivate",
+                // Shift-specific actions
+                "SCHEDULE"       => "Schedule Shift",
+                "ASSIGN"    => "Assign Staff",
+                "CHECK_IN"    => "Check In",
+                "CHECK_OUT"    => "Check Out",
+                "ADJUST_ATTENDANCE"  => "Adjust Attendance",
+                "REPORT_READ"        => "View Reports",
+                "CLOSE"  => "Close Shift",
                 _ => actionCode
             };
         }
@@ -291,6 +300,7 @@ namespace Core.Service
                 "DISH" => 3,
                 "PROMOTION" => 4,
                 "SYSTEM_SETTING" => 5,
+                "SHIFT" => 6,
                 _ => 999
             };
         }
@@ -306,6 +316,14 @@ namespace Core.Service
                 "DELETE" => 4,
                 "RESET_PASSWORD" => 5,
                 "ACTIVATE_DEACTIVATE" => 6,
+                // Shift-specific actions
+                "SCHEDULE"          => 7,
+                "ASSIGN"          => 8,
+                "CHECK_IN"        => 9,
+                "CHECK_OUT"         => 10,
+                "ADJUST_ATTENDANCE" => 11,
+                "REPORT_READ"       => 12,
+                "CLOSE"    => 13,
                 _ => 999
             };
         }

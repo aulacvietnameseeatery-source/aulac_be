@@ -25,9 +25,9 @@ public class JwtSettings
 
     /// <summary>
     /// Access token lifetime in minutes.
-    /// Default: 15 minutes (recommended for security).
+    /// Default: 1 day (1440 minutes).
     /// </summary>
-    public int AccessTokenExpirationMinutes { get; set; } = 15;
+    public int AccessTokenExpirationMinutes { get; set; } = 1440;
 
     /// <summary>
 /// Refresh token lifetime in days.
