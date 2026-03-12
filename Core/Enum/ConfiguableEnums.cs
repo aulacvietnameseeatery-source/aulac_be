@@ -63,3 +63,10 @@ public enum Tag
 {
 
 }
+
+public enum ShiftTypeCode
+{
+    MORNING,
+    LUNCH,
+    EVENING
+}

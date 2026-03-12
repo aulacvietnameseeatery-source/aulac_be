@@ -5,7 +5,6 @@ using Core.Enum;
 using Core.Exceptions;
 using Core.Extensions;
 using Core.Interface.Repo;
-using Core.Interface.Service.Customer;
 using Core.Interface.Service.Entity;
 using LookupTypeEnum = Core.Enum.LookupType;
 
@@ -15,7 +14,6 @@ public class OrderService : IOrderService
 {
     private readonly IOrderRepository _orderRepository;
     private readonly ITableRepository _tableRepository;
-    private readonly ICustomerService _customerService;
     private readonly ILookupResolver _lookupResolver;
     private readonly IDishRepository _dishRepository;
     private readonly IUnitOfWork _uow;
@@ -23,14 +21,12 @@ public class OrderService : IOrderService
     public OrderService(
         IOrderRepository orderRepository,
         ITableRepository tableRepository,
-        ICustomerService customerService,
         ILookupResolver lookupResolver,
         IDishRepository dishRepository,
         IUnitOfWork uow)
     {
         _orderRepository = orderRepository;
         _tableRepository = tableRepository;
-        _customerService = customerService;
         _dishRepository = dishRepository;
         _lookupResolver = lookupResolver;
         _uow = uow;
@@ -58,16 +54,21 @@ public class OrderService : IOrderService
 	{
 		var pendingId    = await OrderStatusCode.PENDING.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
 		var inProgressId = await OrderStatusCode.IN_PROGRESS.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+		var completedId  = await OrderStatusCode.COMPLETED.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+		var cancelledId  = await OrderStatusCode.CANCELLED.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
 
 		return await _orderRepository.GetKitchenOrdersAsync(
 			pendingId,
 			inProgressId,
+			completedId,
+			cancelledId,
 			cancellationToken);
 	}
 
 	public async Task UpdateOrderItemStatusAsync(long orderItemId, uint newStatusLvId, string? rejectReason, CancellationToken cancellationToken = default)
 	{
 		var inProgressItemId = await OrderItemStatusCode.IN_PROGRESS.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
+		var readyItemId      = await OrderItemStatusCode.READY.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
 		var servedItemId     = await OrderItemStatusCode.SERVED.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
 		var rejectedItemId   = await OrderItemStatusCode.REJECTED.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
 
@@ -75,19 +76,32 @@ public class OrderService : IOrderService
 		var inProgressOrderId = await OrderStatusCode.IN_PROGRESS.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
 		var completedOrderId  = await OrderStatusCode.COMPLETED.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
 		var cancelledOrderId  = await OrderStatusCode.CANCELLED.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+		var availableTableId  = await TableStatusCode.AVAILABLE.ToTableStatusIdAsync(_lookupResolver, cancellationToken);
 
 		await _orderRepository.UpdateOrderItemStatusAsync(
 			orderItemId,
 			newStatusLvId,
 			rejectReason,
 			inProgressItemId,
+			readyItemId,
 			servedItemId,
 			rejectedItemId,
 			pendingOrderId,
 			inProgressOrderId,
 			completedOrderId,
 			cancelledOrderId,
+			availableTableId,
 			cancellationToken);
+	}
+
+	public async Task CancelOrderItemAsync(long orderItemId, CancellationToken cancellationToken = default)
+	{
+		// Get CREATED and CANCELLED status IDs
+		var createdStatusId = await OrderItemStatusCode.CREATED.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
+		var cancelledStatusId = await OrderItemStatusCode.CANCELLED.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
+
+		// Update to CANCELLED status (repository will validate if item is CREATED)
+		await UpdateOrderItemStatusAsync(orderItemId, cancelledStatusId, null, cancellationToken);
 	}
 
     public Task<OrderHistoryDTO> GetOrderByIdAsync(long orderId, CancellationToken cancellationToken = default)
@@ -353,23 +367,8 @@ public class OrderService : IOrderService
         var table = await _tableRepository.GetByCodeAsync(request.TableCode.Trim(), cancellationToken)
             ?? throw new KeyNotFoundException($"Table '{request.TableCode}' not found.");
 
-        // 2. Resolve customer_id
-        long customerId;
-        if (request.IsGuest)
-        {
-            customerId = GuestCustomerId;
-        }
-        else
-        {
-            if (string.IsNullOrWhiteSpace(request.CustomerPhone))
-                throw new ArgumentException("CustomerPhone is required when IsGuest = false.");
-
-            customerId = await _customerService.FindOrCreateCustomerIdAsync(
-                request.CustomerPhone.Trim(),
-                request.CustomerFullName,
-                request.CustomerEmail,
-                cancellationToken);
-        }
+        // 2. Always use guest account for customer-facing orders
+        var customerId = GuestCustomerId;
 
         // 3. Calculate total amount from items
         var totalAmount = request.Items.Sum(i => i.Price * i.Quantity);

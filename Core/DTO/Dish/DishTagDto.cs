@@ -11,5 +11,8 @@ namespace Core.DTO.Dish
         public uint TagId { get; set; }
         public string Code { get; set; } = null!;
         public string Name { get; set; } = null!;
+
+        public I18nTextDto NameI18n { get; set; }
+        public I18nTextDto DescriptionI18n { get; set; }
     }
 }

@@ -68,42 +68,36 @@ public class SupplierController : ControllerBase
     /// <response code="404">Supplier not found</response>
     [HttpGet("{id}")]
     [HasPermission(Permissions.EditSupplier)]
-    [ProducesResponseType(typeof(ApiResponse<SupplierDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<SupplierDetailDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetSupplierById(
         long id,
         CancellationToken cancellationToken = default)
     {
-        var supplier = await _supplierRepository.GetByIdAsync(id, cancellationToken);
+        try
+        {
+            var supplier = await _supplierService.GetSupplierDetailAsync(id, cancellationToken);
 
-        if (supplier == null)
+            return Ok(new ApiResponse<SupplierDetailDto>
+            {
+                Success = true,
+                Code = 200,
+                UserMessage = "Supplier retrieved successfully.",
+                Data = supplier,
+                ServerTime = DateTimeOffset.UtcNow
+            });
+        }
+        catch (KeyNotFoundException ex)
         {
             return NotFound(new ApiResponse<object>
             {
                 Success = false,
                 Code = 404,
-                UserMessage = "Supplier not found.",
+                UserMessage = ex.Message,
                 Data = default!,
                 ServerTime = DateTimeOffset.UtcNow
             });
         }
-
-        var dto = new SupplierDto
-        {
-            SupplierId = supplier.SupplierId,
-            SupplierName = supplier.SupplierName,
-            Phone = supplier.Phone,
-            Email = supplier.Email
-        };
-
-        return Ok(new ApiResponse<SupplierDto>
-        {
-            Success = true,
-            Code = 200,
-            UserMessage = "Supplier retrieved successfully.",
-            Data = dto,
-            ServerTime = DateTimeOffset.UtcNow
-        });
     }
 
     /// <summary>

@@ -63,18 +63,17 @@ public class DishService : IDishService
             // Url stores RelativePath — resolve to public URL at read time
             ImageUrls = dish.DishMedia
              .Where(dm => dm.Media != null)
-      .Select(dm => _fileStorage.GetPublicUrl(dm.Media!.Url))
- .ToList(),
+             .Select(dm => _fileStorage.GetPublicUrl(dm.Media!.Url))
+             .ToList(),
             Composition = dish.Recipes
-       .Select(r => new RecipeItemDto
-       {
-           IngredientId = r.IngredientId,
-           IngredientName = r.Ingredient?.IngredientNameText?.GetTranslation(language) ?? r.Ingredient?.IngredientName ?? string.Empty,
-           Quantity = r.Quantity,
-           Unit = r.Unit,
-           Note = r.Note
-       })
-         .ToList()
+            .Select(r => new RecipeItemDto
+            {
+                IngredientId = r.IngredientId,
+                IngredientName = r.Ingredient?.IngredientNameText?.GetTranslation(language) ?? r.Ingredient?.IngredientName ?? string.Empty,
+                Quantity = r.Quantity,
+                Unit = r.Unit,
+                Note = r.Note
+            }).ToList()
         };
     }
 
@@ -203,7 +202,7 @@ public class DishService : IDishService
             DishName = MapTranslations(d.DishNameText, d.DishName),
             Price = d.Price,
             CategoryName = d.Category != null
-            ? MapTranslations(d.Category.CategoryNameText, d.Category.CategoryName): new I18nTextDto(),
+            ? MapTranslations(d.Category.CategoryNameText, d.Category.CategoryName) : new I18nTextDto(),
             Description = MapTranslations(d.DescriptionText, string.Empty),
             // Url stores RelativePath — resolve to public URL at read time
             ImageUrl = d.DishMedia.FirstOrDefault(dm => dm.IsPrimary == true)?.Media?.Url is { } primaryUrl
@@ -284,10 +283,7 @@ public class DishService : IDishService
                    Stream = file.OpenReadStream(),
                    FileName = file.FileName,
                    ContentType = file.ContentType
-               },
-              "dishes",
-                    FileValidationOptions.ImageUpload,
-             ct);
+               },"dishes",FileValidationOptions.ImageUpload,ct);
 
                 savedFilePaths.Add(uploadResult.RelativePath);
 
@@ -351,13 +347,15 @@ public class DishService : IDishService
 
     public async Task<List<DishTagDto>> GetAllActiveTagsAsync()
     {
-        var tags = await _dishRepository.GetAllActiveTagsAsync(); // Get all active tags
+        var tags = await _dishRepository.GetAllActiveTagsAsync();
 
         return tags.Select(t => new DishTagDto
         {
             TagId = t.ValueId,
             Code = t.ValueCode,
-            Name = t.ValueName
+            Name = t.ValueName,
+            NameI18n = MapTranslations(t.ValueNameText, t.ValueName),
+            DescriptionI18n = MapTranslations(t.ValueDescText, string.Empty)
         }).ToList();
     }
 
@@ -387,7 +385,7 @@ public class DishService : IDishService
         try
         {
             var dish = await _dishRepository.FindByIdForActionAsync(request.DishId, ct)
-    ?? throw new KeyNotFoundException($"Dish with ID {request.DishId} not found!");
+                        ?? throw new KeyNotFoundException($"Dish with ID {request.DishId} not found!");
 
             dish.CategoryId = request.CategoryId;
             dish.Price = request.Price;
@@ -418,7 +416,7 @@ public class DishService : IDishService
                   ShortDescriptionTextId = dish.ShortDescriptionTextId,
                   SloganTextId = dish.SloganTextId,
                   NoteTextId = dish.NoteTextId
-              },request.I18n, ct);
+              }, request.I18n, ct);
 
             dish.DishNameTextId = newTextIds.DishNameTextId;
             dish.DescriptionTextId = newTextIds.DescriptionTextId;
@@ -449,7 +447,7 @@ public class DishService : IDishService
                         FileName = file.FileName,
                         ContentType = file.ContentType
                     },
-                 "dishes",FileValidationOptions.ImageUpload,ct);
+                 "dishes", FileValidationOptions.ImageUpload, ct);
 
                 savedFilePaths.Add(uploadResult.RelativePath);
 

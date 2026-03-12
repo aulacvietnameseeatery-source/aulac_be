@@ -1,6 +1,8 @@
 using Core.DTO.Order;
 using Core.Entity;
 using Core.Enum;
+using LookupTypeEnum = Core.Enum.LookupType;
+using Core.Extensions;
 using Core.Interface.Repo;
 using Core.Interface.Service.Entity;
 using Infa.Data;
@@ -31,13 +33,17 @@ public class PaymentService : IPaymentService
             .FirstOrDefaultAsync(o => o.OrderId == dto.OrderId, cancellationToken)
             ?? throw new KeyNotFoundException($"Order {dto.OrderId} not found");
 
-        if (order.OrderStatusLvId == 31) // CANCELLED
+        var cancelledStatusId = await OrderStatusCode.CANCELLED.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+        var completedStatusId = await OrderStatusCode.COMPLETED.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+        var availableTableStatusId = await TableStatusCode.AVAILABLE.ToTableStatusIdAsync(_lookupResolver, cancellationToken);
+
+        if (order.OrderStatusLvId == cancelledStatusId)
         {
             throw new InvalidOperationException("Cannot pay for a cancelled order.");
         }
 
         // Resolve payment method ID
-        var methodLvId = await _lookupResolver.GetIdAsync((ushort)Core.Enum.LookupType.PaymentMethod, dto.PaymentMethod, cancellationToken);
+        var methodLvId = await dto.PaymentMethod.IdAsync(_lookupResolver, (ushort)LookupTypeEnum.PaymentMethod, cancellationToken);
 
         await _unitOfWork.BeginTransactionAsync(cancellationToken);
         try
@@ -54,14 +60,24 @@ public class PaymentService : IPaymentService
 
             _context.Payments.Add(payment);
 
-            // Update Order status to COMPLETED (if it wasn't already)
-            // Even if it's already completed, we ensure it is.
-            order.OrderStatusLvId = 30; // COMPLETED
+            // Update Order status to COMPLETED
+            order.OrderStatusLvId = completedStatusId;
             order.UpdatedAt = DateTime.UtcNow;
 
             if (dto.TipAmount.HasValue)
             {
                 order.TipAmount = dto.TipAmount;
+            }
+
+            // Update Table status to AVAILABLE if it's a dine-in order
+            if (order.TableId.HasValue)
+            {
+                var table = await _context.RestaurantTables.FirstOrDefaultAsync(t => t.TableId == order.TableId.Value, cancellationToken);
+                if (table != null)
+                {
+                    table.TableStatusLvId = availableTableStatusId;
+                    table.UpdatedAt = DateTime.UtcNow;
+                }
             }
 
             await _unitOfWork.SaveChangesAsync(cancellationToken);

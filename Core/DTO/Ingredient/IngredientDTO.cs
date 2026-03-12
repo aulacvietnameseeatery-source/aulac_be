@@ -1,15 +1,13 @@
-﻿using Core.DTO.Supplier;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using Core.DTO.Supplier;
 
-namespace Core.DTO.Ingredient
+namespace Core.DTO.Ingredient;
+
+/// <summary>
+/// Ingredient response DTO
+/// </summary>
+public class IngredientDTO
 {
-    public class IngredientDTO
-    {
-        public long IngredientId { get; set; }
+   public long IngredientId { get; set; }
         public string IngredientName { get; set; } = null!;
         public string Unit { get; set; } = null!;
         public uint? TypeLvId { get; set; }
@@ -24,5 +22,4 @@ namespace Core.DTO.Ingredient
 
         // Suppliers Info
         public List<SupplierDto> Suppliers { get; set; } = new List<SupplierDto>();
-    }
 }

@@ -34,6 +34,7 @@ using Api.SignalR;
 using Core.Interface.Service.LookUp;
 using Core.Interface.Service.Customer;
 using Core.Interface.Service.Promotion;
+using Core.Interface.Service.Shift;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -103,6 +104,9 @@ builder.Services.Configure<FileStorageOptions>(
 
 builder.Services.Configure<GoogleTranslateOptions>(
     builder.Configuration.GetSection("GoogleTranslate"));
+
+builder.Services.Configure<AttendanceOptions>(
+    builder.Configuration.GetSection("Attendance"));
 
 #endregion
 
@@ -215,18 +219,23 @@ builder.Services.AddScoped<IRoleService, RoleService>();
 builder.Services.AddScoped<IAdminReservationService, AdminReservationService>();
 
 builder.Services.AddScoped<IFileStorage, LocalFileStorage>();
+builder.Services.AddScoped<IQrCodeGenerator, QrCodeGeneratorService>();
 builder.Services.AddScoped<IDishI18nService, DishI18nService>();
 builder.Services.AddScoped<Ii18nService, I18nService>();
 builder.Services.AddScoped<ILookupService, LookupService>();
 builder.Services.AddScoped<ICustomerService, CustomerService>();
 builder.Services.AddScoped<IOrderService, OrderService>();
+builder.Services.AddScoped<ISaleInvoiceService, SaleInvoiceService>();
 builder.Services.AddScoped<IPaymentService, PaymentService>();
 builder.Services.AddScoped<ITableService, TableService>();
 builder.Services.AddScoped<IPromotionService, PromotionService>();
 
+builder.Services.AddScoped<IShiftScheduleService, ShiftScheduleService>();
+builder.Services.AddScoped<IShiftAssignmentService, ShiftAssignmentService>();
+builder.Services.AddScoped<IAttendanceService, AttendanceService>();
+
 builder.Services.AddHttpClient<ITranslationService, GoogleTranslationService>();
 builder.Services.AddScoped<IIngredientService, IngredientService>();
-
 
 
 
@@ -257,6 +266,12 @@ builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
 builder.Services.AddScoped<IOrderRepository, OrderRepository>();
 builder.Services.AddScoped<IIngredientRepository, IngredientRepository>();
 builder.Services.AddScoped<IPromotionRepository, PromotionRepository>();
+builder.Services.AddScoped<ISaleInvoiceRepository, SaleInvoiceRepository>();
+
+builder.Services.AddScoped<IShiftScheduleRepository, ShiftScheduleRepository>();
+builder.Services.AddScoped<IShiftAssignmentRepository, ShiftAssignmentRepository>();
+builder.Services.AddScoped<IAttendanceRepository, AttendanceRepository>();
+builder.Services.AddScoped<ILoginActivityRepository, LoginActivityRepository>();
 
 #endregion
 

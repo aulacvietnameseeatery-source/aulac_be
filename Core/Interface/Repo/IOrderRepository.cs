@@ -17,6 +17,8 @@ public interface IOrderRepository
 	Task<List<KitchenOrderDTO>> GetKitchenOrdersAsync(
 		uint pendingStatusId,
 		uint inProgressStatusId,
+		uint completedStatusId,
+		uint cancelledStatusId,
 		CancellationToken cancellationToken = default);
 
 	Task UpdateOrderItemStatusAsync(
@@ -24,12 +26,14 @@ public interface IOrderRepository
 		uint newStatusLvId,
 		string? rejectReason,
 		uint inProgressItemStatusId,
+		uint readyItemStatusId,
 		uint servedItemStatusId,
 		uint rejectedItemStatusId,
 		uint pendingOrderStatusId,
 		uint inProgressOrderStatusId,
 		uint completedOrderStatusId,
 		uint cancelledOrderStatusId,
+		uint availableTableStatusId,
 		CancellationToken cancellationToken = default);
 
 
@@ -56,4 +60,5 @@ public interface IOrderRepository
     Task<OrderHistoryDTO> GetOrderByIdAsync(long orderId, CancellationToken cancellationToken = default);
     Task<Order?> GetByIdForUpdateAsync(long orderId, CancellationToken ct);
     Task<Order?> GetOrderWithItemsAsync(long orderId, CancellationToken ct);
+    Task<Order?> GetActiveOrderByTableAsync(long tableId, CancellationToken ct);
 }

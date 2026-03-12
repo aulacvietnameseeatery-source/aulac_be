@@ -51,7 +51,8 @@ public enum OrderItemStatusCode
     IN_PROGRESS,
     READY,
     SERVED,
-    REJECTED
+    REJECTED,
+    CANCELLED
 }
 
 public enum DishStatusCode
@@ -80,4 +81,30 @@ public enum RoleStatusCode
 {
     ACTIVE,
     INACTIVE
+}
+
+public enum ShiftStatusCode
+{
+    DRAFT,
+    PUBLISHED,
+    CLOSED,
+    CANCELLED
+}
+
+public enum ShiftAssignmentStatusCode
+{
+    ASSIGNED,
+    CONFIRMED,
+    CANCELLED
+}
+
+public enum AttendanceStatusCode
+{
+    SCHEDULED,
+    ACTIVE,
+    COMPLETED,
+    LATE,
+    ABSENT,
+    EARLY_LEAVE,
+    EXCUSED
 }

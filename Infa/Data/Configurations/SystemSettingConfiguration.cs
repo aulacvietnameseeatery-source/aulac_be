@@ -24,6 +24,9 @@ public sealed class SystemSettingConfiguration : IEntityTypeConfiguration<System
         entity.Property(e => e.SettingKey)
         .HasMaxLength(100)
         .HasColumnName("setting_key");
+        entity.Property(e => e.SettingName)
+        .HasMaxLength(255)
+        .HasColumnName("setting_name");
         entity.Property(e => e.UpdatedAt)
         .ValueGeneratedOnAddOrUpdate()
         .HasDefaultValueSql("CURRENT_TIMESTAMP")

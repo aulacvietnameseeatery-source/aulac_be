@@ -138,8 +138,11 @@ public class OrderRepository : IOrderRepository
 	public async Task<List<KitchenOrderDTO>> GetKitchenOrdersAsync(
 		uint pendingStatusId,
 		uint inProgressStatusId,
+		uint completedStatusId,
+		uint cancelledStatusId,
 		CancellationToken cancellationToken = default)
 	{
+		var today = DateTime.UtcNow.Date;
 		var orders = await _context.Orders
 			.Include(o => o.OrderStatusLv)
 			.Include(o => o.Table)
@@ -147,7 +150,9 @@ public class OrderRepository : IOrderRepository
 				.ThenInclude(oi => oi.Dish)
 			.Include(o => o.OrderItems)
 				.ThenInclude(oi => oi.ItemStatusLv)
-			.Where(o => o.OrderStatusLvId == pendingStatusId || o.OrderStatusLvId == inProgressStatusId)
+			.Where(o => o.OrderStatusLvId == pendingStatusId || 
+			            o.OrderStatusLvId == inProgressStatusId ||
+			            ((o.OrderStatusLvId == completedStatusId || o.OrderStatusLvId == cancelledStatusId) && o.CreatedAt >= today))
 			.OrderBy(o => o.CreatedAt)
 			.Select(o => new KitchenOrderDTO
 			{
@@ -175,12 +180,14 @@ public class OrderRepository : IOrderRepository
 		uint newStatusLvId,
 		string? rejectReason,
 		uint inProgressItemStatusId,
+		uint readyItemStatusId,
 		uint servedItemStatusId,
 		uint rejectedItemStatusId,
 		uint pendingOrderStatusId,
 		uint inProgressOrderStatusId,
 		uint completedOrderStatusId,
 		uint cancelledOrderStatusId,
+		uint availableTableStatusId,
 		CancellationToken cancellationToken = default)
 	{
 		var item = await _context.OrderItems
@@ -195,53 +202,61 @@ public class OrderRepository : IOrderRepository
 		// ─── Auto-update Order Status based on Items ──────────────────────
 
 		var order = await _context.Orders
+			.Include(o => o.Table)
 			.FirstOrDefaultAsync(o => o.OrderId == item.OrderId, cancellationToken);
 
 		if (order != null)
 		{
 			bool orderStatusChanged = false;
 
-		// 1. Subtract rejected item from total amount
-		if (newStatusLvId == rejectedItemStatusId)
-		{
-			order.TotalAmount -= item.Price * item.Quantity;
-			orderStatusChanged = true;
-		}
-
-		// 2. Move from PENDING to IN_PROGRESS if an item starts
-		if (newStatusLvId == inProgressItemStatusId && order.OrderStatusLvId == pendingOrderStatusId)
-		{
-			order.OrderStatusLvId = inProgressOrderStatusId;
-			orderStatusChanged = true;
-		}
-
-		// 3. Auto-complete or auto-cancel when ALL items are finished
-		var allItems = await _context.OrderItems
-			.Where(oi => oi.OrderId == item.OrderId)
-			.Select(oi => oi.ItemStatusLvId)
-			.ToListAsync(cancellationToken);
-
-		bool allFinished = allItems.All(lvId => lvId == servedItemStatusId || lvId == rejectedItemStatusId);
-
-		if (allFinished)
-		{
-			bool hasServed = allItems.Any(lvId => lvId == servedItemStatusId);
-			uint targetStatusId = hasServed ? completedOrderStatusId : cancelledOrderStatusId;
-
-			if (order.OrderStatusLvId != targetStatusId)
+			// 1. Subtract rejected/cancelled item from total amount
+			if (newStatusLvId == rejectedItemStatusId)
 			{
-				order.OrderStatusLvId = targetStatusId;
+				order.TotalAmount -= item.Price * item.Quantity;
 				orderStatusChanged = true;
 			}
-		}
 
-		if (orderStatusChanged)
-		{
-			order.UpdatedAt = DateTime.UtcNow;
-			await _context.SaveChangesAsync(cancellationToken);
+			// 2. Move from PENDING to IN_PROGRESS if an item starts
+			if (newStatusLvId == inProgressItemStatusId && order.OrderStatusLvId == pendingOrderStatusId)
+			{
+				order.OrderStatusLvId = inProgressOrderStatusId;
+				orderStatusChanged = true;
+			}
+
+			// 3. Auto-complete or auto-cancel when ALL items are finished
+			var allItems = await _context.OrderItems
+				.Where(oi => oi.OrderId == item.OrderId)
+				.Select(oi => oi.ItemStatusLvId)
+				.ToListAsync(cancellationToken);
+
+			bool allFinished = allItems.All(lvId => lvId == servedItemStatusId || lvId == readyItemStatusId || lvId == rejectedItemStatusId);
+
+			if (allFinished)
+			{
+				bool hasBeenWorked = allItems.Any(lvId => lvId == servedItemStatusId || lvId == readyItemStatusId);
+				uint targetStatusId = hasBeenWorked ? completedOrderStatusId : cancelledOrderStatusId;
+
+				if (order.OrderStatusLvId != targetStatusId)
+				{
+					order.OrderStatusLvId = targetStatusId;
+					orderStatusChanged = true;
+
+					// If order moves to CANCELLED and it has a table, reset the table status to AVAILABLE
+					if (targetStatusId == cancelledOrderStatusId && order.Table != null)
+					{
+						order.Table.TableStatusLvId = availableTableStatusId;
+						order.Table.UpdatedAt = DateTime.UtcNow;
+					}
+				}
+			}
+
+			if (orderStatusChanged)
+			{
+				order.UpdatedAt = DateTime.UtcNow;
+				await _context.SaveChangesAsync(cancellationToken);
+			}
 		}
 	}
-}
 
 
 public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, CancellationToken cancellationToken = default)
@@ -280,15 +295,15 @@ public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, Can
 			DishName     = oi.Dish.DishName,
 			Quantity     = oi.Quantity,
 			Price        = oi.Price,
-			ItemStatus   = oi.ItemStatusLv.ValueName,
+			ItemStatus   = oi.ItemStatusLv.ValueCode,
 			RejectReason = oi.RejectReason,
 			Note         = oi.Note
 		}).ToList();
 
-		// Exclude rejected items from total calculations
-		var nonRejectedItems = allItems.Where(i => i.ItemStatus != "Rejected").ToList();
-		var totalItems     = nonRejectedItems.Sum(i => i.Quantity);
-		var estimatedTotal = nonRejectedItems.Sum(i => i.Price * i.Quantity);
+		// Exclude rejected and cancelled items from total calculations
+		var activeItems = allItems.Where(i => i.ItemStatus != "REJECTED" && i.ItemStatus != "CANCELLED").ToList();
+		var totalItems     = activeItems.Sum(i => i.Quantity);
+		var estimatedTotal = activeItems.Sum(i => i.Price * i.Quantity);
 
 		return new CustomerOrderHistoryDTO
 		{
@@ -346,16 +361,16 @@ public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, Can
 				DishName    = oi.Dish.DishName,
 				Quantity    = oi.Quantity,
 				Price       = oi.Price,
-				ItemStatus  = oi.ItemStatusLv.ValueName,
+				ItemStatus  = oi.ItemStatusLv.ValueCode,
 				RejectReason = oi.RejectReason,
 				Note        = oi.Note
 			}))
 			.ToList();
 
-		// Exclude rejected items from total calculations
-		var nonRejectedItems = allItems.Where(i => i.ItemStatus != "Rejected").ToList();
-		var totalItems     = nonRejectedItems.Sum(i => i.Quantity);
-		var estimatedTotal = nonRejectedItems.Sum(i => i.Price * i.Quantity);
+		// Exclude rejected and cancelled items from total calculations
+		var activeItems = allItems.Where(i => i.ItemStatus != "REJECTED" && i.ItemStatus != "CANCELLED").ToList();
+		var totalItems     = activeItems.Sum(i => i.Quantity);
+		var estimatedTotal = activeItems.Sum(i => i.Price * i.Quantity);
 
 		return new CustomerOrderHistoryDTO
 		{
@@ -441,5 +456,16 @@ public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, Can
             .Include(o => o.OrderItems)
             .ThenInclude(i => i.Dish)
             .FirstOrDefaultAsync(o => o.OrderId == orderId, ct);
+    }
+
+    public async Task<Order?> GetActiveOrderByTableAsync(
+        long tableId,
+        CancellationToken ct)
+    {
+        return await _context.Orders
+            .Where(o => o.TableId == tableId &&
+                        o.OrderStatusLv.ValueCode != OrderStatusCode.COMPLETED.ToString() &&
+                        o.OrderStatusLv.ValueCode != OrderStatusCode.CANCELLED.ToString())
+            .FirstOrDefaultAsync(ct);
     }
 }

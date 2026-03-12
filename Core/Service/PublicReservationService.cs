@@ -6,6 +6,7 @@ using Core.Interface.Repo;
 using Core.Interface.Service.Entity;
 using Core.Interface.Service.Others;
 using Microsoft.Extensions.Logging;
+using System;
 using System.Text.Json;
 
 namespace Core.Service;
@@ -16,24 +17,39 @@ namespace Core.Service;
 /// </summary>
 public class PublicReservationService : IPublicReservationService
 {
+    private const long GuestCustomerId = 68;
+
     private readonly ITableRepository _tableRepository;
     private readonly IReservationRepository _reservationRepository;
     private readonly IReservationBroadcastService _broadcastService;
     private readonly ILogger<PublicReservationService> _logger;
     private readonly ILookupResolver _lookupResolver;
+    private readonly IOrderRepository _orderRepository;
+    private readonly IUnitOfWork _uow;
+    private readonly ISystemSettingService _systemSettingService;
+
+    private const string SettingReservationDuration = "reservation.default_duration_minutes";
+    private const string SettingReservationBuffer = "reservation.buffer_time_minutes";
+    private const string SettingImmediateWindow = "reservation.immediate_window_minutes";
 
     public PublicReservationService(
         ITableRepository tableRepository,
         IReservationRepository reservationRepository,
         IReservationBroadcastService broadcastService,
         ILogger<PublicReservationService> logger,
-        ILookupResolver lookupResolver)
+        ILookupResolver lookupResolver,
+        IUnitOfWork uow,
+        IOrderRepository orderRepository,
+        ISystemSettingService systemSettingService)
     {
         _tableRepository = tableRepository;
         _reservationRepository = reservationRepository;
         _broadcastService = broadcastService;
         _logger = logger;
         _lookupResolver = lookupResolver;
+        _uow = uow;
+        _orderRepository = orderRepository;
+        _systemSettingService = systemSettingService;
     }
 
     public async Task<List<TableAvailabilityDto>> GetAvailableTablesAsync(
@@ -42,11 +58,20 @@ public class PublicReservationService : IPublicReservationService
         string? zone,
         CancellationToken ct = default)
     {
+        // Get configurations
+        var duration = (int)await _systemSettingService.GetIntAsync(SettingReservationDuration, 120, ct);
+        var buffer = (int)await _systemSettingService.GetIntAsync(SettingReservationBuffer, 15, ct);
+        var immediateWindow = (int)await _systemSettingService.GetIntAsync(SettingImmediateWindow, 30, ct);
+
         // Get all non-maintenance tables
         var tables = await _tableRepository.GetAvailableTablesAsync(ct);
 
+        // Fetch all required status IDs via _lookupResolver extension methods
         var cancelledStatusId = await ReservationStatusCode.CANCELLED.ToReservationStatusIdAsync(_lookupResolver, ct);
         var noShowStatusId = await ReservationStatusCode.NO_SHOW.ToReservationStatusIdAsync(_lookupResolver, ct);
+
+        var occupiedTableStatusId = await TableStatusCode.OCCUPIED.ToTableStatusIdAsync(_lookupResolver, ct);
+        var reservedTableStatusId = await TableStatusCode.RESERVED.ToTableStatusIdAsync(_lookupResolver, ct);
 
         // Filter by party size if specified
         if (partySize.HasValue)
@@ -61,16 +86,37 @@ public class PublicReservationService : IPublicReservationService
         }
 
         var result = new List<TableAvailabilityDto>();
+        var now = DateTime.UtcNow;
 
         foreach (var table in tables)
         {
-            // Check for existing reservations at the specified time
-            var hasConflict = false;
+            var isAvailable = true;
+
+            // 1. Check for real-time occupancy if reservedTime is "near-now"
             if (reservedTime.HasValue)
             {
+                var timeDiff = (reservedTime.Value - now).TotalMinutes;
+
+                if (Math.Abs(timeDiff) <= immediateWindow)
+                {
+                    // If searching for "now", don't allow tables that are physically occupied or reserved manually
+                    if (table.TableStatusLvId == occupiedTableStatusId || table.TableStatusLvId == reservedTableStatusId)
+                    {
+                        isAvailable = false;
+                    }
+                }
+            }
+
+            // 2. Check for existing reservation conflicts (overlap check)
+            if (isAvailable && reservedTime.HasValue)
+            {
                 var conflicts = await _reservationRepository.GetTableReservationsForTimeAsync(
-                    table.TableId, reservedTime.Value, 120, cancelledStatusId, noShowStatusId, ct);
-                hasConflict = conflicts.Any();
+                    table.TableId, reservedTime.Value, duration + buffer, cancelledStatusId, noShowStatusId, ct);
+                
+                if (conflicts.Any())
+                {
+                    isAvailable = false;
+                }
             }
 
             result.Add(new TableAvailabilityDto
@@ -80,7 +126,7 @@ public class PublicReservationService : IPublicReservationService
                 Capacity = table.Capacity,
                 TableType = table.TableTypeLv?.ValueName ?? TableTypeCode.NORMAL.ToString(),
                 Zone = table.ZoneLv?.ValueName ?? TableZoneCode.INDOOR.ToString(),
-                IsAvailable = !hasConflict,
+                IsAvailable = isAvailable,
                 LockedUntil = null,
                 ImageUrl = table.TableMedia?.FirstOrDefault()?.Media?.Url
             });
@@ -106,24 +152,43 @@ public class PublicReservationService : IPublicReservationService
 
         // 1. Validate all tables exist and conditions
         var tables = new List<RestaurantTable>();
+        var now = DateTime.UtcNow;
+        var timeWindow = 30.0;
 
         var lockedTableStatusId = await TableStatusCode.LOCKED.ToTableStatusIdAsync(_lookupResolver, ct);
+        var occupiedTableStatusId = await TableStatusCode.OCCUPIED.ToTableStatusIdAsync(_lookupResolver, ct);
+        var reservedTableStatusId = await TableStatusCode.RESERVED.ToTableStatusIdAsync(_lookupResolver, ct);
+
         foreach(var id in tableIds)
         {
              var t = await _tableRepository.GetByIdAsync(id, ct);
              if (t == null) throw new KeyNotFoundException($"Table with ID {id} not found.");
              if (t.TableStatusLvId == lockedTableStatusId) throw new InvalidOperationException($"Table {t.TableCode} is under maintenance.");
+             
+             // Check for real-time occupancy if reservation is "near-now"
+             var timeDiff = (request.ReservedTime - now).TotalMinutes;
+             if (Math.Abs(timeDiff) <= timeWindow)
+             {
+                 if (t.TableStatusLvId == occupiedTableStatusId || t.TableStatusLvId == reservedTableStatusId)
+                 {
+                     throw new InvalidOperationException($"Table {t.TableCode} is currently occupied or reserved.");
+                 }
+             }
+
              tables.Add(t);
         }
 
         // 2. Validate Direct Availability
+        var duration = (int)await _systemSettingService.GetIntAsync(SettingReservationDuration, 120, ct);
+        var buffer = (int)await _systemSettingService.GetIntAsync(SettingReservationBuffer, 15, ct);
+
         foreach(var t in tables)
         {
             var cancelledStatusId = await ReservationStatusCode.CANCELLED.ToReservationStatusIdAsync(_lookupResolver, ct);
             var noShowStatusId = await ReservationStatusCode.NO_SHOW.ToReservationStatusIdAsync(_lookupResolver, ct);
 
             var conflicts = await _reservationRepository.GetTableReservationsForTimeAsync(
-                t.TableId, request.ReservedTime, 120, cancelledStatusId, noShowStatusId, ct);
+                t.TableId, request.ReservedTime, duration + buffer, cancelledStatusId, noShowStatusId, ct);
             if (conflicts.Any())
             {
                     throw new InvalidOperationException($"Table {t.TableCode} already has a reservation around the requested time.");
@@ -184,31 +249,61 @@ public class PublicReservationService : IPublicReservationService
     int? partySize,
     CancellationToken ct = default)
     {
+        // Get configurations
+        var duration = (int)await _systemSettingService.GetIntAsync(SettingReservationDuration, 120, ct);
+        var buffer = (int)await _systemSettingService.GetIntAsync(SettingReservationBuffer, 15, ct);
+        var immediateWindow = (int)await _systemSettingService.GetIntAsync(SettingImmediateWindow, 30, ct);
+
         // Get all non-maintenance tables
         var tables = await _tableRepository.GetManualAvailableTablesAsync(ct);
+
+        // Fetch required status IDs
+        var cancelledStatusId = await ReservationStatusCode.CANCELLED.ToReservationStatusIdAsync(_lookupResolver, ct);
+        var noShowStatusId = await ReservationStatusCode.NO_SHOW.ToReservationStatusIdAsync(_lookupResolver, ct);
+
+        var occupiedTableStatusId = await TableStatusCode.OCCUPIED.ToTableStatusIdAsync(_lookupResolver, ct);
+        var reservedTableStatusId = await TableStatusCode.RESERVED.ToTableStatusIdAsync(_lookupResolver, ct);
 
         // Filter by party size if specified
         if (partySize.HasValue)
         {
             tables = tables.Where(t => t.Capacity >= partySize.Value).ToList();
         }
-        var cancelledStatusId = await ReservationStatusCode.CANCELLED.ToReservationStatusIdAsync(_lookupResolver, ct);
-        var noShowStatusId = await ReservationStatusCode.NO_SHOW.ToReservationStatusIdAsync(_lookupResolver, ct);
 
         var result = new List<ManualTableAvailabilityDto>();
+        var now = DateTime.UtcNow;
 
         foreach (var table in tables)
         {
-            // Check for existing reservations at the specified time
-            var hasConflict = false;
+            var isAvailable = true;
+
+            // 1. Check for real-time occupancy if reservedTime is "near-now"
             if (reservedTime.HasValue)
             {
-                var conflicts = await _reservationRepository.GetTableReservationsForTimeAsync(
-                    table.TableId, reservedTime.Value, 120, cancelledStatusId, noShowStatusId, ct);
-                hasConflict = conflicts.Any();
+                var timeDiff = (reservedTime.Value - now).TotalMinutes;
+
+                if (Math.Abs(timeDiff) <= immediateWindow)
+                {
+                    if (table.TableStatusLvId == occupiedTableStatusId || table.TableStatusLvId == reservedTableStatusId)
+                    {
+                        isAvailable = false;
+                    }
+                }
             }
 
-            if (!hasConflict)
+            // 2. Check for existing reservations at the specified time
+            if (isAvailable && reservedTime.HasValue)
+            {
+                var conflicts = await _reservationRepository.GetTableReservationsForTimeAsync(
+                    table.TableId, reservedTime.Value, duration + buffer, cancelledStatusId, noShowStatusId, ct);
+                
+                if (conflicts.Any())
+                {
+                    isAvailable = false;
+                }
+            }
+
+            if (isAvailable)
             {
                 result.Add(new ManualTableAvailabilityDto
                 {
@@ -235,11 +330,29 @@ public class PublicReservationService : IPublicReservationService
             throw new KeyNotFoundException($"Table with ID {request.TableId} not found.");
         }
 
-        // Check if table is under maintenance
+        // Check if table is under maintenance or occupied (if near-now)
+        var duration = (int)await _systemSettingService.GetIntAsync(SettingReservationDuration, 120, ct);
+        var buffer = (int)await _systemSettingService.GetIntAsync(SettingReservationBuffer, 15, ct);
+        var immediateWindow = (int)await _systemSettingService.GetIntAsync(SettingImmediateWindow, 30, ct);
+
+        var now = DateTime.UtcNow;
+
         var lockedTableStatusId = await TableStatusCode.LOCKED.ToTableStatusIdAsync(_lookupResolver, ct);
-        if (table.TableStatusLvId == lockedTableStatusId) // LOCKED status
+        var occupiedTableStatusId = await TableStatusCode.OCCUPIED.ToTableStatusIdAsync(_lookupResolver, ct);
+        var reservedTableStatusId = await TableStatusCode.RESERVED.ToTableStatusIdAsync(_lookupResolver, ct);
+
+        if (table.TableStatusLvId == lockedTableStatusId)
         {
             throw new InvalidOperationException($"Table {table.TableCode} is under maintenance.");
+        }
+
+        var timeDiff = (request.ReservedTime - now).TotalMinutes;
+        if (Math.Abs(timeDiff) <= immediateWindow)
+        {
+            if (table.TableStatusLvId == occupiedTableStatusId || table.TableStatusLvId == reservedTableStatusId)
+            {
+                throw new InvalidOperationException($"Table {table.TableCode} is currently occupied or reserved.");
+            }
         }
 
         // Direct reservation flow (no lock token)
@@ -248,7 +361,7 @@ public class PublicReservationService : IPublicReservationService
         var noShowStatusId = await ReservationStatusCode.NO_SHOW.ToReservationStatusIdAsync(_lookupResolver, ct);
 
         var conflicts = await _reservationRepository.GetTableReservationsForTimeAsync(
-            request.TableId, request.ReservedTime, 120, cancelledStatusId, noShowStatusId, ct);
+            request.TableId, request.ReservedTime, duration + buffer, cancelledStatusId, noShowStatusId, ct);
         if (conflicts.Any())
         {
             throw new InvalidOperationException(
@@ -304,5 +417,135 @@ public class PublicReservationService : IPublicReservationService
             Status = request.Status,
             CreatedAt = created.CreatedAt ?? DateTime.UtcNow
         };
+    }
+
+    public async Task<ReservationStatusResponseDTO> UpdateReservationStatusAsync(
+        long reservationId,
+        long staffId,
+        UpdateReservationStatusRequest request,
+        CancellationToken ct)
+    {
+        var reservation = await _reservationRepository
+            .GetByIdWithTablesAsync(reservationId, ct)
+            ?? throw new Exception("Reservation not found");
+
+        var currentStatus = System.Enum.Parse<ReservationStatusCode>(
+    reservation.ReservationStatusLv.ValueCode);
+
+        ValidateStatusTransition(currentStatus, request.Status);
+
+        await _uow.BeginTransactionAsync(ct);
+
+        try
+        {
+            long? createdOrderId = null;
+
+            if (request.Status == ReservationStatusCode.CHECKED_IN)
+            {
+                createdOrderId = await HandleCheckIn(
+                    reservation,
+                    staffId,
+                    ct);
+            }
+
+            var statusId = await _lookupResolver.GetIdAsync(
+                (ushort)Enum.LookupType.ReservationStatus,
+                request.Status,
+                ct);
+
+            reservation.ReservationStatusLvId = statusId;
+
+            await _reservationRepository.UpdateAsync(reservation, ct);
+
+            await _uow.CommitAsync(ct);
+
+            return new ReservationStatusResponseDTO
+            {
+                ReservationId = reservation.ReservationId,
+                Status = request.Status,
+                CreatedOrderId = createdOrderId
+            };
+        }
+        catch
+        {
+            await _uow.RollbackAsync(ct);
+            throw;
+        }
+    }
+
+    private void ValidateStatusTransition(
+    ReservationStatusCode current,
+    ReservationStatusCode target)
+    {
+        if (current == target)
+            throw new InvalidOperationException("Reservation already in this status.");
+
+        if (current == ReservationStatusCode.CANCELLED ||
+            current == ReservationStatusCode.NO_SHOW)
+            throw new InvalidOperationException("Reservation already closed.");
+    }
+
+    private void ValidateReservationTime(Reservation reservation)
+    {
+        var now = DateTime.UtcNow;
+
+        var start = reservation.ReservedTime.AddMinutes(-30);
+        var end = reservation.ReservedTime.AddMinutes(30);
+
+        if (now < start || now > end)
+            throw new InvalidOperationException(
+                "Check-in allowed only within reservation time window.");
+    }
+
+    private async Task<long> HandleCheckIn(
+    Reservation reservation,
+    long staffId,
+    CancellationToken ct)
+    {
+        ValidateReservationTime(reservation);
+
+        var table = reservation.Tables.FirstOrDefault()
+            ?? throw new InvalidOperationException("Reservation has no table.");
+
+        var existingOrder = await _orderRepository
+            .GetActiveOrderByTableAsync(table.TableId, ct);
+
+        if (existingOrder != null)
+            throw new InvalidOperationException("Table already has active order.");
+
+        var orderStatusId = await _lookupResolver.GetIdAsync(
+            (ushort)Enum.LookupType.OrderStatus,
+            OrderStatusCode.PENDING,
+            ct);
+
+        var sourceId = await _lookupResolver.GetIdAsync(
+            (ushort)Enum.LookupType.OrderSource,
+            OrderSourceCode.DINE_IN,
+            ct);
+
+        var occupiedStatusId = await _lookupResolver.GetIdAsync(
+            (ushort)Enum.LookupType.TableStatus,
+            TableStatusCode.OCCUPIED,
+            ct);
+
+        var order = new Order
+        {
+            StaffId = staffId,
+            CustomerId = reservation.CustomerId ?? GuestCustomerId,
+            TableId = table.TableId,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+            TotalAmount = 0,
+            SourceLvId = sourceId,
+            OrderStatusLvId = orderStatusId
+        };
+
+        await _orderRepository.AddAsync(order, ct);
+
+        table.TableStatusLvId = occupiedStatusId;
+
+        await _tableRepository.UpdateAsync(table, ct);
+
+        return order.OrderId;
     }
 }

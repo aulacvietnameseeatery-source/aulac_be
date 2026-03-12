@@ -49,4 +49,13 @@ public interface IReservationRepository
         CancellationToken cancellationToken = default);
     // Thêm vào interface repo
     Task<List<LookupValue>> GetReservationStatusesAsync(CancellationToken cancellationToken = default);
+
+    Task<Reservation?> GetByIdWithTablesAsync(long id, CancellationToken ct);
+
+    Task UpdateAsync(Reservation reservation, CancellationToken ct);
+
+    /// <summary>
+    /// Lấy chi tiết Reservation bao gồm Tables, Status, Source.
+    /// </summary>
+    Task<Reservation?> GetByIdWithFullDetailsAsync(long reservationId, CancellationToken ct = default);
 }

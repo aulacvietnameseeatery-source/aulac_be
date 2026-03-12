@@ -2,9 +2,8 @@ namespace Core.DTO.Table;
 
 public class TableDetailDto : TableManagementDto
 {
-    public string? QrCodeUrl { get; set; }
-    public string? QrCodeImageUrl { get; set; }
-    public List<TableMediaDto> Images { get; set; } = new();
+    // QrCodeUrl and QrCodeImageUrl are inherited from TableManagementDto
+    public new List<TableMediaDto> Images { get; set; } = new();
     public int ActiveOrdersCount { get; set; }
     public bool HasErrors { get; set; }
     public List<UpcomingReservationDto> UpcomingReservations { get; set; } = new();

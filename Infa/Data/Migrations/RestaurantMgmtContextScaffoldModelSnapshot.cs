@@ -24,6 +24,95 @@ namespace Infa.Data.Migrations
             MySqlModelBuilderExtensions.HasCharSet(modelBuilder, "utf8mb4");
             MySqlModelBuilderExtensions.AutoIncrementColumns(modelBuilder);
 
+            modelBuilder.Entity("Core.Entity.AttendanceRecord", b =>
+                {
+                    b.Property<long>("AttendanceId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("attendance_id");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("AttendanceId"));
+
+                    b.Property<DateTime?>("ActualCheckInAt")
+                        .HasColumnType("datetime")
+                        .HasColumnName("actual_check_in_at");
+
+                    b.Property<DateTime?>("ActualCheckOutAt")
+                        .HasColumnType("datetime")
+                        .HasColumnName("actual_check_out_at");
+
+                    b.Property<string>("AdjustmentReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)")
+                        .HasColumnName("adjustment_reason");
+
+                    b.Property<uint>("AttendanceStatusLvId")
+                        .HasColumnType("int unsigned")
+                        .HasColumnName("attendance_status_lv_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<int>("EarlyLeaveMinutes")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasColumnName("early_leave_minutes");
+
+                    b.Property<bool>("IsManualAdjustment")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_manual_adjustment");
+
+                    b.Property<int>("LateMinutes")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasColumnName("late_minutes");
+
+                    b.Property<DateTime?>("ReviewedAt")
+                        .HasColumnType("datetime")
+                        .HasColumnName("reviewed_at");
+
+                    b.Property<long?>("ReviewedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("reviewed_by");
+
+                    b.Property<long>("ShiftAssignmentId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("shift_assignment_id");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("datetime")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlComputedColumn(b.Property<DateTime>("UpdatedAt"));
+
+                    b.Property<int>("WorkedMinutes")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasColumnName("worked_minutes");
+
+                    b.HasKey("AttendanceId")
+                        .HasName("PRIMARY");
+
+                    b.HasIndex("ReviewedBy");
+
+                    b.HasIndex(new[] { "AttendanceStatusLvId" }, "idx_attendance_status_lv");
+
+                    b.HasIndex(new[] { "ShiftAssignmentId" }, "uq_attendance_assignment")
+                        .IsUnique();
+
+                    b.ToTable("attendance_record", (string)null);
+                });
+
             modelBuilder.Entity("Core.Entity.AuditLog", b =>
                 {
                     b.Property<long>("LogId")
@@ -742,6 +831,57 @@ namespace Infa.Data.Migrations
                     b.ToTable("inventory_transaction_media", (string)null);
                 });
 
+            modelBuilder.Entity("Core.Entity.LoginActivity", b =>
+                {
+                    b.Property<long>("LoginActivityId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("login_activity_id");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("LoginActivityId"));
+
+                    b.Property<string>("DeviceInfo")
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)")
+                        .HasColumnName("device_info");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("event_type");
+
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)")
+                        .HasColumnName("ip_address");
+
+                    b.Property<DateTime>("OccurredAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime")
+                        .HasColumnName("occurred_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<long?>("SessionId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("session_id");
+
+                    b.Property<long>("StaffId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("staff_id");
+
+                    b.HasKey("LoginActivityId")
+                        .HasName("PRIMARY");
+
+                    b.HasIndex("SessionId");
+
+                    b.HasIndex(new[] { "OccurredAt" }, "idx_login_activity_occurred_at");
+
+                    b.HasIndex(new[] { "StaffId" }, "idx_login_activity_staff");
+
+                    b.ToTable("login_activity", (string)null);
+                });
+
             modelBuilder.Entity("Core.Entity.LookupType", b =>
                 {
                     b.Property<ushort>("TypeId")
@@ -1196,6 +1336,11 @@ namespace Infa.Data.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("varchar(255)")
                         .HasColumnName("description");
+
+                    b.Property<decimal>("DiscountValue")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)")
+                        .HasColumnName("discount_value");
 
                     b.Property<DateTime>("EndTime")
                         .HasColumnType("datetime")
@@ -1699,6 +1844,137 @@ namespace Infa.Data.Migrations
                     b.ToTable("service_error_category", (string)null);
                 });
 
+            modelBuilder.Entity("Core.Entity.ShiftAssignment", b =>
+                {
+                    b.Property<long>("ShiftAssignmentId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("shift_assignment_id");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("ShiftAssignmentId"));
+
+                    b.Property<DateTime>("AssignedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime")
+                        .HasColumnName("assigned_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<long>("AssignedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("assigned_by");
+
+                    b.Property<uint>("AssignmentStatusLvId")
+                        .HasColumnType("int unsigned")
+                        .HasColumnName("assignment_status_lv_id");
+
+                    b.Property<string>("Remarks")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)")
+                        .HasColumnName("remarks");
+
+                    b.Property<long>("RoleId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("role_id");
+
+                    b.Property<long>("ShiftScheduleId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("shift_schedule_id");
+
+                    b.Property<long>("StaffId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("staff_id");
+
+                    b.HasKey("ShiftAssignmentId")
+                        .HasName("PRIMARY");
+
+                    b.HasIndex("AssignedBy");
+
+                    b.HasIndex("AssignmentStatusLvId");
+
+                    b.HasIndex("RoleId");
+
+                    b.HasIndex(new[] { "ShiftScheduleId" }, "idx_shift_assignment_schedule");
+
+                    b.HasIndex(new[] { "StaffId" }, "idx_shift_assignment_staff");
+
+                    b.HasIndex(new[] { "ShiftScheduleId", "StaffId" }, "uq_shift_assignment_schedule_staff")
+                        .IsUnique();
+
+                    b.ToTable("shift_assignment", (string)null);
+                });
+
+            modelBuilder.Entity("Core.Entity.ShiftSchedule", b =>
+                {
+                    b.Property<long>("ShiftScheduleId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("shift_schedule_id");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("ShiftScheduleId"));
+
+                    b.Property<DateOnly>("BusinessDate")
+                        .HasColumnType("date")
+                        .HasColumnName("business_date");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<long>("CreatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)")
+                        .HasColumnName("notes");
+
+                    b.Property<DateTime>("PlannedEndAt")
+                        .HasColumnType("datetime")
+                        .HasColumnName("planned_end_at");
+
+                    b.Property<DateTime>("PlannedStartAt")
+                        .HasColumnType("datetime")
+                        .HasColumnName("planned_start_at");
+
+                    b.Property<uint>("ShiftTypeLvId")
+                        .HasColumnType("int unsigned")
+                        .HasColumnName("shift_type_lv_id");
+
+                    b.Property<uint>("StatusLvId")
+                        .HasColumnType("int unsigned")
+                        .HasColumnName("status_lv_id");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("datetime")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlComputedColumn(b.Property<DateTime>("UpdatedAt"));
+
+                    b.Property<long?>("UpdatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("ShiftScheduleId")
+                        .HasName("PRIMARY");
+
+                    b.HasIndex("CreatedBy");
+
+                    b.HasIndex("UpdatedBy");
+
+                    b.HasIndex(new[] { "BusinessDate" }, "idx_shift_schedule_business_date");
+
+                    b.HasIndex(new[] { "StatusLvId" }, "idx_shift_schedule_status_lv");
+
+                    b.HasIndex(new[] { "ShiftTypeLvId" }, "idx_shift_schedule_type_lv");
+
+                    b.ToTable("shift_schedule", (string)null);
+                });
+
             modelBuilder.Entity("Core.Entity.StaffAccount", b =>
                 {
                     b.Property<long>("AccountId")
@@ -1829,6 +2105,11 @@ namespace Infa.Data.Migrations
                         .HasColumnType("varchar(100)")
                         .HasColumnName("setting_key");
 
+                    b.Property<string>("SettingName")
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)")
+                        .HasColumnName("setting_name");
+
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("datetime")
@@ -1942,6 +2223,33 @@ namespace Infa.Data.Migrations
                     b.HasIndex(new[] { "PermissionId" }, "permission_id");
 
                     b.ToTable("role_permission", (string)null);
+                });
+
+            modelBuilder.Entity("Core.Entity.AttendanceRecord", b =>
+                {
+                    b.HasOne("Core.Entity.LookupValue", "AttendanceStatusLv")
+                        .WithMany()
+                        .HasForeignKey("AttendanceStatusLvId")
+                        .IsRequired()
+                        .HasConstraintName("fk_attendance_status_lv");
+
+                    b.HasOne("Core.Entity.StaffAccount", "ReviewedByStaff")
+                        .WithMany()
+                        .HasForeignKey("ReviewedBy")
+                        .HasConstraintName("fk_attendance_reviewed_by");
+
+                    b.HasOne("Core.Entity.ShiftAssignment", "ShiftAssignment")
+                        .WithOne("AttendanceRecord")
+                        .HasForeignKey("Core.Entity.AttendanceRecord", "ShiftAssignmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_attendance_assignment");
+
+                    b.Navigation("AttendanceStatusLv");
+
+                    b.Navigation("ReviewedByStaff");
+
+                    b.Navigation("ShiftAssignment");
                 });
 
             modelBuilder.Entity("Core.Entity.AuditLog", b =>
@@ -2226,6 +2534,25 @@ namespace Infa.Data.Migrations
                     b.Navigation("Media");
 
                     b.Navigation("Transaction");
+                });
+
+            modelBuilder.Entity("Core.Entity.LoginActivity", b =>
+                {
+                    b.HasOne("Core.Entity.AuthSession", "Session")
+                        .WithMany()
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_login_activity_session");
+
+                    b.HasOne("Core.Entity.StaffAccount", "Staff")
+                        .WithMany()
+                        .HasForeignKey("StaffId")
+                        .IsRequired()
+                        .HasConstraintName("fk_login_activity_staff");
+
+                    b.Navigation("Session");
+
+                    b.Navigation("Staff");
                 });
 
             modelBuilder.Entity("Core.Entity.LookupType", b =>
@@ -2640,6 +2967,84 @@ namespace Infa.Data.Migrations
                     b.Navigation("CategoryNameText");
                 });
 
+            modelBuilder.Entity("Core.Entity.ShiftAssignment", b =>
+                {
+                    b.HasOne("Core.Entity.StaffAccount", "AssignedByStaff")
+                        .WithMany()
+                        .HasForeignKey("AssignedBy")
+                        .IsRequired()
+                        .HasConstraintName("fk_shift_assignment_assigned_by");
+
+                    b.HasOne("Core.Entity.LookupValue", "AssignmentStatusLv")
+                        .WithMany()
+                        .HasForeignKey("AssignmentStatusLvId")
+                        .IsRequired()
+                        .HasConstraintName("fk_shift_assignment_status_lv");
+
+                    b.HasOne("Core.Entity.Role", "Role")
+                        .WithMany()
+                        .HasForeignKey("RoleId")
+                        .IsRequired()
+                        .HasConstraintName("fk_shift_assignment_role");
+
+                    b.HasOne("Core.Entity.ShiftSchedule", "ShiftSchedule")
+                        .WithMany("ShiftAssignments")
+                        .HasForeignKey("ShiftScheduleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_shift_assignment_schedule");
+
+                    b.HasOne("Core.Entity.StaffAccount", "Staff")
+                        .WithMany()
+                        .HasForeignKey("StaffId")
+                        .IsRequired()
+                        .HasConstraintName("fk_shift_assignment_staff");
+
+                    b.Navigation("AssignedByStaff");
+
+                    b.Navigation("AssignmentStatusLv");
+
+                    b.Navigation("Role");
+
+                    b.Navigation("ShiftSchedule");
+
+                    b.Navigation("Staff");
+                });
+
+            modelBuilder.Entity("Core.Entity.ShiftSchedule", b =>
+                {
+                    b.HasOne("Core.Entity.StaffAccount", "CreatedByStaff")
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .IsRequired()
+                        .HasConstraintName("fk_shift_schedule_created_by");
+
+                    b.HasOne("Core.Entity.LookupValue", "ShiftTypeLv")
+                        .WithMany()
+                        .HasForeignKey("ShiftTypeLvId")
+                        .IsRequired()
+                        .HasConstraintName("fk_shift_schedule_type_lv");
+
+                    b.HasOne("Core.Entity.LookupValue", "StatusLv")
+                        .WithMany()
+                        .HasForeignKey("StatusLvId")
+                        .IsRequired()
+                        .HasConstraintName("fk_shift_schedule_status_lv");
+
+                    b.HasOne("Core.Entity.StaffAccount", "UpdatedByStaff")
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .HasConstraintName("fk_shift_schedule_updated_by");
+
+                    b.Navigation("CreatedByStaff");
+
+                    b.Navigation("ShiftTypeLv");
+
+                    b.Navigation("StatusLv");
+
+                    b.Navigation("UpdatedByStaff");
+                });
+
             modelBuilder.Entity("Core.Entity.StaffAccount", b =>
                 {
                     b.HasOne("Core.Entity.Role", "Role")
@@ -2898,6 +3303,16 @@ namespace Infa.Data.Migrations
             modelBuilder.Entity("Core.Entity.ServiceErrorCategory", b =>
                 {
                     b.Navigation("ServiceErrors");
+                });
+
+            modelBuilder.Entity("Core.Entity.ShiftAssignment", b =>
+                {
+                    b.Navigation("AttendanceRecord");
+                });
+
+            modelBuilder.Entity("Core.Entity.ShiftSchedule", b =>
+                {
+                    b.Navigation("ShiftAssignments");
                 });
 
             modelBuilder.Entity("Core.Entity.StaffAccount", b =>

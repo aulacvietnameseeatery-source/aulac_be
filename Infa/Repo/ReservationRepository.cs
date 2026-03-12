@@ -150,4 +150,35 @@ public class ReservationRepository : IReservationRepository
             .OrderBy(lv => lv.ValueId) 
             .ToListAsync(cancellationToken);
     }
+
+    public async Task<Reservation?> GetByIdWithTablesAsync(
+        long id,
+        CancellationToken ct)
+    {
+        return await _context.Reservations
+            .Include(r => r.Tables)
+            .Include(r => r.ReservationStatusLv)
+            .FirstOrDefaultAsync(r => r.ReservationId == id, ct);
+    }
+
+    public async Task UpdateAsync(
+        Reservation reservation,
+        CancellationToken ct)
+    {
+        _context.Reservations.Update(reservation);
+
+        await _context.SaveChangesAsync(ct);
+    }
+
+    /// <inheritdoc />
+    public async Task<Reservation?> GetByIdWithFullDetailsAsync(long reservationId, CancellationToken ct = default)
+    {
+        return await _context.Reservations
+            .AsNoTracking()
+            .Include(r => r.Tables).ThenInclude(t => t.TableTypeLv)
+            .Include(r => r.Tables).ThenInclude(t => t.ZoneLv)
+            .Include(r => r.ReservationStatusLv)
+            .Include(r => r.SourceLv)
+            .FirstOrDefaultAsync(r => r.ReservationId == reservationId, ct);
+    }
 }

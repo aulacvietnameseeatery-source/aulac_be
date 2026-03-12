@@ -98,6 +98,7 @@ public class PublicReservationController : ControllerBase
     /// This is a public endpoint used by customers via QR code.
     /// </summary>
     /// <param name="tableCode">The table code (e.g., TB-R01)</param>
+    /// <param name="token">Optional QR token for validation (from QR scan URL)</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Success response</returns>
     /// <response code="200">Table marked as occupied successfully</response>
@@ -107,9 +108,10 @@ public class PublicReservationController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> OccupyTable(
         string tableCode,
+        [FromQuery] string? token = null,
         CancellationToken cancellationToken = default)
     {
-        await _tableService.OccupyTableByCodeAsync(tableCode, cancellationToken);
+        await _tableService.OccupyTableByCodeAsync(tableCode, token, cancellationToken);
 
         _logger.LogInformation("Table {TableCode} marked as occupied by customer", tableCode);
 

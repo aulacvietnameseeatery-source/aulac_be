@@ -258,6 +258,56 @@ namespace Api.Controllers
 	}
 
 	/// <summary>
+	/// Cancels an order item if it hasn't been started yet (CREATED status only).
+	/// PUBLIC – no authentication required (called from customer order history).
+	/// </summary>
+	/// <param name="orderItemId">ID of the order item to cancel</param>
+	[HttpPatch("items/{orderItemId}/cancel")]
+	[ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+	[ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+	[ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+	public async Task<IActionResult> CancelOrderItem(
+		long orderItemId,
+		CancellationToken cancellationToken = default)
+	{
+		try
+		{
+			await _orderService.CancelOrderItemAsync(orderItemId, cancellationToken);
+
+			return Ok(new ApiResponse<object>
+			{
+				Success = true,
+				Code = 200,
+				SubCode = 0,
+				UserMessage = "Order item cancelled successfully",
+				ServerTime = DateTimeOffset.Now
+			});
+		}
+		catch (KeyNotFoundException ex)
+		{
+			return NotFound(new ApiResponse<object>
+			{
+				Success = false,
+				Code = 404,
+				SubCode = 1,
+				UserMessage = ex.Message,
+				ServerTime = DateTimeOffset.Now
+			});
+		}
+		catch (InvalidOperationException ex)
+		{
+			return BadRequest(new ApiResponse<object>
+			{
+				Success = false,
+				Code = 400,
+				SubCode = 1,
+				UserMessage = ex.Message,
+				ServerTime = DateTimeOffset.Now
+			});
+		}
+	}
+
+	/// <summary>
 	/// Creates a new order from the customer-facing menu (QR / DINE_IN flow).
 	/// The customer either provides their info or skips (guest account).
 	/// </summary>
