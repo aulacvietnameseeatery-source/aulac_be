@@ -54,16 +54,21 @@ public class OrderService : IOrderService
 	{
 		var pendingId    = await OrderStatusCode.PENDING.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
 		var inProgressId = await OrderStatusCode.IN_PROGRESS.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+		var completedId  = await OrderStatusCode.COMPLETED.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+		var cancelledId  = await OrderStatusCode.CANCELLED.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
 
 		return await _orderRepository.GetKitchenOrdersAsync(
 			pendingId,
 			inProgressId,
+			completedId,
+			cancelledId,
 			cancellationToken);
 	}
 
 	public async Task UpdateOrderItemStatusAsync(long orderItemId, uint newStatusLvId, string? rejectReason, CancellationToken cancellationToken = default)
 	{
 		var inProgressItemId = await OrderItemStatusCode.IN_PROGRESS.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
+		var readyItemId      = await OrderItemStatusCode.READY.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
 		var servedItemId     = await OrderItemStatusCode.SERVED.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
 		var rejectedItemId   = await OrderItemStatusCode.REJECTED.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
 
@@ -71,18 +76,21 @@ public class OrderService : IOrderService
 		var inProgressOrderId = await OrderStatusCode.IN_PROGRESS.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
 		var completedOrderId  = await OrderStatusCode.COMPLETED.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
 		var cancelledOrderId  = await OrderStatusCode.CANCELLED.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+		var availableTableId  = await TableStatusCode.AVAILABLE.ToTableStatusIdAsync(_lookupResolver, cancellationToken);
 
 		await _orderRepository.UpdateOrderItemStatusAsync(
 			orderItemId,
 			newStatusLvId,
 			rejectReason,
 			inProgressItemId,
+			readyItemId,
 			servedItemId,
 			rejectedItemId,
 			pendingOrderId,
 			inProgressOrderId,
 			completedOrderId,
 			cancelledOrderId,
+			availableTableId,
 			cancellationToken);
 	}
 
