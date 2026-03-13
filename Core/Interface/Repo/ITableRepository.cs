@@ -136,5 +136,5 @@ public interface ITableRepository
         uint occupiedLvId,
         CancellationToken ct);
 
-    public Task<List<RestaurantTable>> GetAvailableTablesAsync(DateTime targetTime, CancellationToken ct = default);
+     Task<List<RestaurantTable>> GetAvailableTablesAsync(DateTime targetTime, CancellationToken ct = default);
 }
