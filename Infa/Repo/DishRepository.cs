@@ -307,6 +307,8 @@ public class DishRepository : IDishRepository
         return await _context.Dishes
             .AsNoTracking()
             .Include(d => d.DishStatusLv)
+            .Include(d => d.DishMedia)
+                .ThenInclude(dm => dm.Media)
             .Include(d => d.DishNameText)
                 .ThenInclude(t => t.I18nTranslations)
             .Include(d => d.DescriptionText)

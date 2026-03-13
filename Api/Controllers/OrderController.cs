@@ -447,6 +447,20 @@ namespace Api.Controllers
                 ServerTime = DateTimeOffset.UtcNow
             });
         }
+
+        [HttpGet("recent")]
+        public async Task<IActionResult> GetRecentOrders(
+			[FromQuery] int limit = 20,
+			CancellationToken ct = default)
+        {
+            var result = await _orderService.GetRecentOrdersAsync(limit, ct);
+
+            return Ok(new ApiResponse<List<RecentOrderDTO>>
+            {
+                Success = true,
+                Data = result
+            });
+        }
     }
 
 }

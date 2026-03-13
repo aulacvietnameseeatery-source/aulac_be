@@ -13,7 +13,7 @@ namespace Core.DTO.Dish
         public decimal Price { get; set; }
         public bool? ChefRecommended { get; set; }
         public sbyte? DisplayOrder { get; set; }
-
+        public string? ImageUrl { get; set; }
         public Dictionary<string, DishI18nDto> I18n { get; set; } = new();
     }
 }

@@ -468,4 +468,23 @@ public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, Can
                         o.OrderStatusLv.ValueCode != OrderStatusCode.CANCELLED.ToString())
             .FirstOrDefaultAsync(ct);
     }
+
+    public async Task<List<RecentOrderDTO>> GetRecentOrdersAsync(
+    int limit,
+    CancellationToken ct)
+    {
+        return await _context.Orders
+            .OrderByDescending(o => o.CreatedAt)
+            .Take(limit)
+            .Select(o => new RecentOrderDTO
+            {
+                OrderId = o.OrderId,
+                CustomerName = o.Customer.FullName ?? o.Customer.Phone,
+                Source = o.SourceLv.ValueCode,
+                TableCode = o.Table != null ? o.Table.TableCode : null,
+                CreatedAt = o.CreatedAt.Value,
+                Status = o.OrderStatusLv.ValueCode
+            })
+            .ToListAsync(ct);
+    }
 }
