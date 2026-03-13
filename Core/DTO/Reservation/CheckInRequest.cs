@@ -6,9 +6,8 @@ using System.Threading.Tasks;
 
 namespace Core.DTO.Reservation
 {
-    public class UpdateReservationStatusRequest
+    public class AssignTableRequest
     {
-        public ReservationStatusCode Status { get; set; }
-        public string? Notes { get; set; }
+        public List<long> TableIds { get; set; } = new List<long>();
     }
 }

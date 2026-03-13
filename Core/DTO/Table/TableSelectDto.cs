@@ -15,6 +15,8 @@ namespace Core.DTO.Table
         public string ZoneName { get; set; } = string.Empty;
         public string StatusCode { get; set; } = null!;
 
+        public string TableType { get; set; } = null!;
+
         public bool HasActiveOrder { get; set; }
         public long? ActiveOrderId { get; set; }
 

@@ -357,4 +357,27 @@ public class TableController : ControllerBase
         await _tableService.DeleteTableMediaAsync(id, mediaId, ct);
         return NoContent();
     }
+
+
+    /// <summary>
+    /// Gets available tables for a specific reservation time.
+    /// </summary>
+    /// <param name="targetTime">The time to check for overlap</param>
+    /// <param name="ct">Cancellation token</param>
+    [HttpGet("available")]
+    // [HasPermission(Permissions.ViewTable)] // Mở comment nếu cần Auth
+    [ProducesResponseType(typeof(ApiResponse<List<TableSelectDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAvailableTables([FromQuery] DateTime targetTime, CancellationToken ct)
+    {
+        var data = await _tableService.GetAvailableTablesByTimeAsync(targetTime, ct);
+
+        return Ok(new ApiResponse<List<TableSelectDto>>
+        {
+            Success = true,
+            Code = 200,
+            UserMessage = "Available tables retrieved successfully.",
+            Data = data,
+            ServerTime = DateTimeOffset.UtcNow
+        });
+    }
 }

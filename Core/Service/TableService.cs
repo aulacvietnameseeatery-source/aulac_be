@@ -320,6 +320,20 @@ public class TableService : ITableService
         return MapToManagementDto(updated!);
     }
 
+    public async Task<List<TableSelectDto>> GetAvailableTablesByTimeAsync(DateTime targetTime, CancellationToken ct = default)
+    {
+        var tables = await _tableRepository.GetAvailableTablesAsync(targetTime, ct);
+
+        return tables.Select(t => new TableSelectDto
+        {
+            TableId = t.TableId,
+            TableCode = t.TableCode,
+            Capacity = t.Capacity,
+            ZoneName = t.ZoneLv.ValueName, 
+            TableType = t.TableTypeLv.ValueName
+        }).ToList();
+    }
+
     #endregion
 
     #region ── Zone & Type lookups ──

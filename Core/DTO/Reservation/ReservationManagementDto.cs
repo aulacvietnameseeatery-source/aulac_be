@@ -32,5 +32,8 @@ namespace Core.DTO.Reservation
         public string? PreOrderSummary { get; set; }
 
         public DateTime? CreatedAt { get; set; }
+
+        public string? Notes { get; set; }
+        public string TableName { get; set; }
     }
 }

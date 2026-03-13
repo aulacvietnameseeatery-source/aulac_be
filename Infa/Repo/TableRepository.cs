@@ -39,6 +39,38 @@ public class TableRepository : ITableRepository
             .ToListAsync(ct);
     }
 
+    public async Task<List<RestaurantTable>> GetAvailableTablesAsync(DateTime targetTime, CancellationToken ct = default)
+    {
+        // Giả sử mỗi bữa ăn kéo dài 2 tiếng. Bàn bị kẹt từ (Giờ khách đến - 2 tiếng) đến (Giờ khách đến + 2 tiếng)
+        var diningDuration = TimeSpan.FromHours(2);
+        var startTime = targetTime.Add(-diningDuration); // Ví dụ khách đặt 19h -> Tính từ 17h
+        var endTime = targetTime.Add(diningDuration);    // Đến 21h
+
+        // 1. Tìm ID của các bàn ĐANG BỊ KẸT LỊCH
+        var busyTableIds = await _context.Reservations
+            .Where(r => r.ReservedTime > startTime && r.ReservedTime < endTime)
+            .Where(r => r.ReservationStatusLv.ValueCode == "PENDING" ||
+                        r.ReservationStatusLv.ValueCode == "CONFIRMED" ||
+                        r.ReservationStatusLv.ValueCode == "CHECKED_IN")
+            .SelectMany(r => r.Tables.Select(t => t.TableId))
+            .Distinct()
+            .ToListAsync(ct);
+
+        // 2. Lấy danh sách bàn CÒN TRỐNG (Loại trừ các bàn kẹt lịch)
+        return await _context.RestaurantTables
+            .AsNoTracking()
+            .Include(t => t.TableTypeLv)
+            .Include(t => t.ZoneLv)
+            .Where(t => !t.IsDeleted)
+            .Where(t => t.TableStatusLvId != TableStatusLocked)
+            .Where(t => t.IsOnline == true)
+            .Where(t => !busyTableIds.Contains(t.TableId))
+            .OrderBy(t => t.ZoneLv.ValueName) // Xếp theo Zone 
+            .ThenBy(t => t.Capacity)
+            .ThenBy(t => t.TableCode)
+            .ToListAsync(ct);
+    }
+
     /// <inheritdoc />
     public async Task<RestaurantTable?> GetByIdAsync(long tableId, CancellationToken ct = default)
     {
@@ -158,6 +190,28 @@ public class TableRepository : ITableRepository
 
         if (request.IsOnline.HasValue)
             query = query.Where(t => t.IsOnline == request.IsOnline.Value);
+
+        // TÌM BÀN TRỐNG THEO GIỜ CỤ THỂ
+        if (request.TargetTime.HasValue)
+        {
+            var targetTime = request.TargetTime.Value;
+            var diningDuration = TimeSpan.FromHours(2);
+            var startTime = targetTime.Add(-diningDuration);
+            var endTime = targetTime.Add(diningDuration);
+
+            // Tìm ID của các bàn ĐANG BỊ KẸT LỊCH trong khoảng targetTime
+            var busyTableIds = await _context.Reservations
+                .Where(r => r.ReservedTime > startTime && r.ReservedTime < endTime)
+                .Where(r => r.ReservationStatusLv.ValueCode == "PENDING" ||
+                            r.ReservationStatusLv.ValueCode == "CONFIRMED" ||
+                            r.ReservationStatusLv.ValueCode == "CHECKED_IN")
+                .SelectMany(r => r.Tables.Select(t => t.TableId))
+                .Distinct()
+                .ToListAsync(ct);
+
+            // Chỉ lấy những bàn không nằm trong list kẹt lịch
+            query = query.Where(t => !busyTableIds.Contains(t.TableId));
+        }
 
         var totalCount = await query.CountAsync(ct);
 
@@ -279,8 +333,8 @@ public class TableRepository : ITableRepository
         var table = await _context.RestaurantTables
   .FirstOrDefaultAsync(t => t.TableId == tableId, ct);
 
-  if (table is not null)
-  table.TableQrImg = mediaId;
+        if (table is not null)
+            table.TableQrImg = mediaId;
     }
 
     public async Task<bool> TryOccupyIfAvailableAsync(
