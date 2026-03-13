@@ -154,6 +154,8 @@ public class DishRepository : IDishRepository
     {
         return await _context.Dishes
             .Include(d => d.Category)
+                .ThenInclude(c => c.CategoryNameText)
+                    .ThenInclude(t => t!.I18nTranslations)
             .Include(d => d.DishStatusLv)
             .Include(d => d.DishMedia)
                 .ThenInclude(dm => dm.Media)
