@@ -61,4 +61,6 @@ public interface IOrderRepository
     Task<Order?> GetByIdForUpdateAsync(long orderId, CancellationToken ct);
     Task<Order?> GetOrderWithItemsAsync(long orderId, CancellationToken ct);
     Task<Order?> GetActiveOrderByTableAsync(long tableId, CancellationToken ct);
+
+	Task<List<RecentOrderDTO>> GetRecentOrdersAsync(int limit, CancellationToken ct);
 }
