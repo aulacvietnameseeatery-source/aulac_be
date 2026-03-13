@@ -418,5 +418,15 @@ public class OrderService : IOrderService
             CreatedAt = order.CreatedAt,
         };
     }
+
+    public async Task<List<RecentOrderDTO>> GetRecentOrdersAsync(
+        int limit,
+        CancellationToken ct)
+    {
+        if (limit <= 0 || limit > 100)
+            limit = 20;
+
+        return await _orderRepository.GetRecentOrdersAsync(limit, ct);
+    }
 }
 
