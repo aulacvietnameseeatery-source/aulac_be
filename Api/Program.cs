@@ -1,5 +1,7 @@
 ﻿using Api.Background;
+using Api.Hubs;
 using Api.Middleware;
+using Api.SignalR;
 using API.Middleware;
 using API.Models;
 using Core.Data;
@@ -7,13 +9,19 @@ using Core.DTO.General;
 using Core.Interface.Repo;
 using Core.Interface.Service;
 using Core.Interface.Service.Auth;
+using Core.Interface.Service.Customer;
 using Core.Interface.Service.Email;
 using Core.Interface.Service.Entity;
 using Core.Interface.Service.FileStorage;
 using Core.Interface.Service.I18n;
+using Core.Interface.Service.LookUp;
 using Core.Interface.Service.Others;
+using Core.Interface.Service.Promotion;
 using Core.Interface.Service.Role;
+using Core.Interface.Service.Shift;
 using Core.Service;
+using Hangfire;
+using Hangfire.MySql;
 using Infa.Auth;
 using Infa.Data;
 using Infa.Email;
@@ -29,15 +37,10 @@ using System.Reflection;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Api.Hubs;
-using Api.SignalR;
-using Core.Interface.Service.LookUp;
-using Core.Interface.Service.Customer;
-using Core.Interface.Service.Promotion;
-using Core.Interface.Service.Shift;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddHangfireServer();
 // Do NOT stop the whole API if a BackgroundService throws
 builder.Services.Configure<HostOptions>(options =>
 {
@@ -121,6 +124,28 @@ builder.Services.AddDbContext<RestaurantMgmtContext>(options =>
 });
 
 #endregion
+
+#region Hangfire Dashboard Authorization
+builder.Services.AddHangfire(config => config
+    .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+    .UseSimpleAssemblyNameTypeSerializer()
+    .UseRecommendedSerializerSettings()
+    .UseStorage(new MySqlStorage(connectionString, new MySqlStorageOptions
+    {
+        TransactionIsolationLevel = (System.Transactions.IsolationLevel?)System.Data.IsolationLevel.ReadCommitted,
+        QueuePollInterval = TimeSpan.FromSeconds(15),
+        JobExpirationCheckInterval = TimeSpan.FromHours(1),
+        CountersAggregateInterval = TimeSpan.FromMinutes(5),
+        PrepareSchemaIfNecessary = true, 
+        DashboardJobListLimit = 50000,
+        TransactionTimeout = TimeSpan.FromMinutes(1),
+        TablesPrefix = "Hangfire"
+    })));
+
+
+builder.Services.AddHangfireServer();
+#endregion
+
 
 #region Cache Service (Three Modes: Redis / In-Memory / No Cache)
 
@@ -307,6 +332,8 @@ builder.Services.AddSignalR();
 builder.Services.AddScoped<IReservationBroadcastService, SignalRReservationBroadcastService>();
 builder.Services.AddScoped<IDishRepository, Infa.Repo.DishRepository>();
 builder.Services.AddScoped<IDishService, Core.Service.DishService>();
+builder.Services.AddScoped<IRealtimeNotificationService, SignalRNotificationService>();
+builder.Services.AddScoped<IJobSchedulerService, HangfireJobScheduler>();
 
 #endregion
 

@@ -18,5 +18,7 @@ namespace Core.DTO.Table
         public uint? TypeId { get; set; }
         public uint? StatusId { get; set; }
         public bool? IsOnline { get; set; }
+
+        public DateTime? TargetTime { get; set; }
     }
 }

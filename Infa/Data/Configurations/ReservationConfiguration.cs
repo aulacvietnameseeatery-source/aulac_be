@@ -36,7 +36,13 @@ public sealed class ReservationConfiguration : IEntityTypeConfiguration<Reservat
         entity.Property(e => e.Phone)
         .HasMaxLength(30)
         .HasColumnName("phone");
-        entity.Property(e => e.ReservationStatusLvId).HasColumnName("reservation_status_lv_id");
+
+        entity.Property(e => e.Notes)
+            .HasMaxLength(500)
+            .HasColumnName("notes");
+
+        entity.Property(e => e.ReservationStatusLvId)
+            .HasColumnName("reservation_status_lv_id");
         entity.Property(e => e.ReservedTime)
         .HasColumnType("datetime")
         .HasColumnName("reserved_time");
