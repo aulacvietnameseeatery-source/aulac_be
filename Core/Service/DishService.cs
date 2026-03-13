@@ -367,7 +367,7 @@ public class DishService : IDishService
         if (dish == null)
             throw new KeyNotFoundException($"Dish with ID {dishId} not found!");
 
-        return DishMapper.ToDetailDto(dish, dishTags); // Map to DTO
+        return DishMapper.ToDetailDto(dish, dishTags, _fileStorage); // Map to DTO
     }
 
     public async Task UpdateDishAsync(
@@ -494,9 +494,9 @@ public class DishService : IDishService
     private DishPosResponseDto MapToDto(Dish dish)
     {
         var imageUrl = dish.DishMedia
-        .FirstOrDefault(m => m.IsPrimary == true)?.Media?.Url
-        ?? dish.DishMedia
-            .FirstOrDefault()?.Media?.Url;
+            .FirstOrDefault(m => m.IsPrimary == true)?.Media?.Url
+            ?? dish.DishMedia
+                .FirstOrDefault()?.Media?.Url;
 
         var dto = new DishPosResponseDto
         {
@@ -505,7 +505,7 @@ public class DishService : IDishService
             Price = dish.Price,
             ChefRecommended = dish.ChefRecommended,
             DisplayOrder = dish.DisplayOrder,
-            ImageUrl = imageUrl
+            ImageUrl = imageUrl != null ? _fileStorage.GetPublicUrl(imageUrl) : null
         };
 
         foreach (var lang in SupportedLangs)
