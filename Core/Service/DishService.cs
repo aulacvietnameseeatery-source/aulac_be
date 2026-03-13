@@ -53,7 +53,7 @@ public class DishService : IDishService
             DishId = dish.DishId,
             DishName = dish.DishNameText.GetTranslation(language),
             Price = dish.Price,
-            CategoryName = dish.Category.CategoryName,
+            CategoryName = dish.Category.CategoryNameText?.GetTranslation(language) ?? dish.Category.CategoryName,
             Description = dish.DescriptionText?.GetTranslation(language),
             ShortDescription = dish.ShortDescriptionText?.GetTranslation(language),
             Slogan = dish.SloganText?.GetTranslation(language),
