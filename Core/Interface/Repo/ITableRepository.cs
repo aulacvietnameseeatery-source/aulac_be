@@ -1,4 +1,4 @@
-using Core.Entity;
+﻿using Core.Entity;
 
 namespace Core.Interface.Repo;
 
@@ -126,7 +126,7 @@ public interface ITableRepository
     void RemoveTableMedia(TableMedium tableMedium);
 
     /// <summary>
-    /// Sets the QR image foreign key on a table row (does not save �Ecaller must SaveChanges).
+    /// Sets the QR image foreign key on a table row (does not save ・caller must SaveChanges).
     /// </summary>
     Task SetQrImageAsync(long tableId, long mediaId, CancellationToken ct = default);
 
