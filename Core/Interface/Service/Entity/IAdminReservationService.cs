@@ -33,5 +33,8 @@ namespace Core.Interface.Service.Entity
 
         // XÓA ĐƠN
         Task DeleteReservationAsync(long id, CancellationToken ct = default);
+
+        Task LockTablesForReservationAsync(long reservationId);
+
     }
 }

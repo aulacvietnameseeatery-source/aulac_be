@@ -141,8 +141,11 @@ builder.Services.AddHangfire(config => config
         TablesPrefix = "Hangfire"
     })));
 
-
-builder.Services.AddHangfireServer();
+int workerCount = builder.Configuration.GetValue<int>("HangfireSettings:WorkerCount", 3);
+builder.Services.AddHangfireServer(options =>
+{
+    options.WorkerCount = workerCount;
+});
 #endregion
 
 
