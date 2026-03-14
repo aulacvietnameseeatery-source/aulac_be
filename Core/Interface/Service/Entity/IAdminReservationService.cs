@@ -1,4 +1,4 @@
-﻿using Core.DTO.Reservation;
+using Core.DTO.Reservation;
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -27,5 +27,11 @@ namespace Core.Interface.Service.Entity
 
         // DUYỆT ĐƠN VÀ GHÉP BÀN (Truyền vào 1 mảng ID bàn)
         Task AssignTableAndConfirmAsync(long reservationId, List<long> tableIds, CancellationToken cancellationToken = default);
+
+        // CẬP NHẬT THÔNG TIN ĐƠN (Sửa tên, sđt, party size...)
+        Task UpdateReservationAsync(long id, UpdateReservationRequest request, CancellationToken ct = default);
+
+        // XÓA ĐƠN
+        Task DeleteReservationAsync(long id, CancellationToken ct = default);
     }
 }

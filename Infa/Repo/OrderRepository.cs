@@ -143,6 +143,7 @@ public class OrderRepository : IOrderRepository
 		CancellationToken cancellationToken = default)
 	{
 		var today = DateTime.UtcNow.Date;
+		var tomorrow = today.AddDays(1);
 		var orders = await _context.Orders
 			.Include(o => o.OrderStatusLv)
 			.Include(o => o.Table)
@@ -150,22 +151,26 @@ public class OrderRepository : IOrderRepository
 				.ThenInclude(oi => oi.Dish)
 			.Include(o => o.OrderItems)
 				.ThenInclude(oi => oi.ItemStatusLv)
-			.Where(o => o.OrderStatusLvId == pendingStatusId || 
-			            o.OrderStatusLvId == inProgressStatusId ||
-			            ((o.OrderStatusLvId == completedStatusId || o.OrderStatusLvId == cancelledStatusId) && o.CreatedAt >= today))
+			.Where(o =>
+				o.CreatedAt >= today &&
+				o.CreatedAt < tomorrow &&
+				(o.OrderStatusLvId == pendingStatusId ||
+				 o.OrderStatusLvId == inProgressStatusId ||
+				 o.OrderStatusLvId == completedStatusId ||
+				 o.OrderStatusLvId == cancelledStatusId))
 			.OrderBy(o => o.CreatedAt)
 			.Select(o => new KitchenOrderDTO
 			{
 				OrderId = o.OrderId,
 				TableCode = o.Table.TableCode,
-				OrderStatus = o.OrderStatusLv.ValueName,
+				OrderStatus = o.OrderStatusLv.ValueCode,
 				CreatedAt = o.CreatedAt,
 				Items = o.OrderItems.Select(oi => new KitchenOrderItemDTO
 				{
 					OrderItemId = oi.OrderItemId,
 					DishName = oi.Dish.DishName,
 					Quantity = oi.Quantity,
-					ItemStatus = oi.ItemStatusLv.ValueName,
+					ItemStatus = oi.ItemStatusLv.ValueCode,
 					Note = oi.Note,
 					RejectReason = oi.RejectReason
 				}).ToList()

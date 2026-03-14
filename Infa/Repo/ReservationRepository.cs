@@ -182,4 +182,11 @@ public class ReservationRepository : IReservationRepository
             .Include(r => r.SourceLv)
             .FirstOrDefaultAsync(r => r.ReservationId == reservationId, ct);
     }
+
+    /// <inheritdoc />
+    public async Task DeleteAsync(Reservation reservation, CancellationToken ct = default)
+    {
+        _context.Reservations.Remove(reservation);
+        await _context.SaveChangesAsync(ct);
+    }
 }
