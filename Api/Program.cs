@@ -40,7 +40,6 @@ using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddHangfireServer();
 // Do NOT stop the whole API if a BackgroundService throws
 builder.Services.Configure<HostOptions>(options =>
 {
@@ -142,8 +141,11 @@ builder.Services.AddHangfire(config => config
         TablesPrefix = "Hangfire"
     })));
 
-
-builder.Services.AddHangfireServer();
+int workerCount = builder.Configuration.GetValue<int>("HangfireSettings:WorkerCount", 3);
+builder.Services.AddHangfireServer(options =>
+{
+    options.WorkerCount = workerCount;
+});
 #endregion
 
 

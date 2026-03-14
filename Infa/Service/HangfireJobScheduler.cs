@@ -1,12 +1,8 @@
-﻿using Core.Interface.Service.Others;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-using Hangfire;
+﻿using Core.Interface.Service;
 using Core.Interface.Service.Entity;
+using Core.Interface.Service.Others;
+using Hangfire;
+using System;
 
 namespace Infa.Service
 {
@@ -19,10 +15,19 @@ namespace Infa.Service
             _backgroundJobClient = backgroundJobClient;
         }
 
+        //  (No-Show)
         public string ScheduleNoShowCheck(long reservationId, TimeSpan delay)
         {
             return _backgroundJobClient.Schedule<IAdminReservationService>(
                 service => service.CheckAndMarkNoShowAsync(reservationId),
+                delay);
+        }
+
+        //  (Auto-Lock)
+        public string ScheduleTableLock(long reservationId, TimeSpan delay)
+        {
+            return _backgroundJobClient.Schedule<IAdminReservationService>(
+                service => service.LockTablesForReservationAsync(reservationId),
                 delay);
         }
 

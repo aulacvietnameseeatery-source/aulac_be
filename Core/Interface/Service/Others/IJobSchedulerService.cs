@@ -13,5 +13,7 @@ namespace Core.Interface.Service.Others
 
         // Lên lịch gửi nhắc nhở trước khi đến hạn đặt chỗ
         bool CancelJob(string jobId);
+
+        string ScheduleTableLock(long reservationId, TimeSpan delay);
     }
 }
