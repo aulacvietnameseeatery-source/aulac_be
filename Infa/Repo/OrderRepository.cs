@@ -30,7 +30,12 @@ public class OrderRepository : IOrderRepository
 			.AsQueryable();
 
 		// Filter by order status
-		if (query.OrderStatusLvId.HasValue)
+		if (query.OrderStatusCode.HasValue)
+		{
+			var statusCode = query.OrderStatusCode.Value.ToString();
+			queryable = queryable.Where(o => o.OrderStatusLv.ValueCode == statusCode);
+		}
+		else if (query.OrderStatusLvId.HasValue)
 		{
 			queryable = queryable.Where(o => o.OrderStatusLvId == query.OrderStatusLvId.Value);
 		}

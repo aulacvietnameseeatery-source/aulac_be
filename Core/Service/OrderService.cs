@@ -65,6 +65,93 @@ public class OrderService : IOrderService
 			cancellationToken);
 	}
 
+    public async Task UpdateOrderStatusAsync(long orderId, OrderStatusCode newStatus, CancellationToken cancellationToken = default)
+    {
+        var pendingStatusId = await OrderStatusCode.PENDING.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+        var inProgressStatusId = await OrderStatusCode.IN_PROGRESS.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+        var completedStatusId = await OrderStatusCode.COMPLETED.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+        var cancelledStatusId = await OrderStatusCode.CANCELLED.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+
+        var availableTableStatusId = await TableStatusCode.AVAILABLE.ToTableStatusIdAsync(_lookupResolver, cancellationToken);
+        var occupiedTableStatusId = await TableStatusCode.OCCUPIED.ToTableStatusIdAsync(_lookupResolver, cancellationToken);
+
+        var order = await _orderRepository.GetByIdForUpdateAsync(orderId, cancellationToken)
+            ?? throw new NotFoundException("Order not found.");
+
+        var current = order.OrderStatusLvId switch
+        {
+            var id when id == pendingStatusId => OrderStatusCode.PENDING,
+            var id when id == inProgressStatusId => OrderStatusCode.IN_PROGRESS,
+            var id when id == completedStatusId => OrderStatusCode.COMPLETED,
+            var id when id == cancelledStatusId => OrderStatusCode.CANCELLED,
+            _ => throw new InvalidOperationException("Current order status is invalid.")
+        };
+
+        if (current == newStatus)
+            throw new InvalidOperationException("Order is already in this status.");
+
+        var isTransitionAllowed = (current, newStatus) switch
+        {
+            (OrderStatusCode.PENDING, OrderStatusCode.IN_PROGRESS) => true,
+            (OrderStatusCode.PENDING, OrderStatusCode.CANCELLED) => true,
+            (OrderStatusCode.IN_PROGRESS, OrderStatusCode.COMPLETED) => true,
+            (OrderStatusCode.IN_PROGRESS, OrderStatusCode.CANCELLED) => true,
+            (OrderStatusCode.CANCELLED, OrderStatusCode.PENDING) => true,
+            (OrderStatusCode.COMPLETED, OrderStatusCode.IN_PROGRESS) => true,
+            _ => false
+        };
+
+        if (!isTransitionAllowed)
+            throw new InvalidOperationException($"Invalid status transition: {current} -> {newStatus}.");
+
+        if (newStatus == OrderStatusCode.CANCELLED && order.Payments.Any())
+            throw new InvalidOperationException("Cannot cancel a paid order.");
+
+        await _uow.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            var targetStatusId = newStatus switch
+            {
+                OrderStatusCode.PENDING => pendingStatusId,
+                OrderStatusCode.IN_PROGRESS => inProgressStatusId,
+                OrderStatusCode.COMPLETED => completedStatusId,
+                OrderStatusCode.CANCELLED => cancelledStatusId,
+                _ => throw new InvalidOperationException("Unsupported order status.")
+            };
+
+            order.OrderStatusLvId = targetStatusId;
+            order.UpdatedAt = DateTime.UtcNow;
+
+            if (order.TableId.HasValue)
+            {
+                var table = await _tableRepository.GetByIdAsync(order.TableId.Value, cancellationToken);
+                if (table != null)
+                {
+                    if (newStatus == OrderStatusCode.CANCELLED || newStatus == OrderStatusCode.COMPLETED)
+                    {
+                        table.TableStatusLvId = availableTableStatusId;
+                        table.UpdatedAt = DateTime.UtcNow;
+                        await _tableRepository.UpdateAsync(table, cancellationToken);
+                    }
+                    else if (current == OrderStatusCode.CANCELLED && newStatus == OrderStatusCode.PENDING)
+                    {
+                        table.TableStatusLvId = occupiedTableStatusId;
+                        table.UpdatedAt = DateTime.UtcNow;
+                        await _tableRepository.UpdateAsync(table, cancellationToken);
+                    }
+                }
+            }
+
+            await _uow.SaveChangesAsync(cancellationToken);
+            await _uow.CommitAsync(cancellationToken);
+        }
+        catch
+        {
+            await _uow.RollbackAsync(cancellationToken);
+            throw;
+        }
+    }
+
 	public async Task UpdateOrderItemStatusAsync(long orderItemId, uint newStatusLvId, string? rejectReason, CancellationToken cancellationToken = default)
 	{
 		var inProgressItemId = await OrderItemStatusCode.IN_PROGRESS.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
