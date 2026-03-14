@@ -9,6 +9,7 @@ namespace Core.Interface.Repo
 {
     public interface ICustomerRepository
     {
+        Task<Customer?> GetByIdAsync(long id, CancellationToken ct = default);
         Task<Customer?> GetByPhoneAsync(string phone);
 
         /// <summary>
@@ -16,5 +17,8 @@ namespace Core.Interface.Repo
         /// Returns the resolved customer.
         /// </summary>
         Task<Customer> FindOrCreateAsync(string phone, string? fullName, string? email, CancellationToken ct = default);
+
+        Task UpdateAsync(Customer customer, CancellationToken ct = default);
+        Task AddAsync(Customer customer, CancellationToken ct = default);
     }
 }
