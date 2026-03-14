@@ -34,7 +34,8 @@ public enum ReservationStatusCode
     CONFIRMED,
     CHECKED_IN,
     CANCELLED,
-    NO_SHOW
+    NO_SHOW,
+    COMPLETED
 }
 
 public enum OrderStatusCode

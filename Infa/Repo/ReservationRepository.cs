@@ -75,7 +75,8 @@ public class ReservationRepository : IReservationRepository
     {
         // 1. Khởi tạo Query
         var query = _context.Reservations
-            .Include(r => r.ReservationStatusLv) // Join bảng Lookup để lấy Status Name
+            .Include(r => r.ReservationStatusLv) 
+            .Include(r => r.Tables)
             .AsNoTracking()
             .AsQueryable();
 
@@ -127,6 +128,7 @@ public class ReservationRepository : IReservationRepository
                 // Map Status
                 StatusId = r.ReservationStatusLvId,
                 StatusName = r.ReservationStatusLv.ValueName,
+                TableName = string.Join(", ", r.Tables.Select(t => t.TableCode)),
 
                 // Pre-order: Tạm thời để null vì chưa có liên kết DB
                 PreOrderSummary = null,
@@ -174,11 +176,17 @@ public class ReservationRepository : IReservationRepository
     public async Task<Reservation?> GetByIdWithFullDetailsAsync(long reservationId, CancellationToken ct = default)
     {
         return await _context.Reservations
-            .AsNoTracking()
             .Include(r => r.Tables).ThenInclude(t => t.TableTypeLv)
             .Include(r => r.Tables).ThenInclude(t => t.ZoneLv)
             .Include(r => r.ReservationStatusLv)
             .Include(r => r.SourceLv)
             .FirstOrDefaultAsync(r => r.ReservationId == reservationId, ct);
+    }
+
+    /// <inheritdoc />
+    public async Task DeleteAsync(Reservation reservation, CancellationToken ct = default)
+    {
+        _context.Reservations.Remove(reservation);
+        await _context.SaveChangesAsync(ct);
     }
 }

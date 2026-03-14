@@ -4,6 +4,7 @@ using Infa.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Infa.Data.Migrations
 {
     [DbContext(typeof(RestaurantMgmtContext))]
-    partial class RestaurantMgmtContextScaffoldModelSnapshot : ModelSnapshot
+    [Migration("20260313132607_ChangeQrCascadeToSetNull")]
+    partial class ChangeQrCascadeToSetNull
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1549,11 +1552,6 @@ namespace Infa.Data.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("varchar(150)")
                         .HasColumnName("email");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(500)
-                        .HasColumnType("varchar(500)")
-                        .HasColumnName("notes");
 
                     b.Property<int>("PartySize")
                         .HasColumnType("int")

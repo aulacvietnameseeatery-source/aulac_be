@@ -4,6 +4,7 @@ using Infa.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Infa.Data.Migrations
 {
     [DbContext(typeof(RestaurantMgmtContext))]
-    partial class RestaurantMgmtContextScaffoldModelSnapshot : ModelSnapshot
+    [Migration("20260312184529_AddReservationNotes")]
+    partial class AddReservationNotes
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -2855,7 +2858,7 @@ namespace Infa.Data.Migrations
                     b.HasOne("Core.Entity.MediaAsset", "TableQrImgNavigation")
                         .WithMany("RestaurantTables")
                         .HasForeignKey("TableQrImg")
-                        .OnDelete(DeleteBehavior.SetNull)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .HasConstraintName("FK_restaurant_table_table_qr_img");
 
                     b.HasOne("Core.Entity.LookupValue", "TableStatusLv")

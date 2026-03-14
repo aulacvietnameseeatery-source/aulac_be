@@ -23,6 +23,8 @@ public partial class Reservation
 
     public uint SourceLvId { get; set; }
 
+    public string? Notes { get; set; }
+
     public uint ReservationStatusLvId { get; set; }
 
     public virtual Customer? Customer { get; set; }

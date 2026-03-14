@@ -58,4 +58,9 @@ public interface IReservationRepository
     /// Lấy chi tiết Reservation bao gồm Tables, Status, Source.
     /// </summary>
     Task<Reservation?> GetByIdWithFullDetailsAsync(long reservationId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Deletes a reservation.
+    /// </summary>
+    Task DeleteAsync(Reservation reservation, CancellationToken ct = default);
 }

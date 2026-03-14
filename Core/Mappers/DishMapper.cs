@@ -1,5 +1,6 @@
 ﻿using Core.DTO.Dish;
 using Core.Entity;
+using Core.Interface.Service.FileStorage;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,7 +13,7 @@ namespace Core.Mappers
 {
     public static class DishMapper
     {
-        public static DishDetailForActionsDto ToDetailDto(Dish dish, List<DishTag> dishTags)
+        public static DishDetailForActionsDto ToDetailDto(Dish dish, List<DishTag> dishTags, IFileStorage _fileStorage)
         {
             return new DishDetailForActionsDto
             {
@@ -55,7 +56,7 @@ namespace Core.Mappers
                 Media = dish.DishMedia.Select(m => new DishMediaDto
                 {
                     MediaId = m.MediaId,
-                    Url = m.Media.Url,
+                    Url = _fileStorage.GetPublicUrl(m.Media.Url),
                     MediaType = m.Media.MediaTypeLv.ValueCode,
                     IsPrimary = m.IsPrimary ?? false
                 }).ToList()

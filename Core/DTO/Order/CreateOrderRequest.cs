@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Core.DTO.Customer;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -9,13 +10,14 @@ namespace Core.DTO.Order
     public class CreateOrderRequest
     {
         public long? TableId { get; set; }
-        public long? CustomerId { get; set; }
+        public OrderCustomerDto? Customer { get; set; }
         public OrderSourceCode Source { get; set; } // DINE_IN | TAKEAWAY
         public List<CreateOrderItemDto> Items { get; set; } = new();
     }
 
     public class AddOrderItemsRequest
     {
+        public OrderCustomerDto? Customer { get; set; }
         public List<CreateOrderItemDto> Items { get; set; } = new();
     }
 

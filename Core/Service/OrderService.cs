@@ -5,6 +5,7 @@ using Core.Enum;
 using Core.Exceptions;
 using Core.Extensions;
 using Core.Interface.Repo;
+using Core.Interface.Service.Customer;
 using Core.Interface.Service.Entity;
 using LookupTypeEnum = Core.Enum.LookupType;
 
@@ -16,6 +17,7 @@ public class OrderService : IOrderService
     private readonly ITableRepository _tableRepository;
     private readonly ILookupResolver _lookupResolver;
     private readonly IDishRepository _dishRepository;
+    private readonly ICustomerService _customerService;
     private readonly IUnitOfWork _uow;
 
     public OrderService(
@@ -23,12 +25,14 @@ public class OrderService : IOrderService
         ITableRepository tableRepository,
         ILookupResolver lookupResolver,
         IDishRepository dishRepository,
+        ICustomerService customerService,
         IUnitOfWork uow)
     {
         _orderRepository = orderRepository;
         _tableRepository = tableRepository;
         _dishRepository = dishRepository;
         _lookupResolver = lookupResolver;
+        _customerService = customerService;
         _uow = uow;
     }
     private const long GuestCustomerId = 68; // ID representing a visitor
@@ -168,7 +172,7 @@ public class OrderService : IOrderService
                 await _tableRepository.UpdateAsync(table, ct);
             }
 
-            var customerId = request.CustomerId ?? GuestCustomerId;
+            var customerId = await _customerService.ResolveCustomerAsync(request.Customer, ct);
 
             // ===== DISH LOAD (1 QUERY) =====
 
@@ -236,9 +240,6 @@ public class OrderService : IOrderService
     AddOrderItemsRequest request,
     CancellationToken ct)
     {
-        if (!request.Items.Any())
-            throw new InvalidOperationException("Must add at least one item.");
-
         await _uow.BeginTransactionAsync(ct);
 
         try
@@ -265,7 +266,7 @@ public class OrderService : IOrderService
                 OrderItemStatusCode.CREATED,
                 ct);
 
-            // ===== Load order WITH LOCK (concurrency safe) =====
+            // ===== Load order =====
 
             var order = await _orderRepository.GetByIdForUpdateAsync(orderId, ct)
                 ?? throw new NotFoundException("Order not found.");
@@ -278,48 +279,66 @@ public class OrderService : IOrderService
             if (order.Payments.Any())
                 throw new InvalidOperationException("Cannot add items to paid order.");
 
-            // ===== Load dishes in 1 query =====
+            // ===== CUSTOMER RESOLUTION =====
 
-            var dishIds = request.Items
-                .Select(x => x.DishId)
-                .Distinct()
-                .ToList();
-
-            var dishes = await _dishRepository.GetByIdsAsync(dishIds, ct);
-
-            if (dishes.Count != dishIds.Count)
-                throw new NotFoundException("One or more dishes not found.");
-
-            decimal additionalTotal = 0;
-
-            foreach (var item in request.Items)
+            if (request.Customer != null && !string.IsNullOrWhiteSpace(request.Customer.Phone))
             {
-                var dish = dishes.First(d => d.DishId == item.DishId);
+                var customerId = await _customerService.ResolveCustomerAsync(
+                    request.Customer,
+                    ct);
 
-                var price = dish.Price;
-
-                additionalTotal += price * item.Quantity;
-
-                order.OrderItems.Add(new OrderItem
+                // Attach customer if different
+                if (order.CustomerId != customerId)
                 {
-                    DishId = dish.DishId,
-                    Quantity = item.Quantity,
-                    Price = price,
-                    Note = item.Note,
-                    ItemStatusLvId = createdItemStatusId
-                });
+                    order.CustomerId = customerId;
+                }
             }
 
-            // ===== Update total =====
-
-            order.TotalAmount += additionalTotal;
-            order.UpdatedAt = DateTime.UtcNow;
-
-            // ===== Status transition logic =====
-
-            if (order.OrderStatusLvId == completedStatusId)
+            if (request.Items.Any())
             {
-                order.OrderStatusLvId = inProgressStatusId;
+                // ===== Load dishes in 1 query =====
+
+                var dishIds = request.Items
+                    .Select(x => x.DishId)
+                    .Distinct()
+                    .ToList();
+
+                var dishes = await _dishRepository.GetByIdsAsync(dishIds, ct);
+
+                if (dishes.Count != dishIds.Count)
+                    throw new NotFoundException("One or more dishes not found.");
+
+                decimal additionalTotal = 0;
+
+                foreach (var item in request.Items)
+                {
+                    var dish = dishes.First(d => d.DishId == item.DishId);
+
+                    var price = dish.Price;
+
+                    additionalTotal += price * item.Quantity;
+
+                    order.OrderItems.Add(new OrderItem
+                    {
+                        DishId = dish.DishId,
+                        Quantity = item.Quantity,
+                        Price = price,
+                        Note = item.Note,
+                        ItemStatusLvId = createdItemStatusId
+                    });
+                }
+
+                // ===== Update total =====
+
+                order.TotalAmount += additionalTotal;
+                order.UpdatedAt = DateTime.UtcNow;
+
+                // ===== Status transition logic =====
+
+                if (order.OrderStatusLvId == completedStatusId)
+                {
+                    order.OrderStatusLvId = inProgressStatusId;
+                }
             }
 
             await _uow.SaveChangesAsync(ct);
@@ -332,7 +351,6 @@ public class OrderService : IOrderService
             throw;
         }
     }
-
 
 
     public Task<CustomerOrderHistoryDTO> GetCustomerOrderHistoryAsync(string tableCode, CancellationToken cancellationToken = default)
@@ -417,6 +435,16 @@ public class OrderService : IOrderService
             OrderStatus = "PENDING",
             CreatedAt = order.CreatedAt,
         };
+    }
+
+    public async Task<List<RecentOrderDTO>> GetRecentOrdersAsync(
+        int limit,
+        CancellationToken ct)
+    {
+        if (limit <= 0 || limit > 100)
+            limit = 20;
+
+        return await _orderRepository.GetRecentOrdersAsync(limit, ct);
     }
 }
 

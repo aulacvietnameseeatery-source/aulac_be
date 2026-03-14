@@ -19,11 +19,29 @@ namespace Infa.Repo
             _context = context;
         }
 
+        public async Task<Customer?> GetByIdAsync(long id, CancellationToken ct = default)
+        {
+            return await _context.Customers
+                .FirstOrDefaultAsync(c => c.CustomerId == id, ct);
+        }
+
         public async Task<Customer?> GetByPhoneAsync(string phone)
         {
             return await _context.Customers
                 .AsNoTracking()
                 .FirstOrDefaultAsync(c => c.Phone == phone);
+        }
+
+        public async Task UpdateAsync(Customer customer, CancellationToken ct = default)
+        {
+            _context.Customers.Update(customer);
+            await _context.SaveChangesAsync(ct);
+        }
+
+        public async Task AddAsync(Customer customer, CancellationToken ct = default)
+        {
+            await _context.Customers.AddAsync(customer, ct);
+            await _context.SaveChangesAsync(ct);
         }
 
         public async Task<Customer> FindOrCreateAsync(string phone, string? fullName, string? email, CancellationToken ct = default)

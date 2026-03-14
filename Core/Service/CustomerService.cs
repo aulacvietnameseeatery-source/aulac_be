@@ -1,4 +1,6 @@
 ﻿using Core.DTO.Customer;
+using Core.Entity;
+using Core.Exceptions;
 using Core.Interface.Repo;
 using Core.Interface.Service.Customer;
 using System;
@@ -11,6 +13,8 @@ namespace Core.Service
 {
     public class CustomerService : ICustomerService
     {
+        private const long GuestCustomerId = 68;
+
         private readonly ICustomerRepository _customerRepository;
 
         public CustomerService(ICustomerRepository customerRepository)
@@ -37,10 +41,112 @@ namespace Core.Service
             };
         }
 
+        public async Task<CustomerDto?> GetByIdAsync(long id, CancellationToken cancellationToken = default)
+        {
+            var customer = await _customerRepository.GetByIdAsync(id, cancellationToken);
+
+            if (customer == null)
+                return null;
+
+            return new CustomerDto
+            {
+                CustomerId = customer.CustomerId,
+                FullName = customer.FullName,
+                Phone = customer.Phone,
+                Email = customer.Email,
+                IsMember = customer.IsMember,
+                LoyaltyPoints = customer.LoyaltyPoints,
+                CreatedAt = customer.CreatedAt
+            };
+        }
+
         public async Task<long> FindOrCreateCustomerIdAsync(string phone, string? fullName, string? email, CancellationToken ct = default)
         {
             var customer = await _customerRepository.FindOrCreateAsync(phone, fullName, email, ct);
             return customer.CustomerId;
+        }
+
+        public async Task<long> ResolveCustomerAsync(
+            OrderCustomerDto? customerDto,
+            CancellationToken ct)
+        {
+            if (customerDto == null)
+                return GuestCustomerId;
+
+            // CASE 1: Update existing customer by ID
+            if (customerDto.CustomerId.HasValue)
+            {
+                var customer = await _customerRepository.GetByIdAsync(customerDto.CustomerId.Value, ct)
+                    ?? throw new NotFoundException("Customer not found.");
+
+                bool updated = false;
+
+                if (!string.IsNullOrWhiteSpace(customerDto.FullName) &&
+                    customer.FullName != customerDto.FullName)
+                {
+                    customer.FullName = customerDto.FullName;
+                    updated = true;
+                }
+
+                if (!string.IsNullOrWhiteSpace(customerDto.Email) &&
+                    customer.Email != customerDto.Email)
+                {
+                    customer.Email = customerDto.Email;
+                    updated = true;
+                }
+
+                if (updated)
+                    await _customerRepository.UpdateAsync(customer, ct);
+
+                return customer.CustomerId;
+            }
+
+            // CASE 2: Check by phone
+            if (!string.IsNullOrWhiteSpace(customerDto.Phone))
+            {
+                var existing = await _customerRepository.GetByPhoneAsync(customerDto.Phone);
+
+                if (existing != null)
+                {
+                    bool updated = false;
+
+                    if (!string.IsNullOrWhiteSpace(customerDto.FullName) &&
+                        existing.FullName != customerDto.FullName)
+                    {
+                        existing.FullName = customerDto.FullName;
+                        updated = true;
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(customerDto.Email) &&
+                        existing.Email != customerDto.Email)
+                    {
+                        existing.Email = customerDto.Email;
+                        updated = true;
+                    }
+
+                    if (updated)
+                        await _customerRepository.UpdateAsync(existing, ct);
+
+                    return existing.CustomerId;
+                }
+
+                // Create new customer
+                var newCustomer = new Customer
+                {
+                    Phone = customerDto.Phone,
+                    FullName = customerDto.FullName,
+                    Email = customerDto.Email,
+                    CreatedAt = DateTime.UtcNow,
+                    LoyaltyPoints = 0,
+                    IsMember = false
+                };
+
+                await _customerRepository.AddAsync(newCustomer, ct);
+
+                return newCustomer.CustomerId;
+            }
+
+            return GuestCustomerId;
         }
     }
 }

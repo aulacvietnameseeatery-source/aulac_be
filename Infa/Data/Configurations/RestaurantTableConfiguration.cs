@@ -67,7 +67,7 @@ public sealed class RestaurantTableConfiguration : IEntityTypeConfiguration<Rest
 
         entity.HasOne(d => d.TableQrImgNavigation).WithMany(p => p.RestaurantTables)
         .HasForeignKey(d => d.TableQrImg)
-        .OnDelete(DeleteBehavior.Cascade)
+        .OnDelete(DeleteBehavior.SetNull)
         .HasConstraintName("FK_restaurant_table_table_qr_img");
 
         entity.HasOne(d => d.TableStatusLv).WithMany(p => p.RestaurantTableTableStatusLvs)

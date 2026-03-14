@@ -42,5 +42,32 @@ namespace Api.Controllers
                 ServerTime = DateTimeOffset.UtcNow
             });
         }
+
+        [HttpGet("{id:long}")]
+        public async Task<IActionResult> GetById(long id, CancellationToken cancellationToken = default)
+        {
+            var customer = await _customerService.GetByIdAsync(id, cancellationToken);
+
+            if (customer == null)
+            {
+                return Ok(new ApiResponse<object>
+                {
+                    Success = true,
+                    Code = 200,
+                    UserMessage = "Customer not found.",
+                    Data = new { },
+                    ServerTime = DateTimeOffset.UtcNow
+                });
+            }
+
+            return Ok(new ApiResponse<CustomerDto>
+            {
+                Success = true,
+                Code = 200,
+                UserMessage = "Customer retrieved successfully.",
+                Data = customer,
+                ServerTime = DateTimeOffset.UtcNow
+            });
+        }
     }
 }

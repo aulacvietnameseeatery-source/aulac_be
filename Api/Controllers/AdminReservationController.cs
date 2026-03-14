@@ -1,4 +1,4 @@
-﻿using API.Models;
+using API.Models;
 using Core.Attribute;
 using Core.Data;
 using Core.DTO.General; // Chứa ApiResponse, PagedResult
@@ -105,6 +105,195 @@ namespace API.Controllers
                     UserMessage = $"Reservation with ID {id} not found.",
                     Data = null!,
                     ServerTime = DateTimeOffset.UtcNow
+                });
+            }
+        }
+
+        // URL: PATCH /api/reservations/{id}/status
+        [HttpPatch("{id:long}/status")]
+        // [HasPermission(Permissions.EditReservation)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> UpdateReservationStatus(
+            long id,
+            [FromBody] UpdateReservationStatusRequest payload,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                string statusCodeStr = payload.Status.ToString();
+                await _reservationService.UpdateReservationStatusAsync(id, statusCodeStr, payload.Notes, cancellationToken);
+
+                return Ok(new ApiResponse<object>
+                {
+                    Success = true,
+                    Code = 200,
+                    UserMessage = "Cập nhật trạng thái đặt bàn thành công.",
+                    Data = null!,
+                    ServerTime = DateTimeOffset.UtcNow
+                });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new ApiResponse<object>
+                {
+                    Success = false,
+                    Code = 404,
+                    UserMessage = ex.Message,
+                    Data = null!,
+                    ServerTime = DateTimeOffset.UtcNow
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new ApiResponse<object>
+                {
+                    Success = false,
+                    Code = 500,
+                    UserMessage = "Đã xảy ra lỗi hệ thống khi cập nhật trạng thái.",
+                    SystemMessage = ex.Message,
+                    Data = null!,
+                    ServerTime = DateTimeOffset.UtcNow
+                });
+            }
+        }
+
+
+        // --- 5. ASSIGN TABLE & CONFIRM RESERVATION ---
+        // URL: PATCH /api/reservations/{id}/assign-and-confirm
+        [HttpPatch("{id:long}/assign-and-confirm")]
+        // [HasPermission(Permissions.EditReservation)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> AssignTableAndConfirm(
+            long id,
+            [FromBody] AssignTableRequest payload,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                // Kiểm tra validation cơ bản
+                if (payload.TableIds == null || !payload.TableIds.Any())
+                {
+                    return BadRequest(new ApiResponse<object>
+                    {
+                        Success = false,
+                        Code = 400,
+                        UserMessage = "Vui lòng chọn ít nhất 1 bàn."
+                    });
+                }
+
+                await _reservationService.AssignTableAndConfirmAsync(id, payload.TableIds, cancellationToken);
+
+                return Ok(new ApiResponse<object>
+                {
+                    Success = true,
+                    Code = 200,
+                    UserMessage = "Duyệt đơn và Xếp bàn thành công.",
+                    Data = null!,
+                    ServerTime = DateTimeOffset.UtcNow
+                });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new ApiResponse<object>
+                {
+                    Success = false,
+                    Code = 404,
+                    UserMessage = ex.Message
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new ApiResponse<object>
+                {
+                    Success = false,
+                    Code = 500,
+                    UserMessage = "Đã xảy ra lỗi hệ thống khi xếp bàn.",
+                    SystemMessage = ex.Message
+                });
+            }
+        }
+
+        // --- 6. UPDATE RESERVATION ---
+        // URL: PUT /api/reservations/{id}
+        [HttpPut("{id:long}")]
+        // [HasPermission(Permissions.EditReservation)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> UpdateReservation(
+            long id,
+            [FromBody] UpdateReservationRequest payload,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                await _reservationService.UpdateReservationAsync(id, payload, cancellationToken);
+
+                return Ok(new ApiResponse<object>
+                {
+                    Success = true,
+                    Code = 200,
+                    UserMessage = "Cập nhật thông tin đặt bàn thành công.",
+                    Data = null!,
+                    ServerTime = DateTimeOffset.UtcNow
+                });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new ApiResponse<object>
+                {
+                    Success = false,
+                    Code = 404,
+                    UserMessage = ex.Message
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new ApiResponse<object>
+                {
+                    Success = false,
+                    Code = 500,
+                    UserMessage = "Đã xảy ra lỗi hệ thống khi cập nhật thông tin đặt bàn.",
+                    SystemMessage = ex.Message
+                });
+            }
+        }
+
+        // --- 7. DELETE RESERVATION ---
+        // URL: DELETE /api/reservations/{id}
+        [HttpDelete("{id:long}")]
+        // [HasPermission(Permissions.DeleteReservation)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> DeleteReservation(long id, CancellationToken cancellationToken)
+        {
+            try
+            {
+                await _reservationService.DeleteReservationAsync(id, cancellationToken);
+
+                return Ok(new ApiResponse<object>
+                {
+                    Success = true,
+                    Code = 200,
+                    UserMessage = "Xóa đơn đặt bàn thành công.",
+                    Data = null!,
+                    ServerTime = DateTimeOffset.UtcNow
+                });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new ApiResponse<object>
+                {
+                    Success = false,
+                    Code = 404,
+                    UserMessage = ex.Message
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new ApiResponse<object>
+                {
+                    Success = false,
+                    Code = 500,
+                    UserMessage = "Đã xảy ra lỗi hệ thống khi xóa đơn đặt bàn.",
+                    SystemMessage = ex.Message
                 });
             }
         }

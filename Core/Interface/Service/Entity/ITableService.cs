@@ -104,6 +104,9 @@ public interface ITableService
         /// Optionally validates the QR token when provided.
         /// </summary>
     Task OccupyTableByCodeAsync(string tableCode, string? qrToken = null, CancellationToken ct = default);
+
+    // Lấy bàn trống theo khung giờ cụ thể 
+    Task<List<TableSelectDto>> GetAvailableTablesByTimeAsync(DateTime targetTime, CancellationToken ct = default);
 }
 
 /// <summary>
