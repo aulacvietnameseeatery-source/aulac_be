@@ -50,6 +50,11 @@ public interface ILookupRepo
     Task<LookupValue?> GetByIdWithI18nAsync(uint valueId, CancellationToken ct = default);
 
     /// <summary>
+    /// Checks if the given lookup type is configurable.
+    /// </summary>
+    Task<bool> IsTypeConfigurableAsync(ushort typeId, CancellationToken ct = default);
+
+    /// <summary>
     /// Checks if a lookup value with the given name already exists for the specified type.
     /// </summary>
     Task<bool> ValueNameExistsAsync(ushort typeId, string valueName, uint? excludeId = null, CancellationToken ct = default);
