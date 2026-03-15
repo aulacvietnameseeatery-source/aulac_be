@@ -60,6 +60,10 @@ public partial class LookupValue
 
     public virtual ICollection<Payment> Payments { get; set; } = new List<Payment>();
 
+    public virtual ICollection<Coupon> CouponCouponStatusLvs { get; set; } = new List<Coupon>();
+
+    public virtual ICollection<Coupon> CouponTypeLvs { get; set; } = new List<Coupon>();
+
     public virtual ICollection<Promotion> PromotionPromotionStatusLvs { get; set; } = new List<Promotion>();
 
     public virtual ICollection<Promotion> PromotionTypeLvs { get; set; } = new List<Promotion>();

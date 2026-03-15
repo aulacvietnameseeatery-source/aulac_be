@@ -42,6 +42,23 @@ namespace Api.Controllers
             });
         }
 
+        // _OLD: coupon endpoint moved to CouponController using ICouponService and CouponDTO.
+        // [HttpGet("~/api/coupons")]
+        // public async Task<IActionResult> GetCoupons(CancellationToken ct)
+        // {
+        //     var result = await _promotionService.GetCouponListAsync(ct);
+        //
+        //     return Ok(new ApiResponse<List<PromotionListDTO>>
+        //     {
+        //         Success = true,
+        //         Code = 200,
+        //         SubCode = 0,
+        //         UserMessage = "Get coupons successfully",
+        //         Data = result,
+        //         ServerTime = DateTimeOffset.Now
+        //     });
+        // }
+
         /// <summary>
         /// Create promotion
         /// </summary>

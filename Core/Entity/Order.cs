@@ -29,6 +29,8 @@ public partial class Order
 
     public virtual ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
 
+    public virtual ICollection<OrderCoupon> OrderCoupons { get; set; } = new List<OrderCoupon>();
+
     public virtual ICollection<OrderPromotion> OrderPromotions { get; set; } = new List<OrderPromotion>();
 
     public virtual LookupValue OrderStatusLv { get; set; } = null!;
