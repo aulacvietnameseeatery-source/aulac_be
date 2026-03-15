@@ -79,4 +79,9 @@ public interface ILookupRepo
     /// in any of the table's lookup foreign keys (zone, type, status).
     /// </summary>
     Task<int> CountTablesUsingLookupValueAsync(uint valueId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Gets a sequence of lookup values by their IDs.
+    /// </summary>
+    Task<List<LookupValue>> GetByIdsAsync(IEnumerable<uint> valueIds, CancellationToken ct = default);
 }
