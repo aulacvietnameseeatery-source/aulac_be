@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Core.Entity;
 using Microsoft.EntityFrameworkCore;
@@ -91,7 +91,7 @@ public partial class RestaurantMgmtContext : DbContext
 
     public virtual DbSet<TableMedium> TableMedia { get; set; }
 
-    public virtual DbSet<ShiftSchedule> ShiftSchedules { get; set; }
+    public virtual DbSet<ShiftTemplate> ShiftTemplates { get; set; }
 
     public virtual DbSet<ShiftAssignment> ShiftAssignments { get; set; }
 

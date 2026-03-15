@@ -81,6 +81,7 @@ namespace Core.Data
         public const string AdjustAttendance = "SHIFT:ADJUST_ATTENDANCE";
         public const string ViewShiftReport = "SHIFT:REPORT_READ";
         public const string CloseShift = "SHIFT:CLOSE";
+        public const string ManageShiftTemplate = "SHIFT:MANAGE_TEMPLATE";
 
     }
 }
