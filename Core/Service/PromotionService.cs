@@ -354,6 +354,7 @@ namespace Core.Service
                     PromoCode = promo.PromoCode,
                     PromoName = promo.PromoName,
                     PromotionType = promo.TypeLv.ValueCode,
+                    HasTarget = promo.PromotionTargets.Any(),
                     DiscountValue = promo.DiscountValue,
                     EstimatedDiscount = discount,
                     FinalAmount = order.TotalAmount - discount,

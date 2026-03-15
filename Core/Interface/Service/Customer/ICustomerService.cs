@@ -1,4 +1,5 @@
 ﻿using Core.DTO.Customer;
+using Core.DTO.General;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,6 +10,7 @@ namespace Core.Interface.Service.Customer
 {
     public interface ICustomerService
     {
+        Task<PagedResultDTO<CustomerListDTO>> GetCustomersAsync(CustomerListQueryDTO query, CancellationToken ct);
         Task<CustomerDto?> GetByPhoneAsync(string phone);
 
         Task<CustomerDto?> GetByIdAsync(long id, CancellationToken ct = default);
