@@ -1,4 +1,5 @@
 ﻿using Core.DTO.Customer;
+using Core.DTO.General;
 using Core.Entity;
 using Core.Exceptions;
 using Core.Interface.Repo;
@@ -20,6 +21,13 @@ namespace Core.Service
         public CustomerService(ICustomerRepository customerRepository)
         {
             _customerRepository = customerRepository;
+        }
+
+        public Task<PagedResultDTO<CustomerListDTO>> GetCustomersAsync(
+            CustomerListQueryDTO query,
+            CancellationToken ct)
+        {
+            return _customerRepository.GetCustomersAsync(query, ct);
         }
 
         public async Task<CustomerDto?> GetByPhoneAsync(string phone)
