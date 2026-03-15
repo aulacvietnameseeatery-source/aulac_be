@@ -381,60 +381,107 @@ public class OrderService : IOrderService
 
     public async Task<CreateOrderResponseDTO> CreateOrderAsync(CreateOrderRequestDTO request, CancellationToken cancellationToken = default)
     {
-        // 1. Resolve table_id from table code
-        var table = await _tableRepository.GetByCodeAsync(request.TableCode.Trim(), cancellationToken)
-            ?? throw new KeyNotFoundException($"Table '{request.TableCode}' not found.");
+        // Start transaction to prevent race conditions
+        await _uow.BeginTransactionAsync(cancellationToken);
 
-        // 2. Always use guest account for customer-facing orders
-        var customerId = GuestCustomerId;
-
-        // 3. Calculate total amount from items
-        var totalAmount = request.Items.Sum(i => i.Price * i.Quantity);
-
-        // 4. Resolve lookup value IDs from database
-        var pendingOrderLvId = await OrderStatusCode.PENDING.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
-        var dineInSourceLvId = await OrderSourceCode.DINE_IN.IdAsync(_lookupResolver, (ushort)LookupTypeEnum.OrderSource, cancellationToken);
-        var createdItemLvId = await OrderItemStatusCode.CREATED.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
-
-        // 5. Build Order entity (staff_id = null, status = PENDING, source = DINE_IN)
-        var order = new Order
+        try
         {
-            TableId = table.TableId,
-            CustomerId = customerId,
-            StaffId = null,
-            TotalAmount = totalAmount,
-            SourceLvId = dineInSourceLvId,
-            OrderStatusLvId = pendingOrderLvId,
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow,
-        };
+            // 1. Resolve table_id from table code
+            var table = await _tableRepository.GetByCodeAsync(request.TableCode.Trim(), cancellationToken)
+                ?? throw new KeyNotFoundException($"Table '{request.TableCode}' not found.");
 
-        // 6. Build OrderItem entities
-        var orderItems = request.Items.Select(i => new OrderItem
+            // 2. Validate QR token if provided (QR scan flow)
+            if (!string.IsNullOrEmpty(request.QrToken) && !string.Equals(table.QrToken, request.QrToken, StringComparison.Ordinal))
+                throw new ValidationException("Invalid QR token. Please scan the QR code on the table again.");
+
+            // 3. Verify table status and lock the table atomically
+            var availableLvId = await TableStatusCode.AVAILABLE.ToTableStatusIdAsync(_lookupResolver, cancellationToken);
+            var occupiedLvId = await TableStatusCode.OCCUPIED.ToTableStatusIdAsync(_lookupResolver, cancellationToken);
+            var lockedLvId = await TableStatusCode.LOCKED.ToTableStatusIdAsync(_lookupResolver, cancellationToken);
+            var reservedLvId = await TableStatusCode.RESERVED.ToTableStatusIdAsync(_lookupResolver, cancellationToken);
+
+            // Block if table is LOCKED (maintenance)
+            if (table.TableStatusLvId == lockedLvId)
+                throw new InvalidOperationException($"Table '{request.TableCode}' is under maintenance and cannot be used.");
+
+            // CRITICAL: Only allow creating NEW orders when table is AVAILABLE or RESERVED
+            // If table is already OCCUPIED, it means someone else is using it
+            if (table.TableStatusLvId == occupiedLvId)
+            {
+                // Check if there's an active order for this table
+                var activeOrderCount = await _tableRepository.CountActiveOrdersAsync(table.TableId, cancellationToken);
+                if (activeOrderCount > 0)
+                {
+                    throw new ConflictException($"Table '{request.TableCode}' is already occupied by another customer. Please choose another table or add items to your existing order.");
+                }
+                // If no active orders but status is OCCUPIED (edge case), allow order creation
+            }
+
+            // Change status to OCCUPIED if currently AVAILABLE or RESERVED
+            if (table.TableStatusLvId == availableLvId || table.TableStatusLvId == reservedLvId)
+            {
+                table.TableStatusLvId = occupiedLvId;
+                table.UpdatedAt = DateTime.UtcNow;
+                await _tableRepository.UpdateAsync(table, cancellationToken);
+            }
+
+            // 4. Always use guest account for customer-facing orders
+            var customerId = GuestCustomerId;
+
+            // 5. Calculate total amount from items
+            var totalAmount = request.Items.Sum(i => i.Price * i.Quantity);
+
+            // 6. Resolve lookup value IDs from database
+            var pendingOrderLvId = await OrderStatusCode.PENDING.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+            var dineInSourceLvId = await OrderSourceCode.DINE_IN.IdAsync(_lookupResolver, (ushort)LookupTypeEnum.OrderSource, cancellationToken);
+            var createdItemLvId = await OrderItemStatusCode.CREATED.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
+
+            // 7. Build Order entity (staff_id = null, status = PENDING, source = DINE_IN)
+            var order = new Order
+            {
+                TableId = table.TableId,
+                CustomerId = customerId,
+                StaffId = null,
+                TotalAmount = totalAmount,
+                SourceLvId = dineInSourceLvId,
+                OrderStatusLvId = pendingOrderLvId,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow,
+            };
+
+            // 8. Build OrderItem entities
+            var orderItems = request.Items.Select(i => new OrderItem
+            {
+                DishId = i.DishId,
+                Quantity = i.Quantity,
+                Price = i.Price,
+                Note = i.Note,
+                ItemStatus = 1, // CREATED
+                ItemStatusLvId = createdItemLvId,
+            }).ToList();
+
+            // 9. Save to DB
+            var orderId = await _orderRepository.CreateOrderAsync(order, orderItems, cancellationToken);
+
+            // Commit transaction
+            await _uow.CommitAsync(cancellationToken);
+
+            return new CreateOrderResponseDTO
+            {
+                OrderId = orderId,
+                TableId = table.TableId,
+                TableCode = table.TableCode,
+                CustomerId = customerId,
+                TotalAmount = totalAmount,
+                OrderStatus = "PENDING",
+                CreatedAt = order.CreatedAt,
+            };
+        }
+        catch
         {
-            DishId = i.DishId,
-            Quantity = i.Quantity,
-            Price = i.Price,
-            Note = i.Note,
-            ItemStatus = 1, // CREATED
-            ItemStatusLvId = createdItemLvId,
-        }).ToList();
-
-        // 7. Save to DB
-        var orderId = await _orderRepository.CreateOrderAsync(order, orderItems, cancellationToken);
-
-       
-
-        return new CreateOrderResponseDTO
-        {
-            OrderId = orderId,
-            TableId = table.TableId,
-            TableCode = table.TableCode,
-            CustomerId = customerId,
-            TotalAmount = totalAmount,
-            OrderStatus = "PENDING",
-            CreatedAt = order.CreatedAt,
-        };
+            await _uow.RollbackAsync(cancellationToken);
+            throw;
+        }
     }
 
     public async Task<List<RecentOrderDTO>> GetRecentOrdersAsync(

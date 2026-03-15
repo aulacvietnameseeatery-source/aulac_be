@@ -530,14 +530,17 @@ public class TableService : ITableService
         if (qrToken is not null && !string.Equals(table.QrToken, qrToken, StringComparison.Ordinal))
             throw new ValidationException("Invalid QR token. Please scan the QR code on the table again.");
 
-        var availableLvId = await TableStatusCode.AVAILABLE.ToTableStatusIdAsync(_lookupResolver, ct);
-        var occupiedLvId = await TableStatusCode.OCCUPIED.ToTableStatusIdAsync(_lookupResolver, ct);
+        // CHANGED: Only validate the table and QR token, don't lock the table yet
+        // The table will be locked when the first order is created (see OrderService.CreateOrderAsync)
+        
+        var lockedLvId = await TableStatusCode.LOCKED.ToTableStatusIdAsync(_lookupResolver, ct);
 
-        var updated = await _tableRepository.TryOccupyIfAvailableAsync(
-        table.TableId, availableLvId, occupiedLvId, ct);
+        // Only block if the table is LOCKED (for maintenance)
+        if (table.TableStatusLvId == lockedLvId)
+            throw new ConflictException($"Table '{tableCode}' is under maintenance and cannot be used.");
 
-        if (!updated)
-            throw new ConflictException($"Table '{tableCode}' is already occupied by another customer. Please choose another available table.");
+        // If the table is OCCUPIED or RESERVED, we still allow users to view the menu
+        // Multiple users can view the menu, but only the first one to order will lock the table
     }
 
     #endregion
