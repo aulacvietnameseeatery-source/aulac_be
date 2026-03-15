@@ -40,7 +40,6 @@ using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddHangfireServer();
 // Do NOT stop the whole API if a BackgroundService throws
 builder.Services.Configure<HostOptions>(options =>
 {
@@ -142,8 +141,11 @@ builder.Services.AddHangfire(config => config
         TablesPrefix = "Hangfire"
     })));
 
-
-builder.Services.AddHangfireServer();
+int workerCount = builder.Configuration.GetValue<int>("HangfireSettings:WorkerCount", 3);
+builder.Services.AddHangfireServer(options =>
+{
+    options.WorkerCount = workerCount;
+});
 #endregion
 
 
@@ -439,11 +441,11 @@ using (var scope = app.Services.CreateScope())
 app.UseMiddleware<HandleExceptionMiddleware>();
 
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+//if (app.Environment.IsDevelopment())
+//{
+//    app.UseSwagger();
+//    app.UseSwaggerUI();
+//}
 
 app.UseCors("AllowFrontend");
 app.UseHttpsRedirection();

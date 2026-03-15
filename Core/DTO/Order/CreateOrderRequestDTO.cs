@@ -9,6 +9,9 @@ public class CreateOrderRequestDTO
 	/// <summary>Table code (e.g. "TB-002") – resolved to table_id on the server.</summary>
 	public string TableCode { get; set; } = null!;
 
+	/// <summary>QR token for validation (from QR scan URL). Optional.</summary>
+	public string? QrToken { get; set; }
+
 	/// <summary>Cart items to insert as order_item rows.</summary>
 	public List<CreateOrderItemDTO> Items { get; set; } = new();
 }
