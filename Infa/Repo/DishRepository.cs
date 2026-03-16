@@ -131,8 +131,8 @@ public class DishRepository : IDishRepository
     public async Task<List<string>> GetAllCategoriesAsync(CancellationToken cancellationToken = default)
     {
         return await _context.DishCategories
+            .OrderBy(c => c.DisPlayOrder)
             .Select(c => c.CategoryName)
-            .Distinct()
             .ToListAsync(cancellationToken);
     }
 

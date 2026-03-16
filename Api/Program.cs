@@ -443,7 +443,7 @@ using (var scope = app.Services.CreateScope())
 // Must be first in the pipeline to catch all exceptions
 app.UseMiddleware<HandleExceptionMiddleware>();
 
-// Configure the HTTP request pipeline.
+//// Configure the HTTP request pipeline.
 //if (app.Environment.IsDevelopment())
 //{
 //    app.UseSwagger();
