@@ -25,7 +25,9 @@ public sealed class DishCategoryConfiguration : IEntityTypeConfiguration<DishCat
         .HasMaxLength(100)
         .HasColumnName("description");
         entity.Property(e => e.DescriptionTextId).HasColumnName("description_text_id");
-        entity.Property(e => e.IsDisabled).HasColumnName("isDisabled");
+        entity.Property(e => e.IsDisabled).HasColumnName("is_disable");
+
+        entity.Property(e => e.DisPlayOrder).HasColumnName("display_order");
 
         entity.HasOne(d => d.CategoryNameText).WithMany(p => p.DishCategoryCategoryNameTexts)
         .HasForeignKey(d => d.CategoryNameTextId)
