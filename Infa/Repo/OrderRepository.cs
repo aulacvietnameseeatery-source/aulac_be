@@ -30,7 +30,12 @@ public class OrderRepository : IOrderRepository
 			.AsQueryable();
 
 		// Filter by order status
-		if (query.OrderStatusLvId.HasValue)
+		if (query.OrderStatusCode.HasValue)
+		{
+			var statusCode = query.OrderStatusCode.Value.ToString();
+			queryable = queryable.Where(o => o.OrderStatusLv.ValueCode == statusCode);
+		}
+		else if (query.OrderStatusLvId.HasValue)
 		{
 			queryable = queryable.Where(o => o.OrderStatusLvId == query.OrderStatusLvId.Value);
 		}
@@ -458,7 +463,8 @@ public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, Can
         CancellationToken ct)
     {
         return await _context.Orders
-            .Include(o => o.OrderItems)
+            .Include(o => o.OrderItems
+				.Where(od => od.ItemStatusLv.ValueCode == OrderItemStatusCode.SERVED.ToString()))
             .ThenInclude(i => i.Dish)
             .FirstOrDefaultAsync(o => o.OrderId == orderId, ct);
     }

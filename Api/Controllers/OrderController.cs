@@ -99,6 +99,68 @@ namespace Api.Controllers
 		}
 
 		/// <summary>
+		/// Updates order status for staff operations from order list.
+		/// </summary>
+		[HttpPatch("{id:long}/status")]
+		[HasPermission(Permissions.EditOrder)]
+		[ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+		[ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+		[ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+		public async Task<IActionResult> UpdateOrderStatus(
+			long id,
+			[FromBody] UpdateOrderStatusDTO dto,
+			CancellationToken cancellationToken = default)
+		{
+			if (!System.Enum.TryParse<OrderStatusCode>(dto.Status, true, out var statusCode))
+			{
+				return BadRequest(new ApiResponse<object>
+				{
+					Success = false,
+					Code = 400,
+					SubCode = 1,
+					UserMessage = $"Invalid status: {dto.Status}. Valid values: PENDING, IN_PROGRESS, COMPLETED, CANCELLED",
+					ServerTime = DateTimeOffset.Now
+				});
+			}
+
+			try
+			{
+				await _orderService.UpdateOrderStatusAsync(id, statusCode, cancellationToken);
+
+				return Ok(new ApiResponse<object>
+				{
+					Success = true,
+					Code = 200,
+					SubCode = 0,
+					UserMessage = "Order status updated successfully",
+					ServerTime = DateTimeOffset.Now
+				});
+			}
+			catch (KeyNotFoundException ex)
+			{
+				return NotFound(new ApiResponse<object>
+				{
+					Success = false,
+					Code = 404,
+					SubCode = 1,
+					UserMessage = ex.Message,
+					ServerTime = DateTimeOffset.Now
+				});
+			}
+			catch (InvalidOperationException ex)
+			{
+				return BadRequest(new ApiResponse<object>
+				{
+					Success = false,
+					Code = 400,
+					SubCode = 2,
+					UserMessage = ex.Message,
+					ServerTime = DateTimeOffset.Now
+				});
+			}
+		}
+
+		/// <summary>
 		/// Updates the status of a specific order item.
 		/// </summary>
 		/// <param name="id">Order item ID</param>

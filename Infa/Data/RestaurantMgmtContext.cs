@@ -57,6 +57,8 @@ public partial class RestaurantMgmtContext : DbContext
 
     public virtual DbSet<Order> Orders { get; set; }
 
+    public virtual DbSet<OrderCoupon> OrderCoupons { get; set; }
+
     public virtual DbSet<OrderItem> OrderItems { get; set; }
 
     public virtual DbSet<OrderPromotion> OrderPromotions { get; set; }
@@ -64,6 +66,8 @@ public partial class RestaurantMgmtContext : DbContext
     public virtual DbSet<Payment> Payments { get; set; }
 
     public virtual DbSet<Permission> Permissions { get; set; }
+
+    public virtual DbSet<Coupon> Coupons { get; set; }
 
     public virtual DbSet<Promotion> Promotions { get; set; }
 

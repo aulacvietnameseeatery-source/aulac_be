@@ -4,6 +4,7 @@ using Infa.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Infa.Data.Migrations
 {
     [DbContext(typeof(RestaurantMgmtContext))]
-    partial class RestaurantMgmtContextScaffoldModelSnapshot : ModelSnapshot
+    [Migration("20260315144457_AddCouponTables")]
+    partial class AddCouponTables
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1986,17 +1989,68 @@ namespace Infa.Data.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("assigned_by");
 
+                    b.Property<uint>("AssignmentStatusLvId")
+                        .HasColumnType("int unsigned")
+                        .HasColumnName("assignment_status_lv_id");
+
+                    b.Property<string>("Remarks")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)")
+                        .HasColumnName("remarks");
+
+                    b.Property<long>("RoleId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("role_id");
+
+                    b.Property<long>("ShiftScheduleId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("shift_schedule_id");
+
+                    b.Property<long>("StaffId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("staff_id");
+
+                    b.HasKey("ShiftAssignmentId")
+                        .HasName("PRIMARY");
+
+                    b.HasIndex("AssignedBy");
+
+                    b.HasIndex("AssignmentStatusLvId");
+
+                    b.HasIndex("RoleId");
+
+                    b.HasIndex(new[] { "ShiftScheduleId" }, "idx_shift_assignment_schedule");
+
+                    b.HasIndex(new[] { "StaffId" }, "idx_shift_assignment_staff");
+
+                    b.HasIndex(new[] { "ShiftScheduleId", "StaffId" }, "uq_shift_assignment_schedule_staff")
+                        .IsUnique();
+
+                    b.ToTable("shift_assignment", (string)null);
+                });
+
+            modelBuilder.Entity("Core.Entity.ShiftSchedule", b =>
+                {
+                    b.Property<long>("ShiftScheduleId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("shift_schedule_id");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("ShiftScheduleId"));
+
+                    b.Property<DateOnly>("BusinessDate")
+                        .HasColumnType("date")
+                        .HasColumnName("business_date");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime")
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("tinyint(1)")
-                        .HasDefaultValue(true)
-                        .HasColumnName("is_active");
+                    b.Property<long>("CreatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by");
 
                     b.Property<string>("Notes")
                         .HasMaxLength(500)
@@ -2011,86 +2065,13 @@ namespace Infa.Data.Migrations
                         .HasColumnType("datetime")
                         .HasColumnName("planned_start_at");
 
-                    b.Property<long>("ShiftTemplateId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("shift_template_id");
+                    b.Property<uint>("ShiftTypeLvId")
+                        .HasColumnType("int unsigned")
+                        .HasColumnName("shift_type_lv_id");
 
-                    b.Property<long>("StaffId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("staff_id");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("datetime")
-                        .HasColumnName("updated_at")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlComputedColumn(b.Property<DateTime>("UpdatedAt"));
-
-                    b.Property<DateOnly>("WorkDate")
-                        .HasColumnType("date")
-                        .HasColumnName("work_date");
-
-                    b.HasKey("ShiftAssignmentId")
-                        .HasName("PRIMARY");
-
-                    b.HasIndex("AssignedBy");
-
-                    b.HasIndex(new[] { "StaffId" }, "idx_shift_assignment_staff");
-
-                    b.HasIndex(new[] { "ShiftTemplateId" }, "idx_shift_assignment_template");
-
-                    b.HasIndex(new[] { "WorkDate" }, "idx_shift_assignment_work_date");
-
-                    b.HasIndex(new[] { "ShiftTemplateId", "WorkDate", "StaffId" }, "uq_shift_assignment_template_date_staff")
-                        .IsUnique();
-
-                    b.ToTable("shift_assignment", (string)null);
-                });
-
-            modelBuilder.Entity("Core.Entity.ShiftTemplate", b =>
-                {
-                    b.Property<long>("ShiftTemplateId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("shift_template_id");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("ShiftTemplateId"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime")
-                        .HasColumnName("created_at")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                    b.Property<long>("CreatedBy")
-                        .HasColumnType("bigint")
-                        .HasColumnName("created_by");
-
-                    b.Property<TimeOnly>("DefaultEndTime")
-                        .HasColumnType("time")
-                        .HasColumnName("default_end_time");
-
-                    b.Property<TimeOnly>("DefaultStartTime")
-                        .HasColumnType("time")
-                        .HasColumnName("default_start_time");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(500)
-                        .HasColumnType("varchar(500)")
-                        .HasColumnName("description");
-
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("tinyint(1)")
-                        .HasDefaultValue(true)
-                        .HasColumnName("is_active");
-
-                    b.Property<string>("TemplateName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)")
-                        .HasColumnName("template_name");
+                    b.Property<uint>("StatusLvId")
+                        .HasColumnType("int unsigned")
+                        .HasColumnName("status_lv_id");
 
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAddOrUpdate()
@@ -2104,19 +2085,20 @@ namespace Infa.Data.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("updated_by");
 
-                    b.HasKey("ShiftTemplateId")
+                    b.HasKey("ShiftScheduleId")
                         .HasName("PRIMARY");
 
                     b.HasIndex("CreatedBy");
 
                     b.HasIndex("UpdatedBy");
 
-                    b.HasIndex(new[] { "IsActive" }, "idx_shift_template_active");
+                    b.HasIndex(new[] { "BusinessDate" }, "idx_shift_schedule_business_date");
 
-                    b.HasIndex(new[] { "TemplateName" }, "uq_shift_template_name")
-                        .IsUnique();
+                    b.HasIndex(new[] { "StatusLvId" }, "idx_shift_schedule_status_lv");
 
-                    b.ToTable("shift_template", (string)null);
+                    b.HasIndex(new[] { "ShiftTypeLvId" }, "idx_shift_schedule_type_lv");
+
+                    b.ToTable("shift_schedule", (string)null);
                 });
 
             modelBuilder.Entity("Core.Entity.StaffAccount", b =>
@@ -3157,12 +3139,24 @@ namespace Infa.Data.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_shift_assignment_assigned_by");
 
-                    b.HasOne("Core.Entity.ShiftTemplate", "ShiftTemplate")
+                    b.HasOne("Core.Entity.LookupValue", "AssignmentStatusLv")
+                        .WithMany()
+                        .HasForeignKey("AssignmentStatusLvId")
+                        .IsRequired()
+                        .HasConstraintName("fk_shift_assignment_status_lv");
+
+                    b.HasOne("Core.Entity.Role", "Role")
+                        .WithMany()
+                        .HasForeignKey("RoleId")
+                        .IsRequired()
+                        .HasConstraintName("fk_shift_assignment_role");
+
+                    b.HasOne("Core.Entity.ShiftSchedule", "ShiftSchedule")
                         .WithMany("ShiftAssignments")
-                        .HasForeignKey("ShiftTemplateId")
+                        .HasForeignKey("ShiftScheduleId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
-                        .HasConstraintName("fk_shift_assignment_template");
+                        .HasConstraintName("fk_shift_assignment_schedule");
 
                     b.HasOne("Core.Entity.StaffAccount", "Staff")
                         .WithMany()
@@ -3172,25 +3166,45 @@ namespace Infa.Data.Migrations
 
                     b.Navigation("AssignedByStaff");
 
-                    b.Navigation("ShiftTemplate");
+                    b.Navigation("AssignmentStatusLv");
+
+                    b.Navigation("Role");
+
+                    b.Navigation("ShiftSchedule");
 
                     b.Navigation("Staff");
                 });
 
-            modelBuilder.Entity("Core.Entity.ShiftTemplate", b =>
+            modelBuilder.Entity("Core.Entity.ShiftSchedule", b =>
                 {
                     b.HasOne("Core.Entity.StaffAccount", "CreatedByStaff")
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .IsRequired()
-                        .HasConstraintName("fk_shift_template_created_by");
+                        .HasConstraintName("fk_shift_schedule_created_by");
+
+                    b.HasOne("Core.Entity.LookupValue", "ShiftTypeLv")
+                        .WithMany()
+                        .HasForeignKey("ShiftTypeLvId")
+                        .IsRequired()
+                        .HasConstraintName("fk_shift_schedule_type_lv");
+
+                    b.HasOne("Core.Entity.LookupValue", "StatusLv")
+                        .WithMany()
+                        .HasForeignKey("StatusLvId")
+                        .IsRequired()
+                        .HasConstraintName("fk_shift_schedule_status_lv");
 
                     b.HasOne("Core.Entity.StaffAccount", "UpdatedByStaff")
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
-                        .HasConstraintName("fk_shift_template_updated_by");
+                        .HasConstraintName("fk_shift_schedule_updated_by");
 
                     b.Navigation("CreatedByStaff");
+
+                    b.Navigation("ShiftTypeLv");
+
+                    b.Navigation("StatusLv");
 
                     b.Navigation("UpdatedByStaff");
                 });
@@ -3471,7 +3485,7 @@ namespace Infa.Data.Migrations
                     b.Navigation("AttendanceRecord");
                 });
 
-            modelBuilder.Entity("Core.Entity.ShiftTemplate", b =>
+            modelBuilder.Entity("Core.Entity.ShiftSchedule", b =>
                 {
                     b.Navigation("ShiftAssignments");
                 });

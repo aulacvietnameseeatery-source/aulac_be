@@ -17,6 +17,7 @@ using Core.Interface.Service.I18n;
 using Core.Interface.Service.LookUp;
 using Core.Interface.Service.Others;
 using Core.Interface.Service.Promotion;
+using Core.Interface.Service.Coupon;
 using Core.Interface.Service.Role;
 using Core.Interface.Service.Shift;
 using Core.Service;
@@ -256,6 +257,7 @@ builder.Services.AddScoped<ISaleInvoiceService, SaleInvoiceService>();
 builder.Services.AddScoped<IPaymentService, PaymentService>();
 builder.Services.AddScoped<ITableService, TableService>();
 builder.Services.AddScoped<IPromotionService, PromotionService>();
+builder.Services.AddScoped<ICouponService, CouponService>();
 
 builder.Services.AddScoped<IShiftTemplateService, ShiftTemplateService>();
 builder.Services.AddScoped<IShiftAssignmentService, ShiftAssignmentService>();
@@ -293,6 +295,7 @@ builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
 builder.Services.AddScoped<IOrderRepository, OrderRepository>();
 builder.Services.AddScoped<IIngredientRepository, IngredientRepository>();
 builder.Services.AddScoped<IPromotionRepository, PromotionRepository>();
+builder.Services.AddScoped<ICouponRepository, CouponRepository>();
 builder.Services.AddScoped<ISaleInvoiceRepository, SaleInvoiceRepository>();
 
 builder.Services.AddScoped<IShiftTemplateRepository, ShiftTemplateRepository>();

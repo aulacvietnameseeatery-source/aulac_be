@@ -1,5 +1,6 @@
 ﻿using API.Models;
 using Core.DTO.Customer;
+using Core.DTO.General;
 using Core.Interface.Service.Customer;
 using Microsoft.AspNetCore.Mvc;
 
@@ -14,6 +15,24 @@ namespace Api.Controllers
         public CustomerController(ICustomerService customerService)
         {
             _customerService = customerService;
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetCustomers(
+            [FromQuery] CustomerListQueryDTO query,
+            CancellationToken ct)
+        {
+            var result = await _customerService.GetCustomersAsync(query, ct);
+
+            return Ok(new ApiResponse<PagedResultDTO<CustomerListDTO>>
+            {
+                Success = true,
+                Code = 200,
+                SubCode = 0,
+                UserMessage = "Get customers successfully",
+                Data = result,
+                ServerTime = DateTimeOffset.UtcNow
+            });
         }
 
         [HttpGet("phone/{phone}")]
