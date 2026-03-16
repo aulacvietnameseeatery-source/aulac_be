@@ -33,6 +33,10 @@ public interface IPublicReservationService
         int? partySize,
         CancellationToken ct = default);
 
+    Task<ReservationFitCheckResponse> CheckReservationFitAsync(
+        ReservationFitCheckRequest request,
+        CancellationToken ct = default);
+
     /// <summary>
     /// Submits a final reservation.
     /// </summary>

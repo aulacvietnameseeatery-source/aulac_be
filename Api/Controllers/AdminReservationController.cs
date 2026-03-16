@@ -165,29 +165,19 @@ namespace API.Controllers
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
         public async Task<IActionResult> AssignTableAndConfirm(
             long id,
-            [FromBody] AssignTableRequest payload,
+            [FromBody] AssignTableRequest? payload,
             CancellationToken cancellationToken)
         {
             try
             {
-                // Kiểm tra validation cơ bản
-                if (payload.TableIds == null || !payload.TableIds.Any())
-                {
-                    return BadRequest(new ApiResponse<object>
-                    {
-                        Success = false,
-                        Code = 400,
-                        UserMessage = "Vui lòng chọn ít nhất 1 bàn."
-                    });
-                }
-
-                await _reservationService.AssignTableAndConfirmAsync(id, payload.TableIds, cancellationToken);
+                var selectedTableIds = payload?.TableIds ?? new List<long>();
+                await _reservationService.AssignTableAndConfirmAsync(id, selectedTableIds, cancellationToken);
 
                 return Ok(new ApiResponse<object>
                 {
                     Success = true,
                     Code = 200,
-                    UserMessage = "Duyệt đơn và Xếp bàn thành công.",
+                    UserMessage = "Duyệt đơn thành công.",
                     Data = null!,
                     ServerTime = DateTimeOffset.UtcNow
                 });
