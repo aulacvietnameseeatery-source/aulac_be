@@ -87,11 +87,13 @@ namespace Core.Service
             };
         }
 
-        // 1.  (CONFIRMED)
+        // 1. CONFIRM ĐƠN (BÀN ĐÃ ĐƯỢC GÁN Ở PUBLIC)
         public async Task AssignTableAndConfirmAsync(long reservationId, List<long> tableIds, CancellationToken cancellationToken = default)
         {
             var reservation = await _reservationRepository.GetByIdWithFullDetailsAsync(reservationId, cancellationToken);
             if (reservation == null) throw new KeyNotFoundException("Không tìm thấy đơn đặt bàn");
+            if (reservation.Tables == null || !reservation.Tables.Any())
+                throw new InvalidOperationException("Đơn chưa có bàn được gán. Vui lòng chỉnh sửa đơn trước khi duyệt.");
 
             var confirmedStatusId = await ReservationStatusCode.CONFIRMED.ToReservationStatusIdAsync(_lookupResolver, cancellationToken);
             var reservedTableStatusId = await TableStatusCode.RESERVED.ToTableStatusIdAsync(_lookupResolver, cancellationToken);
@@ -101,15 +103,6 @@ namespace Core.Service
             {
                 reservation.ReservationStatusLvId = confirmedStatusId;
 
-                foreach (var tableId in tableIds)
-                {
-                    if (!reservation.Tables.Any(t => t.TableId == tableId))
-                    {
-                        var table = await _tableRepository.GetByIdAsync(tableId, cancellationToken);
-                        if (table != null) reservation.Tables.Add(table);
-                    }
-                }
-
                 // [ KHÓA BÀN TRƯỚC 2 TIẾNG]
                 var lockTime = reservation.ReservedTime.AddHours(-2);
                 var timeUntilLock = lockTime - DateTime.UtcNow;
@@ -117,7 +110,7 @@ namespace Core.Service
                 if (timeUntilLock <= TimeSpan.Zero)
                 {
                     // Nếu thời gian đến lúc ăn < 2 tiếng -> Khóa bàn (RESERVED) ngay lập tức
-                    foreach (var tableId in tableIds)
+                    foreach (var tableId in reservation.Tables.Select(t => t.TableId))
                     {
                         await _tableRepository.UpdateStatusAsync(tableId, reservedTableStatusId, cancellationToken);
                         await _realtimeNotification.NotifyTableStatusChangedAsync(tableId, "RESERVED");

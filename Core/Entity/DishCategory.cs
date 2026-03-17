@@ -15,6 +15,7 @@ public partial class DishCategory
 
     public long? DescriptionTextId { get; set; }
 
+    public int DisPlayOrder { get; set; }
     public bool IsDisabled { get; set; }
 
     public virtual I18nText? CategoryNameText { get; set; }
@@ -26,4 +27,6 @@ public partial class DishCategory
     public virtual ICollection<PromotionRule> PromotionRules { get; set; } = new List<PromotionRule>();
 
     public virtual ICollection<PromotionTarget> PromotionTargets { get; set; } = new List<PromotionTarget>();
+
+
 }
