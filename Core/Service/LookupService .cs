@@ -221,6 +221,50 @@ public class LookupService : ILookupService
         await _lookupResolver.RefreshIfChangedAsync(ct);
     }
 
+    /// <inheritdoc />
+    public async Task<int> ReorderAsync(ushort typeId, ReorderLookupValuesRequest request, CancellationToken ct = default)
+    {
+        if (request.Items == null || !request.Items.Any())
+            throw new ValidationException("No items provided for reordering.");
+
+        var distinctIds = request.Items.Select(x => x.ValueId).Distinct().ToList();
+        if (distinctIds.Count != request.Items.Count)
+            throw new ValidationException("Duplicate IDs are not allowed.");
+
+        var entities = await _repo.GetByIdsAsync(distinctIds, ct);
+
+        if (entities.Count != distinctIds.Count)
+            throw new ValidationException("One or more lookup values were not found.");
+
+        foreach (var entity in entities)
+        {
+            if (entity.TypeId != typeId)
+                throw new ValidationException($"Lookup value {entity.ValueId} does not belong to the expected type.");
+        }
+
+        await _unitOfWork.BeginTransactionAsync(ct);
+        try
+        {
+            foreach (var item in request.Items)
+            {
+                var entityToUpdate = entities.First(e => e.ValueId == item.ValueId);
+                entityToUpdate.SortOrder = item.SortOrder;
+                entityToUpdate.UpdateAt = DateTime.UtcNow;
+            }
+            
+            await _unitOfWork.SaveChangesAsync(ct);
+            await _unitOfWork.CommitAsync(ct);
+            await _lookupResolver.RefreshIfChangedAsync(ct);
+
+            return distinctIds.Count;
+        }
+        catch
+        {
+            await _unitOfWork.RollbackAsync(ct);
+            throw;
+        }
+    }
+
     #endregion
 
     #region ── Private helpers ──

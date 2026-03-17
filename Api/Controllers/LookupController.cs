@@ -90,4 +90,28 @@ public class LookupController : ControllerBase
         await _lookupService.DeleteAsync(typeId, valueId, typeLabel, ct);
         return NoContent();
     }
+
+    /// <summary>
+    /// Reorders a batch of lookup values.
+    /// </summary>
+    [HttpPut("reorder")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ReorderValues(ushort typeId, [FromBody] ReorderLookupValuesRequest request, CancellationToken ct)
+    {
+        var updatedCount = await _lookupService.ReorderAsync(typeId, request, ct);
+
+        return Ok(new ApiResponse<object>
+        {
+            Success = true,
+            Code = 200,
+            UserMessage = "Reordered successfully",
+            Data = new
+            {
+                typeId = typeId,
+                updatedCount = updatedCount,
+                version = DateTime.UtcNow
+            },
+            ServerTime = DateTimeOffset.UtcNow
+        });
+    }
 }

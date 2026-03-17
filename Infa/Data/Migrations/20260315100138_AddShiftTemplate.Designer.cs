@@ -4,6 +4,7 @@ using Infa.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Infa.Data.Migrations
 {
     [DbContext(typeof(RestaurantMgmtContext))]
-    partial class RestaurantMgmtContextScaffoldModelSnapshot : ModelSnapshot
+    [Migration("20260315100138_AddShiftTemplate")]
+    partial class AddShiftTemplate
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -207,82 +210,6 @@ namespace Infa.Data.Migrations
                     b.HasIndex(new[] { "UserId", "ExpiresAt" }, "idx_session_user");
 
                     b.ToTable("auth_session", (string)null);
-                });
-
-            modelBuilder.Entity("Core.Entity.Coupon", b =>
-                {
-                    b.Property<long>("CouponId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("coupon_id");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("CouponId"));
-
-                    b.Property<string>("CouponCode")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("varchar(50)")
-                        .HasColumnName("coupon_code");
-
-                    b.Property<string>("CouponName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("varchar(200)")
-                        .HasColumnName("coupon_name");
-
-                    b.Property<uint>("CouponStatusLvId")
-                        .HasColumnType("int unsigned")
-                        .HasColumnName("coupon_status_lv_id");
-
-                    b.Property<DateTime?>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime")
-                        .HasColumnName("created_at")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(255)
-                        .HasColumnType("varchar(255)")
-                        .HasColumnName("description");
-
-                    b.Property<decimal>("DiscountValue")
-                        .HasPrecision(10, 2)
-                        .HasColumnType("decimal(10,2)")
-                        .HasColumnName("discount_value");
-
-                    b.Property<DateTime>("EndTime")
-                        .HasColumnType("datetime")
-                        .HasColumnName("end_time");
-
-                    b.Property<int?>("MaxUsage")
-                        .HasColumnType("int")
-                        .HasColumnName("max_usage");
-
-                    b.Property<DateTime>("StartTime")
-                        .HasColumnType("datetime")
-                        .HasColumnName("start_time");
-
-                    b.Property<uint>("TypeLvId")
-                        .HasColumnType("int unsigned")
-                        .HasColumnName("type_lv_id");
-
-                    b.Property<int?>("UsedCount")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasColumnName("used_count")
-                        .HasDefaultValueSql("'0'");
-
-                    b.HasKey("CouponId")
-                        .HasName("PRIMARY");
-
-                    b.HasIndex(new[] { "CouponStatusLvId" }, "idx_coupon_status_lv");
-
-                    b.HasIndex(new[] { "TypeLvId" }, "idx_coupon_type_lv");
-
-                    b.HasIndex(new[] { "CouponCode" }, "uq_coupon_code")
-                        .IsUnique();
-
-                    b.ToTable("coupon", (string)null);
                 });
 
             modelBuilder.Entity("Core.Entity.CurrentStock", b =>
@@ -526,13 +453,9 @@ namespace Infa.Data.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("description_text_id");
 
-                    b.Property<int>("DisPlayOrder")
-                        .HasColumnType("int")
-                        .HasColumnName("display_order");
-
                     b.Property<bool>("IsDisabled")
                         .HasColumnType("tinyint(1)")
-                        .HasColumnName("is_disable");
+                        .HasColumnName("isDisabled");
 
                     b.HasKey("CategoryId")
                         .HasName("PRIMARY");
@@ -1232,45 +1155,6 @@ namespace Infa.Data.Migrations
                     b.HasIndex(new[] { "TableId" }, "table_id");
 
                     b.ToTable("orders", (string)null);
-                });
-
-            modelBuilder.Entity("Core.Entity.OrderCoupon", b =>
-                {
-                    b.Property<long>("OrderCouponId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("order_coupon_id");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("OrderCouponId"));
-
-                    b.Property<DateTime?>("AppliedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime")
-                        .HasColumnName("applied_at")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                    b.Property<long>("CouponId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("coupon_id");
-
-                    b.Property<decimal>("DiscountAmount")
-                        .HasPrecision(14, 2)
-                        .HasColumnType("decimal(14,2)")
-                        .HasColumnName("discount_amount");
-
-                    b.Property<long>("OrderId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("order_id");
-
-                    b.HasKey("OrderCouponId")
-                        .HasName("PRIMARY");
-
-                    b.HasIndex(new[] { "CouponId" }, "idx_order_coupon_coupon");
-
-                    b.HasIndex(new[] { "OrderId", "CouponId" }, "uq_order_coupon")
-                        .IsUnique();
-
-                    b.ToTable("order_coupon", (string)null);
                 });
 
             modelBuilder.Entity("Core.Entity.OrderItem", b =>
@@ -1990,17 +1874,68 @@ namespace Infa.Data.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("assigned_by");
 
+                    b.Property<uint>("AssignmentStatusLvId")
+                        .HasColumnType("int unsigned")
+                        .HasColumnName("assignment_status_lv_id");
+
+                    b.Property<string>("Remarks")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)")
+                        .HasColumnName("remarks");
+
+                    b.Property<long>("RoleId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("role_id");
+
+                    b.Property<long>("ShiftScheduleId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("shift_schedule_id");
+
+                    b.Property<long>("StaffId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("staff_id");
+
+                    b.HasKey("ShiftAssignmentId")
+                        .HasName("PRIMARY");
+
+                    b.HasIndex("AssignedBy");
+
+                    b.HasIndex("AssignmentStatusLvId");
+
+                    b.HasIndex("RoleId");
+
+                    b.HasIndex(new[] { "ShiftScheduleId" }, "idx_shift_assignment_schedule");
+
+                    b.HasIndex(new[] { "StaffId" }, "idx_shift_assignment_staff");
+
+                    b.HasIndex(new[] { "ShiftScheduleId", "StaffId" }, "uq_shift_assignment_schedule_staff")
+                        .IsUnique();
+
+                    b.ToTable("shift_assignment", (string)null);
+                });
+
+            modelBuilder.Entity("Core.Entity.ShiftSchedule", b =>
+                {
+                    b.Property<long>("ShiftScheduleId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("shift_schedule_id");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("ShiftScheduleId"));
+
+                    b.Property<DateOnly>("BusinessDate")
+                        .HasColumnType("date")
+                        .HasColumnName("business_date");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime")
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("tinyint(1)")
-                        .HasDefaultValue(true)
-                        .HasColumnName("is_active");
+                    b.Property<long>("CreatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by");
 
                     b.Property<string>("Notes")
                         .HasMaxLength(500)
@@ -2019,9 +1954,9 @@ namespace Infa.Data.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("shift_template_id");
 
-                    b.Property<long>("StaffId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("staff_id");
+                    b.Property<uint>("StatusLvId")
+                        .HasColumnType("int unsigned")
+                        .HasColumnName("status_lv_id");
 
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAddOrUpdate()
@@ -2031,25 +1966,24 @@ namespace Infa.Data.Migrations
 
                     MySqlPropertyBuilderExtensions.UseMySqlComputedColumn(b.Property<DateTime>("UpdatedAt"));
 
-                    b.Property<DateOnly>("WorkDate")
-                        .HasColumnType("date")
-                        .HasColumnName("work_date");
+                    b.Property<long?>("UpdatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("updated_by");
 
-                    b.HasKey("ShiftAssignmentId")
+                    b.HasKey("ShiftScheduleId")
                         .HasName("PRIMARY");
 
-                    b.HasIndex("AssignedBy");
+                    b.HasIndex("CreatedBy");
 
-                    b.HasIndex(new[] { "StaffId" }, "idx_shift_assignment_staff");
+                    b.HasIndex("UpdatedBy");
 
-                    b.HasIndex(new[] { "ShiftTemplateId" }, "idx_shift_assignment_template");
+                    b.HasIndex(new[] { "BusinessDate" }, "idx_shift_schedule_business_date");
 
-                    b.HasIndex(new[] { "WorkDate" }, "idx_shift_assignment_work_date");
+                    b.HasIndex(new[] { "StatusLvId" }, "idx_shift_schedule_status_lv");
 
-                    b.HasIndex(new[] { "ShiftTemplateId", "WorkDate", "StaffId" }, "uq_shift_assignment_template_date_staff")
-                        .IsUnique();
+                    b.HasIndex(new[] { "ShiftTemplateId" }, "idx_shift_schedule_template");
 
-                    b.ToTable("shift_assignment", (string)null);
+                    b.ToTable("shift_schedule", (string)null);
                 });
 
             modelBuilder.Entity("Core.Entity.ShiftTemplate", b =>
@@ -2419,25 +2353,6 @@ namespace Infa.Data.Migrations
                         .HasConstraintName("auth_session_ibfk_1");
 
                     b.Navigation("User");
-                });
-
-            modelBuilder.Entity("Core.Entity.Coupon", b =>
-                {
-                    b.HasOne("Core.Entity.LookupValue", "CouponStatusLv")
-                        .WithMany("CouponCouponStatusLvs")
-                        .HasForeignKey("CouponStatusLvId")
-                        .IsRequired()
-                        .HasConstraintName("fk_coupon_status_lv");
-
-                    b.HasOne("Core.Entity.LookupValue", "TypeLv")
-                        .WithMany("CouponTypeLvs")
-                        .HasForeignKey("TypeLvId")
-                        .IsRequired()
-                        .HasConstraintName("fk_coupon_type_lv");
-
-                    b.Navigation("CouponStatusLv");
-
-                    b.Navigation("TypeLv");
                 });
 
             modelBuilder.Entity("Core.Entity.CurrentStock", b =>
@@ -2816,25 +2731,6 @@ namespace Infa.Data.Migrations
                     b.Navigation("Table");
                 });
 
-            modelBuilder.Entity("Core.Entity.OrderCoupon", b =>
-                {
-                    b.HasOne("Core.Entity.Coupon", "Coupon")
-                        .WithMany("OrderCoupons")
-                        .HasForeignKey("CouponId")
-                        .IsRequired()
-                        .HasConstraintName("fk_order_coupon_coupon");
-
-                    b.HasOne("Core.Entity.Order", "Order")
-                        .WithMany("OrderCoupons")
-                        .HasForeignKey("OrderId")
-                        .IsRequired()
-                        .HasConstraintName("fk_order_coupon_order");
-
-                    b.Navigation("Coupon");
-
-                    b.Navigation("Order");
-                });
-
             modelBuilder.Entity("Core.Entity.OrderItem", b =>
                 {
                     b.HasOne("Core.Entity.Dish", "Dish")
@@ -3161,12 +3057,24 @@ namespace Infa.Data.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_shift_assignment_assigned_by");
 
-                    b.HasOne("Core.Entity.ShiftTemplate", "ShiftTemplate")
+                    b.HasOne("Core.Entity.LookupValue", "AssignmentStatusLv")
+                        .WithMany()
+                        .HasForeignKey("AssignmentStatusLvId")
+                        .IsRequired()
+                        .HasConstraintName("fk_shift_assignment_status_lv");
+
+                    b.HasOne("Core.Entity.Role", "Role")
+                        .WithMany()
+                        .HasForeignKey("RoleId")
+                        .IsRequired()
+                        .HasConstraintName("fk_shift_assignment_role");
+
+                    b.HasOne("Core.Entity.ShiftSchedule", "ShiftSchedule")
                         .WithMany("ShiftAssignments")
-                        .HasForeignKey("ShiftTemplateId")
+                        .HasForeignKey("ShiftScheduleId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
-                        .HasConstraintName("fk_shift_assignment_template");
+                        .HasConstraintName("fk_shift_assignment_schedule");
 
                     b.HasOne("Core.Entity.StaffAccount", "Staff")
                         .WithMany()
@@ -3176,9 +3084,47 @@ namespace Infa.Data.Migrations
 
                     b.Navigation("AssignedByStaff");
 
-                    b.Navigation("ShiftTemplate");
+                    b.Navigation("AssignmentStatusLv");
+
+                    b.Navigation("Role");
+
+                    b.Navigation("ShiftSchedule");
 
                     b.Navigation("Staff");
+                });
+
+            modelBuilder.Entity("Core.Entity.ShiftSchedule", b =>
+                {
+                    b.HasOne("Core.Entity.StaffAccount", "CreatedByStaff")
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .IsRequired()
+                        .HasConstraintName("fk_shift_schedule_created_by");
+
+                    b.HasOne("Core.Entity.ShiftTemplate", "ShiftTemplate")
+                        .WithMany("ShiftSchedules")
+                        .HasForeignKey("ShiftTemplateId")
+                        .IsRequired()
+                        .HasConstraintName("fk_shift_schedule_template");
+
+                    b.HasOne("Core.Entity.LookupValue", "StatusLv")
+                        .WithMany()
+                        .HasForeignKey("StatusLvId")
+                        .IsRequired()
+                        .HasConstraintName("fk_shift_schedule_status_lv");
+
+                    b.HasOne("Core.Entity.StaffAccount", "UpdatedByStaff")
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .HasConstraintName("fk_shift_schedule_updated_by");
+
+                    b.Navigation("CreatedByStaff");
+
+                    b.Navigation("ShiftTemplate");
+
+                    b.Navigation("StatusLv");
+
+                    b.Navigation("UpdatedByStaff");
                 });
 
             modelBuilder.Entity("Core.Entity.ShiftTemplate", b =>
@@ -3267,11 +3213,6 @@ namespace Infa.Data.Migrations
                         .HasForeignKey("RoleId")
                         .IsRequired()
                         .HasConstraintName("role_permission_ibfk_1");
-                });
-
-            modelBuilder.Entity("Core.Entity.Coupon", b =>
-                {
-                    b.Navigation("OrderCoupons");
                 });
 
             modelBuilder.Entity("Core.Entity.Customer", b =>
@@ -3372,10 +3313,6 @@ namespace Infa.Data.Migrations
 
             modelBuilder.Entity("Core.Entity.LookupValue", b =>
                 {
-                    b.Navigation("CouponCouponStatusLvs");
-
-                    b.Navigation("CouponTypeLvs");
-
                     b.Navigation("Dishes");
 
                     b.Navigation("Ingredients");
@@ -3426,8 +3363,6 @@ namespace Infa.Data.Migrations
 
             modelBuilder.Entity("Core.Entity.Order", b =>
                 {
-                    b.Navigation("OrderCoupons");
-
                     b.Navigation("OrderItems");
 
                     b.Navigation("OrderPromotions");
@@ -3475,9 +3410,14 @@ namespace Infa.Data.Migrations
                     b.Navigation("AttendanceRecord");
                 });
 
-            modelBuilder.Entity("Core.Entity.ShiftTemplate", b =>
+            modelBuilder.Entity("Core.Entity.ShiftSchedule", b =>
                 {
                     b.Navigation("ShiftAssignments");
+                });
+
+            modelBuilder.Entity("Core.Entity.ShiftTemplate", b =>
+                {
+                    b.Navigation("ShiftSchedules");
                 });
 
             modelBuilder.Entity("Core.Entity.StaffAccount", b =>
