@@ -84,21 +84,6 @@ public enum RoleStatusCode
     INACTIVE
 }
 
-public enum ShiftStatusCode
-{
-    DRAFT,
-    PUBLISHED,
-    CLOSED,
-    CANCELLED
-}
-
-public enum ShiftAssignmentStatusCode
-{
-    ASSIGNED,
-    CONFIRMED,
-    CANCELLED
-}
-
 public enum AttendanceStatusCode
 {
     SCHEDULED,

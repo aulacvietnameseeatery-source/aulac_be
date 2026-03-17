@@ -193,4 +193,12 @@ public class LookupRepo : ILookupRepo
                 || t.TableStatusLvId == valueId)
             .CountAsync(ct);
     }
+
+    /// <inheritdoc />
+    public async Task<List<LookupValue>> GetByIdsAsync(IEnumerable<uint> valueIds, CancellationToken ct = default)
+    {
+        return await _context.LookupValues
+            .Where(lv => valueIds.Contains(lv.ValueId) && lv.DeletedAt == null)
+            .ToListAsync(ct);
+    }
 }
