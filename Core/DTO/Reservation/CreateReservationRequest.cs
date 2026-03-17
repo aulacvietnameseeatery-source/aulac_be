@@ -7,16 +7,6 @@ namespace Core.DTO.Reservation;
 /// </summary>
 public class CreateReservationRequest
 {
-    public string? LockToken { get; set; }
-    
-    /// <summary>
-    /// List of table IDs to reserve. If provided, TableId is ignored (or used as fallback/first item).
-    /// </summary>
-    public List<long>? TableIds { get; set; }
-
-    [Required]
-    public long TableId { get; set; }
-
     [Required]
     [StringLength(150, MinimumLength = 2)]
     public string CustomerName { get; set; } = null!;
@@ -36,4 +26,7 @@ public class CreateReservationRequest
 
     [Required]
     public DateTime ReservedTime { get; set; }
+
+    [StringLength(1000)]
+    public string? Notes { get; set; }
 }
