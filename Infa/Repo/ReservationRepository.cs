@@ -107,8 +107,10 @@ public class ReservationRepository : IReservationRepository
             );
         }
 
-        // 5. Sorting (Mặc định sắp xếp theo giờ đặt tăng dần - Sớm nhất lên đầu)
-        query = query.OrderBy(r => r.ReservedTime);
+        // 5. Sorting (Mặc định sắp xếp theo ngày tạo mới nhất)
+        query = query
+            .OrderByDescending(r => r.CreatedAt ?? DateTime.MinValue)
+            .ThenByDescending(r => r.ReservationId);
 
         // 6. Pagination
         var totalCount = await query.CountAsync(cancellationToken);
