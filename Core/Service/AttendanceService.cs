@@ -267,6 +267,28 @@ public class AttendanceService : IAttendanceService
             .ToList();
     }
 
+    public async Task<ShiftReportSnapshotDto> GetReportSnapshotAsync(
+        DateOnly fromDate, DateOnly toDate, CancellationToken ct = default)
+    {
+        // Attendance count: total attendance report rows in the date range
+        var attendanceRequest = new AttendanceReportRequest { FromDate = fromDate, ToDate = toDate, PageSize = 1 };
+        var (_, attendanceCount) = await _assignmentRepo.GetAttendanceReportAsync(attendanceRequest, ct);
+
+        // Worked staff count: unique staff in worked-hours data
+        var workedData = await _assignmentRepo.GetWorkedHoursDataAsync(fromDate, toDate, null, ct);
+        var workedStaffCount = workedData.Select(a => a.StaffId).Distinct().Count();
+
+        // Exception count
+        var exceptions = await _assignmentRepo.GetExceptionDataAsync(fromDate, toDate, null, ct);
+
+        return new ShiftReportSnapshotDto
+        {
+            AttendanceCount = attendanceCount,
+            WorkedStaffCount = workedStaffCount,
+            ExceptionCount = exceptions.Count
+        };
+    }
+
     #endregion
 
     private static AttendanceReportRowDto MapToReportRow(ShiftAssignment a) => new()

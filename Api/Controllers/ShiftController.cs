@@ -211,6 +211,38 @@ public class ShiftController : ControllerBase
     }
 
     // ─────────────────────────────────────────────────────────────
+    //  MY SHIFTS (staff-only view)
+    // ─────────────────────────────────────────────────────────────
+
+    /// <summary>Returns shifts assigned to the currently authenticated staff member with attendance details.</summary>
+    [HttpGet("my-shifts")]
+    [HasPermission(Permissions.ViewOwnShift)]
+    [ProducesResponseType(typeof(ApiResponse<PagedResult<ShiftAssignmentDetailDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetMyShifts([FromQuery] GetShiftAssignmentRequest request, CancellationToken ct)
+    {
+        var staffId = GetStaffId();
+        var (items, totalCount) = await _assignmentService.GetMyShiftsAsync(staffId, request, ct);
+
+        var pageIndex = request.PageIndex > 0 ? request.PageIndex : 1;
+        var pageSize = request.PageSize > 0 ? request.PageSize : 20;
+
+        return Ok(new ApiResponse<PagedResult<ShiftAssignmentDetailDto>>
+        {
+            Success = true, Code = 200,
+            UserMessage = "Your shifts retrieved successfully.",
+            Data = new PagedResult<ShiftAssignmentDetailDto>
+            {
+                PageData = items,
+                PageIndex = pageIndex,
+                PageSize = pageSize,
+                TotalCount = totalCount,
+                TotalPage = (int)Math.Ceiling((double)totalCount / pageSize)
+            },
+            ServerTime = DateTimeOffset.UtcNow
+        });
+    }
+
+    // ─────────────────────────────────────────────────────────────
     //  ATTENDANCE
     // ─────────────────────────────────────────────────────────────
 
@@ -268,6 +300,22 @@ public class ShiftController : ControllerBase
     // ─────────────────────────────────────────────────────────────
     //  REPORTS
     // ─────────────────────────────────────────────────────────────
+
+    /// <summary>Top-level KPI snapshot for the reports dashboard.</summary>
+    [HttpGet("reports/snapshot")]
+    [HasPermission(Permissions.ViewShiftReport)]
+    [ProducesResponseType(typeof(ApiResponse<ShiftReportSnapshotDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetReportSnapshot(
+        [FromQuery] DateOnly fromDate, [FromQuery] DateOnly toDate, CancellationToken ct)
+    {
+        var dto = await _attendanceService.GetReportSnapshotAsync(fromDate, toDate, ct);
+        return Ok(new ApiResponse<ShiftReportSnapshotDto>
+        {
+            Success = true, Code = 200,
+            UserMessage = "Report snapshot retrieved successfully.",
+            Data = dto, ServerTime = DateTimeOffset.UtcNow
+        });
+    }
 
     /// <summary>Attendance report with paging and filters.</summary>
     [HttpGet("reports/attendance")]

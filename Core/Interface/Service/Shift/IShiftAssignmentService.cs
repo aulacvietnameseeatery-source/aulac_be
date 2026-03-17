@@ -21,4 +21,8 @@ public interface IShiftAssignmentService
 
     /// <summary>Cancels an assignment. Fails if attendance has already started.</summary>
     Task CancelAssignmentAsync(long id, CancellationToken ct = default);
+
+    /// <summary>Returns assignments for a specific staff member ("My Shifts" view).</summary>
+    Task<(List<ShiftAssignmentDetailDto> Items, int TotalCount)> GetMyShiftsAsync(
+        long staffId, GetShiftAssignmentRequest request, CancellationToken ct = default);
 }

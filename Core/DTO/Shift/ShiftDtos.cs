@@ -83,3 +83,12 @@ public class AttendanceExceptionReportRowDto
     public bool IsManualAdjustment { get; set; }
     public string? ReviewerName { get; set; }
 }
+
+// Snapshot DTO
+
+public class ShiftReportSnapshotDto
+{
+    public int AttendanceCount { get; set; }
+    public int WorkedStaffCount { get; set; }
+    public int ExceptionCount { get; set; }
+}

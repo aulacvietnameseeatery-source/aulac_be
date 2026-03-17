@@ -26,4 +26,8 @@ public interface IAttendanceService
     /// <summary>Worked-hours report: scheduled vs actual per staff.</summary>
     Task<List<WorkedHoursReportRowDto>> GetWorkedHoursReportAsync(
         DateOnly fromDate, DateOnly toDate, long? staffId, CancellationToken ct = default);
+
+    /// <summary>Returns top-level KPI counts for the report dashboard.</summary>
+    Task<ShiftReportSnapshotDto> GetReportSnapshotAsync(
+        DateOnly fromDate, DateOnly toDate, CancellationToken ct = default);
 }

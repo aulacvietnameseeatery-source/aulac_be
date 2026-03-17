@@ -154,6 +154,15 @@ public class ShiftAssignmentService : IShiftAssignmentService
         assignment.UpdatedAt = DateTime.UtcNow;
         await _unitOfWork.SaveChangesAsync(ct);
     }
+    public async Task<(List<ShiftAssignmentDetailDto> Items, int TotalCount)> GetMyShiftsAsync(
+        long staffId, GetShiftAssignmentRequest request, CancellationToken ct = default)
+    {
+        // Force the staff filter to the authenticated staff member
+        request.StaffId = staffId;
+
+        var (items, totalCount) = await _assignmentRepo.GetAssignmentsAsync(request, ct);
+        return (items.Select(MapToDetailDto).ToList(), totalCount);
+    }
 
     // Mapping helpers
 

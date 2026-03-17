@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -75,6 +75,7 @@ namespace Core.Data
 
         // Shift
         public const string ViewShift = "SHIFT:READ";
+        public const string ViewOwnShift = "SHIFT:READ_OWN";
         public const string ScheduleShift = "SHIFT:SCHEDULE";
         public const string AssignShift = "SHIFT:ASSIGN";
         public const string CheckInShift = "SHIFT:CHECK_IN";
