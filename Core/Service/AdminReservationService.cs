@@ -12,6 +12,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Hangfire;
 
 namespace Core.Service
 {
@@ -43,41 +44,22 @@ namespace Core.Service
             _jobScheduler = jobScheduler;
         }
 
-        public async Task<(List<ReservationManagementDto> Items, int TotalCount)> GetReservationsAsync(
-            GetReservationsRequest request,
-            CancellationToken cancellationToken = default)
+        public async Task<(List<ReservationManagementDto> Items, int TotalCount)> GetReservationsAsync(GetReservationsRequest request, CancellationToken cancellationToken = default)
         {
-            try
-            {
-                return await _reservationRepository.GetReservationsAsync(request, cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting reservation list");
-                throw;
-            }
+            try { return await _reservationRepository.GetReservationsAsync(request, cancellationToken); }
+            catch (Exception ex) { _logger.LogError(ex, "Error getting reservation list"); throw; }
         }
 
         public async Task<List<ReservationStatusDto>> GetReservationStatusesAsync(CancellationToken cancellationToken = default)
         {
             var entities = await _reservationRepository.GetReservationStatusesAsync(cancellationToken);
-
-            return entities.Select(x => new ReservationStatusDto
-            {
-                StatusId = x.ValueId,
-                StatusName = x.ValueName,
-                StatusCode = x.ValueCode
-            }).ToList();
+            return entities.Select(x => new ReservationStatusDto { StatusId = x.ValueId, StatusName = x.ValueName, StatusCode = x.ValueCode }).ToList();
         }
 
         public async Task<ReservationDetailDto> GetReservationDetailAsync(long reservationId, CancellationToken cancellationToken = default)
         {
             var reservation = await _reservationRepository.GetByIdWithFullDetailsAsync(reservationId, cancellationToken);
-
-            if (reservation == null)
-            {
-                throw new KeyNotFoundException($"Reservation with ID {reservationId} not found.");
-            }
+            if (reservation == null) throw new KeyNotFoundException($"Reservation with ID {reservationId} not found.");
 
             return new ReservationDetailDto
             {
@@ -105,11 +87,13 @@ namespace Core.Service
             };
         }
 
-        // 1. DUYỆT ĐƠN & GÁN NHIỀU BÀN (CONFIRMED)
+        // 1. CONFIRM ĐƠN (BÀN ĐÃ ĐƯỢC GÁN Ở PUBLIC)
         public async Task AssignTableAndConfirmAsync(long reservationId, List<long> tableIds, CancellationToken cancellationToken = default)
         {
             var reservation = await _reservationRepository.GetByIdWithFullDetailsAsync(reservationId, cancellationToken);
             if (reservation == null) throw new KeyNotFoundException("Không tìm thấy đơn đặt bàn");
+            if (reservation.Tables == null || !reservation.Tables.Any())
+                throw new InvalidOperationException("Đơn chưa có bàn được gán. Vui lòng chỉnh sửa đơn trước khi duyệt.");
 
             var confirmedStatusId = await ReservationStatusCode.CONFIRMED.ToReservationStatusIdAsync(_lookupResolver, cancellationToken);
             var reservedTableStatusId = await TableStatusCode.RESERVED.ToTableStatusIdAsync(_lookupResolver, cancellationToken);
@@ -117,24 +101,30 @@ namespace Core.Service
             await _uow.BeginTransactionAsync(cancellationToken);
             try
             {
-                // 1. Đổi Status Đơn
                 reservation.ReservationStatusLvId = confirmedStatusId;
 
-                // 2. Gán các Bàn vào Đơn và đổi Status Bàn -> RESERVED
-                foreach (var tableId in tableIds)
+                // [ KHÓA BÀN TRƯỚC 2 TIẾNG]
+                var lockTime = reservation.ReservedTime.AddHours(-2);
+                var timeUntilLock = lockTime - DateTime.UtcNow;
+
+                if (timeUntilLock <= TimeSpan.Zero)
                 {
-                    if (!reservation.Tables.Any(t => t.TableId == tableId))
+                    // Nếu thời gian đến lúc ăn < 2 tiếng -> Khóa bàn (RESERVED) ngay lập tức
+                    foreach (var tableId in reservation.Tables.Select(t => t.TableId))
                     {
-                        var table = await _tableRepository.GetByIdAsync(tableId, cancellationToken);
-                        if (table != null) reservation.Tables.Add(table);
+                        await _tableRepository.UpdateStatusAsync(tableId, reservedTableStatusId, cancellationToken);
+                        await _realtimeNotification.NotifyTableStatusChangedAsync(tableId, "RESERVED");
                     }
-                    await _tableRepository.UpdateStatusAsync(tableId, reservedTableStatusId, cancellationToken);
+                }
+                else
+                {
+                    // Nếu thời gian đến lúc ăn còn > 2 tiếng -> Lập lịch khóa bàn sau khoảng thời gian tính được
+                    _jobScheduler.ScheduleTableLock(reservation.ReservationId, timeUntilLock);
                 }
 
-                // Không dùng _reservationRepository.UpdateAsync để tránh lỗi Tracking DB
                 await _uow.SaveChangesAsync(cancellationToken);
 
-                // 3. Kích hoạt Hangfire đếm ngược 15p No-Show
+                // Lập lịch Hangfire đếm ngược 15p No-Show
                 TimeSpan delay = reservation.ReservedTime.AddMinutes(15) > DateTime.UtcNow
                     ? reservation.ReservedTime.AddMinutes(15) - DateTime.UtcNow
                     : TimeSpan.FromMinutes(1);
@@ -142,12 +132,7 @@ namespace Core.Service
 
                 await _uow.CommitAsync(cancellationToken);
 
-                // 4. Bắn SignalR
                 await _realtimeNotification.NotifyReservationUpdatedAsync(reservationId, "CONFIRMED");
-                foreach (var tableId in tableIds)
-                {
-                    await _realtimeNotification.NotifyTableStatusChangedAsync(tableId, "RESERVED");
-                }
             }
             catch (Exception)
             {
@@ -167,18 +152,13 @@ namespace Core.Service
             await _uow.BeginTransactionAsync(cancellationToken);
             try
             {
-                // 1. Đổi Status Đơn
                 reservation.ReservationStatusLvId = newStatusId;
 
-                // 2. Xử lý Ghi chú
                 if (!string.IsNullOrWhiteSpace(note))
                 {
-                    reservation.Notes = string.IsNullOrWhiteSpace(reservation.Notes)
-                        ? note.Trim()
-                        : $"{reservation.Notes} | {note.Trim()}";
+                    reservation.Notes = string.IsNullOrWhiteSpace(reservation.Notes) ? note.Trim() : $"{reservation.Notes} | {note.Trim()}";
                 }
 
-                // 3. Xử lý Bàn theo Trạng thái (Quan trọng)
                 if (reservation.Tables != null && reservation.Tables.Any())
                 {
                     uint targetTableStatusId = 0;
@@ -186,16 +166,51 @@ namespace Core.Service
 
                     if (newStatusCode == ReservationStatusCode.CHECKED_IN.ToString())
                     {
-                        targetTableStatusId = await TableStatusCode.OCCUPIED.ToTableStatusIdAsync(_lookupResolver, cancellationToken);
+                        var occupiedTableStatusId = await TableStatusCode.OCCUPIED.ToTableStatusIdAsync(_lookupResolver, cancellationToken);
+
+                        foreach (var table in reservation.Tables)
+                        {
+                            var currentTable = await _tableRepository.GetByIdAsync(table.TableId, cancellationToken);
+                            if (currentTable != null && currentTable.TableStatusLvId == occupiedTableStatusId)
+                            {
+                                throw new InvalidOperationException($"Bàn {currentTable.TableCode} đã được xếp cho khách khác. Vui lòng gỡ bàn cũ và xếp bàn mới cho đơn này!");
+                            }
+                        }
+
+                        targetTableStatusId = occupiedTableStatusId;
                         targetTableStatusCode = TableStatusCode.OCCUPIED.ToString();
                     }
-                    else if (newStatusCode == ReservationStatusCode.CANCELLED.ToString() || newStatusCode == ReservationStatusCode.COMPLETED.ToString())
+                    else if (newStatusCode == ReservationStatusCode.CANCELLED.ToString() ||
+                             newStatusCode == ReservationStatusCode.COMPLETED.ToString() ||
+                             newStatusCode == ReservationStatusCode.NO_SHOW.ToString())
                     {
                         targetTableStatusId = await TableStatusCode.AVAILABLE.ToTableStatusIdAsync(_lookupResolver, cancellationToken);
                         targetTableStatusCode = TableStatusCode.AVAILABLE.ToString();
                     }
+                    else if (newStatusCode == ReservationStatusCode.CONFIRMED.ToString())
+                    {
+                        // [ KHÓA BÀN TRƯỚC 2 TIẾNG CHO ĐƠN ONLINE]
+                        var lockTime = reservation.ReservedTime.AddHours(-2);
+                        var timeUntilLock = lockTime - DateTime.UtcNow;
 
-                    // Đổi trạng thái tất cả các bàn đang được gán cho đơn này
+                        if (timeUntilLock <= TimeSpan.Zero)
+                        {
+                            targetTableStatusId = await TableStatusCode.RESERVED.ToTableStatusIdAsync(_lookupResolver, cancellationToken);
+                            targetTableStatusCode = TableStatusCode.RESERVED.ToString();
+                        }
+                        else
+                        {
+                            _jobScheduler.ScheduleTableLock(reservationId, timeUntilLock);
+                            targetTableStatusId = 0; 
+                        }
+
+                        // Lập lịch Hangfire đếm ngược 15p No-Show
+                        TimeSpan delay = reservation.ReservedTime.AddMinutes(15) > DateTime.UtcNow
+                            ? reservation.ReservedTime.AddMinutes(15) - DateTime.UtcNow
+                            : TimeSpan.FromMinutes(1);
+                        _jobScheduler.ScheduleNoShowCheck(reservation.ReservationId, delay);
+                    }
+
                     if (targetTableStatusId != 0)
                     {
                         foreach (var table in reservation.Tables)
@@ -209,7 +224,6 @@ namespace Core.Service
                 await _uow.SaveChangesAsync(cancellationToken);
                 await _uow.CommitAsync(cancellationToken);
 
-                // 4. Bắn SignalR
                 await _realtimeNotification.NotifyReservationUpdatedAsync(reservationId, newStatusCode);
             }
             catch (Exception)
@@ -219,15 +233,14 @@ namespace Core.Service
             }
         }
 
-        // 3. HANGFIRE - ĐÁNH DẤU NO-SHOW (Khách bùn)
+        // 3. HANGFIRE JOB: ĐÁNH DẤU NO-SHOW (Sau 15 phút)
+        [AutomaticRetry(Attempts = 2)]
         public async Task CheckAndMarkNoShowAsync(long reservationId)
         {
             try
             {
                 var reservation = await _reservationRepository.GetByIdWithFullDetailsAsync(reservationId, CancellationToken.None);
-                if (reservation == null) return;
-
-                if (reservation.ReservationStatusLv.ValueCode != "CONFIRMED") return;
+                if (reservation == null || reservation.ReservationStatusLv.ValueCode != "CONFIRMED") return;
 
                 var noShowStatusId = await ReservationStatusCode.NO_SHOW.ToReservationStatusIdAsync(_lookupResolver, CancellationToken.None);
                 var availableTableStatusId = await TableStatusCode.AVAILABLE.ToTableStatusIdAsync(_lookupResolver, CancellationToken.None);
@@ -264,6 +277,51 @@ namespace Core.Service
             }
         }
 
+        // 4. HANGFIRE JOB: TỰ ĐỘNG KHÓA BÀN (Trước 2 tiếng)
+        [AutomaticRetry(Attempts = 2)]
+        public async Task LockTablesForReservationAsync(long reservationId)
+        {
+            try
+            {
+                var reservation = await _reservationRepository.GetByIdWithFullDetailsAsync(reservationId, CancellationToken.None);
+
+                // Chỉ khóa khi đơn vẫn còn giữ trạng thái CONFIRMED và giờ hiện tại thực sự đã đến gần (< 2 tiếng 5 phút để bù trừ delay)
+                if (reservation == null || reservation.ReservationStatusLv.ValueCode != "CONFIRMED") return;
+
+                if (reservation.ReservedTime.AddHours(-2) > DateTime.UtcNow.AddMinutes(5)) return;
+
+                var reservedTableStatusId = await TableStatusCode.RESERVED.ToTableStatusIdAsync(_lookupResolver, CancellationToken.None);
+                var availableTableStatusId = await TableStatusCode.AVAILABLE.ToTableStatusIdAsync(_lookupResolver, CancellationToken.None);
+
+                await _uow.BeginTransactionAsync(CancellationToken.None);
+
+                if (reservation.Tables != null)
+                {
+                    foreach (var table in reservation.Tables)
+                    {
+                        // Lấy trạng thái hiện tại của bàn dưới DB
+                        var currentTable = await _tableRepository.GetByIdAsync(table.TableId, CancellationToken.None);
+
+                        // Tránh tình trạng nhét đè lên bàn đang OCCUPIED của khách Walk-in chưa ăn xong.
+                        if (currentTable != null && currentTable.TableStatusLvId == availableTableStatusId)
+                        {
+                            await _tableRepository.UpdateStatusAsync(table.TableId, reservedTableStatusId, CancellationToken.None);
+                            await _realtimeNotification.NotifyTableStatusChangedAsync(table.TableId, "RESERVED");
+                        }
+                    }
+                }
+
+                await _uow.SaveChangesAsync(CancellationToken.None);
+                await _uow.CommitAsync(CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                await _uow.RollbackAsync(CancellationToken.None);
+                _logger.LogError(ex, "Lỗi khi chạy Hangfire Job Lock Tables cho Reservation {Id}", reservationId);
+                throw;
+            }
+        }
+
         public async Task UpdateReservationAsync(long id, UpdateReservationRequest request, CancellationToken ct = default)
         {
             var reservation = await _reservationRepository.GetByIdAsync(id, ct);
@@ -284,7 +342,6 @@ namespace Core.Service
                     reservation.ReservationStatusLvId = request.StatusId.Value;
                 }
 
-                // --- Xử lý cập nhật Bàn ---
                 if (request.TableIds != null)
                 {
                     var currentTableIds = reservation.Tables.Select(t => t.TableId).ToList();
@@ -294,8 +351,7 @@ namespace Core.Service
                     var tableIdsToAdd = newTableIds.Where(id => !currentTableIds.Contains(id)).ToList();
 
                     var availableStatusId = await TableStatusCode.AVAILABLE.ToTableStatusIdAsync(_lookupResolver, ct);
-                    
-                    // 1. Giải phóng các bàn bị gỡ bỏ
+
                     foreach (var table in tablesToRemove)
                     {
                         reservation.Tables.Remove(table);
@@ -303,17 +359,15 @@ namespace Core.Service
                         await _realtimeNotification.NotifyTableStatusChangedAsync(table.TableId, "AVAILABLE");
                     }
 
-                    // 2. Thêm các bàn mới
                     if (tableIdsToAdd.Any())
                     {
                         var reservationStatusCode = (await _reservationRepository.GetReservationStatusesAsync(ct))
                             .FirstOrDefault(s => s.ValueId == reservation.ReservationStatusLvId)?.ValueCode;
 
-                        // Xác định status bàn mới dựa trên status đơn
                         TableStatusCode targetTableStatus = TableStatusCode.RESERVED;
-                        if (reservationStatusCode == ReservationStatusCode.CHECKED_IN.ToString()) 
+                        if (reservationStatusCode == ReservationStatusCode.CHECKED_IN.ToString())
                             targetTableStatus = TableStatusCode.OCCUPIED;
-                        
+
                         var targetTableStatusId = await targetTableStatus.ToTableStatusIdAsync(_lookupResolver, ct);
 
                         foreach (var tableId in tableIdsToAdd)
@@ -322,8 +376,16 @@ namespace Core.Service
                             if (table != null)
                             {
                                 reservation.Tables.Add(table);
-                                await _tableRepository.UpdateStatusAsync(tableId, targetTableStatusId, ct);
-                                await _realtimeNotification.NotifyTableStatusChangedAsync(tableId, targetTableStatus.ToString());
+
+                                // Nếu thời gian còn > 2 tiếng thì chưa khóa bàn 
+                                if (targetTableStatus == TableStatusCode.RESERVED && reservation.ReservedTime.AddHours(-2) > DateTime.UtcNow)
+                                {
+                                }
+                                else
+                                {
+                                    await _tableRepository.UpdateStatusAsync(tableId, targetTableStatusId, ct);
+                                    await _realtimeNotification.NotifyTableStatusChangedAsync(tableId, targetTableStatus.ToString());
+                                }
                             }
                         }
                     }
@@ -331,20 +393,11 @@ namespace Core.Service
 
                 await _reservationRepository.UpdateAsync(reservation, ct);
                 await _uow.CommitAsync(ct);
-                
-                // Bắn thông báo cập nhật đơn
-                var status = (await _reservationRepository.GetReservationStatusesAsync(ct))
-                    .FirstOrDefault(s => s.ValueId == reservation.ReservationStatusLvId);
-                if (status != null)
-                {
-                    await _realtimeNotification.NotifyReservationUpdatedAsync(id, status.ValueCode);
-                }
+
+                var status = (await _reservationRepository.GetReservationStatusesAsync(ct)).FirstOrDefault(s => s.ValueId == reservation.ReservationStatusLvId);
+                if (status != null) await _realtimeNotification.NotifyReservationUpdatedAsync(id, status.ValueCode);
             }
-            catch (Exception)
-            {
-                await _uow.RollbackAsync(ct);
-                throw;
-            }
+            catch (Exception) { await _uow.RollbackAsync(ct); throw; }
         }
 
         public async Task DeleteReservationAsync(long id, CancellationToken ct = default)
@@ -355,7 +408,6 @@ namespace Core.Service
             await _uow.BeginTransactionAsync(ct);
             try
             {
-                // Nếu Reservation đang gán bàn, cần giải phóng bàn trước
                 if (reservation.Tables != null && reservation.Tables.Any())
                 {
                     var availableTableStatusId = await TableStatusCode.AVAILABLE.ToTableStatusIdAsync(_lookupResolver, ct);
@@ -369,11 +421,7 @@ namespace Core.Service
                 await _reservationRepository.DeleteAsync(reservation, ct);
                 await _uow.CommitAsync(ct);
             }
-            catch (Exception)
-            {
-                await _uow.RollbackAsync(ct);
-                throw;
-            }
+            catch (Exception) { await _uow.RollbackAsync(ct); throw; }
         }
     }
 }

@@ -125,6 +125,16 @@ public class LookupRepo : ILookupRepo
     }
 
     /// <inheritdoc />
+    public async Task<bool> IsTypeConfigurableAsync(ushort typeId, CancellationToken ct = default)
+    {
+        var lookupType = await _context.LookupTypes
+            .AsNoTracking()
+            .FirstOrDefaultAsync(t => t.TypeId == typeId, ct);
+            
+        return lookupType?.IsConfigurable ?? false;
+    }
+
+    /// <inheritdoc />
     public async Task<bool> ValueNameExistsAsync(ushort typeId, string valueName, uint? excludeId = null, CancellationToken ct = default)
     {
         var query = _context.LookupValues

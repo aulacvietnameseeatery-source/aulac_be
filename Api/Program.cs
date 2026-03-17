@@ -17,6 +17,7 @@ using Core.Interface.Service.I18n;
 using Core.Interface.Service.LookUp;
 using Core.Interface.Service.Others;
 using Core.Interface.Service.Promotion;
+using Core.Interface.Service.Coupon;
 using Core.Interface.Service.Role;
 using Core.Interface.Service.Shift;
 using Core.Service;
@@ -40,7 +41,6 @@ using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddHangfireServer();
 // Do NOT stop the whole API if a BackgroundService throws
 builder.Services.Configure<HostOptions>(options =>
 {
@@ -142,8 +142,11 @@ builder.Services.AddHangfire(config => config
         TablesPrefix = "Hangfire"
     })));
 
-
-builder.Services.AddHangfireServer();
+int workerCount = builder.Configuration.GetValue<int>("HangfireSettings:WorkerCount", 3);
+builder.Services.AddHangfireServer(options =>
+{
+    options.WorkerCount = workerCount;
+});
 #endregion
 
 
@@ -254,6 +257,7 @@ builder.Services.AddScoped<ISaleInvoiceService, SaleInvoiceService>();
 builder.Services.AddScoped<IPaymentService, PaymentService>();
 builder.Services.AddScoped<ITableService, TableService>();
 builder.Services.AddScoped<IPromotionService, PromotionService>();
+builder.Services.AddScoped<ICouponService, CouponService>();
 
 builder.Services.AddScoped<IShiftScheduleService, ShiftScheduleService>();
 builder.Services.AddScoped<IShiftAssignmentService, ShiftAssignmentService>();
@@ -291,6 +295,7 @@ builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
 builder.Services.AddScoped<IOrderRepository, OrderRepository>();
 builder.Services.AddScoped<IIngredientRepository, IngredientRepository>();
 builder.Services.AddScoped<IPromotionRepository, PromotionRepository>();
+builder.Services.AddScoped<ICouponRepository, CouponRepository>();
 builder.Services.AddScoped<ISaleInvoiceRepository, SaleInvoiceRepository>();
 
 builder.Services.AddScoped<IShiftScheduleRepository, ShiftScheduleRepository>();
@@ -438,7 +443,7 @@ using (var scope = app.Services.CreateScope())
 // Must be first in the pipeline to catch all exceptions
 app.UseMiddleware<HandleExceptionMiddleware>();
 
-// Configure the HTTP request pipeline.
+//// Configure the HTTP request pipeline.
 //if (app.Environment.IsDevelopment())
 //{
 //    app.UseSwagger();

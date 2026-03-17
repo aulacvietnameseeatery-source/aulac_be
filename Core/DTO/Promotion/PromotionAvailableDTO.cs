@@ -15,6 +15,7 @@ namespace Core.DTO.Promotion
         public string PromoName { get; set; } = null!;
 
         public string PromotionType { get; set; } = null!;
+        public bool HasTarget { get; set; }
 
         public decimal DiscountValue { get; set; }
 

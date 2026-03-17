@@ -1,5 +1,7 @@
 using API.Models;
+using Core.DTO.Customer;
 using Core.DTO.Reservation;
+using Core.Interface.Service.Customer;
 using Core.Interface.Service.Entity;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -16,17 +18,67 @@ namespace Api.Controllers;
 public class PublicReservationController : ControllerBase
 {
     private readonly IPublicReservationService _reservationService;
+    private readonly ICustomerService _customerService;
     private readonly ITableService _tableService;
     private readonly ILogger<PublicReservationController> _logger;
 
     public PublicReservationController(
         IPublicReservationService reservationService,
+        ICustomerService customerService,
         ITableService tableService,
         ILogger<PublicReservationController> logger)
     {
         _reservationService = reservationService;
+        _customerService = customerService;
         _tableService = tableService;
         _logger = logger;
+    }
+
+    [HttpGet("customers/phone/{phone}")]
+    [ProducesResponseType(typeof(ApiResponse<CustomerDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetCustomerByPhone(string phone)
+    {
+        var customer = await _customerService.GetByPhoneAsync(phone);
+
+        if (customer == null)
+        {
+            return Ok(new ApiResponse<object>
+            {
+                Success = true,
+                Code = 200,
+                UserMessage = "Customer not found.",
+                Data = new { },
+                ServerTime = DateTimeOffset.UtcNow
+            });
+        }
+
+        return Ok(new ApiResponse<CustomerDto>
+        {
+            Success = true,
+            Code = 200,
+            UserMessage = "Customer retrieved successfully.",
+            Data = customer,
+            ServerTime = DateTimeOffset.UtcNow
+        });
+    }
+
+    [HttpPost("reservations/fit")]
+    [ProducesResponseType(typeof(ApiResponse<ReservationFitCheckResponse>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> CheckReservationFit(
+        [FromBody] ReservationFitCheckRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _reservationService.CheckReservationFitAsync(request, cancellationToken);
+
+        return Ok(new ApiResponse<ReservationFitCheckResponse>
+        {
+            Success = true,
+            Code = 200,
+            UserMessage = result.CanBookOnline ? "Online reservation is available." : "No suitable online table arrangement found.",
+            Data = result,
+            ServerTime = DateTimeOffset.UtcNow
+        });
     }
 
     /// <summary>
@@ -86,8 +138,8 @@ public class PublicReservationController : ControllerBase
         {
             Success = true,
             Code = 200,
-            UserMessage = "Reservation confirmed successfully.",
-            SystemMessage = "Reservation created",
+            UserMessage = "Reservation request created successfully.",
+            SystemMessage = "Reservation created in pending status",
             Data = result,
             ServerTime = DateTimeOffset.UtcNow
         });

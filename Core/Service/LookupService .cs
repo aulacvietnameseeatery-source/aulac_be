@@ -55,6 +55,10 @@ public class LookupService : ILookupService
     /// <inheritdoc />
     public async Task<LookupValueI18nDto> CreateAsync(ushort typeId, CreateLookupValueRequest request, CancellationToken ct = default)
     {
+        var isConfigurable = await _repo.IsTypeConfigurableAsync(typeId, ct);
+        if (!isConfigurable)
+            throw new ValidationException("Cannot add new values to a non-configurable lookup type");
+
         if (string.IsNullOrWhiteSpace(request.ValueName))
             throw new ValidationException("Value name is required");
 
@@ -193,6 +197,10 @@ public class LookupService : ILookupService
     /// <inheritdoc />
     public async Task DeleteAsync(ushort typeId, uint valueId, string typeLabel, CancellationToken ct = default)
     {
+        var isConfigurable = await _repo.IsTypeConfigurableAsync(typeId, ct);
+        if (!isConfigurable)
+            throw new ValidationException($"Cannot delete values from a non-configurable {typeLabel} type");
+
         var entity = await _repo.GetByIdAsync(valueId, ct)
             ?? throw new NotFoundException($"{typeLabel} not found");
 
