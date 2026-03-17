@@ -85,5 +85,10 @@ namespace Core.Data
         public const string CloseShift = "SHIFT:CLOSE";
         public const string ManageShiftTemplate = "SHIFT:MANAGE_TEMPLATE";
 
-    }
+		public const string ViewCustomer = "CUSTOMER:READ";
+		public const string CreateCustomer = "CUSTOMER:CREATE";
+		public const string UpdateCustomer = "CUSTOMER:UPDATE";
+		public const string DeleteCustomer = "CUSTOMER:DELETE";
+
+	}
 }
