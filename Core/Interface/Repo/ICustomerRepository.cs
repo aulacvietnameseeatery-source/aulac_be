@@ -23,5 +23,7 @@ namespace Core.Interface.Repo
 
         Task UpdateAsync(Customer customer, CancellationToken ct = default);
         Task AddAsync(Customer customer, CancellationToken ct = default);
+        Task DeleteAsync(Customer customer, CancellationToken ct = default);
+        Task<bool> HasOrdersOrReservationsAsync(long customerId, CancellationToken ct = default);
     }
 }

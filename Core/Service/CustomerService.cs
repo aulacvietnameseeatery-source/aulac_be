@@ -156,5 +156,84 @@ namespace Core.Service
 
             return GuestCustomerId;
         }
+
+        public async Task<CustomerDto> CreateCustomerAsync(CreateCustomerRequest request, CancellationToken ct = default)
+        {
+            var trimmedPhone = request.Phone.Trim();
+
+            var existing = await _customerRepository.GetByPhoneAsync(trimmedPhone);
+            if (existing != null)
+                throw new InvalidOperationException($"A customer with phone '{trimmedPhone}' already exists.");
+
+            var customer = new Customer
+            {
+                Phone = trimmedPhone,
+                FullName = string.IsNullOrWhiteSpace(request.FullName) ? null : request.FullName.Trim(),
+                Email = string.IsNullOrWhiteSpace(request.Email) ? null : request.Email.Trim(),
+                IsMember = request.IsMember,
+                LoyaltyPoints = request.LoyaltyPoints,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await _customerRepository.AddAsync(customer, ct);
+
+            return new CustomerDto
+            {
+                CustomerId = customer.CustomerId,
+                FullName = customer.FullName,
+                Phone = customer.Phone,
+                Email = customer.Email,
+                IsMember = customer.IsMember,
+                LoyaltyPoints = customer.LoyaltyPoints,
+                CreatedAt = customer.CreatedAt
+            };
+        }
+
+        public async Task<CustomerDto> UpdateCustomerAsync(long id, UpdateCustomerRequest request, CancellationToken ct = default)
+        {
+            var customer = await _customerRepository.GetByIdAsync(id, ct)
+                ?? throw new KeyNotFoundException($"Customer with ID {id} was not found.");
+
+            var trimmedPhone = request.Phone.Trim();
+
+            // Check phone uniqueness when changed
+            if (customer.Phone != trimmedPhone)
+            {
+                var existing = await _customerRepository.GetByPhoneAsync(trimmedPhone);
+                if (existing != null && existing.CustomerId != id)
+                    throw new InvalidOperationException($"A customer with phone '{trimmedPhone}' already exists.");
+            }
+
+            customer.Phone = trimmedPhone;
+            customer.FullName = string.IsNullOrWhiteSpace(request.FullName) ? null : request.FullName.Trim();
+            customer.Email = string.IsNullOrWhiteSpace(request.Email) ? null : request.Email.Trim();
+            customer.IsMember = request.IsMember;
+            customer.LoyaltyPoints = request.LoyaltyPoints;
+
+            await _customerRepository.UpdateAsync(customer, ct);
+
+            return new CustomerDto
+            {
+                CustomerId = customer.CustomerId,
+                FullName = customer.FullName,
+                Phone = customer.Phone,
+                Email = customer.Email,
+                IsMember = customer.IsMember,
+                LoyaltyPoints = customer.LoyaltyPoints,
+                CreatedAt = customer.CreatedAt
+            };
+        }
+
+        public async Task DeleteCustomerAsync(long id, CancellationToken ct = default)
+        {
+            var customer = await _customerRepository.GetByIdAsync(id, ct)
+                ?? throw new KeyNotFoundException($"Customer with ID {id} was not found.");
+
+            var hasDependencies = await _customerRepository.HasOrdersOrReservationsAsync(id, ct);
+            if (hasDependencies)
+                throw new InvalidOperationException("Cannot delete a customer who has existing orders or reservations.");
+
+            await _customerRepository.DeleteAsync(customer, ct);
+        }
     }
 }
