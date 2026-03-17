@@ -1,3 +1,4 @@
+using Core.DTO.General;
 using Core.DTO.Order;
 using Core.Entity;
 
@@ -7,4 +8,5 @@ public interface ISaleInvoiceRepository
 {
     Task<Order?> GetOrderForInvoiceAsync(long orderId, CancellationToken cancellationToken = default);
     Task<decimal> GetTotalDiscountAsync(long orderId, CancellationToken cancellationToken = default);
+    Task<PagedResultDTO<SaleInvoiceListDTO>> GetOrdersForInvoiceListAsync(SaleInvoiceListQueryDTO query, CancellationToken cancellationToken = default);
 }
