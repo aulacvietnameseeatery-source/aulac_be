@@ -329,28 +329,6 @@ this AccountStatusCode statusCode,
     }
 
     /// <summary>
-    /// Gets the lookup value_id for a ShiftStatusCode enum asynchronously.
-    /// </summary>
-    public static async Task<uint> ToShiftStatusIdAsync(
-        this ShiftStatusCode statusCode,
-        ILookupResolver resolver,
-        CancellationToken ct = default)
-    {
-        return await statusCode.IdAsync(resolver, (ushort)LookupType.ShiftStatus, ct);
-    }
-
-    /// <summary>
-    /// Gets the lookup value_id for a ShiftAssignmentStatusCode enum asynchronously.
-    /// </summary>
-    public static async Task<uint> ToShiftAssignmentStatusIdAsync(
-        this ShiftAssignmentStatusCode statusCode,
-        ILookupResolver resolver,
-        CancellationToken ct = default)
-    {
-        return await statusCode.IdAsync(resolver, (ushort)LookupType.ShiftAssignmentStatus, ct);
-    }
-
-    /// <summary>
     /// Gets the lookup value_id for an AttendanceStatusCode enum asynchronously.
     /// </summary>
     public static async Task<uint> ToAttendanceStatusIdAsync(

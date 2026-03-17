@@ -73,6 +73,7 @@ namespace Core.Data
         public static readonly LookupTypeInfo RoleStatus =
             new(20, "ROLE_STATUS", false);
 
+        // @deprecated: SHIFT_TYPE lookup is no longer used — ShiftTemplate entity replaces it.
         public static readonly LookupTypeInfo ShiftType =
             new(21, "SHIFT_TYPE", true);
 
