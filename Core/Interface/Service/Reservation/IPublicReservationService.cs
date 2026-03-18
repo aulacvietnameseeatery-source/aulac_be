@@ -1,6 +1,6 @@
 using Core.DTO.Reservation;
 
-namespace Core.Interface.Service.Entity;
+namespace Core.Interface.Service.Reservation;
 
 /// <summary>
 /// Service interface for public reservation operations.

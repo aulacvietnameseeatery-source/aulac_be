@@ -7,6 +7,8 @@ namespace Core.DTO.Reservation;
 /// </summary>
 public class CreateReservationRequest
 {
+    public int? CustomerId { get; set; }
+
     [Required]
     [StringLength(150, MinimumLength = 2)]
     public string CustomerName { get; set; } = null!;

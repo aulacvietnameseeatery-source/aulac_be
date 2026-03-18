@@ -1,6 +1,6 @@
 ﻿using API.Models;
 using Core.DTO.Reservation;
-using Core.Interface.Service.Entity;
+using Core.Interface.Service.Reservation;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Api.Controllers
@@ -9,11 +9,11 @@ namespace Api.Controllers
     [ApiController]
     public class ManualReservationController : ControllerBase
     {
-        private readonly IManualReservationService _reservationService;
+        private readonly IAdminReservationService _reservationService;
         private readonly ILogger<ManualReservationController> _logger;
 
         public ManualReservationController(
-            IManualReservationService reservationService,
+            IAdminReservationService reservationService,
             ILogger<ManualReservationController> logger)
         {
             _reservationService = reservationService;
