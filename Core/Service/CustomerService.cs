@@ -235,5 +235,30 @@ namespace Core.Service
 
             await _customerRepository.DeleteAsync(customer, ct);
         }
+
+        public Task<CustomerDetailDTO?> GetCustomerDetailAsync(
+        long customerId,
+        CancellationToken ct)
+        {
+            return _customerRepository.GetCustomerDetailAsync(customerId, ct);
+        }
+
+        public Task<PagedResultDTO<CustomerOrderDTO>> GetCustomerOrdersAsync(
+            CustomerOrderQueryDTO query,
+            CancellationToken ct)
+        {
+            return _customerRepository.GetCustomerOrdersAsync(query, ct);
+        }
+
+        public Task<CustomerOrderDetailDTO?> GetCustomerOrderDetailAsync(
+            long customerId,
+            long orderId,
+            CancellationToken ct)
+        {
+            return _customerRepository.GetCustomerOrderDetailAsync(
+                customerId,
+                orderId,
+                ct);
+        }
     }
 }
