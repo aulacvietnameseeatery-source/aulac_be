@@ -21,18 +21,6 @@ public interface IPublicReservationService
         string? zone,
         CancellationToken ct = default);
 
-    /// <summary>
-    /// Gets available tables for manual reservation.
-    /// </summary>
-    /// <param name="reservedTime">Optional filter by reservation time</param>
-    /// <param name="partySize">Optional filter by minimum capacity</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>List of available tables</returns>
-    Task<List<ManualTableAvailabilityDto>> GetManualAvailableTablesAsync(
-        DateTime? reservedTime,
-        int? partySize,
-        CancellationToken ct = default);
-
     Task<ReservationFitCheckResponse> CheckReservationFitAsync(
         ReservationFitCheckRequest request,
         CancellationToken ct = default);
@@ -47,19 +35,4 @@ public interface IPublicReservationService
         CreateReservationRequest request,
         CancellationToken ct = default);
 
-    /// <summary>
-    /// Submits a final reservation.
-    /// </summary>
-    /// <param name="request">Reservation details</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>Confirmed reservation details</returns>
-    Task<ReservationResponseDto> CreateManualReservationAsync(
-        CreateManualReservationRequest request,
-        CancellationToken ct = default);
-
-    Task<ReservationStatusResponseDTO> UpdateReservationStatusAsync(
-        long reservationId,
-        long staffId,
-        UpdateReservationStatusRequest request,
-        CancellationToken ct);
 }
