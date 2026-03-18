@@ -213,5 +213,66 @@ namespace Api.Controllers
                 });
             }
         }
+
+        [HttpGet("detail/{customerId}")]
+        public async Task<IActionResult> GetCustomerDetail(
+        long customerId,
+        CancellationToken ct)
+        {
+            var result = await _customerService
+                .GetCustomerDetailAsync(customerId, ct);
+
+            return Ok(new ApiResponse<CustomerDetailDTO?>
+            {
+                Success = true,
+                Code = 200,
+                SubCode = 0,
+                UserMessage = "Get customer detail successfully",
+                Data = result,
+                ServerTime = DateTimeOffset.UtcNow
+            });
+        }
+
+        [HttpGet("{customerId}/orders")]
+        public async Task<IActionResult> GetCustomerOrders(
+            long customerId,
+            [FromQuery] CustomerOrderQueryDTO query,
+            CancellationToken ct)
+        {
+            query.CustomerId = customerId;
+
+            var result = await _customerService
+                .GetCustomerOrdersAsync(query, ct);
+
+            return Ok(new ApiResponse<PagedResultDTO<CustomerOrderDTO>>
+            {
+                Success = true,
+                Code = 200,
+                SubCode = 0,
+                UserMessage = "Get customer orders successfully",
+                Data = result,
+                ServerTime = DateTimeOffset.UtcNow
+            });
+        }
+
+        [HttpGet("{customerId}/orders/{orderId}")]
+        public async Task<IActionResult> GetCustomerOrderDetail(
+            long customerId,
+            long orderId,
+            CancellationToken ct)
+        {
+            var result = await _customerService
+                .GetCustomerOrderDetailAsync(customerId, orderId, ct);
+
+            return Ok(new ApiResponse<CustomerOrderDetailDTO?>
+            {
+                Success = true,
+                Code = 200,
+                SubCode = 0,
+                UserMessage = "Get customer order detail successfully",
+                Data = result,
+                ServerTime = DateTimeOffset.UtcNow
+            });
+        }
     }
 }

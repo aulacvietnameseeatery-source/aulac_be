@@ -15,6 +15,8 @@ namespace Core.DTO.Dish
 
         public List<IFormFile> Images360 { get; set; } = [];
 
+        public IFormFile? Video { get; set; }
+
         public string RemovedMediaIds { get; set; } = "[]";
     }
 }

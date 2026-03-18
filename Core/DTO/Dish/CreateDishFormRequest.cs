@@ -15,5 +15,7 @@ namespace Core.DTO.Dish
         public List<IFormFile> StaticImages { get; set; } = [];
 
         public List<IFormFile> Images360 { get; set; } = [];
+
+        public IFormFile? Video { get; set; }
     }
 }

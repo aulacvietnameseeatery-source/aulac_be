@@ -246,6 +246,7 @@ public class DishController : ControllerBase
             request,
             dto.StaticImages,
             dto.Images360,
+            dto.Video,
             ct
         );
 
@@ -304,6 +305,7 @@ public class DishController : ControllerBase
             request,
             dto.StaticImages,
             dto.Images360,
+            dto.Video,
             removedMediaIds,
             ct
         );

@@ -236,6 +236,7 @@ public class DishService : IDishService
         CreateDishRequest request,
         IReadOnlyList<IFormFile> staticImages,
         IReadOnlyList<IFormFile> images360,
+        IFormFile? video,
         CancellationToken ct)
     {
         var savedFilePaths = new List<string>();
@@ -301,6 +302,44 @@ public class DishService : IDishService
                     DishId = dish.DishId,
                     MediaId = media.MediaId,
                     IsPrimary = true
+                }, ct);
+            }
+
+            if (video is not null)
+            {
+                using var stream = video.OpenReadStream();
+
+                var uploadResult = await _fileStorage.SaveAsync(
+                    new FileUploadRequest
+                    {
+                        Stream = stream,
+                        FileName = video.FileName,
+                        ContentType = video.ContentType
+                    },
+                    "dish-videos",
+                    FileValidationOptions.DishVideo,
+                    ct);
+
+                savedFilePaths.Add(uploadResult.RelativePath);
+
+                var videoTypeId = await _lookupResolver.GetIdAsync(
+                    (ushort)Enum.LookupType.MediaType,
+                    MediaTypeCode.VIDEO,
+                    ct);
+
+                var media = await _mediaRepo.AddMediaAsync(new MediaAsset
+                {
+                    Url = uploadResult.RelativePath,
+                    MimeType = video.ContentType,
+                    MediaTypeLvId = videoTypeId,
+                    CreatedAt = DateTime.UtcNow
+                }, ct);
+
+                await _mediaRepo.AddDishMediaAsync(new DishMedium
+                {
+                    DishId = dish.DishId,
+                    MediaId = media.MediaId,
+                    IsPrimary = false
                 }, ct);
             }
 
@@ -374,6 +413,7 @@ public class DishService : IDishService
         UpdateDishRequest request,
         IReadOnlyList<IFormFile> staticImages,
         IReadOnlyList<IFormFile> images360,
+        IFormFile? video,
         IReadOnlyList<long> removedMediaIds,
         CancellationToken ct)
     {
@@ -465,6 +505,57 @@ public class DishService : IDishService
                     DishId = dish.DishId,
                     MediaId = media.MediaId,
                     IsPrimary = true
+                }, ct);
+            }
+
+            if (video is not null)
+            {
+                // get old video
+                var existingVideos = await _mediaRepo.GetDishMediaByTypeAsync(
+                    dish.DishId,
+                    MediaTypeCode.VIDEO,
+                    ct);
+
+                foreach (var v in existingVideos)
+                {
+                    filesToDeleteAfterCommit.Add(v.Media.Url);
+
+                    await _mediaRepo.RemoveDishMediaAsync(v, ct);
+                    await _mediaRepo.RemoveMediaAsync(v.Media, ct);
+                }
+
+                using var stream = video.OpenReadStream();
+
+                var uploadResult = await _fileStorage.SaveAsync(
+                    new FileUploadRequest
+                    {
+                        Stream = stream,
+                        FileName = video.FileName,
+                        ContentType = video.ContentType
+                    },
+                    "dish-videos",
+                    FileValidationOptions.DishVideo,
+                    ct);
+
+                savedFilePaths.Add(uploadResult.RelativePath);
+
+                var videoTypeId = await _lookupResolver.GetIdAsync(
+                    (ushort)Enum.LookupType.MediaType,
+                    MediaTypeCode.VIDEO,
+                    ct);
+
+                var media = await _mediaRepo.AddMediaAsync(new MediaAsset
+                {
+                    Url = uploadResult.RelativePath,
+                    MimeType = video.ContentType,
+                    MediaTypeLvId = videoTypeId,
+                    CreatedAt = DateTime.UtcNow
+                }, ct);
+
+                await _mediaRepo.AddDishMediaAsync(new DishMedium
+                {
+                    DishId = dish.DishId,
+                    MediaId = media.MediaId
                 }, ct);
             }
 
