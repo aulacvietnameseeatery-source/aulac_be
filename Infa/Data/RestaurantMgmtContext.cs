@@ -103,6 +103,10 @@ public partial class RestaurantMgmtContext : DbContext
 
     public virtual DbSet<LoginActivity> LoginActivities { get; set; }
 
+    public virtual DbSet<Notification> Notifications { get; set; }
+
+    public virtual DbSet<NotificationReadState> NotificationReadStates { get; set; }
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         

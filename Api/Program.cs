@@ -39,6 +39,8 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Core.Interface.Service.Reservation;
+using Core.Interface.Service.Notification;
+using Infa.Service;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -344,6 +346,11 @@ builder.Services.AddScoped<IDishService, Core.Service.DishService>();
 builder.Services.AddScoped<IRealtimeNotificationService, SignalRNotificationService>();
 builder.Services.AddScoped<IJobSchedulerService, HangfireJobScheduler>();
 
+// Notification module
+builder.Services.AddScoped<INotificationRepository, Infa.Repo.NotificationRepository>();
+builder.Services.AddScoped<INotificationService, Core.Service.NotificationService>();
+builder.Services.AddScoped<INotificationRealtimePublisher, NotificationRealtimePublisher>();
+
 #endregion
 
 #region Swagger
@@ -466,6 +473,7 @@ app.UseStaticFiles();
 
 app.MapControllers();
 app.MapHub<ReservationHub>("/hubs/reservation");
+app.MapHub<RestaurantHub>("/hubs/restaurant");
 
 #endregion
 

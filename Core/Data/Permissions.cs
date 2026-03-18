@@ -90,5 +90,9 @@ namespace Core.Data
 		public const string UpdateCustomer = "CUSTOMER:UPDATE";
 		public const string DeleteCustomer = "CUSTOMER:DELETE";
 
+		// Notification
+		public const string ViewNotification = "NOTIFICATION:READ";
+		public const string AcknowledgeNotification = "NOTIFICATION:ACK";
+
 	}
 }
