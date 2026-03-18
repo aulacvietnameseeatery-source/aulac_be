@@ -21,6 +21,8 @@ public class ReservationRepository : IReservationRepository
     /// <inheritdoc />
     public async Task<Reservation> CreateAsync(Reservation reservation, CancellationToken ct = default)
     {
+        reservation.CreatedAt = DateTime.UtcNow;
+
         _context.Reservations.Add(reservation);
         await _context.SaveChangesAsync(ct);
         return reservation;
