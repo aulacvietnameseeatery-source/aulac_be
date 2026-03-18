@@ -120,6 +120,21 @@ namespace Infa.Repo
             await _context.SaveChangesAsync(ct);
         }
 
+        public async Task DeleteAsync(Customer customer, CancellationToken ct = default)
+        {
+            _context.Customers.Remove(customer);
+            await _context.SaveChangesAsync(ct);
+        }
+
+        public async Task<bool> HasOrdersOrReservationsAsync(long customerId, CancellationToken ct = default)
+        {
+            var hasOrders = await _context.Orders.AnyAsync(o => o.CustomerId == customerId, ct);
+            if (hasOrders) return true;
+
+            var hasReservations = await _context.Reservations.AnyAsync(r => r.CustomerId == customerId, ct);
+            return hasReservations;
+        }
+
         public async Task<Customer> FindOrCreateAsync(string phone, string? fullName, string? email, CancellationToken ct = default)
         {
             // Try to find by phone first (unique key)

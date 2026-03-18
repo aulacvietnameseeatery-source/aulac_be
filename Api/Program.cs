@@ -1,4 +1,4 @@
-﻿using Api.Background;
+using Api.Background;
 using Api.Hubs;
 using Api.Middleware;
 using Api.SignalR;
@@ -263,7 +263,7 @@ builder.Services.AddScoped<ITableService, TableService>();
 builder.Services.AddScoped<IPromotionService, PromotionService>();
 builder.Services.AddScoped<ICouponService, CouponService>();
 
-builder.Services.AddScoped<IShiftScheduleService, ShiftScheduleService>();
+builder.Services.AddScoped<IShiftTemplateService, ShiftTemplateService>();
 builder.Services.AddScoped<IShiftAssignmentService, ShiftAssignmentService>();
 builder.Services.AddScoped<IAttendanceService, AttendanceService>();
 
@@ -302,7 +302,7 @@ builder.Services.AddScoped<IPromotionRepository, PromotionRepository>();
 builder.Services.AddScoped<ICouponRepository, CouponRepository>();
 builder.Services.AddScoped<ISaleInvoiceRepository, SaleInvoiceRepository>();
 
-builder.Services.AddScoped<IShiftScheduleRepository, ShiftScheduleRepository>();
+builder.Services.AddScoped<IShiftTemplateRepository, ShiftTemplateRepository>();
 builder.Services.AddScoped<IShiftAssignmentRepository, ShiftAssignmentRepository>();
 builder.Services.AddScoped<IAttendanceRepository, AttendanceRepository>();
 builder.Services.AddScoped<ILoginActivityRepository, LoginActivityRepository>();
