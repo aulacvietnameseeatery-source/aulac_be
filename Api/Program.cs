@@ -120,7 +120,10 @@ var connectionString = builder.Configuration.GetConnectionString("Default")
 
 builder.Services.AddDbContext<RestaurantMgmtContext>(options =>
 {
-    options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString));
+    options.UseMySql(
+        connectionString,
+        new MySqlServerVersion(new Version(8, 0, 32))
+    );
 });
 
 #endregion
@@ -242,6 +245,7 @@ builder.Services.AddScoped<IPasswordGenerator, PasswordGeneratorService>();
 builder.Services.AddScoped<IUsernameGenerator, UsernameGeneratorService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IPublicReservationService, PublicReservationService>();
+builder.Services.AddScoped<IManualReservationService, ManualReservationService>();
 builder.Services.AddScoped<IRoleService, RoleService>();
 
 builder.Services.AddScoped<IAdminReservationService, AdminReservationService>();

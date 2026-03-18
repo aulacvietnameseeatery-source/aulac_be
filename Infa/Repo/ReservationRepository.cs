@@ -43,6 +43,7 @@ public class ReservationRepository : IReservationRepository
         int durationMinutes,
         uint cancelledStatusId,
         uint noShowStatusId,
+        uint completedStatusId,
         CancellationToken ct = default)
     {
         // New reservation will occupy: [reservedTime, reservedTime + durationMinutes]
@@ -59,6 +60,7 @@ public class ReservationRepository : IReservationRepository
             .Where(r => r.Tables.Any(t => t.TableId == tableId))
             .Where(r => r.ReservationStatusLvId != cancelledStatusId)
             .Where(r => r.ReservationStatusLvId != noShowStatusId)
+            .Where(r => r.ReservationStatusLvId != completedStatusId)
             // Overlap check: existing reservation overlaps with new reservation window
             // Existing: [r.ReservedTime, r.ReservedTime + duration]
             // New: [reservedTime, reservedTime + duration]

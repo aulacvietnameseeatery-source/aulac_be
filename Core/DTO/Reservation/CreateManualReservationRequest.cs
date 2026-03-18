@@ -11,8 +11,9 @@ namespace Core.DTO.Reservation
     {
         public string? LockToken { get; set; }
 
-        [Required]
-        public long TableId { get; set; }
+        public long? TableId { get; set; }
+
+        public List<long>? TableIds { get; set; }
 
         [Required]
         [StringLength(150, MinimumLength = 2)]

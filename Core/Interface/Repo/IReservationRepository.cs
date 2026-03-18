@@ -39,6 +39,7 @@ public interface IReservationRepository
 		int durationMinutes,
 		uint cancelledStatusId,
 		uint noShowStatusId,
+        uint completedStatusId,
         CancellationToken ct = default);
 
     /// <summary>

@@ -9,11 +9,11 @@ namespace Api.Controllers
     [ApiController]
     public class ManualReservationController : ControllerBase
     {
-        private readonly IPublicReservationService _reservationService;
+        private readonly IManualReservationService _reservationService;
         private readonly ILogger<ManualReservationController> _logger;
 
         public ManualReservationController(
-            IPublicReservationService reservationService,
+            IManualReservationService reservationService,
             ILogger<ManualReservationController> logger)
         {
             _reservationService = reservationService;
@@ -29,7 +29,7 @@ namespace Api.Controllers
         /// <returns>List of available tables</returns>
         /// <response code="200">Returns list of available tables</response>
         [HttpGet("table/availability")]
-        [ProducesResponseType(typeof(ApiResponse<List<ManualTableAvailabilityDto>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<List<ManualTableOptionDto>>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetAvailability(
             [FromQuery] DateTime? reservedTime,
             [FromQuery] int? partySize,
@@ -42,7 +42,7 @@ namespace Api.Controllers
                 "Reserved Time {reservedTime}",
                 reservedTime);
 
-            return Ok(new ApiResponse<List<ManualTableAvailabilityDto>>
+            return Ok(new ApiResponse<List<ManualTableOptionDto>>
             {
                 Success = true,
                 Code = 200,
