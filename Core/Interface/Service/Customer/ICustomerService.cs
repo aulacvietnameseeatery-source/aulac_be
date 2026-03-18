@@ -22,5 +22,9 @@ namespace Core.Interface.Service.Customer
         Task<long> FindOrCreateCustomerIdAsync(string phone, string? fullName, string? email, CancellationToken ct = default);
 
         Task<long> ResolveCustomerAsync(OrderCustomerDto? customerDto, CancellationToken ct);
+
+        Task<CustomerDto> CreateCustomerAsync(CreateCustomerRequest request, CancellationToken ct = default);
+        Task<CustomerDto> UpdateCustomerAsync(long id, UpdateCustomerRequest request, CancellationToken ct = default);
+        Task DeleteCustomerAsync(long id, CancellationToken ct = default);
     }
 }

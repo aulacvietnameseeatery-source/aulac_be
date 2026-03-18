@@ -1,3 +1,4 @@
+using Core.DTO.General;
 using Core.DTO.Order;
 using Core.Exceptions;
 using Core.Interface.Repo;
@@ -50,5 +51,10 @@ public class SaleInvoiceService : ISaleInvoiceService
         invoice.TotalAmount = invoice.SubTotal - invoice.DiscountAmount;
 
         return invoice;
+    }
+
+    public async Task<PagedResultDTO<SaleInvoiceListDTO>> GetSaleInvoiceListAsync(SaleInvoiceListQueryDTO query, CancellationToken cancellationToken = default)
+    {
+        return await _saleInvoiceRepository.GetOrdersForInvoiceListAsync(query, cancellationToken);
     }
 }

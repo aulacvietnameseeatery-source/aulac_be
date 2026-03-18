@@ -352,4 +352,23 @@ public class TableRepository : ITableRepository
 
         return affected == 1;
     }
+
+    public async Task LockTablesForUpdateAsync(IEnumerable<long> tableIds, CancellationToken ct = default)
+    {
+        var ids = tableIds
+            .Where(id => id > 0)
+            .Distinct()
+            .ToList();
+
+        if (ids.Count == 0)
+        {
+            return;
+        }
+
+        var idsCsv = string.Join(",", ids);
+        var sql = $"SELECT table_id FROM restaurant_table WHERE table_id IN ({idsCsv}) FOR UPDATE";
+
+        // Materialize rows to ensure the lock query is executed in the active transaction.
+        await _context.Database.SqlQueryRaw<long>(sql).ToListAsync(ct);
+    }
 }

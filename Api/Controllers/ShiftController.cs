@@ -10,127 +10,121 @@ using System.Security.Claims;
 namespace API.Controllers;
 
 /// <summary>
-/// Manages shift schedules, staff assignments, attendance tracking, live board, and reports.
+/// Unified shift management: templates, assignments, attendance tracking, and reports.
 /// </summary>
 [ApiController]
 [Route("api/shifts")]
 [Authorize]
 public class ShiftController : ControllerBase
 {
-    private readonly IShiftScheduleService _scheduleService;
+    private readonly IShiftTemplateService _templateService;
     private readonly IShiftAssignmentService _assignmentService;
     private readonly IAttendanceService _attendanceService;
 
     public ShiftController(
-        IShiftScheduleService scheduleService,
-           IShiftAssignmentService assignmentService,
-       IAttendanceService attendanceService)
+        IShiftTemplateService templateService,
+        IShiftAssignmentService assignmentService,
+        IAttendanceService attendanceService)
     {
-        _scheduleService = scheduleService;
+        _templateService = templateService;
         _assignmentService = assignmentService;
         _attendanceService = attendanceService;
     }
 
     private long GetStaffId() =>
-  long.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)
-    ?? throw new UnauthorizedAccessException("Staff ID not found in token"));
+        long.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? throw new UnauthorizedAccessException("Staff ID not found in token"));
 
-    // 
-    //  SCHEDULES
-    // 
+    // ─────────────────────────────────────────────────────────────
+    //  TEMPLATES
+    // ─────────────────────────────────────────────────────────────
 
-    /// <summary>Lists shift schedules with filtering and paging.</summary>
-    [HttpGet("schedules")]
+    /// <summary>Lists all shift templates, optionally filtered by active status.</summary>
+    [HttpGet("templates")]
     [HasPermission(Permissions.ViewShift)]
-    [ProducesResponseType(typeof(ApiResponse<PagedResult<ShiftScheduleListDto>>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetSchedules([FromQuery] GetShiftScheduleRequest request, CancellationToken ct)
+    [ProducesResponseType(typeof(ApiResponse<List<ShiftTemplateListDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetTemplates([FromQuery] bool? isActive, CancellationToken ct)
     {
-        var (items, totalCount) = await _scheduleService.GetSchedulesAsync(request, ct);
-
-        var pageIndex = request.PageIndex > 0 ? request.PageIndex : 1;
-        var pageSize = request.PageSize > 0 ? request.PageSize : 20;
-
-        return Ok(new ApiResponse<PagedResult<ShiftScheduleListDto>>
+        var items = await _templateService.GetAllAsync(isActive, ct);
+        return Ok(new ApiResponse<List<ShiftTemplateListDto>>
         {
-            Success = true,
-            Code = 200,
-            UserMessage = "Shift schedules retrieved successfully.",
-            Data = new PagedResult<ShiftScheduleListDto>
-            {
-                PageData = items,
-                PageIndex = pageIndex,
-                PageSize = pageSize,
-                TotalCount = totalCount,
-                TotalPage = (int)Math.Ceiling((double)totalCount / pageSize)
-            },
-            ServerTime = DateTimeOffset.UtcNow
+            Success = true, Code = 200,
+            UserMessage = "Shift templates retrieved successfully.",
+            Data = items, ServerTime = DateTimeOffset.UtcNow
         });
     }
 
-    /// <summary>Gets full detail for a shift schedule including assignments and attendance.</summary>
-    [HttpGet("schedules/{id:long}")]
+    /// <summary>Gets full detail for a single shift template.</summary>
+    [HttpGet("templates/{id:long}")]
     [HasPermission(Permissions.ViewShift)]
-    [ProducesResponseType(typeof(ApiResponse<ShiftScheduleDetailDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<ShiftTemplateDetailDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetSchedule(long id, CancellationToken ct)
+    public async Task<IActionResult> GetTemplate(long id, CancellationToken ct)
     {
-        var dto = await _scheduleService.GetScheduleByIdAsync(id, ct);
-        return Ok(new ApiResponse<ShiftScheduleDetailDto>
+        var dto = await _templateService.GetByIdAsync(id, ct);
+        return Ok(new ApiResponse<ShiftTemplateDetailDto>
         {
-            Success = true,
-            Code = 200,
-            UserMessage = "Shift schedule retrieved successfully.",
-            Data = dto,
-            ServerTime = DateTimeOffset.UtcNow
+            Success = true, Code = 200,
+            UserMessage = "Shift template retrieved successfully.",
+            Data = dto, ServerTime = DateTimeOffset.UtcNow
         });
     }
 
-    /// <summary>Creates a new shift schedule (initially DRAFT).</summary>
-    [HttpPost("schedules")]
-    [HasPermission(Permissions.ScheduleShift)]
-    [ProducesResponseType(typeof(ApiResponse<ShiftScheduleDetailDto>), StatusCodes.Status201Created)]
+    /// <summary>Creates a new shift template.</summary>
+    [HttpPost("templates")]
+    [HasPermission(Permissions.ManageShiftTemplate)]
+    [ProducesResponseType(typeof(ApiResponse<ShiftTemplateDetailDto>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> CreateSchedule([FromBody] CreateShiftScheduleRequest request, CancellationToken ct)
+    public async Task<IActionResult> CreateTemplate([FromBody] CreateShiftTemplateRequest request, CancellationToken ct)
     {
-        var dto = await _scheduleService.CreateScheduleAsync(request, GetStaffId(), ct);
-        return StatusCode(StatusCodes.Status201Created, new ApiResponse<ShiftScheduleDetailDto>
+        var dto = await _templateService.CreateAsync(request, GetStaffId(), ct);
+        return StatusCode(StatusCodes.Status201Created, new ApiResponse<ShiftTemplateDetailDto>
         {
-            Success = true,
-            Code = 201,
-            UserMessage = "Shift schedule created successfully.",
-            Data = dto,
-            ServerTime = DateTimeOffset.UtcNow
+            Success = true, Code = 201,
+            UserMessage = "Shift template created successfully.",
+            Data = dto, ServerTime = DateTimeOffset.UtcNow
         });
     }
 
-    /// <summary>Updates a shift schedule (times, status, or notes).</summary>
-    [HttpPut("schedules/{id:long}")]
-    [HasPermission(Permissions.ScheduleShift)]
-    [ProducesResponseType(typeof(ApiResponse<ShiftScheduleDetailDto>), StatusCodes.Status200OK)]
+    /// <summary>Updates an existing shift template.</summary>
+    [HttpPut("templates/{id:long}")]
+    [HasPermission(Permissions.ManageShiftTemplate)]
+    [ProducesResponseType(typeof(ApiResponse<ShiftTemplateDetailDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> UpdateSchedule(long id, [FromBody] UpdateShiftScheduleRequest request, CancellationToken ct)
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> UpdateTemplate(long id, [FromBody] UpdateShiftTemplateRequest request, CancellationToken ct)
     {
-        var dto = await _scheduleService.UpdateScheduleAsync(id, request, GetStaffId(), ct);
-        return Ok(new ApiResponse<ShiftScheduleDetailDto>
+        var dto = await _templateService.UpdateAsync(id, request, GetStaffId(), ct);
+        return Ok(new ApiResponse<ShiftTemplateDetailDto>
         {
-            Success = true,
-            Code = 200,
-            UserMessage = "Shift schedule updated successfully.",
-            Data = dto,
-            ServerTime = DateTimeOffset.UtcNow
+            Success = true, Code = 200,
+            UserMessage = "Shift template updated successfully.",
+            Data = dto, ServerTime = DateTimeOffset.UtcNow
         });
     }
 
-    // 
+    /// <summary>Deactivates a shift template. Fails if active assignments exist.</summary>
+    [HttpDelete("templates/{id:long}")]
+    [HasPermission(Permissions.ManageShiftTemplate)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> DeactivateTemplate(long id, CancellationToken ct)
+    {
+        await _templateService.DeactivateAsync(id, ct);
+        return NoContent();
+    }
+
+    // ─────────────────────────────────────────────────────────────
     //  ASSIGNMENTS
-    // 
+    // ─────────────────────────────────────────────────────────────
 
     /// <summary>Lists shift assignments with filtering and paging.</summary>
     [HttpGet("assignments")]
     [HasPermission(Permissions.ViewShift)]
-    [ProducesResponseType(typeof(ApiResponse<PagedResult<ShiftAssignmentDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<PagedResult<ShiftAssignmentListDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAssignments([FromQuery] GetShiftAssignmentRequest request, CancellationToken ct)
     {
         var (items, totalCount) = await _assignmentService.GetAssignmentsAsync(request, ct);
@@ -138,12 +132,11 @@ public class ShiftController : ControllerBase
         var pageIndex = request.PageIndex > 0 ? request.PageIndex : 1;
         var pageSize = request.PageSize > 0 ? request.PageSize : 20;
 
-        return Ok(new ApiResponse<PagedResult<ShiftAssignmentDto>>
+        return Ok(new ApiResponse<PagedResult<ShiftAssignmentListDto>>
         {
-            Success = true,
-            Code = 200,
+            Success = true, Code = 200,
             UserMessage = "Shift assignments retrieved successfully.",
-            Data = new PagedResult<ShiftAssignmentDto>
+            Data = new PagedResult<ShiftAssignmentListDto>
             {
                 PageData = items,
                 PageIndex = pageIndex,
@@ -155,26 +148,57 @@ public class ShiftController : ControllerBase
         });
     }
 
-    /// <summary>Creates one or many staff assignments for a shift schedule.</summary>
-    [HttpPost("assignments")]
-    [HasPermission(Permissions.AssignShift)]
-    [ProducesResponseType(typeof(ApiResponse<List<ShiftAssignmentDto>>), StatusCodes.Status201Created)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> CreateAssignments([FromBody] CreateShiftAssignmentRequest request, CancellationToken ct)
+    /// <summary>Gets full detail for a single shift assignment including attendance.</summary>
+    [HttpGet("assignments/{id:long}")]
+    [HasPermission(Permissions.ViewShift)]
+    [ProducesResponseType(typeof(ApiResponse<ShiftAssignmentDetailDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetAssignment(long id, CancellationToken ct)
     {
-        var dtos = await _assignmentService.CreateAssignmentsAsync(request, GetStaffId(), ct);
-        return StatusCode(StatusCodes.Status201Created, new ApiResponse<List<ShiftAssignmentDto>>
+        var dto = await _assignmentService.GetByIdAsync(id, ct);
+        return Ok(new ApiResponse<ShiftAssignmentDetailDto>
         {
-            Success = true,
-            Code = 201,
-            UserMessage = $"{dtos.Count} assignment(s) created successfully.",
-            Data = dtos,
-            ServerTime = DateTimeOffset.UtcNow
+            Success = true, Code = 200,
+            UserMessage = "Shift assignment retrieved successfully.",
+            Data = dto, ServerTime = DateTimeOffset.UtcNow
         });
     }
 
-    /// <summary>Soft-cancels an assignment if attendance hasn't started.</summary>
+    /// <summary>Assigns a staff member to a shift template on a specific date.</summary>
+    [HttpPost("assignments")]
+    [HasPermission(Permissions.AssignShift)]
+    [ProducesResponseType(typeof(ApiResponse<ShiftAssignmentDetailDto>), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> CreateAssignment([FromBody] CreateShiftAssignmentRequest request, CancellationToken ct)
+    {
+        var dto = await _assignmentService.CreateAssignmentAsync(request, GetStaffId(), ct);
+        return StatusCode(StatusCodes.Status201Created, new ApiResponse<ShiftAssignmentDetailDto>
+        {
+            Success = true, Code = 201,
+            UserMessage = "Shift assignment created successfully.",
+            Data = dto, ServerTime = DateTimeOffset.UtcNow
+        });
+    }
+
+    /// <summary>Updates planned times or notes on an assignment.</summary>
+    [HttpPut("assignments/{id:long}")]
+    [HasPermission(Permissions.AssignShift)]
+    [ProducesResponseType(typeof(ApiResponse<ShiftAssignmentDetailDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateAssignment(long id, [FromBody] UpdateShiftAssignmentRequest request, CancellationToken ct)
+    {
+        var dto = await _assignmentService.UpdateAssignmentAsync(id, request, GetStaffId(), ct);
+        return Ok(new ApiResponse<ShiftAssignmentDetailDto>
+        {
+            Success = true, Code = 200,
+            UserMessage = "Shift assignment updated successfully.",
+            Data = dto, ServerTime = DateTimeOffset.UtcNow
+        });
+    }
+
+    /// <summary>Cancels an assignment. Fails if staff has already checked in.</summary>
     [HttpDelete("assignments/{id:long}")]
     [HasPermission(Permissions.AssignShift)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
@@ -186,9 +210,41 @@ public class ShiftController : ControllerBase
         return NoContent();
     }
 
-    // 
+    // ─────────────────────────────────────────────────────────────
+    //  MY SHIFTS (staff-only view)
+    // ─────────────────────────────────────────────────────────────
+
+    /// <summary>Returns shifts assigned to the currently authenticated staff member with attendance details.</summary>
+    [HttpGet("my-shifts")]
+    [HasPermission(Permissions.ViewOwnShift)]
+    [ProducesResponseType(typeof(ApiResponse<PagedResult<ShiftAssignmentDetailDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetMyShifts([FromQuery] GetShiftAssignmentRequest request, CancellationToken ct)
+    {
+        var staffId = GetStaffId();
+        var (items, totalCount) = await _assignmentService.GetMyShiftsAsync(staffId, request, ct);
+
+        var pageIndex = request.PageIndex > 0 ? request.PageIndex : 1;
+        var pageSize = request.PageSize > 0 ? request.PageSize : 20;
+
+        return Ok(new ApiResponse<PagedResult<ShiftAssignmentDetailDto>>
+        {
+            Success = true, Code = 200,
+            UserMessage = "Your shifts retrieved successfully.",
+            Data = new PagedResult<ShiftAssignmentDetailDto>
+            {
+                PageData = items,
+                PageIndex = pageIndex,
+                PageSize = pageSize,
+                TotalCount = totalCount,
+                TotalPage = (int)Math.Ceiling((double)totalCount / pageSize)
+            },
+            ServerTime = DateTimeOffset.UtcNow
+        });
+    }
+
+    // ─────────────────────────────────────────────────────────────
     //  ATTENDANCE
-    // 
+    // ─────────────────────────────────────────────────────────────
 
     /// <summary>Staff check-in for an assigned shift.</summary>
     [HttpPost("assignments/{id:long}/check-in")]
@@ -201,11 +257,9 @@ public class ShiftController : ControllerBase
         var dto = await _attendanceService.CheckInAsync(id, ct);
         return Ok(new ApiResponse<AttendanceRecordDto>
         {
-            Success = true,
-            Code = 200,
+            Success = true, Code = 200,
             UserMessage = "Checked in successfully.",
-            Data = dto,
-            ServerTime = DateTimeOffset.UtcNow
+            Data = dto, ServerTime = DateTimeOffset.UtcNow
         });
     }
 
@@ -220,11 +274,9 @@ public class ShiftController : ControllerBase
         var dto = await _attendanceService.CheckOutAsync(id, ct);
         return Ok(new ApiResponse<AttendanceRecordDto>
         {
-            Success = true,
-            Code = 200,
+            Success = true, Code = 200,
             UserMessage = "Checked out successfully.",
-            Data = dto,
-            ServerTime = DateTimeOffset.UtcNow
+            Data = dto, ServerTime = DateTimeOffset.UtcNow
         });
     }
 
@@ -239,43 +291,36 @@ public class ShiftController : ControllerBase
         var dto = await _attendanceService.AdjustAttendanceAsync(id, request, GetStaffId(), ct);
         return Ok(new ApiResponse<AttendanceRecordDto>
         {
-            Success = true,
-            Code = 200,
+            Success = true, Code = 200,
             UserMessage = "Attendance adjusted successfully.",
-            Data = dto,
-            ServerTime = DateTimeOffset.UtcNow
+            Data = dto, ServerTime = DateTimeOffset.UtcNow
         });
     }
 
-    // 
-    //  LIVE BOARD
-    // 
-
-    /// <summary>Returns the live on-duty board for the current (or specified) business date.</summary>
-    [HttpGet("live")]
-    [HasPermission(Permissions.ViewShift)]
-    [ProducesResponseType(typeof(ApiResponse<LiveShiftBoardDto>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetLiveBoard([FromQuery] DateOnly? businessDate, CancellationToken ct)
-    {
-        var dto = await _attendanceService.GetLiveBoardAsync(businessDate, ct);
-        return Ok(new ApiResponse<LiveShiftBoardDto>
-        {
-            Success = true,
-            Code = 200,
-            UserMessage = "Live board data retrieved successfully.",
-            Data = dto,
-            ServerTime = DateTimeOffset.UtcNow
-        });
-    }
-
-    // 
+    // ─────────────────────────────────────────────────────────────
     //  REPORTS
-    // 
+    // ─────────────────────────────────────────────────────────────
+
+    /// <summary>Top-level KPI snapshot for the reports dashboard.</summary>
+    [HttpGet("reports/snapshot")]
+    [HasPermission(Permissions.ViewShiftReport)]
+    [ProducesResponseType(typeof(ApiResponse<ShiftReportSnapshotDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetReportSnapshot(
+        [FromQuery] DateOnly fromDate, [FromQuery] DateOnly toDate, CancellationToken ct)
+    {
+        var dto = await _attendanceService.GetReportSnapshotAsync(fromDate, toDate, ct);
+        return Ok(new ApiResponse<ShiftReportSnapshotDto>
+        {
+            Success = true, Code = 200,
+            UserMessage = "Report snapshot retrieved successfully.",
+            Data = dto, ServerTime = DateTimeOffset.UtcNow
+        });
+    }
 
     /// <summary>Attendance report with paging and filters.</summary>
     [HttpGet("reports/attendance")]
     [HasPermission(Permissions.ViewShiftReport)]
-    [ProducesResponseType(typeof(ApiResponse<PagedResult<ShiftAssignmentDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<PagedResult<AttendanceReportRowDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAttendanceReport([FromQuery] AttendanceReportRequest request, CancellationToken ct)
     {
         var (items, totalCount) = await _attendanceService.GetAttendanceReportAsync(request, ct);
@@ -283,12 +328,11 @@ public class ShiftController : ControllerBase
         var pageIndex = request.PageIndex > 0 ? request.PageIndex : 1;
         var pageSize = request.PageSize > 0 ? request.PageSize : 20;
 
-        return Ok(new ApiResponse<PagedResult<ShiftAssignmentDto>>
+        return Ok(new ApiResponse<PagedResult<AttendanceReportRowDto>>
         {
-            Success = true,
-            Code = 200,
+            Success = true, Code = 200,
             UserMessage = "Attendance report retrieved successfully.",
-            Data = new PagedResult<ShiftAssignmentDto>
+            Data = new PagedResult<AttendanceReportRowDto>
             {
                 PageData = items,
                 PageIndex = pageIndex,
@@ -300,26 +344,24 @@ public class ShiftController : ControllerBase
         });
     }
 
-    /// <summary>Worked-hours report: scheduled vs actual.</summary>
+    /// <summary>Worked-hours report: scheduled vs actual per staff.</summary>
     [HttpGet("reports/worked-hours")]
     [HasPermission(Permissions.ViewShiftReport)]
     [ProducesResponseType(typeof(ApiResponse<List<WorkedHoursReportRowDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetWorkedHoursReport(
         [FromQuery] DateOnly fromDate, [FromQuery] DateOnly toDate,
-      [FromQuery] long? staffId, CancellationToken ct)
+        [FromQuery] long? staffId, CancellationToken ct)
     {
         var data = await _attendanceService.GetWorkedHoursReportAsync(fromDate, toDate, staffId, ct);
         return Ok(new ApiResponse<List<WorkedHoursReportRowDto>>
         {
-            Success = true,
-            Code = 200,
+            Success = true, Code = 200,
             UserMessage = "Worked-hours report retrieved successfully.",
-            Data = data,
-            ServerTime = DateTimeOffset.UtcNow
+            Data = data, ServerTime = DateTimeOffset.UtcNow
         });
     }
 
-    /// <summary>Exceptions report: late, absent, early leave, manual adjustments.</summary>
+    /// <summary>Exceptions report: late arrivals, absences, early departures, manual adjustments.</summary>
     [HttpGet("reports/exceptions")]
     [HasPermission(Permissions.ViewShiftReport)]
     [ProducesResponseType(typeof(ApiResponse<List<AttendanceExceptionReportRowDto>>), StatusCodes.Status200OK)]
@@ -330,11 +372,9 @@ public class ShiftController : ControllerBase
         var data = await _attendanceService.GetExceptionsReportAsync(fromDate, toDate, staffId, ct);
         return Ok(new ApiResponse<List<AttendanceExceptionReportRowDto>>
         {
-            Success = true,
-            Code = 200,
+            Success = true, Code = 200,
             UserMessage = "Exceptions report retrieved successfully.",
-            Data = data,
-            ServerTime = DateTimeOffset.UtcNow
+            Data = data, ServerTime = DateTimeOffset.UtcNow
         });
     }
 }

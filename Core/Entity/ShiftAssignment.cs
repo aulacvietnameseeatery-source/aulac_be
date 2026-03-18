@@ -7,33 +7,39 @@ public partial class ShiftAssignment
 {
     public long ShiftAssignmentId { get; set; }
 
-    /// <summary>FK ? shift_schedule.</summary>
-    public long ShiftScheduleId { get; set; }
+    /// <summary>FK → shift_template.</summary>
+    public long ShiftTemplateId { get; set; }
 
-    /// <summary>FK ? staff_account.account_id.</summary>
+    /// <summary>FK → staff_account.account_id.</summary>
     public long StaffId { get; set; }
 
-    /// <summary>Snapshot of assigned role at time of scheduling.</summary>
-    public long RoleId { get; set; }
+    /// <summary>The date this shift occurs on.</summary>
+    public DateOnly WorkDate { get; set; }
 
-    /// <summary>FK ? lookup_value (SHIFT_ASSIGNMENT_STATUS): ASSIGNED, CONFIRMED, CANCELLED.</summary>
-    public uint AssignmentStatusLvId { get; set; }
+    /// <summary>Planned shift start (copied from template defaults, can be overridden).</summary>
+    public DateTime PlannedStartAt { get; set; }
+
+    /// <summary>Planned shift end (copied from template defaults, can be overridden).</summary>
+    public DateTime PlannedEndAt { get; set; }
+
+    /// <summary>False when assignment is cancelled.</summary>
+    public bool IsActive { get; set; } = true;
+
+    public string? Notes { get; set; }
 
     public long AssignedBy { get; set; }
 
     public DateTime AssignedAt { get; set; }
 
-    public string? Remarks { get; set; }
+    public DateTime CreatedAt { get; set; }
 
-    // Navigation 
+    public DateTime UpdatedAt { get; set; }
 
-    public virtual ShiftSchedule ShiftSchedule { get; set; } = null!;
+    // Navigation
+
+    public virtual ShiftTemplate ShiftTemplate { get; set; } = null!;
 
     public virtual StaffAccount Staff { get; set; } = null!;
-
-    public virtual Role Role { get; set; } = null!;
-
-    public virtual LookupValue AssignmentStatusLv { get; set; } = null!;
 
     public virtual StaffAccount AssignedByStaff { get; set; } = null!;
 

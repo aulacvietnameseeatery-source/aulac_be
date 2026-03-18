@@ -3,7 +3,7 @@ using Core.Attribute;
 using Core.Data;
 using Core.DTO.General; // Chứa ApiResponse, PagedResult
 using Core.DTO.Reservation;
-using Core.Interface.Service.Entity;
+using Core.Interface.Service.Reservation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

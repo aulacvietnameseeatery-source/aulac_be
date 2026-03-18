@@ -36,6 +36,7 @@ public class OrderService : IOrderService
         _uow = uow;
     }
     private const long GuestCustomerId = 68; // ID representing a visitor
+
     public Task<PagedResultDTO<OrderHistoryDTO>> GetOrderHistoryAsync(OrderHistoryQueryDTO query, CancellationToken cancellationToken = default)
 		=> _orderRepository.GetOrderHistoryAsync(query, cancellationToken);
 

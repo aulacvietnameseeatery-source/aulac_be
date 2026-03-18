@@ -1,4 +1,4 @@
-﻿using Api.Background;
+using Api.Background;
 using Api.Hubs;
 using Api.Middleware;
 using Api.SignalR;
@@ -38,6 +38,7 @@ using System.Reflection;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Core.Interface.Service.Reservation;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -120,7 +121,10 @@ var connectionString = builder.Configuration.GetConnectionString("Default")
 
 builder.Services.AddDbContext<RestaurantMgmtContext>(options =>
 {
-    options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString));
+    options.UseMySql(
+        connectionString,
+        new MySqlServerVersion(new Version(8, 0, 32))
+    );
 });
 
 #endregion
@@ -259,7 +263,7 @@ builder.Services.AddScoped<ITableService, TableService>();
 builder.Services.AddScoped<IPromotionService, PromotionService>();
 builder.Services.AddScoped<ICouponService, CouponService>();
 
-builder.Services.AddScoped<IShiftScheduleService, ShiftScheduleService>();
+builder.Services.AddScoped<IShiftTemplateService, ShiftTemplateService>();
 builder.Services.AddScoped<IShiftAssignmentService, ShiftAssignmentService>();
 builder.Services.AddScoped<IAttendanceService, AttendanceService>();
 
@@ -298,7 +302,7 @@ builder.Services.AddScoped<IPromotionRepository, PromotionRepository>();
 builder.Services.AddScoped<ICouponRepository, CouponRepository>();
 builder.Services.AddScoped<ISaleInvoiceRepository, SaleInvoiceRepository>();
 
-builder.Services.AddScoped<IShiftScheduleRepository, ShiftScheduleRepository>();
+builder.Services.AddScoped<IShiftTemplateRepository, ShiftTemplateRepository>();
 builder.Services.AddScoped<IShiftAssignmentRepository, ShiftAssignmentRepository>();
 builder.Services.AddScoped<IAttendanceRepository, AttendanceRepository>();
 builder.Services.AddScoped<ILoginActivityRepository, LoginActivityRepository>();
