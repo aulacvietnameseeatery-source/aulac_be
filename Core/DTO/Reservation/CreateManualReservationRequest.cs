@@ -11,6 +11,8 @@ namespace Core.DTO.Reservation
     {
         public string? LockToken { get; set; }
 
+        public long? CustomerId { get; set; }
+
         public long? TableId { get; set; }
 
         public List<long>? TableIds { get; set; }

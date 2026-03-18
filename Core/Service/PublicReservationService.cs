@@ -5,6 +5,7 @@ using Core.Extensions;
 using Core.Interface.Repo;
 using Core.Interface.Service.Customer;
 using Core.Interface.Service.Entity;
+using Core.Interface.Service.Reservation;
 using Core.Service.Utils;
 using Microsoft.Extensions.Logging;
 using System;
@@ -181,11 +182,25 @@ public class PublicReservationService : IPublicReservationService
                 (ushort)Core.Enum.LookupType.ReservationSource,
                 ct);
             var pendingStatusId = await ReservationStatusCode.PENDING.ToReservationStatusIdAsync(_lookupResolver, ct);
-            var customerId = await _customerService.FindOrCreateCustomerIdAsync(
-                request.Phone,
-                request.CustomerName,
-                request.Email,
-                ct);
+
+            long customerId;
+            if (request.CustomerId.HasValue && request.CustomerId.Value > 0)
+            {
+                var existingCustomer = await _customerService.GetByIdAsync(request.CustomerId.Value, ct);
+                if (existingCustomer != null)
+                {
+                    customerId = request.CustomerId.Value;
+                }
+                else
+                {
+                    customerId = await _customerService.FindOrCreateCustomerIdAsync(request.Phone, request.CustomerName, request.Email, ct);
+                }
+            }
+            else
+            {
+                customerId = await _customerService.FindOrCreateCustomerIdAsync(request.Phone, request.CustomerName, request.Email, ct);
+            }
+
 
             var selectedTables = new List<RestaurantTable>();
             foreach (var candidate in candidates)

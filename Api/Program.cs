@@ -38,6 +38,7 @@ using System.Reflection;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Core.Interface.Service.Reservation;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -245,7 +246,6 @@ builder.Services.AddScoped<IPasswordGenerator, PasswordGeneratorService>();
 builder.Services.AddScoped<IUsernameGenerator, UsernameGeneratorService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IPublicReservationService, PublicReservationService>();
-builder.Services.AddScoped<IManualReservationService, ManualReservationService>();
 builder.Services.AddScoped<IRoleService, RoleService>();
 
 builder.Services.AddScoped<IAdminReservationService, AdminReservationService>();
