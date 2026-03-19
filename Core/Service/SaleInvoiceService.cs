@@ -35,6 +35,7 @@ public class SaleInvoiceService : ISaleInvoiceService
             CustomerName = order.Customer?.FullName ?? "",
             CustomerPhone = order.Customer?.Phone ?? "",
             IsPaid = order.Payments.Any(),
+            PaymentMethod = order.Payments.Any() ? (order.Payments.FirstOrDefault()?.MethodLv?.ValueName ?? "-") : "-",
             Items = order.OrderItems.Select(oi => new SaleInvoiceItemDTO
             {
                 OrderItemId = oi.OrderItemId,
@@ -48,7 +49,8 @@ public class SaleInvoiceService : ISaleInvoiceService
 
         invoice.SubTotal = invoice.Items.Sum(i => i.Amount);
         invoice.DiscountAmount = promotions;
-        invoice.TotalAmount = invoice.SubTotal - invoice.DiscountAmount;
+        invoice.TipAmount = order.TipAmount ?? 0;
+        invoice.TotalAmount = invoice.SubTotal - invoice.DiscountAmount + invoice.TipAmount;
 
         return invoice;
     }
