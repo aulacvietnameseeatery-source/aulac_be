@@ -70,6 +70,7 @@ public interface IDishService
         CreateDishRequest request,
         IReadOnlyList<IFormFile> staticImages,
         IReadOnlyList<IFormFile> images360,
+        IFormFile? video,
         CancellationToken ct
     );
 
@@ -96,6 +97,7 @@ public interface IDishService
         UpdateDishRequest request,
         IReadOnlyList<IFormFile> staticImages,
         IReadOnlyList<IFormFile> images360,
+        IFormFile? video,
         IReadOnlyList<long> removedMediaIds,
         CancellationToken ct
     );

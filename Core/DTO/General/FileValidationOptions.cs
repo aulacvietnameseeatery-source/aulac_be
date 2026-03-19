@@ -30,6 +30,8 @@ public class FileValidationOptions
     /// </summary>
     public HashSet<string>? AllowedExtensions { get; init; }
 
+    public int? MaxVideoDurationSeconds { get; init; }
+
     // ?? Predefined presets ??????????????????????????????????????????????
 
     /// <summary>
@@ -43,8 +45,17 @@ public class FileValidationOptions
         AllowedExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp"]
     };
 
+    public static readonly FileValidationOptions DishVideo = new()
+    {
+        MaxFileSizeBytes = 20 * 1024 * 1024,
+        MaxFileCount = 1,
+        AllowedMimeTypes = ["video/mp4"],
+        AllowedExtensions = [".mp4"],
+        MaxVideoDurationSeconds = 15
+    };
+
     /// <summary>
- /// Relaxed preset: uses global defaults for everything.
+    /// Relaxed preset: uses global defaults for everything.
     /// </summary>
- public static readonly FileValidationOptions Default = new();
+    public static readonly FileValidationOptions Default = new();
 }

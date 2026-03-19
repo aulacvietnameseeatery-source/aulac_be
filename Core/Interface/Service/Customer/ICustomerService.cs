@@ -23,6 +23,12 @@ namespace Core.Interface.Service.Customer
 
         Task<long> ResolveCustomerAsync(OrderCustomerDto? customerDto, CancellationToken ct);
 
+        Task<CustomerDetailDTO?> GetCustomerDetailAsync(long customerId, CancellationToken ct);
+
+        Task<PagedResultDTO<CustomerOrderDTO>> GetCustomerOrdersAsync(CustomerOrderQueryDTO query, CancellationToken ct);
+
+        Task<CustomerOrderDetailDTO?> GetCustomerOrderDetailAsync(long customerId, long orderId, CancellationToken ct);
+
         Task<CustomerDto> CreateCustomerAsync(CreateCustomerRequest request, CancellationToken ct = default);
         Task<CustomerDto> UpdateCustomerAsync(long id, UpdateCustomerRequest request, CancellationToken ct = default);
         Task DeleteCustomerAsync(long id, CancellationToken ct = default);
