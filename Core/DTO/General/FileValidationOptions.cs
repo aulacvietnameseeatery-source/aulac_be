@@ -54,6 +54,15 @@ public class FileValidationOptions
         MaxVideoDurationSeconds = 15
     };
 
+    public static readonly FileValidationOptions StoreVideo = new()
+    {
+        MaxFileSizeBytes = 100 * 1024 * 1024,
+        MaxFileCount = 1,
+        AllowedMimeTypes = ["video/mp4", "video/webm", "video/ogg"],
+        AllowedExtensions = [".mp4", ".webm", ".ogv"],
+        MaxVideoDurationSeconds = 600 // 10 minutes
+    };
+
     /// <summary>
     /// Relaxed preset: uses global defaults for everything.
     /// </summary>
