@@ -28,9 +28,11 @@ namespace Core.DTO.Order
         // Pricing Info
         public decimal SubTotal { get; set; }
         public decimal DiscountAmount { get; set; }
-        public decimal TotalAmount { get; set; } // Total = SubTotal - DiscountAmount
+        public decimal TipAmount { get; set; }
+        public decimal TotalAmount { get; set; } // Total = SubTotal - DiscountAmount + TipAmount
 
         public bool IsPaid { get; set; }
+        public string PaymentMethod { get; set; } = string.Empty;
 
         public List<SaleInvoiceItemDTO> Items { get; set; } = new();
     }

@@ -26,6 +26,7 @@ public class SaleInvoiceRepository : ISaleInvoiceRepository
             .Include(o => o.Staff)
             .Include(o => o.Customer)
             .Include(o => o.Payments)
+                .ThenInclude(p => p.MethodLv)
             .Include(o => o.OrderItems)
                 .ThenInclude(oi => oi.Dish)
             .FirstOrDefaultAsync(o => o.OrderId == orderId, cancellationToken);
@@ -85,6 +86,12 @@ public class SaleInvoiceRepository : ISaleInvoiceRepository
         if (query.ToDate.HasValue)
         {
             queryable = queryable.Where(o => o.CreatedAt <= query.ToDate.Value);
+        }
+
+        // Filter by Order Status Code if provided
+        if (!string.IsNullOrWhiteSpace(query.OrderStatusCode))
+        {
+            queryable = queryable.Where(o => o.OrderStatusLv != null && o.OrderStatusLv.ValueCode == query.OrderStatusCode);
         }
 
         // Get total count after filters
