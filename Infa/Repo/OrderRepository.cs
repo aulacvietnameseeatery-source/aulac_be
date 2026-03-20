@@ -481,10 +481,21 @@ public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, Can
     }
 
     public async Task<List<RecentOrderDTO>> GetRecentOrdersAsync(
-    int limit,
-    CancellationToken ct)
+		long userId,
+		List<string> roles,
+		int limit,
+		CancellationToken ct)
     {
-        return await _context.Orders
+        var query = _context.Orders.AsQueryable();
+
+        var isAdmin = roles.Any(r => r == "ADMIN");
+
+        if (!isAdmin)
+        {
+            query = query.Where(o => o.StaffId == null || o.StaffId == userId);
+        }
+
+        return await query
             .OrderByDescending(o => o.CreatedAt)
             .Take(limit)
             .Select(o => new RecentOrderDTO
