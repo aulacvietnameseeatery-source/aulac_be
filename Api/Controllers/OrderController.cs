@@ -515,7 +515,13 @@ namespace Api.Controllers
 			[FromQuery] int limit = 20,
 			CancellationToken ct = default)
         {
-            var result = await _orderService.GetRecentOrdersAsync(limit, ct);
+            var userId = long.Parse(User.FindFirst("user_id")!.Value);
+
+            var roles = User.FindAll(ClaimTypes.Role)
+                .Select(r => r.Value)
+                .ToList();
+
+            var result = await _orderService.GetRecentOrdersAsync(userId, roles, limit, ct);
 
             return Ok(new ApiResponse<List<RecentOrderDTO>>
             {

@@ -7,6 +7,7 @@ using Core.Extensions;
 using Core.Interface.Repo;
 using Core.Interface.Service.Customer;
 using Core.Interface.Service.Entity;
+using Core.Interface.Service.Others;
 using LookupTypeEnum = Core.Enum.LookupType;
 
 namespace Core.Service;
@@ -19,6 +20,7 @@ public class OrderService : IOrderService
     private readonly IDishRepository _dishRepository;
     private readonly ICustomerService _customerService;
     private readonly IUnitOfWork _uow;
+    private readonly IOrderRealtimeService _realtime;
 
     public OrderService(
         IOrderRepository orderRepository,
@@ -26,7 +28,8 @@ public class OrderService : IOrderService
         ILookupResolver lookupResolver,
         IDishRepository dishRepository,
         ICustomerService customerService,
-        IUnitOfWork uow)
+        IUnitOfWork uow,
+        IOrderRealtimeService realtime)
     {
         _orderRepository = orderRepository;
         _tableRepository = tableRepository;
@@ -34,6 +37,7 @@ public class OrderService : IOrderService
         _lookupResolver = lookupResolver;
         _customerService = customerService;
         _uow = uow;
+        _realtime = realtime;
     }
     private const long GuestCustomerId = 68; // ID representing a visitor
 
@@ -149,6 +153,14 @@ public class OrderService : IOrderService
 
             await _uow.SaveChangesAsync(cancellationToken);
             await _uow.CommitAsync(cancellationToken);
+
+            await _realtime.OrderUpdatedAsync(new OrderRealtimeDTO
+            {
+                OrderId = orderId,
+                Status = newStatus.ToString(),
+                TableId = order.TableId,
+                UpdatedAt = DateTime.UtcNow
+            });
         }
         catch
         {
@@ -184,7 +196,15 @@ public class OrderService : IOrderService
 			cancelledOrderId,
 			availableTableId,
 			cancellationToken);
-	}
+
+        await _realtime.OrderItemUpdatedAsync(new OrderItemRealtimeDTO
+        {
+            OrderItemId = orderItemId,
+            OrderId = 0,
+            Status = newStatusLvId.ToString(),
+            UpdatedAt = DateTime.UtcNow
+        });
+    }
 
 	public async Task CancelOrderItemAsync(long orderItemId, CancellationToken cancellationToken = default)
 	{
@@ -314,6 +334,14 @@ public class OrderService : IOrderService
 
             await _uow.CommitAsync(ct);
 
+            await _realtime.OrderCreatedAsync(new OrderRealtimeDTO
+            {
+                OrderId = order.OrderId,
+                Status = OrderStatusCode.PENDING.ToString(),
+                TableId = order.TableId,
+                UpdatedAt = DateTime.UtcNow
+            });
+
             return order.OrderId;
         }
         catch
@@ -432,6 +460,14 @@ public class OrderService : IOrderService
             await _uow.SaveChangesAsync(ct);
 
             await _uow.CommitAsync(ct);
+
+            await _realtime.OrderUpdatedAsync(new OrderRealtimeDTO
+            {
+                OrderId = orderId,
+                Status = "ITEMS_ADDED",
+                TableId = order.TableId,
+                UpdatedAt = DateTime.UtcNow
+            });
         }
         catch
         {
@@ -554,6 +590,14 @@ public class OrderService : IOrderService
             // Commit transaction
             await _uow.CommitAsync(cancellationToken);
 
+            await _realtime.OrderCreatedAsync(new OrderRealtimeDTO
+            {
+                OrderId = orderId,
+                Status = OrderStatusCode.PENDING.ToString(),
+                TableId = table.TableId,
+                UpdatedAt = DateTime.UtcNow
+            });
+
             return new CreateOrderResponseDTO
             {
                 OrderId = orderId,
@@ -573,13 +617,15 @@ public class OrderService : IOrderService
     }
 
     public async Task<List<RecentOrderDTO>> GetRecentOrdersAsync(
+        long userId,
+        List<string> roles,
         int limit,
         CancellationToken ct)
     {
         if (limit <= 0 || limit > 100)
             limit = 20;
 
-        return await _orderRepository.GetRecentOrdersAsync(limit, ct);
+        return await _orderRepository.GetRecentOrdersAsync(userId, roles, limit, ct);
     }
 }
 

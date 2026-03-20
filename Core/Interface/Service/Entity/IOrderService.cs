@@ -40,6 +40,6 @@ public interface IOrderService
     Task<OrderHistoryDTO> GetOrderByIdAsync(long orderId, CancellationToken cancellationToken = default);
     Task AddItemsAsync(long orderId, AddOrderItemsRequest request, CancellationToken ct);
 
-    Task<List<RecentOrderDTO>> GetRecentOrdersAsync(int limit, CancellationToken ct);
+    Task<List<RecentOrderDTO>> GetRecentOrdersAsync(long userId, List<string> roles, int limit, CancellationToken ct);
 
 }
