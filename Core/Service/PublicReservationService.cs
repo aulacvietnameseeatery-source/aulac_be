@@ -10,6 +10,9 @@ using Core.Service.Utils;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Text.RegularExpressions;
+using Core.Interface.Service.Email;
+using Core.DTO.Email;
+using Core.Interface.Service;
 
 namespace Core.Service;
 
@@ -26,9 +29,12 @@ public class PublicReservationService : IPublicReservationService
     private readonly IUnitOfWork _uow;
     private readonly ISystemSettingService _systemSettingService;
     private readonly ICustomerService _customerService;
+    private readonly IEmailTemplateService _emailTemplateService;
+    private readonly IEmailQueue _emailQueue;
 
     private const string SettingReservationDuration = "reservation.default_duration_minutes";
     private const string SettingImmediateWindow = "reservation.immediate_window_minutes";
+    private const string TemplateCodeReservationConfirmation = "RESERVATION_CONFIRM";
 
     public PublicReservationService(
         ITableRepository tableRepository,
@@ -37,7 +43,9 @@ public class PublicReservationService : IPublicReservationService
         ILookupResolver lookupResolver,
         IUnitOfWork uow,
         ISystemSettingService systemSettingService,
-        ICustomerService customerService)
+        ICustomerService customerService,
+        IEmailTemplateService emailTemplateService,
+        IEmailQueue emailQueue)
     {
         _tableRepository = tableRepository;
         _reservationRepository = reservationRepository;
@@ -46,6 +54,8 @@ public class PublicReservationService : IPublicReservationService
         _uow = uow;
         _systemSettingService = systemSettingService;
         _customerService = customerService;
+        _emailTemplateService = emailTemplateService;
+        _emailQueue = emailQueue;
     }
 
     public async Task<ReservationFitCheckResponse> CheckReservationFitAsync(
@@ -237,6 +247,13 @@ public class PublicReservationService : IPublicReservationService
             await _uow.CommitAsync(ct);
 
             var tableCodes = string.Join(", ", candidates.Select(x => x.TableCode));
+
+            // Send confirmation email asynchronously (background queue)
+            if (!string.IsNullOrWhiteSpace(created.Email))
+            {
+                _ = SendReservationConfirmationEmailAsync(created, tableCodes);
+            }
+
             var zones = candidates
                 .Select(x => x.Zone)
                 .Where(x => !string.IsNullOrWhiteSpace(x))
@@ -424,5 +441,39 @@ public class PublicReservationService : IPublicReservationService
         }
 
         return int.TryParse(match.Value, out var value) ? value : int.MaxValue;
+    }
+
+    private async Task SendReservationConfirmationEmailAsync(Reservation reservation, string tableCodes)
+    {
+        try
+        {
+            var template = await _emailTemplateService.GetByCodeAsync(TemplateCodeReservationConfirmation);
+            if (template == null)
+            {
+                _logger.LogWarning("Email template {TemplateCode} not found. Skipping email.", TemplateCodeReservationConfirmation);
+                return;
+            }
+
+            var body = template.BodyHtml
+                .Replace("{{CustomerName}}", reservation.CustomerName)
+                .Replace("{{ReservedTime}}", reservation.ReservedTime.ToString("dd/MM/yyyy HH:mm"))
+                .Replace("{{PartySize}}", reservation.PartySize.ToString())
+                .Replace("{{TableCode}}", tableCodes)
+                .Replace("{{ReservationId}}", reservation.ReservationId.ToString());
+
+            var queuedEmail = new QueuedEmail(
+                To: reservation.Email!,
+                Subject: template.Subject,
+                HtmlBody: body,
+                CorrelationId: $"Res-{reservation.ReservationId}"
+            );
+
+            await _emailQueue.EnqueueAsync(queuedEmail);
+            _logger.LogInformation("Enqueued confirmation email for reservation {ReservationId} to {Email}", reservation.ReservationId, reservation.Email);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error enqueuing confirmation email for reservation {ReservationId}", reservation.ReservationId);
+        }
     }
 }
