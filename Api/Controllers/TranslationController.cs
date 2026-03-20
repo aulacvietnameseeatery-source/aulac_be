@@ -1,6 +1,8 @@
-﻿using Core.DTO.Dish;
+using Core.DTO.Dish;
+using Core.DTO.SystemSetting;
 using Core.Interface.Service.Others;
 using Microsoft.AspNetCore.Mvc;
+using API.Models;
 
 namespace Api.Controllers
 {
@@ -19,14 +21,33 @@ namespace Api.Controllers
         public async Task<IActionResult> TranslateDish([FromBody] TranslateDishRequest request)
         {
             if (!new[] { "vi", "en", "fr" }.Contains(request.SourceLang))
-                return BadRequest("Unsupported language.");
+                return BadRequest(new ApiResponse<object> { Success = false, Code = 400, UserMessage = "Unsupported language." });
 
             var translations = await _translationService
                 .TranslateDishAsync(request.SourceLang, request.Data);
 
-            return Ok(new TranslateDishResponse
+            return Ok(new ApiResponse<TranslateDishResponse>
             {
-                Translations = translations
+                Success = true,
+                Code = 200,
+                Data = new TranslateDishResponse { Translations = translations }
+            });
+        }
+
+        [HttpPost("system-settings")]
+        public async Task<IActionResult> TranslateSystemSettings([FromBody] TranslateSystemSettingsRequest request)
+        {
+            if (!new[] { "vi", "en", "fr" }.Contains(request.SourceLang))
+                return BadRequest(new ApiResponse<object> { Success = false, Code = 400, UserMessage = "Unsupported language." });
+
+            var translations = await _translationService
+                .TranslateSystemSettingsAsync(request.SourceLang, request.Data);
+
+            return Ok(new ApiResponse<TranslateSystemSettingsResponse>
+            {
+                Success = true,
+                Code = 200,
+                Data = new TranslateSystemSettingsResponse { Translations = translations }
             });
         }
     }

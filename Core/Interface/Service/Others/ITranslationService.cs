@@ -1,4 +1,4 @@
-﻿using Core.DTO.Dish;
+using Core.DTO.Dish;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,5 +12,9 @@ namespace Core.Interface.Service.Others
         Task<Dictionary<string, DishI18nDto>> TranslateDishAsync(
             string sourceLang,
             DishI18nDto sourceData);
+
+        Task<Dictionary<string, Dictionary<string, string>>> TranslateSystemSettingsAsync(
+            string sourceLang,
+            Dictionary<string, string> sourceData);
     }
 }
