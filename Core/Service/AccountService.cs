@@ -29,7 +29,10 @@ public class AccountService : IAccountService
     private readonly ISystemSettingService _systemSettingService;
     private readonly ILookupResolver _lookupResolver;
     private readonly IEmailQueue _emailQueue;
+    private readonly IEmailTemplateService _emailTemplateService;
     private readonly ILogger<AccountService> _logger;
+
+    private const string TemplateCodeAccountCreated = "ACCOUNT_CREATED";
 
     public AccountService(
         IAccountRepository accountRepository,
@@ -40,6 +43,7 @@ public class AccountService : IAccountService
         ISystemSettingService systemSettingService,
         ILookupResolver lookupResolver,
         IEmailQueue emailQueue,
+        IEmailTemplateService emailTemplateService,
         ILogger<AccountService> logger)
     {
         _accountRepository = accountRepository;
@@ -50,6 +54,7 @@ public class AccountService : IAccountService
         _systemSettingService = systemSettingService;
         _lookupResolver = lookupResolver;
         _emailQueue = emailQueue;
+        _emailTemplateService = emailTemplateService;
         _logger = logger;
     }
 
@@ -106,19 +111,33 @@ public class AccountService : IAccountService
         var emailSent = false;
         try
         {
-            var emailHtml = BuildTemporaryPasswordEmail(request.FullName, username, temporaryPassword);
-            await _emailQueue.EnqueueAsync(new QueuedEmail(
-                To: request.Email,
-                Subject: "Your New Account - Temporary Password",
-                HtmlBody: emailHtml,
-                CorrelationId: $"account_created:{account.AccountId}:{DateTimeOffset.UtcNow.Ticks}"
-            ), cancellationToken);
+            var template = await _emailTemplateService.GetByCodeAsync(TemplateCodeAccountCreated, cancellationToken);
+            if (template != null)
+            {
+                var emailHtml = template.BodyHtml
+                    .Replace("{{fullName}}", request.FullName)
+                    .Replace("{{username}}", username)
+                    .Replace("{{temporaryPassword}}", temporaryPassword);
 
-            emailSent = true;
+                await _emailQueue.EnqueueAsync(new QueuedEmail(
+                    To: request.Email,
+                    Subject: template.Subject,
+                    HtmlBody: emailHtml,
+                    CorrelationId: $"account_created:{account.AccountId}:{DateTimeOffset.UtcNow.Ticks}"
+                ), cancellationToken);
+
+                emailSent = true;
+            }
+            else
+            {
+                _logger.LogWarning("Email template {TemplateCode} not found. Skipping email delivery.", TemplateCodeAccountCreated);
+            }
+
             _logger.LogInformation(
-                "Account created successfully. ID: {AccountId}, Username: {Username}, Email queued",
+                "Account created successfully. ID: {AccountId}, Username: {Username}, Email queued: {EmailSent}",
                 account.AccountId,
-                username);
+                username,
+                emailSent);
         }
         catch (System.Exception ex)
         {

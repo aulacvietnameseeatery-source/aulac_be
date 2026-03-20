@@ -4,9 +4,11 @@ using Core.DTO.Email;
 using Core.Entity;
 using Core.Extensions;
 using Core.Interface.Repo;
+using Core.Interface.Service;
 using Core.Interface.Service.Auth;
 using Core.Interface.Service.Email;
 using Core.Interface.Service.Entity;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Security.Cryptography;
 using System.Text;
@@ -25,7 +27,12 @@ public class AuthService : IAuthService
     private readonly IPasswordHasher _passwordHasher;
     private readonly IPasswordResetTokenStore _tokenStore;
     private readonly IEmailQueue _emailQueue;
+    private readonly IEmailTemplateService _emailTemplateService;
     private readonly ILookupResolver _lookupResolver;
+    private readonly ILogger<AuthService> _logger;
+
+
+    private const string TemplateCodeForgotPassword = "FORGOT_PASSWORD";
 
     // Password reset security configuration
     private readonly ForgotPasswordRulesOptions _forgotOpt;
@@ -39,9 +46,11 @@ public class AuthService : IAuthService
         IPasswordHasher passwordHasher,
         IPasswordResetTokenStore tokenStore,
         IEmailQueue emailQueue,
+        IEmailTemplateService emailTemplateService,
         ILookupResolver lookupResolver,
         IOptions<ForgotPasswordRulesOptions> forgotOpt,
-        IOptions<BaseUrlOptions> baseUrlOpt)
+        IOptions<BaseUrlOptions> baseUrlOpt,
+        ILogger<AuthService> logger)
     {
         _tokenService = tokenService;
         _sessionRepository = sessionRepository;
@@ -49,10 +58,12 @@ public class AuthService : IAuthService
         _passwordHasher = passwordHasher;
         _tokenStore = tokenStore;
         _emailQueue = emailQueue;
+        _emailTemplateService = emailTemplateService;
         _lookupResolver = lookupResolver;
 
         _forgotOpt = forgotOpt.Value;
         _baseUrl = baseUrlOpt.Value;
+        _logger = logger;
     }
 
 
@@ -346,14 +357,26 @@ public class AuthService : IAuthService
 
         // Queue password reset email (processed by background worker)
         var resetLink = $"{_baseUrl.Client.TrimEnd('/')}/reset-password?token={token}";
-        var emailHtml = BuildPasswordResetEmail(account.Username, resetLink, lifetime);
+        
+        var template = await _emailTemplateService.GetByCodeAsync(TemplateCodeForgotPassword, cancellationToken);
+        if (template != null)
+        {
+            var emailHtml = template.BodyHtml
+                .Replace("{{username}}", account.Username)
+                .Replace("{{resetLink}}", resetLink)
+                .Replace("{{expiryMinutes}}", _forgotOpt.TokenLifetimeMinutes.ToString());
 
-        await _emailQueue.EnqueueAsync(new QueuedEmail(
+            await _emailQueue.EnqueueAsync(new QueuedEmail(
                 To: account.Email,
-                Subject: "Password Reset Request",
+                Subject: template.Subject,
                 HtmlBody: emailHtml,
                 CorrelationId: $"pwdreset:{account.AccountId}:{DateTimeOffset.UtcNow.Ticks}"
-                ), cancellationToken);
+            ), cancellationToken);
+        }
+        else
+        {
+            _logger.LogWarning("Email template {TemplateCode} not found. Skipping reset email.", TemplateCodeForgotPassword);
+        }
 
         // Note: We don't log the token, only metadata for security audit
         // Logging could include: userId, ip, userAgent, timestamp

@@ -4,6 +4,7 @@ using Infa.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Infa.Data.Migrations
 {
     [DbContext(typeof(RestaurantMgmtContext))]
-    partial class RestaurantMgmtContextScaffoldModelSnapshot : ModelSnapshot
+    [Migration("20260320081527_SeedInitialEmailTemplates")]
+    partial class SeedInitialEmailTemplates
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -644,7 +647,7 @@ namespace Infa.Data.Migrations
                     b.HasIndex("TemplateCode")
                         .IsUnique();
 
-                    b.ToTable("email_template", (string)null);
+                    b.ToTable("EmailTemplates", (string)null);
 
                     b.HasData(
                         new
