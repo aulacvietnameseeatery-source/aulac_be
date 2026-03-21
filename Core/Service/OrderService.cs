@@ -10,6 +10,7 @@ using Core.Interface.Repo;
 using Core.Interface.Service.Customer;
 using Core.Interface.Service.Entity;
 using Core.Interface.Service.Notification;
+using Core.Interface.Service.Others;
 using LookupTypeEnum = Core.Enum.LookupType;
 
 namespace Core.Service;
@@ -23,6 +24,7 @@ public class OrderService : IOrderService
     private readonly ICustomerService _customerService;
     private readonly IUnitOfWork _uow;
     private readonly INotificationService _notificationService;
+    private readonly IOrderRealtimeService _realtime;
 
     public OrderService(
         IOrderRepository orderRepository,
@@ -31,7 +33,8 @@ public class OrderService : IOrderService
         IDishRepository dishRepository,
         ICustomerService customerService,
         IUnitOfWork uow,
-        INotificationService notificationService)
+        INotificationService notificationService,
+        IOrderRealtimeService realtime)
     {
         _orderRepository = orderRepository;
         _tableRepository = tableRepository;
@@ -40,6 +43,7 @@ public class OrderService : IOrderService
         _customerService = customerService;
         _uow = uow;
         _notificationService = notificationService;
+        _realtime = realtime;
     }
     private const long GuestCustomerId = 68; // ID representing a visitor
 
@@ -176,6 +180,14 @@ public class OrderService : IOrderService
                     TargetPermissions = new List<string> { Permissions.UpdateOrderItemStatus }
                 }, cancellationToken);
             }
+
+            await _realtime.OrderUpdatedAsync(new OrderRealtimeDTO
+            {
+                OrderId = orderId,
+                Status = newStatus.ToString(),
+                TableId = order.TableId,
+                UpdatedAt = DateTime.UtcNow
+            });
         }
         catch
         {
@@ -252,7 +264,15 @@ public class OrderService : IOrderService
 				TargetPermissions = new List<string> { Permissions.ViewOrder }
 			}, cancellationToken);
 		}
-	}
+
+        await _realtime.OrderItemUpdatedAsync(new OrderItemRealtimeDTO
+        {
+            OrderItemId = orderItemId,
+            OrderId = 0,
+            Status = newStatusLvId.ToString(),
+            UpdatedAt = DateTime.UtcNow
+        });
+    }
 
 	public async Task CancelOrderItemAsync(long orderItemId, CancellationToken cancellationToken = default)
 	{
@@ -381,6 +401,14 @@ public class OrderService : IOrderService
             await _orderRepository.AddAsync(order, ct);
 
             await _uow.CommitAsync(ct);
+
+            await _realtime.OrderCreatedAsync(new OrderRealtimeDTO
+            {
+                OrderId = order.OrderId,
+                Status = OrderStatusCode.PENDING.ToString(),
+                TableId = order.TableId,
+                UpdatedAt = DateTime.UtcNow
+            });
 
             // Notify kitchen staff about new order
             await _notificationService.PublishAsync(new PublishNotificationRequest
@@ -521,6 +549,14 @@ public class OrderService : IOrderService
             await _uow.SaveChangesAsync(ct);
 
             await _uow.CommitAsync(ct);
+
+            await _realtime.OrderUpdatedAsync(new OrderRealtimeDTO
+            {
+                OrderId = orderId,
+                Status = "ITEMS_ADDED",
+                TableId = order.TableId,
+                UpdatedAt = DateTime.UtcNow
+            });
         }
         catch
         {
@@ -643,6 +679,14 @@ public class OrderService : IOrderService
             // Commit transaction
             await _uow.CommitAsync(cancellationToken);
 
+            await _realtime.OrderCreatedAsync(new OrderRealtimeDTO
+            {
+                OrderId = orderId,
+                Status = OrderStatusCode.PENDING.ToString(),
+                TableId = table.TableId,
+                UpdatedAt = DateTime.UtcNow
+            });
+
             return new CreateOrderResponseDTO
             {
                 OrderId = orderId,
@@ -662,13 +706,15 @@ public class OrderService : IOrderService
     }
 
     public async Task<List<RecentOrderDTO>> GetRecentOrdersAsync(
+        long userId,
+        List<string> roles,
         int limit,
         CancellationToken ct)
     {
         if (limit <= 0 || limit > 100)
             limit = 20;
 
-        return await _orderRepository.GetRecentOrdersAsync(limit, ct);
+        return await _orderRepository.GetRecentOrdersAsync(userId, roles, limit, ct);
     }
 }
 

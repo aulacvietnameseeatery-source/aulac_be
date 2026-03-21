@@ -271,6 +271,7 @@ builder.Services.AddScoped<IAttendanceService, AttendanceService>();
 
 builder.Services.AddHttpClient<ITranslationService, GoogleTranslationService>();
 builder.Services.AddScoped<IIngredientService, IngredientService>();
+builder.Services.AddScoped<IEmailTemplateService, EmailTemplateService>();
 
 
 
@@ -308,6 +309,7 @@ builder.Services.AddScoped<IShiftTemplateRepository, ShiftTemplateRepository>();
 builder.Services.AddScoped<IShiftAssignmentRepository, ShiftAssignmentRepository>();
 builder.Services.AddScoped<IAttendanceRepository, AttendanceRepository>();
 builder.Services.AddScoped<ILoginActivityRepository, LoginActivityRepository>();
+builder.Services.AddScoped<IEmailTemplateRepository, EmailTemplateRepository>();
 
 #endregion
 
@@ -345,6 +347,7 @@ builder.Services.AddScoped<IDishRepository, Infa.Repo.DishRepository>();
 builder.Services.AddScoped<IDishService, Core.Service.DishService>();
 builder.Services.AddScoped<IRealtimeNotificationService, SignalRNotificationService>();
 builder.Services.AddScoped<IJobSchedulerService, HangfireJobScheduler>();
+builder.Services.AddScoped<IOrderRealtimeService, OrderRealtimeService>();
 
 // Notification module
 builder.Services.AddScoped<INotificationRepository, Infa.Repo.NotificationRepository>();
@@ -455,11 +458,11 @@ using (var scope = app.Services.CreateScope())
 app.UseMiddleware<HandleExceptionMiddleware>();
 
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+//if (app.Environment.IsDevelopment())
+//{
+//    app.UseSwagger();
+//    app.UseSwaggerUI();
+//}
 
 app.UseCors("AllowFrontend");
 app.UseHttpsRedirection();

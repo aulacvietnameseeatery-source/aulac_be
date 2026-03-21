@@ -4,6 +4,7 @@ using Infa.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Infa.Data.Migrations
 {
     [DbContext(typeof(RestaurantMgmtContext))]
-    partial class RestaurantMgmtContextScaffoldModelSnapshot : ModelSnapshot
+    [Migration("20260320081040_AddEmailTemplates")]
+    partial class AddEmailTemplates
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -644,39 +647,7 @@ namespace Infa.Data.Migrations
                     b.HasIndex("TemplateCode")
                         .IsUnique();
 
-                    b.ToTable("email_template", (string)null);
-
-                    b.HasData(
-                        new
-                        {
-                            TemplateId = 1L,
-                            BodyHtml = "<!DOCTYPE html>\r\n<html>\r\n<head>\r\n    <meta charset=\"utf-8\">\r\n    <style>\r\n        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }\r\n        .container { max-width: 600px; margin: 0 auto; padding: 20px; }\r\n        .button { \r\n            display: inline-block; \r\n            padding: 12px 24px; \r\n            background-color: #007bff; \r\n            color: #ffffff; \r\n            text-decoration: none; \r\n            border-radius: 4px; \r\n            margin: 20px 0;\r\n        }\r\n        .warning { color: #856404; background-color: #fff3cd; padding: 10px; border-radius: 4px; }\r\n    </style>\r\n</head>\r\n<body>\r\n    <div class=\"container\">\r\n        <h2>Password Reset Request</h2>\r\n        <p>Hello {{username}},</p>\r\n        <p>We received a request to reset your password. Click the button below to create a new password:</p>\r\n        <a href=\"{{resetLink}}\" class=\"button\">Reset Password</a>\r\n        <p>Or copy and paste this link into your browser:</p>\r\n        <p><a href=\"{{resetLink}}\">{{resetLink}}</a></p>\r\n        <div class=\"warning\">\r\n            <strong>Security Notice:</strong>\r\n            <ul>\r\n                <li>This link will expire in {{expiryMinutes}} minutes</li>\r\n                <li>If you didn't request a password reset, you can safely ignore this email</li>\r\n                <li>Never share this link with anyone</li>\r\n            </ul>\r\n        </div>\r\n        <p>Best regards,<br>Your Application Team</p>\r\n    </div>\r\n</body>\r\n</html>",
-                            CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Description = "Email sent when a user forgets their password.",
-                            Subject = "Password Reset Request",
-                            TemplateCode = "FORGOT_PASSWORD",
-                            TemplateName = "Forgot Password"
-                        },
-                        new
-                        {
-                            TemplateId = 2L,
-                            BodyHtml = "<!DOCTYPE html>\r\n<html>\r\n<head>\r\n    <meta charset=\"utf-8\">\r\n    <style>\r\n        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }\r\n        .container { max-width: 600px; margin: 0 auto; padding: 20px; }\r\n        .credentials { background-color: #f8f9fa; padding: 15px; border-left: 4px solid #007bff; margin: 20px 0; }\r\n        .warning { color: #856404; background-color: #fff3cd; padding: 10px; border-radius: 4px; margin: 20px 0; }\r\n        .code { font-family: 'Courier New', monospace; font-size: 16px; font-weight: bold; color: #007bff; }\r\n    </style>\r\n</head>\r\n<body>\r\n    <div class=\"container\">\r\n        <h2>Welcome! Your Account Has Been Created</h2>\r\n        <p>Hello {{fullName}},</p>\r\n        <p>Your account has been successfully created. Here are your login credentials:</p>\r\n        <div class=\"credentials\">\r\n            <p><strong>Username:</strong> <span class=\"code\">{{username}}</span></p>\r\n            <p><strong>Temporary Password:</strong> <span class=\"code\">{{temporaryPassword}}</span></p>\r\n        </div>\r\n        <div class=\"warning\">\r\n            <strong>Important Security Notice:</strong>\r\n            <ul>\r\n                <li>This is a temporary password that must be changed on your first login</li>\r\n                <li>Your account is currently locked and will be activated after you change your password</li>\r\n                <li>Never share your password with anyone</li>\r\n            </ul>\r\n        </div>\r\n        <p>Best regards,<br>Restaurant Management Team</p>\r\n    </div>\r\n</body>\r\n</html>",
-                            CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Description = "Email sent to new staff members with their temporary credentials.",
-                            Subject = "Welcome! Your Account Has Been Created",
-                            TemplateCode = "ACCOUNT_CREATED",
-                            TemplateName = "Account Created"
-                        },
-                        new
-                        {
-                            TemplateId = 3L,
-                            BodyHtml = "<!DOCTYPE html>\r\n<html>\r\n<head>\r\n    <meta charset=\"utf-8\">\r\n    <style>\r\n        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }\r\n        .container { max-width: 600px; margin: 0 auto; padding: 20px; }\r\n        .details { background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0; border: 1px solid #dee2e6; }\r\n        .highlight { color: #d97706; font-weight: bold; }\r\n        .footer { margin-top: 30px; font-size: 12px; color: #666; }\r\n    </style>\r\n</head>\r\n<body>\r\n    <div class=\"container\">\r\n        <h2 style=\"color: #1A3A51;\">Reservation Confirmation</h2>\r\n        <p>Hello <span class=\"highlight\">{{CustomerName}}</span>,</p>\r\n        <p>Thank you for choosing An Lac Restaurant. We are pleased to confirm your reservation:</p>\r\n        <div class=\"details\">\r\n            <p><strong>Reservation ID:</strong> #{{ReservationId}}</p>\r\n            <p><strong>Date & Time:</strong> {{ReservedTime}}</p>\r\n            <p><strong>Party Size:</strong> {{PartySize}} people</p>\r\n            <p><strong>Table(s):</strong> {{TableCodes}}</p>\r\n            <p><strong>Zone:</strong> {{Zone}}</p>\r\n        </div>\r\n        <p>If you need to change or cancel your reservation, please contact us at least 2 hours in advance.</p>\r\n        <p>We look forward to serving you!</p>\r\n        <div class=\"footer\">\r\n            <p>An Lac Restaurant<br>123 Restaurant Street, City<br>Phone: (+84) 123-456-789</p>\r\n        </div>\r\n    </div>\r\n</body>\r\n</html>",
-                            CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Description = "Email sent to customers after a successful online reservation.",
-                            Subject = "Reservation Confirmed - An Lac Restaurant",
-                            TemplateCode = "RESERVATION_CONFIRM",
-                            TemplateName = "Reservation Confirmation"
-                        });
+                    b.ToTable("EmailTemplates", (string)null);
                 });
 
             modelBuilder.Entity("Core.Entity.I18nLanguage", b =>
@@ -1248,202 +1219,6 @@ namespace Infa.Data.Migrations
                     b.HasIndex(new[] { "MediaTypeLvId" }, "idx_media_asset_type_lv");
 
                     b.ToTable("media_asset", (string)null);
-                });
-
-            modelBuilder.Entity("Core.Entity.Notification", b =>
-                {
-                    b.Property<long>("NotificationId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("notification_id");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("NotificationId"));
-
-                    b.Property<string>("ActionUrl")
-                        .HasMaxLength(500)
-                        .HasColumnType("varchar(500)")
-                        .HasColumnName("action_url");
-
-                    b.Property<string>("Body")
-                        .HasMaxLength(1000)
-                        .HasColumnType("varchar(1000)")
-                        .HasColumnName("body");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime")
-                        .HasColumnName("created_at")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                    b.Property<string>("EntityId")
-                        .HasMaxLength(50)
-                        .HasColumnType("varchar(50)")
-                        .HasColumnName("entity_id");
-
-                    b.Property<string>("EntityType")
-                        .HasMaxLength(50)
-                        .HasColumnType("varchar(50)")
-                        .HasColumnName("entity_type");
-
-                    b.Property<string>("MetadataJson")
-                        .HasColumnType("json")
-                        .HasColumnName("metadata_json");
-
-                    b.Property<string>("Priority")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("varchar(20)")
-                        .HasColumnName("priority");
-
-                    b.Property<bool>("RequireAck")
-                        .HasColumnType("tinyint(1)")
-                        .HasColumnName("require_ack");
-
-                    b.Property<string>("SoundKey")
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)")
-                        .HasColumnName("sound_key");
-
-                    b.Property<string>("TargetPermissions")
-                        .HasMaxLength(500)
-                        .HasColumnType("varchar(500)")
-                        .HasColumnName("target_permissions");
-
-                    b.Property<string>("TargetUserIds")
-                        .HasMaxLength(500)
-                        .HasColumnType("varchar(500)")
-                        .HasColumnName("target_user_ids");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("varchar(200)")
-                        .HasColumnName("title");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("varchar(50)")
-                        .HasColumnName("type");
-
-                    b.HasKey("NotificationId")
-                        .HasName("PRIMARY");
-
-                    b.HasIndex(new[] { "CreatedAt" }, "idx_notifications_created_at");
-
-                    b.HasIndex(new[] { "Type" }, "idx_notifications_type");
-
-                    b.ToTable("notifications", (string)null);
-                });
-
-            modelBuilder.Entity("Core.Entity.NotificationPreference", b =>
-                {
-                    b.Property<long>("NotificationPreferenceId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("notification_preference_id");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("NotificationPreferenceId"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime")
-                        .HasColumnName("created_at")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                    b.Property<bool>("IsEnabled")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("tinyint(1)")
-                        .HasDefaultValue(true)
-                        .HasColumnName("is_enabled");
-
-                    b.Property<string>("NotificationType")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("varchar(50)")
-                        .HasColumnName("notification_type");
-
-                    b.Property<bool>("SoundEnabled")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("tinyint(1)")
-                        .HasDefaultValue(true)
-                        .HasColumnName("sound_enabled");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime")
-                        .HasColumnName("updated_at")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                    b.Property<long>("UserId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("NotificationPreferenceId")
-                        .HasName("PRIMARY");
-
-                    b.HasIndex(new[] { "UserId" }, "idx_notification_pref_user_id");
-
-                    b.HasIndex(new[] { "UserId", "NotificationType" }, "uq_notification_pref_user_type")
-                        .IsUnique();
-
-                    b.ToTable("notification_preferences", (string)null);
-                });
-
-            modelBuilder.Entity("Core.Entity.NotificationReadState", b =>
-                {
-                    b.Property<long>("NotificationReadStateId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("notification_read_state_id");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("NotificationReadStateId"));
-
-                    b.Property<DateTime?>("AcknowledgedAt")
-                        .HasColumnType("datetime")
-                        .HasColumnName("acknowledged_at");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime")
-                        .HasColumnName("created_at")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                    b.Property<bool>("IsAcknowledged")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("tinyint(1)")
-                        .HasDefaultValue(false)
-                        .HasColumnName("is_acknowledged");
-
-                    b.Property<bool>("IsRead")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("tinyint(1)")
-                        .HasDefaultValue(false)
-                        .HasColumnName("is_read");
-
-                    b.Property<long>("NotificationId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("notification_id");
-
-                    b.Property<DateTime?>("ReadAt")
-                        .HasColumnType("datetime")
-                        .HasColumnName("read_at");
-
-                    b.Property<long>("UserId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("NotificationReadStateId")
-                        .HasName("PRIMARY");
-
-                    b.HasIndex(new[] { "NotificationId" }, "idx_nrs_notification_id");
-
-                    b.HasIndex(new[] { "UserId", "IsRead" }, "idx_nrs_user_is_read");
-
-                    b.HasIndex(new[] { "NotificationId", "UserId" }, "uq_notification_user")
-                        .IsUnique();
-
-                    b.ToTable("notification_read_states", (string)null);
                 });
 
             modelBuilder.Entity("Core.Entity.Order", b =>
@@ -3054,18 +2829,6 @@ namespace Infa.Data.Migrations
                     b.Navigation("MediaTypeLv");
                 });
 
-            modelBuilder.Entity("Core.Entity.NotificationReadState", b =>
-                {
-                    b.HasOne("Core.Entity.Notification", "Notification")
-                        .WithMany("ReadStates")
-                        .HasForeignKey("NotificationId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_nrs_notification");
-
-                    b.Navigation("Notification");
-                });
-
             modelBuilder.Entity("Core.Entity.Order", b =>
                 {
                     b.HasOne("Core.Entity.Customer", "Customer")
@@ -3713,11 +3476,6 @@ namespace Infa.Data.Migrations
                     b.Navigation("RestaurantTables");
 
                     b.Navigation("TableMedia");
-                });
-
-            modelBuilder.Entity("Core.Entity.Notification", b =>
-                {
-                    b.Navigation("ReadStates");
                 });
 
             modelBuilder.Entity("Core.Entity.Order", b =>

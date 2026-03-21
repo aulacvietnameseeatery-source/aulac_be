@@ -102,6 +102,7 @@ public partial class RestaurantMgmtContext : DbContext
     public virtual DbSet<AttendanceRecord> AttendanceRecords { get; set; }
 
     public virtual DbSet<LoginActivity> LoginActivities { get; set; }
+    public virtual DbSet<EmailTemplate> EmailTemplates { get; set; }
 
     public virtual DbSet<Notification> Notifications { get; set; }
 

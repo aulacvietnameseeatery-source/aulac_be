@@ -1,4 +1,4 @@
-﻿using Core.Data;
+using Core.Data;
 using Core.DTO.Dish;
 using Core.DTO.Google;
 using Core.Interface.Service.Others;
@@ -31,7 +31,7 @@ namespace Infa.Service
         {
             var targetLangs = GetTargetLanguages(sourceLang);
 
-            // 1️⃣ Gom field thành array
+            // 1️ Gom field thành array
             var fields = new List<string?>
         {
             sourceData.DishName,
@@ -44,7 +44,7 @@ namespace Infa.Service
             // Replace null bằng empty để giữ index
             var normalized = fields.Select(x => x ?? string.Empty).ToList();
 
-            // 2️⃣ Gọi song song 2 API call
+            // 2️ Gọi song song 2 API call
             var tasks = targetLangs
                 .Select(lang => TranslateBatch(normalized, sourceLang, lang))
                 .ToList();
@@ -65,6 +65,38 @@ namespace Infa.Service
                     Note = translatedList[3],
                     ShortDescription = translatedList[4]
                 };
+            }
+
+            return response;
+        }
+
+        public async Task<Dictionary<string, Dictionary<string, string>>> TranslateSystemSettingsAsync(
+            string sourceLang,
+            Dictionary<string, string> sourceData)
+        {
+            var targetLangs = GetTargetLanguages(sourceLang);
+            var keys = sourceData.Keys.ToList();
+            var values = keys.Select(k => sourceData[k] ?? string.Empty).ToList();
+
+            var tasks = targetLangs
+                .Select(lang => TranslateBatch(values, sourceLang, lang))
+                .ToList();
+
+            var results = await Task.WhenAll(tasks);
+
+            var response = new Dictionary<string, Dictionary<string, string>>();
+
+            for (int i = 0; i < targetLangs.Count; i++)
+            {
+                var translatedList = results[i];
+                var langResponse = new Dictionary<string, string>();
+
+                for (int j = 0; j < keys.Count; j++)
+                {
+                    langResponse[keys[j]] = translatedList[j];
+                }
+
+                response[targetLangs[i]] = langResponse;
             }
 
             return response;
