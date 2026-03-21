@@ -1,10 +1,13 @@
 using Core.Data;
+using Core.DTO.Notification;
 using Core.DTO.Shift;
 using Core.Entity;
+using Core.Enum;
 using Core.Exceptions;
 using Core.Extensions;
 using Core.Interface.Repo;
 using Core.Interface.Service.Entity;
+using Core.Interface.Service.Notification;
 using Core.Interface.Service.Shift;
 using Microsoft.Extensions.Options;
 
@@ -17,19 +20,22 @@ public class AttendanceService : IAttendanceService
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILookupResolver _lookupResolver;
     private readonly AttendanceOptions _options;
+    private readonly INotificationService _notificationService;
 
     public AttendanceService(
         IAttendanceRepository attendanceRepo,
         IShiftAssignmentRepository assignmentRepo,
         IUnitOfWork unitOfWork,
         ILookupResolver lookupResolver,
-        IOptions<AttendanceOptions> options)
+        IOptions<AttendanceOptions> options,
+        INotificationService notificationService)
     {
         _attendanceRepo = attendanceRepo;
         _assignmentRepo = assignmentRepo;
         _unitOfWork = unitOfWork;
         _lookupResolver = lookupResolver;
         _options = options.Value;
+        _notificationService = notificationService;
     }
 
     #region Check-in / Check-out
@@ -85,6 +91,30 @@ public class AttendanceService : IAttendanceService
 
         await _unitOfWork.SaveChangesAsync(ct);
 
+        // Notify managers if staff checked in late
+        if (isLate)
+        {
+            await _notificationService.PublishAsync(new PublishNotificationRequest
+            {
+                Type = nameof(NotificationType.ATTENDANCE_ALERT),
+                Title = "Late Check-in",
+                Body = $"{assignment.Staff?.FullName ?? "Staff"} checked in {lateMinutes} minutes late",
+                Priority = nameof(NotificationPriority.High),
+                SoundKey = "notification_high",
+                ActionUrl = "/dashboard/shifts/live",
+                EntityType = "AttendanceRecord",
+                EntityId = assignmentId.ToString(),
+                Metadata = new Dictionary<string, object>
+                {
+                    ["assignmentId"] = assignmentId.ToString(),
+                    ["staffName"] = assignment.Staff?.FullName ?? "Unknown",
+                    ["lateMinutes"] = lateMinutes.ToString(),
+                    ["alertType"] = "LATE_CHECKIN"
+                },
+                TargetPermissions = new List<string> { Permissions.ViewShift }
+            }, ct);
+        }
+
         var updated = await _attendanceRepo.GetByAssignmentIdAsync(assignmentId, ct)!;
         return ShiftAssignmentService.MapAttendance(updated!);
     }
@@ -119,6 +149,29 @@ public class AttendanceService : IAttendanceService
         record.UpdatedAt = DateTime.UtcNow;
 
         await _unitOfWork.SaveChangesAsync(ct);
+
+        // Notify managers if staff left early
+        if (isEarlyLeave)
+        {
+            await _notificationService.PublishAsync(new PublishNotificationRequest
+            {
+                Type = nameof(NotificationType.ATTENDANCE_ALERT),
+                Title = "Early Leave",
+                Body = $"{(await _assignmentRepo.GetByIdWithDetailsAsync(assignmentId, ct))?.Staff?.FullName ?? "Staff"} left {earlyLeaveMinutes} minutes early",
+                Priority = nameof(NotificationPriority.High),
+                SoundKey = "notification_high",
+                ActionUrl = "/dashboard/shifts/live",
+                EntityType = "AttendanceRecord",
+                EntityId = assignmentId.ToString(),
+                Metadata = new Dictionary<string, object>
+                {
+                    ["assignmentId"] = assignmentId.ToString(),
+                    ["earlyLeaveMinutes"] = earlyLeaveMinutes.ToString(),
+                    ["alertType"] = "EARLY_LEAVE"
+                },
+                TargetPermissions = new List<string> { Permissions.ViewShift }
+            }, ct);
+        }
 
         var updated = await _attendanceRepo.GetByAssignmentIdAsync(assignmentId, ct)!;
         return ShiftAssignmentService.MapAttendance(updated!);

@@ -24,11 +24,15 @@ public class NotificationService : INotificationService
 
     public async Task PublishAsync(PublishNotificationRequest request, CancellationToken ct = default)
     {
+        // Metadata-first payload: FE localizes by Type + Metadata.
+        // Keep compact title for backward compatibility and set body to null.
+        var compactTitle = request.Type;
+
         var notification = new Entity.Notification
         {
             Type = request.Type,
-            Title = request.Title,
-            Body = request.Body,
+            Title = compactTitle,
+            Body = null,
             Priority = request.Priority,
             RequireAck = request.RequireAck,
             SoundKey = request.SoundKey,
@@ -54,8 +58,8 @@ public class NotificationService : INotificationService
         {
             Id = notification.NotificationId,
             Type = notification.Type,
-            Title = notification.Title,
-            Body = notification.Body,
+            Title = compactTitle,
+            Body = null,
             Priority = notification.Priority,
             RequireAck = notification.RequireAck,
             SoundKey = notification.SoundKey,
@@ -126,5 +130,51 @@ public class NotificationService : INotificationService
     public Task AcknowledgeAsync(long notificationId, long userId, CancellationToken ct = default)
     {
         return _notificationRepository.AcknowledgeAsync(notificationId, userId, ct);
+    }
+
+    // --- Notification Preferences ---
+
+    public async Task<List<NotificationPreferenceDto>> GetPreferencesAsync(long userId, CancellationToken ct = default)
+    {
+        var entities = await _notificationRepository.GetPreferencesAsync(userId, ct);
+
+        // Return all known types, merging persisted preferences with defaults
+        var prefMap = entities.ToDictionary(p => p.NotificationType);
+
+        var allTypes = System.Enum.GetNames(typeof(Enum.NotificationType));
+
+        return allTypes.Select(type =>
+        {
+            if (prefMap.TryGetValue(type, out var pref))
+            {
+                return new NotificationPreferenceDto
+                {
+                    NotificationType = type,
+                    IsEnabled = pref.IsEnabled,
+                    SoundEnabled = pref.SoundEnabled
+                };
+            }
+
+            // Default: enabled
+            return new NotificationPreferenceDto
+            {
+                NotificationType = type,
+                IsEnabled = true,
+                SoundEnabled = true
+            };
+        }).ToList();
+    }
+
+    public async Task UpdatePreferencesAsync(long userId, UpdateNotificationPreferencesRequest request, CancellationToken ct = default)
+    {
+        var entities = request.Preferences.Select(p => new Entity.NotificationPreference
+        {
+            UserId = userId,
+            NotificationType = p.NotificationType,
+            IsEnabled = p.IsEnabled,
+            SoundEnabled = p.SoundEnabled
+        }).ToList();
+
+        await _notificationRepository.UpsertPreferencesAsync(userId, entities, ct);
     }
 }

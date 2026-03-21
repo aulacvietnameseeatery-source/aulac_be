@@ -160,6 +160,56 @@ namespace API.Controllers
             });
         }
 
+        // ── Notification Preferences ──
+
+        /// <summary>
+        /// GET /api/notifications/preferences
+        /// Lấy danh sách tùy chọn thông báo của user hiện tại.
+        /// Trả về tất cả loại notification kèm trạng thái bật/tắt.
+        /// </summary>
+        [HttpGet("preferences")]
+        [HasPermission(Permissions.ViewNotification)]
+        [ProducesResponseType(typeof(ApiResponse<List<NotificationPreferenceDto>>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetPreferences(CancellationToken ct)
+        {
+            var (userId, _) = ExtractUserContext();
+
+            var data = await _notificationService.GetPreferencesAsync(userId, ct);
+
+            return Ok(new ApiResponse<List<NotificationPreferenceDto>>
+            {
+                Success = true,
+                Code = 200,
+                Data = data,
+                ServerTime = DateTimeOffset.UtcNow
+            });
+        }
+
+        /// <summary>
+        /// PUT /api/notifications/preferences
+        /// Cập nhật tùy chọn thông báo cho user hiện tại (bulk update).
+        /// </summary>
+        [HttpPut("preferences")]
+        [HasPermission(Permissions.ViewNotification)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> UpdatePreferences(
+            [FromBody] UpdateNotificationPreferencesRequest request,
+            CancellationToken ct)
+        {
+            var (userId, _) = ExtractUserContext();
+
+            await _notificationService.UpdatePreferencesAsync(userId, request, ct);
+
+            return Ok(new ApiResponse<object>
+            {
+                Success = true,
+                Code = 200,
+                UserMessage = "Notification preferences updated.",
+                Data = null!,
+                ServerTime = DateTimeOffset.UtcNow
+            });
+        }
+
         /// <summary>
         /// Trích xuất userId và permissions từ JWT claims
         /// </summary>

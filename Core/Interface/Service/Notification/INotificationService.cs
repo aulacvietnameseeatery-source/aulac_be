@@ -28,4 +28,10 @@ public interface INotificationService
     Task MarkAllReadAsync(IEnumerable<string> userPermissions, long userId, CancellationToken ct = default);
 
     Task AcknowledgeAsync(long notificationId, long userId, CancellationToken ct = default);
+
+    // --- Notification Preferences ---
+
+    Task<List<NotificationPreferenceDto>> GetPreferencesAsync(long userId, CancellationToken ct = default);
+
+    Task UpdatePreferencesAsync(long userId, UpdateNotificationPreferencesRequest request, CancellationToken ct = default);
 }

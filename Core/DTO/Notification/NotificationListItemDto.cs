@@ -1,3 +1,6 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
 namespace Core.DTO.Notification;
 
 /// <summary>
@@ -15,8 +18,24 @@ public class NotificationListItemDto
     public string? ActionUrl { get; set; }
     public string? EntityType { get; set; }
     public string? EntityId { get; set; }
+    public Dictionary<string, object>? Metadata { get; set; }
     public DateTime CreatedAt { get; set; }
     public bool IsRead { get; set; }
     public bool IsAcknowledged { get; set; }
     public DateTime? AcknowledgedAt { get; set; }
+
+    /// <summary>
+    /// Internal: used by EF projection, then deserialized into Metadata.
+    /// </summary>
+    [JsonIgnore]
+    public string? MetadataJson { get; set; }
+
+    /// <summary>
+    /// Call after EF projection to hydrate the Metadata dictionary from MetadataJson.
+    /// </summary>
+    public void HydrateMetadata()
+    {
+        if (MetadataJson != null && Metadata == null)
+            Metadata = JsonSerializer.Deserialize<Dictionary<string, object>>(MetadataJson);
+    }
 }

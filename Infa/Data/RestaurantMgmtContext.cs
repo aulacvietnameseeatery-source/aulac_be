@@ -107,6 +107,8 @@ public partial class RestaurantMgmtContext : DbContext
 
     public virtual DbSet<NotificationReadState> NotificationReadStates { get; set; }
 
+    public virtual DbSet<NotificationPreference> NotificationPreferences { get; set; }
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         

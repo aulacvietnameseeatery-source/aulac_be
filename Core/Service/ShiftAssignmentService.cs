@@ -1,7 +1,10 @@
+using Core.DTO.Notification;
 using Core.DTO.Shift;
 using Core.Entity;
+using Core.Enum;
 using Core.Exceptions;
 using Core.Interface.Repo;
+using Core.Interface.Service.Notification;
 using Core.Interface.Service.Shift;
 
 namespace Core.Service;
@@ -12,17 +15,20 @@ public class ShiftAssignmentService : IShiftAssignmentService
     private readonly IShiftTemplateRepository _templateRepo;
     private readonly IAccountRepository _accountRepo;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly INotificationService _notificationService;
 
     public ShiftAssignmentService(
         IShiftAssignmentRepository assignmentRepo,
         IShiftTemplateRepository templateRepo,
         IAccountRepository accountRepo,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        INotificationService notificationService)
     {
         _assignmentRepo = assignmentRepo;
         _templateRepo = templateRepo;
         _accountRepo = accountRepo;
         _unitOfWork = unitOfWork;
+        _notificationService = notificationService;
     }
 
     public async Task<(List<ShiftAssignmentListDto> Items, int TotalCount)> GetAssignmentsAsync(
@@ -93,6 +99,28 @@ public class ShiftAssignmentService : IShiftAssignmentService
 
         _assignmentRepo.Add(entity);
         await _unitOfWork.SaveChangesAsync(ct);
+
+        // Notify the assigned staff member
+        await _notificationService.PublishAsync(new PublishNotificationRequest
+        {
+            Type = nameof(NotificationType.SHIFT_ASSIGNED),
+            Title = "Shift Assigned",
+            Body = $"You have been assigned to {template.TemplateName} on {request.WorkDate:yyyy-MM-dd}",
+            Priority = nameof(NotificationPriority.Normal),
+            SoundKey = "notification_normal",
+            ActionUrl = "/dashboard/my-shifts",
+            EntityType = "ShiftAssignment",
+            EntityId = entity.ShiftAssignmentId.ToString(),
+            Metadata = new Dictionary<string, object>
+            {
+                ["shiftAssignmentId"] = entity.ShiftAssignmentId.ToString(),
+                ["templateName"] = template.TemplateName,
+                ["workDate"] = request.WorkDate.ToString("yyyy-MM-dd"),
+                ["startTime"] = plannedStart.ToString("HH:mm"),
+                ["endTime"] = plannedEnd.ToString("HH:mm")
+            },
+            TargetUserIds = new List<long> { request.StaffId }
+        }, ct);
 
         var saved = await _assignmentRepo.GetByIdWithDetailsAsync(entity.ShiftAssignmentId, ct)
             ?? throw new NotFoundException("Assignment not found after creation");

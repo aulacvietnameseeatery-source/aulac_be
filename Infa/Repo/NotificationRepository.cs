@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Core.DTO.Notification;
 using Core.Entity;
 using Core.Interface.Repo;
@@ -54,14 +55,15 @@ public class NotificationRepository : INotificationRepository
             {
                 Id = x.n.NotificationId,
                 Type = x.n.Type,
-                Title = x.n.Title,
-                Body = x.n.Body,
+                Title = x.n.Type,
+                Body = null,
                 Priority = x.n.Priority,
                 RequireAck = x.n.RequireAck,
                 SoundKey = x.n.SoundKey,
                 ActionUrl = x.n.ActionUrl,
                 EntityType = x.n.EntityType,
                 EntityId = x.n.EntityId,
+                MetadataJson = x.n.MetadataJson,
                 CreatedAt = x.n.CreatedAt,
                 IsRead = x.rs != null && x.rs.IsRead,
                 IsAcknowledged = x.rs != null && x.rs.IsAcknowledged,
@@ -69,6 +71,7 @@ public class NotificationRepository : INotificationRepository
             })
             .ToListAsync(ct);
 
+        foreach (var item in items) item.HydrateMetadata();
         return items;
     }
 
@@ -100,7 +103,7 @@ public class NotificationRepository : INotificationRepository
         if (afterUtc.HasValue)
             baseQuery = baseQuery.Where(n => n.CreatedAt > afterUtc.Value);
 
-        return await baseQuery
+        var items = await baseQuery
             .OrderByDescending(n => n.CreatedAt)
             .Take(100)
             .GroupJoin(
@@ -112,20 +115,24 @@ public class NotificationRepository : INotificationRepository
             {
                 Id = x.n.NotificationId,
                 Type = x.n.Type,
-                Title = x.n.Title,
-                Body = x.n.Body,
+                Title = x.n.Type,
+                Body = null,
                 Priority = x.n.Priority,
                 RequireAck = x.n.RequireAck,
                 SoundKey = x.n.SoundKey,
                 ActionUrl = x.n.ActionUrl,
                 EntityType = x.n.EntityType,
                 EntityId = x.n.EntityId,
+                MetadataJson = x.n.MetadataJson,
                 CreatedAt = x.n.CreatedAt,
                 IsRead = x.rs != null && x.rs.IsRead,
                 IsAcknowledged = x.rs != null && x.rs.IsAcknowledged,
                 AcknowledgedAt = x.rs != null ? x.rs.AcknowledgedAt : null
             })
             .ToListAsync(ct);
+
+        foreach (var item in items) item.HydrateMetadata();
+        return items;
     }
 
     public async Task MarkAsReadAsync(long notificationId, long userId, CancellationToken ct = default)
@@ -232,18 +239,98 @@ public class NotificationRepository : INotificationRepository
 
     /// <summary>
     /// Build a base query for notifications visible to a user based on their permissions or direct targeting.
+    /// Pomelo MySQL does not support primitive collection translation, so permission matching
+    /// is built as an expression tree with individual OR conditions per permission.
     /// </summary>
     private IQueryable<Notification> BuildUserNotificationQuery(List<string> permissions, long userId)
     {
         var userIdStr = userId.ToString();
 
-        return _context.Notifications
-            .Where(n =>
-                // User-specific targeting
-                (n.TargetUserIds != null && n.TargetUserIds.Contains(userIdStr))
-                // Permission-based targeting: check if any user permission matches
-                || (n.TargetPermissions != null && permissions.Any(p => n.TargetPermissions.Contains(p)))
-                // Broadcast (no targeting = everyone)
-                || (n.TargetPermissions == null && n.TargetUserIds == null));
+        // n => ...
+        var param = Expression.Parameter(typeof(Notification), "n");
+
+        // n.TargetUserIds != null && n.TargetUserIds.Contains(userIdStr)
+        var targetUserIds = Expression.Property(param, nameof(Notification.TargetUserIds));
+        var userTargeted = Expression.AndAlso(
+            Expression.NotEqual(targetUserIds, Expression.Constant(null, typeof(string))),
+            Expression.Call(targetUserIds, typeof(string).GetMethod(nameof(string.Contains), new[] { typeof(string) })!,
+                Expression.Constant(userIdStr)));
+
+        // n.TargetPermissions == null && n.TargetUserIds == null
+        var targetPerms = Expression.Property(param, nameof(Notification.TargetPermissions));
+        var broadcast = Expression.AndAlso(
+            Expression.Equal(targetPerms, Expression.Constant(null, typeof(string))),
+            Expression.Equal(targetUserIds, Expression.Constant(null, typeof(string))));
+
+        Expression body = Expression.OrElse(userTargeted, broadcast);
+
+        // For each permission, add: n.TargetPermissions != null && n.TargetPermissions.Contains("PERM")
+        if (permissions.Count > 0)
+        {
+            var containsMethod = typeof(string).GetMethod(nameof(string.Contains), new[] { typeof(string) })!;
+            foreach (var perm in permissions)
+            {
+                var permCheck = Expression.AndAlso(
+                    Expression.NotEqual(targetPerms, Expression.Constant(null, typeof(string))),
+                    Expression.Call(targetPerms, containsMethod, Expression.Constant(perm)));
+                body = Expression.OrElse(body, permCheck);
+            }
+        }
+
+        var predicate = Expression.Lambda<Func<Notification, bool>>(body, param);
+        return _context.Notifications.Where(predicate);
+    }
+
+    // --- Notification Preferences ---
+
+    public async Task<List<NotificationPreference>> GetPreferencesAsync(long userId, CancellationToken ct = default)
+    {
+        return await _context.NotificationPreferences
+            .Where(p => p.UserId == userId)
+            .OrderBy(p => p.NotificationType)
+            .ToListAsync(ct);
+    }
+
+    public async Task UpsertPreferencesAsync(long userId, List<NotificationPreference> preferences, CancellationToken ct = default)
+    {
+        var existing = await _context.NotificationPreferences
+            .Where(p => p.UserId == userId)
+            .ToListAsync(ct);
+
+        var existingMap = existing.ToDictionary(p => p.NotificationType);
+
+        foreach (var pref in preferences)
+        {
+            if (existingMap.TryGetValue(pref.NotificationType, out var found))
+            {
+                found.IsEnabled = pref.IsEnabled;
+                found.SoundEnabled = pref.SoundEnabled;
+                found.UpdatedAt = DateTime.UtcNow;
+            }
+            else
+            {
+                _context.NotificationPreferences.Add(new NotificationPreference
+                {
+                    UserId = userId,
+                    NotificationType = pref.NotificationType,
+                    IsEnabled = pref.IsEnabled,
+                    SoundEnabled = pref.SoundEnabled,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                });
+            }
+        }
+
+        await _context.SaveChangesAsync(ct);
+    }
+
+    public async Task<HashSet<string>> GetDisabledTypesAsync(long userId, CancellationToken ct = default)
+    {
+        var disabled = await _context.NotificationPreferences
+            .Where(p => p.UserId == userId && !p.IsEnabled)
+            .Select(p => p.NotificationType)
+            .ToListAsync(ct);
+
+        return disabled.ToHashSet();
     }
 }

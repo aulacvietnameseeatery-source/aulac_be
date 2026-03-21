@@ -28,4 +28,15 @@ public interface INotificationRepository
     Task MarkAllReadAsync(IEnumerable<string> userPermissions, long userId, CancellationToken ct = default);
 
     Task AcknowledgeAsync(long notificationId, long userId, CancellationToken ct = default);
+
+    // --- Notification Preferences ---
+
+    Task<List<Core.Entity.NotificationPreference>> GetPreferencesAsync(long userId, CancellationToken ct = default);
+
+    Task UpsertPreferencesAsync(long userId, List<Core.Entity.NotificationPreference> preferences, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns the set of notification types the user has explicitly disabled.
+    /// </summary>
+    Task<HashSet<string>> GetDisabledTypesAsync(long userId, CancellationToken ct = default);
 }
