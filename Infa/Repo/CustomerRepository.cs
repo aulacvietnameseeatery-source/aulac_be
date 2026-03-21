@@ -1,4 +1,4 @@
-﻿using Core.DTO.Customer;
+using Core.DTO.Customer;
 using Core.DTO.General;
 using Core.Entity;
 using Core.Interface.Repo;
@@ -142,7 +142,26 @@ namespace Infa.Repo
                 .FirstOrDefaultAsync(c => c.Phone == phone, ct);
 
             if (existing != null)
+            {
+                bool updated = false;
+                if (!string.IsNullOrWhiteSpace(fullName) && existing.FullName != fullName.Trim())
+                {
+                    existing.FullName = fullName.Trim();
+                    updated = true;
+                }
+                if (!string.IsNullOrWhiteSpace(email) && existing.Email != email.Trim())
+                {
+                    existing.Email = email.Trim();
+                    updated = true;
+                }
+
+                if (updated)
+                {
+                    await _context.SaveChangesAsync(ct);
+                }
+
                 return existing;
+            }
 
             // Create new customer
             var newCustomer = new Customer

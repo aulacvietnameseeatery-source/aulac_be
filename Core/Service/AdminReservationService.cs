@@ -14,6 +14,9 @@ using Hangfire;
 using Core.Interface.Service.Reservation;
 using Core.Entity;
 using Core.Interface.Service.Customer;
+using Core.Interface.Service.Email;
+using Core.DTO.Email;
+using Core.Interface.Service;
 
 namespace Core.Service
 {
@@ -31,6 +34,10 @@ namespace Core.Service
         private readonly IOrderRepository _orderRepository;
         private readonly ICustomerService _customerService;
         private readonly INotificationService _notificationService;
+        private readonly IEmailTemplateService _emailTemplateService;
+        private readonly IEmailQueue _emailQueue;
+
+        private const string TemplateCodeReservationConfirmation = "RESERVATION_CONFIRM";
 
         private const long GuestCustomerId = 68;
 
@@ -49,7 +56,9 @@ namespace Core.Service
             IReservationBroadcastService broadcastService,
             IOrderRepository orderRepository,
             ICustomerService customerService,
-            INotificationService notificationService)
+            INotificationService notificationService,
+            IEmailTemplateService emailTemplateService,
+            IEmailQueue emailQueue)
         {
             _reservationRepository = reservationRepository;
             _tableRepository = tableRepository;
@@ -63,6 +72,8 @@ namespace Core.Service
             _orderRepository = orderRepository;
             _customerService = customerService;
             _notificationService = notificationService;
+            _emailTemplateService = emailTemplateService;
+            _emailQueue = emailQueue;
         }
 
         public async Task<(List<ReservationManagementDto> Items, int TotalCount)> GetReservationsAsync(GetReservationsRequest request, CancellationToken cancellationToken = default)
@@ -406,23 +417,26 @@ namespace Core.Service
             var confirmedStatusId = await ReservationStatusCode.CONFIRMED.ToReservationStatusIdAsync(_lookupResolver, ct);
             var checkedInStatusId = await ReservationStatusCode.CHECKED_IN.ToReservationStatusIdAsync(_lookupResolver, ct);
 
-            long customerId;
-            if (request.CustomerId.HasValue && request.CustomerId.Value > 0)
+            await _uow.BeginTransactionAsync(ct);
+            try
             {
-                var existingCustomer = await _customerService.GetByIdAsync(request.CustomerId.Value, ct);
-                if (existingCustomer != null)
+                long customerId;
+                if (request.CustomerId.HasValue && request.CustomerId.Value > 0)
                 {
-                    customerId = request.CustomerId.Value;
+                    var existingCustomer = await _customerService.GetByIdAsync(request.CustomerId.Value, ct);
+                    if (existingCustomer != null)
+                    {
+                        customerId = request.CustomerId.Value;
+                    }
+                    else
+                    {
+                        customerId = await _customerService.FindOrCreateCustomerIdAsync(request.Phone, request.CustomerName, request.Email, ct);
+                    }
                 }
                 else
                 {
                     customerId = await _customerService.FindOrCreateCustomerIdAsync(request.Phone, request.CustomerName, request.Email, ct);
                 }
-            }
-            else
-            {
-                customerId = await _customerService.FindOrCreateCustomerIdAsync(request.Phone, request.CustomerName, request.Email, ct);
-            }
 
             var reservation = new Reservation
             {
@@ -475,6 +489,14 @@ namespace Core.Service
                 .Select(x => x.TableCode)
                 .OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
 
+            // Send confirmation email (inside transaction to ensure connection lives)
+            if (!string.IsNullOrWhiteSpace(created.Email))
+            {
+                await SendReservationConfirmationEmailAsync(created, tableCodes);
+            }
+
+            await _uow.CommitAsync(ct);
+
             var zones = selectedTables
                 .Select(x => x.ZoneLv?.ValueName ?? TableZoneCode.INDOOR.ToString())
                 .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -493,6 +515,12 @@ namespace Core.Service
                 Status = request.Status,
                 CreatedAt = created.CreatedAt ?? DateTime.UtcNow
             };
+            }
+            catch (Exception)
+            {
+                await _uow.RollbackAsync(ct);
+                throw;
+            }
         }
 
         // 1. CONFIRM ĐƠN (BÀN ĐÃ ĐƯỢC GÁN Ở PUBLIC)
@@ -1185,6 +1213,41 @@ namespace Core.Service
                 await _uow.CommitAsync(ct);
             }
             catch (Exception) { await _uow.RollbackAsync(ct); throw; }
+        }
+
+        private async Task SendReservationConfirmationEmailAsync(Reservation reservation, string tableCodes)
+        {
+            try
+            {
+                var template = await _emailTemplateService.GetByCodeAsync(TemplateCodeReservationConfirmation);
+                if (template == null)
+                {
+                    _logger.LogWarning("Email template {TemplateCode} not found. Skipping email.", TemplateCodeReservationConfirmation);
+                    return;
+                }
+
+                var body = template.BodyHtml
+                    .Replace("{{CustomerName}}", reservation.CustomerName)
+                    .Replace("{{ReservedTime}}", reservation.ReservedTime.ToString("dd/MM/yyyy HH:mm"))
+                    .Replace("{{PartySize}}", reservation.PartySize.ToString())
+                    .Replace("{{TableCode}}", tableCodes)
+                    .Replace("{{TableCodes}}", tableCodes)
+                    .Replace("{{ReservationId}}", reservation.ReservationId.ToString());
+
+                var queuedEmail = new QueuedEmail(
+                    To: reservation.Email!,
+                    Subject: template.Subject,
+                    HtmlBody: body,
+                    CorrelationId: $"Res-{reservation.ReservationId}"
+                );
+
+                await _emailQueue.EnqueueAsync(queuedEmail);
+                _logger.LogInformation("Enqueued confirmation email for manual reservation {ReservationId} to {Email}", reservation.ReservationId, reservation.Email);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error enqueuing confirmation email for manual reservation {ReservationId}", reservation.ReservationId);
+            }
         }
     }
 }
