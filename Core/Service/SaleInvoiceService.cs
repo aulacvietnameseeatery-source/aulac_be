@@ -36,7 +36,9 @@ public class SaleInvoiceService : ISaleInvoiceService
             CustomerPhone = order.Customer?.Phone ?? "",
             IsPaid = order.Payments.Any(),
             PaymentMethod = order.Payments.Any() ? (order.Payments.FirstOrDefault()?.MethodLv?.ValueName ?? "-") : "-",
-            Items = order.OrderItems.Select(oi => new SaleInvoiceItemDTO
+            Items = order.OrderItems
+                .Where(oi => oi.ItemStatusLv.ValueCode != "REJECTED" && oi.ItemStatusLv.ValueCode != "CANCELLED")
+                .Select(oi => new SaleInvoiceItemDTO
             {
                 OrderItemId = oi.OrderItemId,
                 Quantity = oi.Quantity,

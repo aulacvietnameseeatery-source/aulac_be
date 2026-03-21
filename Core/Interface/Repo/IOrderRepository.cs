@@ -29,6 +29,7 @@ public interface IOrderRepository
 		uint readyItemStatusId,
 		uint servedItemStatusId,
 		uint rejectedItemStatusId,
+		uint cancelledItemStatusId,
 		uint pendingOrderStatusId,
 		uint inProgressOrderStatusId,
 		uint completedOrderStatusId,

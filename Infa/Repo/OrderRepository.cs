@@ -95,7 +95,7 @@ public class OrderRepository : IOrderRepository
 					DishName = oi.Dish.DishName,
 					Quantity = oi.Quantity,
 					Price = oi.Price,
-					ItemStatus = oi.ItemStatusLv.ValueName,
+					ItemStatus = oi.ItemStatusLv.ValueCode,
 					RejectReason = oi.RejectReason,
 					Note = oi.Note
 				}).ToList()
@@ -193,6 +193,7 @@ public class OrderRepository : IOrderRepository
 		uint readyItemStatusId,
 		uint servedItemStatusId,
 		uint rejectedItemStatusId,
+		uint cancelledItemStatusId,
 		uint pendingOrderStatusId,
 		uint inProgressOrderStatusId,
 		uint completedOrderStatusId,
@@ -220,7 +221,7 @@ public class OrderRepository : IOrderRepository
 			bool orderStatusChanged = false;
 
 			// 1. Subtract rejected/cancelled item from total amount
-			if (newStatusLvId == rejectedItemStatusId)
+			if (newStatusLvId == rejectedItemStatusId || newStatusLvId == cancelledItemStatusId)
 			{
 				order.TotalAmount -= item.Price * item.Quantity;
 				orderStatusChanged = true;
@@ -435,7 +436,7 @@ public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, Can
                         DishName = oi.Dish.DishName,
                         Quantity = oi.Quantity,
                         Price = oi.Price,
-                        ItemStatus = oi.ItemStatusLv.ValueName,
+                        ItemStatus = oi.ItemStatusLv.ValueCode,
                         RejectReason = oi.RejectReason,
                         Note = oi.Note
                     })
