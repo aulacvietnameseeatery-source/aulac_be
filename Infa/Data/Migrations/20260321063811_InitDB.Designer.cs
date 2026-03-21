@@ -9,11 +9,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
-namespace Infa.Data.Migrations
+namespace Infa.Migrations
 {
     [DbContext(typeof(RestaurantMgmtContext))]
-    [Migration("20260320081527_SeedInitialEmailTemplates")]
-    partial class SeedInitialEmailTemplates
+    [Migration("20260321063811_InitDB")]
+    partial class InitDB
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -647,7 +647,7 @@ namespace Infa.Data.Migrations
                     b.HasIndex("TemplateCode")
                         .IsUnique();
 
-                    b.ToTable("EmailTemplates", (string)null);
+                    b.ToTable("email_template", (string)null);
 
                     b.HasData(
                         new
@@ -1251,6 +1251,202 @@ namespace Infa.Data.Migrations
                     b.HasIndex(new[] { "MediaTypeLvId" }, "idx_media_asset_type_lv");
 
                     b.ToTable("media_asset", (string)null);
+                });
+
+            modelBuilder.Entity("Core.Entity.Notification", b =>
+                {
+                    b.Property<long>("NotificationId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("notification_id");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("NotificationId"));
+
+                    b.Property<string>("ActionUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)")
+                        .HasColumnName("action_url");
+
+                    b.Property<string>("Body")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)")
+                        .HasColumnName("body");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("EntityId")
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("entity_id");
+
+                    b.Property<string>("EntityType")
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("entity_type");
+
+                    b.Property<string>("MetadataJson")
+                        .HasColumnType("json")
+                        .HasColumnName("metadata_json");
+
+                    b.Property<string>("Priority")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)")
+                        .HasColumnName("priority");
+
+                    b.Property<bool>("RequireAck")
+                        .HasColumnType("tinyint(1)")
+                        .HasColumnName("require_ack");
+
+                    b.Property<string>("SoundKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)")
+                        .HasColumnName("sound_key");
+
+                    b.Property<string>("TargetPermissions")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)")
+                        .HasColumnName("target_permissions");
+
+                    b.Property<string>("TargetUserIds")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)")
+                        .HasColumnName("target_user_ids");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)")
+                        .HasColumnName("title");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("type");
+
+                    b.HasKey("NotificationId")
+                        .HasName("PRIMARY");
+
+                    b.HasIndex(new[] { "CreatedAt" }, "idx_notifications_created_at");
+
+                    b.HasIndex(new[] { "Type" }, "idx_notifications_type");
+
+                    b.ToTable("notifications", (string)null);
+                });
+
+            modelBuilder.Entity("Core.Entity.NotificationPreference", b =>
+                {
+                    b.Property<long>("NotificationPreferenceId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("notification_preference_id");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("NotificationPreferenceId"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_enabled");
+
+                    b.Property<string>("NotificationType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("notification_type");
+
+                    b.Property<bool>("SoundEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(true)
+                        .HasColumnName("sound_enabled");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("NotificationPreferenceId")
+                        .HasName("PRIMARY");
+
+                    b.HasIndex(new[] { "UserId" }, "idx_notification_pref_user_id");
+
+                    b.HasIndex(new[] { "UserId", "NotificationType" }, "uq_notification_pref_user_type")
+                        .IsUnique();
+
+                    b.ToTable("notification_preferences", (string)null);
+                });
+
+            modelBuilder.Entity("Core.Entity.NotificationReadState", b =>
+                {
+                    b.Property<long>("NotificationReadStateId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("notification_read_state_id");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("NotificationReadStateId"));
+
+                    b.Property<DateTime?>("AcknowledgedAt")
+                        .HasColumnType("datetime")
+                        .HasColumnName("acknowledged_at");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<bool>("IsAcknowledged")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_acknowledged");
+
+                    b.Property<bool>("IsRead")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_read");
+
+                    b.Property<long>("NotificationId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("notification_id");
+
+                    b.Property<DateTime?>("ReadAt")
+                        .HasColumnType("datetime")
+                        .HasColumnName("read_at");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("NotificationReadStateId")
+                        .HasName("PRIMARY");
+
+                    b.HasIndex(new[] { "NotificationId" }, "idx_nrs_notification_id");
+
+                    b.HasIndex(new[] { "UserId", "IsRead" }, "idx_nrs_user_is_read");
+
+                    b.HasIndex(new[] { "NotificationId", "UserId" }, "uq_notification_user")
+                        .IsUnique();
+
+                    b.ToTable("notification_read_states", (string)null);
                 });
 
             modelBuilder.Entity("Core.Entity.Order", b =>
@@ -2076,6 +2272,10 @@ namespace Infa.Data.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("assigned_by");
 
+                    b.Property<uint>("AssignmentStatusLvId")
+                        .HasColumnType("int unsigned")
+                        .HasColumnName("assignment_status_lv_id");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime")
@@ -2109,6 +2309,11 @@ namespace Infa.Data.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("staff_id");
 
+                    b.Property<string>("Tags")
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)")
+                        .HasColumnName("tags");
+
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("datetime")
@@ -2128,6 +2333,8 @@ namespace Infa.Data.Migrations
 
                     b.HasIndex(new[] { "StaffId" }, "idx_shift_assignment_staff");
 
+                    b.HasIndex(new[] { "AssignmentStatusLvId" }, "idx_shift_assignment_status_lv");
+
                     b.HasIndex(new[] { "ShiftTemplateId" }, "idx_shift_assignment_template");
 
                     b.HasIndex(new[] { "WorkDate" }, "idx_shift_assignment_work_date");
@@ -2146,6 +2353,14 @@ namespace Infa.Data.Migrations
                         .HasColumnName("shift_template_id");
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("ShiftTemplateId"));
+
+                    b.Property<int?>("BufferAfterMinutes")
+                        .HasColumnType("int")
+                        .HasColumnName("buffer_after_minutes");
+
+                    b.Property<int?>("BufferBeforeMinutes")
+                        .HasColumnType("int")
+                        .HasColumnName("buffer_before_minutes");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
@@ -2257,6 +2472,9 @@ namespace Infa.Data.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("varchar(30)")
                         .HasColumnName("phone");
+
+                    b.Property<string>("RegisteredDeviceId")
+                        .HasColumnType("longtext");
 
                     b.Property<long>("RoleId")
                         .HasColumnType("bigint")
@@ -2418,6 +2636,75 @@ namespace Infa.Data.Migrations
                         .HasDatabaseName("media_id1");
 
                     b.ToTable("table_media", (string)null);
+                });
+
+            modelBuilder.Entity("Core.Entity.TimeLog", b =>
+                {
+                    b.Property<long>("TimeLogId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("time_log_id");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("TimeLogId"));
+
+                    b.Property<long>("AttendanceRecordId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("attendance_record_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("DeviceIdIn")
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)")
+                        .HasColumnName("device_id_in");
+
+                    b.Property<string>("DeviceIdOut")
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)")
+                        .HasColumnName("device_id_out");
+
+                    b.Property<string>("GpsLocationIn")
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("gps_location_in");
+
+                    b.Property<string>("GpsLocationOut")
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("gps_location_out");
+
+                    b.Property<int>("PunchDurationMinutes")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasColumnName("punch_duration_minutes");
+
+                    b.Property<DateTime>("PunchInTime")
+                        .HasColumnType("datetime")
+                        .HasColumnName("punch_in_time");
+
+                    b.Property<DateTime?>("PunchOutTime")
+                        .HasColumnType("datetime")
+                        .HasColumnName("punch_out_time");
+
+                    b.Property<string>("ValidationStatus")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)")
+                        .HasDefaultValue("Valid")
+                        .HasColumnName("validation_status");
+
+                    b.HasKey("TimeLogId")
+                        .HasName("PRIMARY");
+
+                    b.HasIndex(new[] { "AttendanceRecordId" }, "idx_time_log_attendance");
+
+                    b.ToTable("time_log", (string)null);
                 });
 
             modelBuilder.Entity("ReservationTable", b =>
@@ -2861,6 +3148,18 @@ namespace Infa.Data.Migrations
                     b.Navigation("MediaTypeLv");
                 });
 
+            modelBuilder.Entity("Core.Entity.NotificationReadState", b =>
+                {
+                    b.HasOne("Core.Entity.Notification", "Notification")
+                        .WithMany("ReadStates")
+                        .HasForeignKey("NotificationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_nrs_notification");
+
+                    b.Navigation("Notification");
+                });
+
             modelBuilder.Entity("Core.Entity.Order", b =>
                 {
                     b.HasOne("Core.Entity.Customer", "Customer")
@@ -3247,6 +3546,12 @@ namespace Infa.Data.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_shift_assignment_assigned_by");
 
+                    b.HasOne("Core.Entity.LookupValue", "AssignmentStatusLv")
+                        .WithMany()
+                        .HasForeignKey("AssignmentStatusLvId")
+                        .IsRequired()
+                        .HasConstraintName("fk_shift_assignment_status_lv");
+
                     b.HasOne("Core.Entity.ShiftTemplate", "ShiftTemplate")
                         .WithMany("ShiftAssignments")
                         .HasForeignKey("ShiftTemplateId")
@@ -3261,6 +3566,8 @@ namespace Infa.Data.Migrations
                         .HasConstraintName("fk_shift_assignment_staff");
 
                     b.Navigation("AssignedByStaff");
+
+                    b.Navigation("AssignmentStatusLv");
 
                     b.Navigation("ShiftTemplate");
 
@@ -3325,6 +3632,18 @@ namespace Infa.Data.Migrations
                     b.Navigation("Table");
                 });
 
+            modelBuilder.Entity("Core.Entity.TimeLog", b =>
+                {
+                    b.HasOne("Core.Entity.AttendanceRecord", "AttendanceRecord")
+                        .WithMany("TimeLogs")
+                        .HasForeignKey("AttendanceRecordId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_time_log_attendance");
+
+                    b.Navigation("AttendanceRecord");
+                });
+
             modelBuilder.Entity("ReservationTable", b =>
                 {
                     b.HasOne("Core.Entity.Reservation", null)
@@ -3353,6 +3672,11 @@ namespace Infa.Data.Migrations
                         .HasForeignKey("RoleId")
                         .IsRequired()
                         .HasConstraintName("role_permission_ibfk_1");
+                });
+
+            modelBuilder.Entity("Core.Entity.AttendanceRecord", b =>
+                {
+                    b.Navigation("TimeLogs");
                 });
 
             modelBuilder.Entity("Core.Entity.Coupon", b =>
@@ -3508,6 +3832,11 @@ namespace Infa.Data.Migrations
                     b.Navigation("RestaurantTables");
 
                     b.Navigation("TableMedia");
+                });
+
+            modelBuilder.Entity("Core.Entity.Notification", b =>
+                {
+                    b.Navigation("ReadStates");
                 });
 
             modelBuilder.Entity("Core.Entity.Order", b =>

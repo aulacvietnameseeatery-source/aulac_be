@@ -23,6 +23,9 @@ public class CreateShiftTemplateRequest
 
     [MaxLength(500)]
     public string? Description { get; set; }
+
+    public int? BufferBeforeMinutes { get; set; }
+    public int? BufferAfterMinutes { get; set; }
 }
 
 public class UpdateShiftTemplateRequest
@@ -38,4 +41,7 @@ public class UpdateShiftTemplateRequest
     public string? Description { get; set; }
 
     public bool? IsActive { get; set; }
+
+    public int? BufferBeforeMinutes { get; set; }
+    public int? BufferAfterMinutes { get; set; }
 }

@@ -18,6 +18,12 @@ public partial class ShiftTemplate
 
     public string? Description { get; set; }
 
+    /// <summary>Minutes before planned start that check-in is allowed. Overrides global AttendanceOptions when set.</summary>
+    public int? BufferBeforeMinutes { get; set; }
+
+    /// <summary>Minutes after planned end that check-out is still accepted. Overrides global AttendanceOptions when set.</summary>
+    public int? BufferAfterMinutes { get; set; }
+
     public bool IsActive { get; set; }
 
     public long CreatedBy { get; set; }

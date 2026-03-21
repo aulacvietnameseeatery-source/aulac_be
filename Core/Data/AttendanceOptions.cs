@@ -15,6 +15,23 @@ public class AttendanceOptions
     /// <summary>Minutes after planned start with no check-in ? flag ABSENT.</summary>
     public int AbsenceThresholdMinutes { get; set; } = 30;
 
-    /// <summary>Buffer before planned end � checking out earlier marks EARLY_LEAVE.</summary>
+    /// <summary>Buffer before planned end � checking out earlier marks EARLY_LEAVE.</summary>
     public int EarlyLeaveBufferMinutes { get; set; } = 5;
-}
+    // ── Geofencing placeholders ──
+
+    /// <summary>Base restaurant latitude for geofencing. Null = geofencing disabled.</summary>
+    public double? BaseLatitude { get; set; }
+
+    /// <summary>Base restaurant longitude for geofencing. Null = geofencing disabled.</summary>
+    public double? BaseLongitude { get; set; }
+
+    /// <summary>Maximum allowed distance from base location in metres.</summary>
+    public int MaxRadiusMeters { get; set; } = 200;
+
+    // ── No-show & weekly limits ──
+
+    /// <summary>Minutes after planned start with no check-in before sending a no-show alert.</summary>
+    public int NoShowThresholdMinutes { get; set; } = 15;
+
+    /// <summary>Soft limit for total scheduled hours per week (used for conflict warnings).</summary>
+    public double MaxWeeklyHours { get; set; } = 48;}

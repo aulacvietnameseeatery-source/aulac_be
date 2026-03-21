@@ -4,19 +4,16 @@ using Infa.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
-using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
-namespace Infa.Data.Migrations
+namespace Infa.Migrations
 {
     [DbContext(typeof(RestaurantMgmtContext))]
-    [Migration("20260312184247_AddNoteToReservation")]
-    partial class AddNoteToReservation
+    partial class RestaurantMgmtContextModelSnapshot : ModelSnapshot
     {
-        /// <inheritdoc />
-        protected override void BuildTargetModel(ModelBuilder modelBuilder)
+        protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -210,6 +207,82 @@ namespace Infa.Data.Migrations
                     b.HasIndex(new[] { "UserId", "ExpiresAt" }, "idx_session_user");
 
                     b.ToTable("auth_session", (string)null);
+                });
+
+            modelBuilder.Entity("Core.Entity.Coupon", b =>
+                {
+                    b.Property<long>("CouponId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("coupon_id");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("CouponId"));
+
+                    b.Property<string>("CouponCode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("coupon_code");
+
+                    b.Property<string>("CouponName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)")
+                        .HasColumnName("coupon_name");
+
+                    b.Property<uint>("CouponStatusLvId")
+                        .HasColumnType("int unsigned")
+                        .HasColumnName("coupon_status_lv_id");
+
+                    b.Property<DateTime?>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)")
+                        .HasColumnName("description");
+
+                    b.Property<decimal>("DiscountValue")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)")
+                        .HasColumnName("discount_value");
+
+                    b.Property<DateTime>("EndTime")
+                        .HasColumnType("datetime")
+                        .HasColumnName("end_time");
+
+                    b.Property<int?>("MaxUsage")
+                        .HasColumnType("int")
+                        .HasColumnName("max_usage");
+
+                    b.Property<DateTime>("StartTime")
+                        .HasColumnType("datetime")
+                        .HasColumnName("start_time");
+
+                    b.Property<uint>("TypeLvId")
+                        .HasColumnType("int unsigned")
+                        .HasColumnName("type_lv_id");
+
+                    b.Property<int?>("UsedCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasColumnName("used_count")
+                        .HasDefaultValueSql("'0'");
+
+                    b.HasKey("CouponId")
+                        .HasName("PRIMARY");
+
+                    b.HasIndex(new[] { "CouponStatusLvId" }, "idx_coupon_status_lv");
+
+                    b.HasIndex(new[] { "TypeLvId" }, "idx_coupon_type_lv");
+
+                    b.HasIndex(new[] { "CouponCode" }, "uq_coupon_code")
+                        .IsUnique();
+
+                    b.ToTable("coupon", (string)null);
                 });
 
             modelBuilder.Entity("Core.Entity.CurrentStock", b =>
@@ -453,9 +526,13 @@ namespace Infa.Data.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("description_text_id");
 
+                    b.Property<int>("DisPlayOrder")
+                        .HasColumnType("int")
+                        .HasColumnName("display_order");
+
                     b.Property<bool>("IsDisabled")
                         .HasColumnType("tinyint(1)")
-                        .HasColumnName("isDisabled");
+                        .HasColumnName("is_disable");
 
                     b.HasKey("CategoryId")
                         .HasName("PRIMARY");
@@ -517,6 +594,89 @@ namespace Infa.Data.Migrations
                     b.HasIndex(new[] { "TagId" }, "FK_dish_tag_lookup_value_value_id");
 
                     b.ToTable("dish_tag", (string)null);
+                });
+
+            modelBuilder.Entity("Core.Entity.EmailTemplate", b =>
+                {
+                    b.Property<long>("TemplateId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("TemplateId"));
+
+                    b.Property<string>("BodyHtml")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime(6)")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP(6)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<string>("TemplateCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("TemplateName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("datetime(6)")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlComputedColumn(b.Property<DateTime?>("UpdatedAt"));
+
+                    b.HasKey("TemplateId");
+
+                    b.HasIndex("TemplateCode")
+                        .IsUnique();
+
+                    b.ToTable("email_template", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            TemplateId = 1L,
+                            BodyHtml = "<!DOCTYPE html>\r\n<html>\r\n<head>\r\n    <meta charset=\"utf-8\">\r\n    <style>\r\n        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }\r\n        .container { max-width: 600px; margin: 0 auto; padding: 20px; }\r\n        .button { \r\n            display: inline-block; \r\n            padding: 12px 24px; \r\n            background-color: #007bff; \r\n            color: #ffffff; \r\n            text-decoration: none; \r\n            border-radius: 4px; \r\n            margin: 20px 0;\r\n        }\r\n        .warning { color: #856404; background-color: #fff3cd; padding: 10px; border-radius: 4px; }\r\n    </style>\r\n</head>\r\n<body>\r\n    <div class=\"container\">\r\n        <h2>Password Reset Request</h2>\r\n        <p>Hello {{username}},</p>\r\n        <p>We received a request to reset your password. Click the button below to create a new password:</p>\r\n        <a href=\"{{resetLink}}\" class=\"button\">Reset Password</a>\r\n        <p>Or copy and paste this link into your browser:</p>\r\n        <p><a href=\"{{resetLink}}\">{{resetLink}}</a></p>\r\n        <div class=\"warning\">\r\n            <strong>Security Notice:</strong>\r\n            <ul>\r\n                <li>This link will expire in {{expiryMinutes}} minutes</li>\r\n                <li>If you didn't request a password reset, you can safely ignore this email</li>\r\n                <li>Never share this link with anyone</li>\r\n            </ul>\r\n        </div>\r\n        <p>Best regards,<br>Your Application Team</p>\r\n    </div>\r\n</body>\r\n</html>",
+                            CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Email sent when a user forgets their password.",
+                            Subject = "Password Reset Request",
+                            TemplateCode = "FORGOT_PASSWORD",
+                            TemplateName = "Forgot Password"
+                        },
+                        new
+                        {
+                            TemplateId = 2L,
+                            BodyHtml = "<!DOCTYPE html>\r\n<html>\r\n<head>\r\n    <meta charset=\"utf-8\">\r\n    <style>\r\n        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }\r\n        .container { max-width: 600px; margin: 0 auto; padding: 20px; }\r\n        .credentials { background-color: #f8f9fa; padding: 15px; border-left: 4px solid #007bff; margin: 20px 0; }\r\n        .warning { color: #856404; background-color: #fff3cd; padding: 10px; border-radius: 4px; margin: 20px 0; }\r\n        .code { font-family: 'Courier New', monospace; font-size: 16px; font-weight: bold; color: #007bff; }\r\n    </style>\r\n</head>\r\n<body>\r\n    <div class=\"container\">\r\n        <h2>Welcome! Your Account Has Been Created</h2>\r\n        <p>Hello {{fullName}},</p>\r\n        <p>Your account has been successfully created. Here are your login credentials:</p>\r\n        <div class=\"credentials\">\r\n            <p><strong>Username:</strong> <span class=\"code\">{{username}}</span></p>\r\n            <p><strong>Temporary Password:</strong> <span class=\"code\">{{temporaryPassword}}</span></p>\r\n        </div>\r\n        <div class=\"warning\">\r\n            <strong>Important Security Notice:</strong>\r\n            <ul>\r\n                <li>This is a temporary password that must be changed on your first login</li>\r\n                <li>Your account is currently locked and will be activated after you change your password</li>\r\n                <li>Never share your password with anyone</li>\r\n            </ul>\r\n        </div>\r\n        <p>Best regards,<br>Restaurant Management Team</p>\r\n    </div>\r\n</body>\r\n</html>",
+                            CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Email sent to new staff members with their temporary credentials.",
+                            Subject = "Welcome! Your Account Has Been Created",
+                            TemplateCode = "ACCOUNT_CREATED",
+                            TemplateName = "Account Created"
+                        },
+                        new
+                        {
+                            TemplateId = 3L,
+                            BodyHtml = "<!DOCTYPE html>\r\n<html>\r\n<head>\r\n    <meta charset=\"utf-8\">\r\n    <style>\r\n        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }\r\n        .container { max-width: 600px; margin: 0 auto; padding: 20px; }\r\n        .details { background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0; border: 1px solid #dee2e6; }\r\n        .highlight { color: #d97706; font-weight: bold; }\r\n        .footer { margin-top: 30px; font-size: 12px; color: #666; }\r\n    </style>\r\n</head>\r\n<body>\r\n    <div class=\"container\">\r\n        <h2 style=\"color: #1A3A51;\">Reservation Confirmation</h2>\r\n        <p>Hello <span class=\"highlight\">{{CustomerName}}</span>,</p>\r\n        <p>Thank you for choosing An Lac Restaurant. We are pleased to confirm your reservation:</p>\r\n        <div class=\"details\">\r\n            <p><strong>Reservation ID:</strong> #{{ReservationId}}</p>\r\n            <p><strong>Date & Time:</strong> {{ReservedTime}}</p>\r\n            <p><strong>Party Size:</strong> {{PartySize}} people</p>\r\n            <p><strong>Table(s):</strong> {{TableCodes}}</p>\r\n            <p><strong>Zone:</strong> {{Zone}}</p>\r\n        </div>\r\n        <p>If you need to change or cancel your reservation, please contact us at least 2 hours in advance.</p>\r\n        <p>We look forward to serving you!</p>\r\n        <div class=\"footer\">\r\n            <p>An Lac Restaurant<br>123 Restaurant Street, City<br>Phone: (+84) 123-456-789</p>\r\n        </div>\r\n    </div>\r\n</body>\r\n</html>",
+                            CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Email sent to customers after a successful online reservation.",
+                            Subject = "Reservation Confirmed - An Lac Restaurant",
+                            TemplateCode = "RESERVATION_CONFIRM",
+                            TemplateName = "Reservation Confirmation"
+                        });
                 });
 
             modelBuilder.Entity("Core.Entity.I18nLanguage", b =>
@@ -1090,6 +1250,202 @@ namespace Infa.Data.Migrations
                     b.ToTable("media_asset", (string)null);
                 });
 
+            modelBuilder.Entity("Core.Entity.Notification", b =>
+                {
+                    b.Property<long>("NotificationId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("notification_id");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("NotificationId"));
+
+                    b.Property<string>("ActionUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)")
+                        .HasColumnName("action_url");
+
+                    b.Property<string>("Body")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)")
+                        .HasColumnName("body");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("EntityId")
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("entity_id");
+
+                    b.Property<string>("EntityType")
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("entity_type");
+
+                    b.Property<string>("MetadataJson")
+                        .HasColumnType("json")
+                        .HasColumnName("metadata_json");
+
+                    b.Property<string>("Priority")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)")
+                        .HasColumnName("priority");
+
+                    b.Property<bool>("RequireAck")
+                        .HasColumnType("tinyint(1)")
+                        .HasColumnName("require_ack");
+
+                    b.Property<string>("SoundKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)")
+                        .HasColumnName("sound_key");
+
+                    b.Property<string>("TargetPermissions")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)")
+                        .HasColumnName("target_permissions");
+
+                    b.Property<string>("TargetUserIds")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)")
+                        .HasColumnName("target_user_ids");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)")
+                        .HasColumnName("title");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("type");
+
+                    b.HasKey("NotificationId")
+                        .HasName("PRIMARY");
+
+                    b.HasIndex(new[] { "CreatedAt" }, "idx_notifications_created_at");
+
+                    b.HasIndex(new[] { "Type" }, "idx_notifications_type");
+
+                    b.ToTable("notifications", (string)null);
+                });
+
+            modelBuilder.Entity("Core.Entity.NotificationPreference", b =>
+                {
+                    b.Property<long>("NotificationPreferenceId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("notification_preference_id");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("NotificationPreferenceId"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_enabled");
+
+                    b.Property<string>("NotificationType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("notification_type");
+
+                    b.Property<bool>("SoundEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(true)
+                        .HasColumnName("sound_enabled");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("NotificationPreferenceId")
+                        .HasName("PRIMARY");
+
+                    b.HasIndex(new[] { "UserId" }, "idx_notification_pref_user_id");
+
+                    b.HasIndex(new[] { "UserId", "NotificationType" }, "uq_notification_pref_user_type")
+                        .IsUnique();
+
+                    b.ToTable("notification_preferences", (string)null);
+                });
+
+            modelBuilder.Entity("Core.Entity.NotificationReadState", b =>
+                {
+                    b.Property<long>("NotificationReadStateId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("notification_read_state_id");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("NotificationReadStateId"));
+
+                    b.Property<DateTime?>("AcknowledgedAt")
+                        .HasColumnType("datetime")
+                        .HasColumnName("acknowledged_at");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<bool>("IsAcknowledged")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_acknowledged");
+
+                    b.Property<bool>("IsRead")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_read");
+
+                    b.Property<long>("NotificationId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("notification_id");
+
+                    b.Property<DateTime?>("ReadAt")
+                        .HasColumnType("datetime")
+                        .HasColumnName("read_at");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("NotificationReadStateId")
+                        .HasName("PRIMARY");
+
+                    b.HasIndex(new[] { "NotificationId" }, "idx_nrs_notification_id");
+
+                    b.HasIndex(new[] { "UserId", "IsRead" }, "idx_nrs_user_is_read");
+
+                    b.HasIndex(new[] { "NotificationId", "UserId" }, "uq_notification_user")
+                        .IsUnique();
+
+                    b.ToTable("notification_read_states", (string)null);
+                });
+
             modelBuilder.Entity("Core.Entity.Order", b =>
                 {
                     b.Property<long>("OrderId")
@@ -1155,6 +1511,45 @@ namespace Infa.Data.Migrations
                     b.HasIndex(new[] { "TableId" }, "table_id");
 
                     b.ToTable("orders", (string)null);
+                });
+
+            modelBuilder.Entity("Core.Entity.OrderCoupon", b =>
+                {
+                    b.Property<long>("OrderCouponId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("order_coupon_id");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("OrderCouponId"));
+
+                    b.Property<DateTime?>("AppliedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime")
+                        .HasColumnName("applied_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<long>("CouponId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("coupon_id");
+
+                    b.Property<decimal>("DiscountAmount")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("decimal(14,2)")
+                        .HasColumnName("discount_amount");
+
+                    b.Property<long>("OrderId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("order_id");
+
+                    b.HasKey("OrderCouponId")
+                        .HasName("PRIMARY");
+
+                    b.HasIndex(new[] { "CouponId" }, "idx_order_coupon_coupon");
+
+                    b.HasIndex(new[] { "OrderId", "CouponId" }, "uq_order_coupon")
+                        .IsUnique();
+
+                    b.ToTable("order_coupon", (string)null);
                 });
 
             modelBuilder.Entity("Core.Entity.OrderItem", b =>
@@ -1554,7 +1949,9 @@ namespace Infa.Data.Migrations
                         .HasColumnName("email");
 
                     b.Property<string>("Notes")
-                        .HasColumnType("longtext");
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)")
+                        .HasColumnName("notes");
 
                     b.Property<int>("PartySize")
                         .HasColumnType("int")
@@ -1876,64 +2273,17 @@ namespace Infa.Data.Migrations
                         .HasColumnType("int unsigned")
                         .HasColumnName("assignment_status_lv_id");
 
-                    b.Property<string>("Remarks")
-                        .HasMaxLength(500)
-                        .HasColumnType("varchar(500)")
-                        .HasColumnName("remarks");
-
-                    b.Property<long>("RoleId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("role_id");
-
-                    b.Property<long>("ShiftScheduleId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("shift_schedule_id");
-
-                    b.Property<long>("StaffId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("staff_id");
-
-                    b.HasKey("ShiftAssignmentId")
-                        .HasName("PRIMARY");
-
-                    b.HasIndex("AssignedBy");
-
-                    b.HasIndex("AssignmentStatusLvId");
-
-                    b.HasIndex("RoleId");
-
-                    b.HasIndex(new[] { "ShiftScheduleId" }, "idx_shift_assignment_schedule");
-
-                    b.HasIndex(new[] { "StaffId" }, "idx_shift_assignment_staff");
-
-                    b.HasIndex(new[] { "ShiftScheduleId", "StaffId" }, "uq_shift_assignment_schedule_staff")
-                        .IsUnique();
-
-                    b.ToTable("shift_assignment", (string)null);
-                });
-
-            modelBuilder.Entity("Core.Entity.ShiftSchedule", b =>
-                {
-                    b.Property<long>("ShiftScheduleId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("shift_schedule_id");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("ShiftScheduleId"));
-
-                    b.Property<DateOnly>("BusinessDate")
-                        .HasColumnType("date")
-                        .HasColumnName("business_date");
-
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime")
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-                    b.Property<long>("CreatedBy")
-                        .HasColumnType("bigint")
-                        .HasColumnName("created_by");
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_active");
 
                     b.Property<string>("Notes")
                         .HasMaxLength(500)
@@ -1948,13 +2298,101 @@ namespace Infa.Data.Migrations
                         .HasColumnType("datetime")
                         .HasColumnName("planned_start_at");
 
-                    b.Property<uint>("ShiftTypeLvId")
-                        .HasColumnType("int unsigned")
-                        .HasColumnName("shift_type_lv_id");
+                    b.Property<long>("ShiftTemplateId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("shift_template_id");
 
-                    b.Property<uint>("StatusLvId")
-                        .HasColumnType("int unsigned")
-                        .HasColumnName("status_lv_id");
+                    b.Property<long>("StaffId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("staff_id");
+
+                    b.Property<string>("Tags")
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)")
+                        .HasColumnName("tags");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("datetime")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlComputedColumn(b.Property<DateTime>("UpdatedAt"));
+
+                    b.Property<DateOnly>("WorkDate")
+                        .HasColumnType("date")
+                        .HasColumnName("work_date");
+
+                    b.HasKey("ShiftAssignmentId")
+                        .HasName("PRIMARY");
+
+                    b.HasIndex("AssignedBy");
+
+                    b.HasIndex(new[] { "StaffId" }, "idx_shift_assignment_staff");
+
+                    b.HasIndex(new[] { "AssignmentStatusLvId" }, "idx_shift_assignment_status_lv");
+
+                    b.HasIndex(new[] { "ShiftTemplateId" }, "idx_shift_assignment_template");
+
+                    b.HasIndex(new[] { "WorkDate" }, "idx_shift_assignment_work_date");
+
+                    b.HasIndex(new[] { "ShiftTemplateId", "WorkDate", "StaffId" }, "uq_shift_assignment_template_date_staff")
+                        .IsUnique();
+
+                    b.ToTable("shift_assignment", (string)null);
+                });
+
+            modelBuilder.Entity("Core.Entity.ShiftTemplate", b =>
+                {
+                    b.Property<long>("ShiftTemplateId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("shift_template_id");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("ShiftTemplateId"));
+
+                    b.Property<int?>("BufferAfterMinutes")
+                        .HasColumnType("int")
+                        .HasColumnName("buffer_after_minutes");
+
+                    b.Property<int?>("BufferBeforeMinutes")
+                        .HasColumnType("int")
+                        .HasColumnName("buffer_before_minutes");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<long>("CreatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by");
+
+                    b.Property<TimeOnly>("DefaultEndTime")
+                        .HasColumnType("time")
+                        .HasColumnName("default_end_time");
+
+                    b.Property<TimeOnly>("DefaultStartTime")
+                        .HasColumnType("time")
+                        .HasColumnName("default_start_time");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("TemplateName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)")
+                        .HasColumnName("template_name");
 
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAddOrUpdate()
@@ -1968,20 +2406,19 @@ namespace Infa.Data.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("updated_by");
 
-                    b.HasKey("ShiftScheduleId")
+                    b.HasKey("ShiftTemplateId")
                         .HasName("PRIMARY");
 
                     b.HasIndex("CreatedBy");
 
                     b.HasIndex("UpdatedBy");
 
-                    b.HasIndex(new[] { "BusinessDate" }, "idx_shift_schedule_business_date");
+                    b.HasIndex(new[] { "IsActive" }, "idx_shift_template_active");
 
-                    b.HasIndex(new[] { "StatusLvId" }, "idx_shift_schedule_status_lv");
+                    b.HasIndex(new[] { "TemplateName" }, "uq_shift_template_name")
+                        .IsUnique();
 
-                    b.HasIndex(new[] { "ShiftTypeLvId" }, "idx_shift_schedule_type_lv");
-
-                    b.ToTable("shift_schedule", (string)null);
+                    b.ToTable("shift_template", (string)null);
                 });
 
             modelBuilder.Entity("Core.Entity.StaffAccount", b =>
@@ -2032,6 +2469,9 @@ namespace Infa.Data.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("varchar(30)")
                         .HasColumnName("phone");
+
+                    b.Property<string>("RegisteredDeviceId")
+                        .HasColumnType("longtext");
 
                     b.Property<long>("RoleId")
                         .HasColumnType("bigint")
@@ -2195,6 +2635,75 @@ namespace Infa.Data.Migrations
                     b.ToTable("table_media", (string)null);
                 });
 
+            modelBuilder.Entity("Core.Entity.TimeLog", b =>
+                {
+                    b.Property<long>("TimeLogId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("time_log_id");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("TimeLogId"));
+
+                    b.Property<long>("AttendanceRecordId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("attendance_record_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("DeviceIdIn")
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)")
+                        .HasColumnName("device_id_in");
+
+                    b.Property<string>("DeviceIdOut")
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)")
+                        .HasColumnName("device_id_out");
+
+                    b.Property<string>("GpsLocationIn")
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("gps_location_in");
+
+                    b.Property<string>("GpsLocationOut")
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("gps_location_out");
+
+                    b.Property<int>("PunchDurationMinutes")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasColumnName("punch_duration_minutes");
+
+                    b.Property<DateTime>("PunchInTime")
+                        .HasColumnType("datetime")
+                        .HasColumnName("punch_in_time");
+
+                    b.Property<DateTime?>("PunchOutTime")
+                        .HasColumnType("datetime")
+                        .HasColumnName("punch_out_time");
+
+                    b.Property<string>("ValidationStatus")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)")
+                        .HasDefaultValue("Valid")
+                        .HasColumnName("validation_status");
+
+                    b.HasKey("TimeLogId")
+                        .HasName("PRIMARY");
+
+                    b.HasIndex(new[] { "AttendanceRecordId" }, "idx_time_log_attendance");
+
+                    b.ToTable("time_log", (string)null);
+                });
+
             modelBuilder.Entity("ReservationTable", b =>
                 {
                     b.Property<long>("ReservationId")
@@ -2280,6 +2789,25 @@ namespace Infa.Data.Migrations
                         .HasConstraintName("auth_session_ibfk_1");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Core.Entity.Coupon", b =>
+                {
+                    b.HasOne("Core.Entity.LookupValue", "CouponStatusLv")
+                        .WithMany("CouponCouponStatusLvs")
+                        .HasForeignKey("CouponStatusLvId")
+                        .IsRequired()
+                        .HasConstraintName("fk_coupon_status_lv");
+
+                    b.HasOne("Core.Entity.LookupValue", "TypeLv")
+                        .WithMany("CouponTypeLvs")
+                        .HasForeignKey("TypeLvId")
+                        .IsRequired()
+                        .HasConstraintName("fk_coupon_type_lv");
+
+                    b.Navigation("CouponStatusLv");
+
+                    b.Navigation("TypeLv");
                 });
 
             modelBuilder.Entity("Core.Entity.CurrentStock", b =>
@@ -2617,6 +3145,18 @@ namespace Infa.Data.Migrations
                     b.Navigation("MediaTypeLv");
                 });
 
+            modelBuilder.Entity("Core.Entity.NotificationReadState", b =>
+                {
+                    b.HasOne("Core.Entity.Notification", "Notification")
+                        .WithMany("ReadStates")
+                        .HasForeignKey("NotificationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_nrs_notification");
+
+                    b.Navigation("Notification");
+                });
+
             modelBuilder.Entity("Core.Entity.Order", b =>
                 {
                     b.HasOne("Core.Entity.Customer", "Customer")
@@ -2656,6 +3196,25 @@ namespace Infa.Data.Migrations
                     b.Navigation("Staff");
 
                     b.Navigation("Table");
+                });
+
+            modelBuilder.Entity("Core.Entity.OrderCoupon", b =>
+                {
+                    b.HasOne("Core.Entity.Coupon", "Coupon")
+                        .WithMany("OrderCoupons")
+                        .HasForeignKey("CouponId")
+                        .IsRequired()
+                        .HasConstraintName("fk_order_coupon_coupon");
+
+                    b.HasOne("Core.Entity.Order", "Order")
+                        .WithMany("OrderCoupons")
+                        .HasForeignKey("OrderId")
+                        .IsRequired()
+                        .HasConstraintName("fk_order_coupon_order");
+
+                    b.Navigation("Coupon");
+
+                    b.Navigation("Order");
                 });
 
             modelBuilder.Entity("Core.Entity.OrderItem", b =>
@@ -2856,7 +3415,7 @@ namespace Infa.Data.Migrations
                     b.HasOne("Core.Entity.MediaAsset", "TableQrImgNavigation")
                         .WithMany("RestaurantTables")
                         .HasForeignKey("TableQrImg")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.SetNull)
                         .HasConstraintName("FK_restaurant_table_table_qr_img");
 
                     b.HasOne("Core.Entity.LookupValue", "TableStatusLv")
@@ -2990,18 +3549,12 @@ namespace Infa.Data.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_shift_assignment_status_lv");
 
-                    b.HasOne("Core.Entity.Role", "Role")
-                        .WithMany()
-                        .HasForeignKey("RoleId")
-                        .IsRequired()
-                        .HasConstraintName("fk_shift_assignment_role");
-
-                    b.HasOne("Core.Entity.ShiftSchedule", "ShiftSchedule")
+                    b.HasOne("Core.Entity.ShiftTemplate", "ShiftTemplate")
                         .WithMany("ShiftAssignments")
-                        .HasForeignKey("ShiftScheduleId")
+                        .HasForeignKey("ShiftTemplateId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
-                        .HasConstraintName("fk_shift_assignment_schedule");
+                        .HasConstraintName("fk_shift_assignment_template");
 
                     b.HasOne("Core.Entity.StaffAccount", "Staff")
                         .WithMany()
@@ -3013,43 +3566,25 @@ namespace Infa.Data.Migrations
 
                     b.Navigation("AssignmentStatusLv");
 
-                    b.Navigation("Role");
-
-                    b.Navigation("ShiftSchedule");
+                    b.Navigation("ShiftTemplate");
 
                     b.Navigation("Staff");
                 });
 
-            modelBuilder.Entity("Core.Entity.ShiftSchedule", b =>
+            modelBuilder.Entity("Core.Entity.ShiftTemplate", b =>
                 {
                     b.HasOne("Core.Entity.StaffAccount", "CreatedByStaff")
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .IsRequired()
-                        .HasConstraintName("fk_shift_schedule_created_by");
-
-                    b.HasOne("Core.Entity.LookupValue", "ShiftTypeLv")
-                        .WithMany()
-                        .HasForeignKey("ShiftTypeLvId")
-                        .IsRequired()
-                        .HasConstraintName("fk_shift_schedule_type_lv");
-
-                    b.HasOne("Core.Entity.LookupValue", "StatusLv")
-                        .WithMany()
-                        .HasForeignKey("StatusLvId")
-                        .IsRequired()
-                        .HasConstraintName("fk_shift_schedule_status_lv");
+                        .HasConstraintName("fk_shift_template_created_by");
 
                     b.HasOne("Core.Entity.StaffAccount", "UpdatedByStaff")
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
-                        .HasConstraintName("fk_shift_schedule_updated_by");
+                        .HasConstraintName("fk_shift_template_updated_by");
 
                     b.Navigation("CreatedByStaff");
-
-                    b.Navigation("ShiftTypeLv");
-
-                    b.Navigation("StatusLv");
 
                     b.Navigation("UpdatedByStaff");
                 });
@@ -3094,6 +3629,18 @@ namespace Infa.Data.Migrations
                     b.Navigation("Table");
                 });
 
+            modelBuilder.Entity("Core.Entity.TimeLog", b =>
+                {
+                    b.HasOne("Core.Entity.AttendanceRecord", "AttendanceRecord")
+                        .WithMany("TimeLogs")
+                        .HasForeignKey("AttendanceRecordId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_time_log_attendance");
+
+                    b.Navigation("AttendanceRecord");
+                });
+
             modelBuilder.Entity("ReservationTable", b =>
                 {
                     b.HasOne("Core.Entity.Reservation", null)
@@ -3122,6 +3669,16 @@ namespace Infa.Data.Migrations
                         .HasForeignKey("RoleId")
                         .IsRequired()
                         .HasConstraintName("role_permission_ibfk_1");
+                });
+
+            modelBuilder.Entity("Core.Entity.AttendanceRecord", b =>
+                {
+                    b.Navigation("TimeLogs");
+                });
+
+            modelBuilder.Entity("Core.Entity.Coupon", b =>
+                {
+                    b.Navigation("OrderCoupons");
                 });
 
             modelBuilder.Entity("Core.Entity.Customer", b =>
@@ -3222,6 +3779,10 @@ namespace Infa.Data.Migrations
 
             modelBuilder.Entity("Core.Entity.LookupValue", b =>
                 {
+                    b.Navigation("CouponCouponStatusLvs");
+
+                    b.Navigation("CouponTypeLvs");
+
                     b.Navigation("Dishes");
 
                     b.Navigation("Ingredients");
@@ -3270,8 +3831,15 @@ namespace Infa.Data.Migrations
                     b.Navigation("TableMedia");
                 });
 
+            modelBuilder.Entity("Core.Entity.Notification", b =>
+                {
+                    b.Navigation("ReadStates");
+                });
+
             modelBuilder.Entity("Core.Entity.Order", b =>
                 {
+                    b.Navigation("OrderCoupons");
+
                     b.Navigation("OrderItems");
 
                     b.Navigation("OrderPromotions");
@@ -3319,7 +3887,7 @@ namespace Infa.Data.Migrations
                     b.Navigation("AttendanceRecord");
                 });
 
-            modelBuilder.Entity("Core.Entity.ShiftSchedule", b =>
+            modelBuilder.Entity("Core.Entity.ShiftTemplate", b =>
                 {
                     b.Navigation("ShiftAssignments");
                 });

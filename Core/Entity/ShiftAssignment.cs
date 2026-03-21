@@ -22,8 +22,14 @@ public partial class ShiftAssignment
     /// <summary>Planned shift end (copied from template defaults, can be overridden).</summary>
     public DateTime PlannedEndAt { get; set; }
 
-    /// <summary>False when assignment is cancelled.</summary>
+    /// <summary>FK → lookup_value (SHIFT_ASSIGNMENT_STATUS): DRAFT, ASSIGNED, CONFIRMED, CANCELLED.</summary>
+    public uint AssignmentStatusLvId { get; set; }
+
+    /// <summary>False when assignment is cancelled (soft delete).</summary>
     public bool IsActive { get; set; } = true;
+
+    /// <summary>Metadata tags, e.g. "SPLIT_SHIFT" for Ca Gãy.</summary>
+    public string? Tags { get; set; }
 
     public string? Notes { get; set; }
 
@@ -42,6 +48,8 @@ public partial class ShiftAssignment
     public virtual StaffAccount Staff { get; set; } = null!;
 
     public virtual StaffAccount AssignedByStaff { get; set; } = null!;
+
+    public virtual LookupValue AssignmentStatusLv { get; set; } = null!;
 
     public virtual AttendanceRecord? AttendanceRecord { get; set; }
 }

@@ -84,6 +84,7 @@ namespace Core.Data
         public const string ViewShiftReport = "SHIFT:REPORT_READ";
         public const string CloseShift = "SHIFT:CLOSE";
         public const string ManageShiftTemplate = "SHIFT:MANAGE_TEMPLATE";
+        public const string PublishShift = "SHIFT:PUBLISH";
 
 		public const string ViewCustomer = "CUSTOMER:READ";
 		public const string CreateCustomer = "CUSTOMER:CREATE";

@@ -29,6 +29,12 @@ public sealed class ShiftTemplateConfiguration : IEntityTypeConfiguration<ShiftT
             .HasMaxLength(500)
             .HasColumnName("description");
 
+        entity.Property(e => e.BufferBeforeMinutes)
+            .HasColumnName("buffer_before_minutes");
+
+        entity.Property(e => e.BufferAfterMinutes)
+            .HasColumnName("buffer_after_minutes");
+
         entity.Property(e => e.IsActive)
             .HasDefaultValue(true)
             .HasColumnName("is_active");

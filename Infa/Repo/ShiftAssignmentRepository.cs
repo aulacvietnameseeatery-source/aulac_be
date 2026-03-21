@@ -1,5 +1,6 @@
 using Core.DTO.Shift;
 using Core.Entity;
+using Core.Enum;
 using Core.Interface.Repo;
 using Infa.Data;
 using Microsoft.EntityFrameworkCore;
@@ -16,6 +17,7 @@ public class ShiftAssignmentRepository : IShiftAssignmentRepository
     }
 
     public void Add(ShiftAssignment entity) => _context.ShiftAssignments.Add(entity);
+    public void AddRange(IEnumerable<ShiftAssignment> entities) => _context.ShiftAssignments.AddRange(entities);
 
     public async Task<ShiftAssignment?> GetByIdAsync(long id, CancellationToken ct = default)
     {
@@ -31,10 +33,13 @@ public class ShiftAssignmentRepository : IShiftAssignmentRepository
             .Include(a => a.ShiftTemplate)
             .Include(a => a.Staff)
             .Include(a => a.AssignedByStaff)
+            .Include(a => a.AssignmentStatusLv)
             .Include(a => a.AttendanceRecord)
                 .ThenInclude(ar => ar!.AttendanceStatusLv)
             .Include(a => a.AttendanceRecord)
                 .ThenInclude(ar => ar!.ReviewedByStaff)
+            .Include(a => a.AttendanceRecord)
+                .ThenInclude(ar => ar!.TimeLogs)
             .FirstOrDefaultAsync(a => a.ShiftAssignmentId == id, ct);
     }
 
@@ -45,6 +50,7 @@ public class ShiftAssignmentRepository : IShiftAssignmentRepository
             .Include(a => a.ShiftTemplate)
             .Include(a => a.Staff)
             .Include(a => a.AssignedByStaff)
+            .Include(a => a.AssignmentStatusLv)
             .Include(a => a.AttendanceRecord)
                 .ThenInclude(ar => ar!.AttendanceStatusLv)
             .AsNoTracking()
@@ -64,6 +70,9 @@ public class ShiftAssignmentRepository : IShiftAssignmentRepository
 
         if (request.IsActive.HasValue)
             query = query.Where(a => a.IsActive == request.IsActive.Value);
+
+        if (!string.IsNullOrEmpty(request.AssignmentStatusCode))
+            query = query.Where(a => a.AssignmentStatusLv.ValueCode == request.AssignmentStatusCode);
 
         var totalCount = await query.CountAsync(ct);
 
@@ -203,5 +212,97 @@ public class ShiftAssignmentRepository : IShiftAssignmentRepository
             .ToListAsync(ct);
 
         return (items, totalCount);
+    }
+
+    public async Task<List<ShiftAssignment>> GetDraftAssignmentsAsync(
+        DateOnly fromDate, DateOnly toDate, CancellationToken ct = default)
+    {
+        return await _context.ShiftAssignments
+            .Include(a => a.ShiftTemplate)
+            .Include(a => a.Staff)
+            .Include(a => a.AssignmentStatusLv)
+            .Where(a => a.IsActive
+                && a.WorkDate >= fromDate
+                && a.WorkDate <= toDate
+                && a.AssignmentStatusLv.ValueCode == nameof(ShiftAssignmentStatusCode.DRAFT))
+            .ToListAsync(ct);
+    }
+
+    public async Task<List<ShiftAssignment>> GetByIdsWithDetailsAsync(
+        IEnumerable<long> ids, CancellationToken ct = default)
+    {
+        var idList = ids.ToList();
+        return await _context.ShiftAssignments
+            .Include(a => a.ShiftTemplate)
+            .Include(a => a.Staff)
+            .Include(a => a.AssignedByStaff)
+            .Include(a => a.AssignmentStatusLv)
+            .Where(a => idList.Contains(a.ShiftAssignmentId))
+            .ToListAsync(ct);
+    }
+
+    public async Task<List<ShiftAssignment>> GetWeekAssignmentsAsync(
+        DateOnly weekStart, CancellationToken ct = default)
+    {
+        var weekEnd = weekStart.AddDays(6);
+        return await _context.ShiftAssignments
+            .Include(a => a.ShiftTemplate)
+            .AsNoTracking()
+            .Where(a => a.IsActive && a.WorkDate >= weekStart && a.WorkDate <= weekEnd)
+            .ToListAsync(ct);
+    }
+
+    public async Task<List<ShiftAssignment>> GetTeamScheduleAsync(
+        DateOnly weekStart, long? shiftTemplateId, CancellationToken ct = default)
+    {
+        var weekEnd = weekStart.AddDays(6);
+        var query = _context.ShiftAssignments
+            .Include(a => a.ShiftTemplate)
+            .Include(a => a.Staff)
+            .Include(a => a.AssignmentStatusLv)
+            .Include(a => a.AttendanceRecord)
+                .ThenInclude(ar => ar!.AttendanceStatusLv)
+            .AsNoTracking()
+            .Where(a => a.IsActive && a.WorkDate >= weekStart && a.WorkDate <= weekEnd);
+
+        if (shiftTemplateId.HasValue)
+            query = query.Where(a => a.ShiftTemplateId == shiftTemplateId.Value);
+
+        return await query
+            .OrderBy(a => a.WorkDate)
+                .ThenBy(a => a.PlannedStartAt)
+                .ThenBy(a => a.Staff.FullName)
+            .ToListAsync(ct);
+    }
+
+    public async Task<int> GetWeeklyScheduledMinutesAsync(
+        long staffId, DateOnly weekStart, CancellationToken ct = default)
+    {
+        var weekEnd = weekStart.AddDays(6);
+        var assignments = await _context.ShiftAssignments
+            .AsNoTracking()
+            .Where(a => a.StaffId == staffId
+                && a.IsActive
+                && a.WorkDate >= weekStart
+                && a.WorkDate <= weekEnd)
+            .Select(a => new { a.PlannedStartAt, a.PlannedEndAt })
+            .ToListAsync(ct);
+
+        return assignments.Sum(a => (int)(a.PlannedEndAt - a.PlannedStartAt).TotalMinutes);
+    }
+
+    public async Task<List<ShiftAssignment>> GetNoShowCandidatesAsync(
+        DateTime thresholdUtc, CancellationToken ct = default)
+    {
+        return await _context.ShiftAssignments
+            .Include(a => a.ShiftTemplate)
+            .Include(a => a.Staff)
+            .Include(a => a.AssignmentStatusLv)
+            .Where(a => a.IsActive
+                && a.PlannedStartAt <= thresholdUtc
+                && a.AttendanceRecord == null
+                && a.AssignmentStatusLv.ValueCode != nameof(ShiftAssignmentStatusCode.DRAFT)
+                && a.AssignmentStatusLv.ValueCode != nameof(ShiftAssignmentStatusCode.CANCELLED))
+            .ToListAsync(ct);
     }
 }

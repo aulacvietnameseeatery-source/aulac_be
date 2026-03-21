@@ -210,6 +210,106 @@ public class ShiftController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>Bulk-create assignments for multiple staff on a single shift/date.</summary>
+    [HttpPost("assignments/bulk")]
+    [HasPermission(Permissions.AssignShift)]
+    [ProducesResponseType(typeof(ApiResponse<List<ShiftAssignmentDetailDto>>), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> BulkCreateAssignment([FromBody] BulkCreateAssignmentRequest request, CancellationToken ct)
+    {
+        var dtos = await _assignmentService.BulkCreateAssignmentsAsync(request, GetStaffId(), ct);
+        return StatusCode(StatusCodes.Status201Created, new ApiResponse<List<ShiftAssignmentDetailDto>>
+        {
+            Success = true, Code = 201,
+            UserMessage = $"{dtos.Count} shift assignment(s) created successfully.",
+            Data = dtos, ServerTime = DateTimeOffset.UtcNow
+        });
+    }
+
+    /// <summary>Publishes DRAFT assignments → ASSIGNED, notifying staff members.</summary>
+    [HttpPost("assignments/publish")]
+    [HasPermission(Permissions.PublishShift)]
+    [ProducesResponseType(typeof(ApiResponse<List<ShiftAssignmentListDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> PublishAssignments([FromBody] PublishAssignmentsRequest request, CancellationToken ct)
+    {
+        var dtos = await _assignmentService.PublishAssignmentsAsync(request, GetStaffId(), ct);
+        return Ok(new ApiResponse<List<ShiftAssignmentListDto>>
+        {
+            Success = true, Code = 200,
+            UserMessage = $"{dtos.Count} assignment(s) published successfully.",
+            Data = dtos, ServerTime = DateTimeOffset.UtcNow
+        });
+    }
+
+    /// <summary>Copies all active assignments from source week to target week.</summary>
+    [HttpPost("assignments/copy-week")]
+    [HasPermission(Permissions.AssignShift)]
+    [ProducesResponseType(typeof(ApiResponse<List<ShiftAssignmentListDto>>), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> CopyWeek([FromBody] CopyWeekRequest request, CancellationToken ct)
+    {
+        var dtos = await _assignmentService.CopyWeekAsync(request, GetStaffId(), ct);
+        return StatusCode(StatusCodes.Status201Created, new ApiResponse<List<ShiftAssignmentListDto>>
+        {
+            Success = true, Code = 201,
+            UserMessage = $"{dtos.Count} assignment(s) copied successfully.",
+            Data = dtos, ServerTime = DateTimeOffset.UtcNow
+        });
+    }
+
+    /// <summary>Reassigns a shift to a different staff member.</summary>
+    [HttpPut("assignments/{id:long}/reassign")]
+    [HasPermission(Permissions.AssignShift)]
+    [ProducesResponseType(typeof(ApiResponse<ShiftAssignmentDetailDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> ReassignAssignment(long id, [FromBody] ReassignRequest request, CancellationToken ct)
+    {
+        var dto = await _assignmentService.ReassignAsync(id, request, GetStaffId(), ct);
+        return Ok(new ApiResponse<ShiftAssignmentDetailDto>
+        {
+            Success = true, Code = 200,
+            UserMessage = "Shift reassigned successfully.",
+            Data = dto, ServerTime = DateTimeOffset.UtcNow
+        });
+    }
+
+    /// <summary>Staff confirms their own upcoming assigned shift.</summary>
+    [HttpPost("assignments/{id:long}/confirm")]
+    [HasPermission(Permissions.ViewOwnShift)]
+    [ProducesResponseType(typeof(ApiResponse<ShiftAssignmentDetailDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> ConfirmAssignment(long id, CancellationToken ct)
+    {
+        var dto = await _assignmentService.ConfirmAssignmentAsync(id, GetStaffId(), ct);
+        return Ok(new ApiResponse<ShiftAssignmentDetailDto>
+        {
+            Success = true, Code = 200,
+            UserMessage = "Shift confirmed successfully.",
+            Data = dto, ServerTime = DateTimeOffset.UtcNow
+        });
+    }
+
+    /// <summary>Returns the team schedule (all staff × 7 days) for a given week.</summary>
+    [HttpGet("team-schedule")]
+    [HasPermission(Permissions.ViewShift)]
+    [ProducesResponseType(typeof(ApiResponse<List<ShiftAssignmentListDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetTeamSchedule([FromQuery] TeamScheduleRequest request, CancellationToken ct)
+    {
+        var data = await _assignmentService.GetTeamScheduleAsync(request, ct);
+        return Ok(new ApiResponse<List<ShiftAssignmentListDto>>
+        {
+            Success = true, Code = 200,
+            UserMessage = "Team schedule retrieved successfully.",
+            Data = data, ServerTime = DateTimeOffset.UtcNow
+        });
+    }
+
     // ─────────────────────────────────────────────────────────────
     //  MY SHIFTS (staff-only view)
     // ─────────────────────────────────────────────────────────────
