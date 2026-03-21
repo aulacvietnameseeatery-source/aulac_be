@@ -244,15 +244,15 @@ public class PublicReservationService : IPublicReservationService
             }
 
             var created = await _reservationRepository.CreateAsync(reservation, ct);
-            await _uow.CommitAsync(ct);
-
             var tableCodes = string.Join(", ", candidates.Select(x => x.TableCode));
 
-            // Send confirmation email asynchronously (background queue)
+            // Send confirmation email (inside transaction to ensure connection lives)
             if (!string.IsNullOrWhiteSpace(created.Email))
             {
-                _ = SendReservationConfirmationEmailAsync(created, tableCodes);
+                await SendReservationConfirmationEmailAsync(created, tableCodes);
             }
+
+            await _uow.CommitAsync(ct);
 
             var zones = candidates
                 .Select(x => x.Zone)
@@ -459,6 +459,7 @@ public class PublicReservationService : IPublicReservationService
                 .Replace("{{ReservedTime}}", reservation.ReservedTime.ToString("dd/MM/yyyy HH:mm"))
                 .Replace("{{PartySize}}", reservation.PartySize.ToString())
                 .Replace("{{TableCode}}", tableCodes)
+                .Replace("{{TableCodes}}", tableCodes)
                 .Replace("{{ReservationId}}", reservation.ReservationId.ToString());
 
             var queuedEmail = new QueuedEmail(
