@@ -26,9 +26,16 @@ public sealed class ShiftAssignmentConfiguration : IEntityTypeConfiguration<Shif
             .HasColumnType("datetime")
             .HasColumnName("planned_end_at");
 
+        entity.Property(e => e.AssignmentStatusLvId)
+            .HasColumnName("assignment_status_lv_id");
+
         entity.Property(e => e.IsActive)
             .HasDefaultValue(true)
             .HasColumnName("is_active");
+
+        entity.Property(e => e.Tags)
+            .HasMaxLength(200)
+            .HasColumnName("tags");
 
         entity.Property(e => e.Notes)
             .HasMaxLength(500)
@@ -56,6 +63,7 @@ public sealed class ShiftAssignmentConfiguration : IEntityTypeConfiguration<Shif
         entity.HasIndex(e => e.ShiftTemplateId, "idx_shift_assignment_template");
         entity.HasIndex(e => e.StaffId, "idx_shift_assignment_staff");
         entity.HasIndex(e => e.WorkDate, "idx_shift_assignment_work_date");
+        entity.HasIndex(e => e.AssignmentStatusLvId, "idx_shift_assignment_status_lv");
         entity.HasIndex(e => new { e.ShiftTemplateId, e.WorkDate, e.StaffId }, "uq_shift_assignment_template_date_staff").IsUnique();
 
         // Relationships
@@ -76,5 +84,11 @@ public sealed class ShiftAssignmentConfiguration : IEntityTypeConfiguration<Shif
             .HasForeignKey(e => e.AssignedBy)
             .OnDelete(DeleteBehavior.ClientSetNull)
             .HasConstraintName("fk_shift_assignment_assigned_by");
+
+        entity.HasOne(e => e.AssignmentStatusLv)
+            .WithMany()
+            .HasForeignKey(e => e.AssignmentStatusLvId)
+            .OnDelete(DeleteBehavior.ClientSetNull)
+            .HasConstraintName("fk_shift_assignment_status_lv");
     }
 }

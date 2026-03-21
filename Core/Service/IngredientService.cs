@@ -1,8 +1,12 @@
-﻿using Core.DTO.Ingredient;
+﻿using Core.Data;
+using Core.DTO.Ingredient;
+using Core.DTO.Notification;
 using Core.DTO.Supplier;
 using Core.Entity;
+using Core.Enum;
 using Core.Interface.Repo;
 using Core.Interface.Service.Entity;
+using Core.Interface.Service.Notification;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,10 +18,12 @@ namespace Core.Service
     public class IngredientService : IIngredientService
     {
         private readonly IIngredientRepository _repo;
+        private readonly INotificationService _notificationService;
 
-        public IngredientService(IIngredientRepository repo)
+        public IngredientService(IIngredientRepository repo, INotificationService notificationService)
         {
             _repo = repo;
+            _notificationService = notificationService;
         }
 
         public async Task<(List<IngredientDTO> Items, int TotalCount)> GetListAsync(IngredientFilterParams filter)
@@ -110,6 +116,33 @@ namespace Core.Service
         public async Task AdjustStockAsync(long id, AdjustStockRequest request)
         {
             await _repo.AdjustStockAsync(id, request.Quantity, request.Note);
+
+            // Check if stock fell below minimum after adjustment
+            var entity = await _repo.GetByIdAsync(id);
+            if (entity?.CurrentStock != null &&
+                entity.CurrentStock.QuantityOnHand < entity.CurrentStock.MinStockLevel)
+            {
+                await _notificationService.PublishAsync(new PublishNotificationRequest
+                {
+                    Type = nameof(NotificationType.LOW_STOCK_ALERT),
+                    Title = "Low Stock Alert",
+                    Body = $"{entity.IngredientName} stock is low: {entity.CurrentStock.QuantityOnHand} {entity.Unit} (min: {entity.CurrentStock.MinStockLevel})",
+                    Priority = nameof(NotificationPriority.High),
+                    SoundKey = "notification_high",
+                    ActionUrl = $"/dashboard/ingredients/{id}/history",
+                    EntityType = "Ingredient",
+                    EntityId = id.ToString(),
+                    Metadata = new Dictionary<string, object>
+                    {
+                        ["ingredientId"] = id.ToString(),
+                        ["ingredientName"] = entity.IngredientName,
+                        ["currentStock"] = entity.CurrentStock.QuantityOnHand.ToString(),
+                        ["minStock"] = entity.CurrentStock.MinStockLevel.ToString(),
+                        ["unit"] = entity.Unit
+                    },
+                    TargetPermissions = new List<string> { Permissions.ViewDish }
+                });
+            }
         }
 
         public async Task<List<StockHistoryDto>> GetStockHistoryAsync(long id)

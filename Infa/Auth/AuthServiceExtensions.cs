@@ -76,6 +76,18 @@ public static class AuthServiceExtensions
           // Configure JWT Bearer events for session validation
           options.Events = new JwtBearerEvents
           {
+              OnMessageReceived = context =>
+              {
+                  // Allow SignalR to receive token from query string
+                  var accessToken = context.Request.Query["access_token"];
+                  var path = context.HttpContext.Request.Path;
+                  if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+                  {
+                      context.Token = accessToken;
+                  }
+                  return Task.CompletedTask;
+              },
+
               OnTokenValidated = async context =>
             {
                 // Extract session ID from token claims

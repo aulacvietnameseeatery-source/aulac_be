@@ -39,6 +39,8 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Core.Interface.Service.Reservation;
+using Core.Interface.Service.Notification;
+using Infa.Service;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -269,6 +271,7 @@ builder.Services.AddScoped<IAttendanceService, AttendanceService>();
 
 builder.Services.AddHttpClient<ITranslationService, GoogleTranslationService>();
 builder.Services.AddScoped<IIngredientService, IngredientService>();
+builder.Services.AddScoped<IEmailTemplateService, EmailTemplateService>();
 
 
 
@@ -306,6 +309,7 @@ builder.Services.AddScoped<IShiftTemplateRepository, ShiftTemplateRepository>();
 builder.Services.AddScoped<IShiftAssignmentRepository, ShiftAssignmentRepository>();
 builder.Services.AddScoped<IAttendanceRepository, AttendanceRepository>();
 builder.Services.AddScoped<ILoginActivityRepository, LoginActivityRepository>();
+builder.Services.AddScoped<IEmailTemplateRepository, EmailTemplateRepository>();
 
 #endregion
 
@@ -344,6 +348,11 @@ builder.Services.AddScoped<IDishService, Core.Service.DishService>();
 builder.Services.AddScoped<IRealtimeNotificationService, SignalRNotificationService>();
 builder.Services.AddScoped<IJobSchedulerService, HangfireJobScheduler>();
 builder.Services.AddScoped<IOrderRealtimeService, OrderRealtimeService>();
+
+// Notification module
+builder.Services.AddScoped<INotificationRepository, Infa.Repo.NotificationRepository>();
+builder.Services.AddScoped<INotificationService, Core.Service.NotificationService>();
+builder.Services.AddScoped<INotificationRealtimePublisher, NotificationRealtimePublisher>();
 
 #endregion
 
@@ -467,6 +476,7 @@ app.UseStaticFiles();
 
 app.MapControllers();
 app.MapHub<ReservationHub>("/hubs/reservation");
+app.MapHub<RestaurantHub>("/hubs/restaurant");
 
 #endregion
 

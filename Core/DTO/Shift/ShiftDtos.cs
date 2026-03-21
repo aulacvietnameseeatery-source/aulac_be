@@ -12,7 +12,10 @@ public class ShiftAssignmentListDto
     public DateOnly WorkDate { get; set; }
     public DateTime PlannedStartAt { get; set; }
     public DateTime PlannedEndAt { get; set; }
+    public string AssignmentStatusCode { get; set; } = string.Empty;
+    public string AssignmentStatusName { get; set; } = string.Empty;
     public bool IsActive { get; set; }
+    public string? Tags { get; set; }
     public string? Notes { get; set; }
     public DateTime AssignedAt { get; set; }
     public string AssignedByName { get; set; } = string.Empty;
@@ -24,6 +27,16 @@ public class ShiftAssignmentDetailDto : ShiftAssignmentListDto
 }
 
 // Attendance DTOs
+
+public class TimeLogDto
+{
+    public long TimeLogId { get; set; }
+    public DateTime PunchInTime { get; set; }
+    public DateTime? PunchOutTime { get; set; }
+    public string ValidationStatus { get; set; } = "Valid";
+    public int PunchDurationMinutes { get; set; }
+    public DateTime CreatedAt { get; set; }
+}
 
 public class AttendanceRecordDto
 {
@@ -40,6 +53,7 @@ public class AttendanceRecordDto
     public string? AdjustmentReason { get; set; }
     public string? ReviewedByName { get; set; }
     public DateTime? ReviewedAt { get; set; }
+    public List<TimeLogDto> TimeLogs { get; set; } = new();
 }
 
 // Report DTOs

@@ -11,6 +11,7 @@ public class GetShiftAssignmentRequest
     public DateOnly? FromDate { get; set; }
     public DateOnly? ToDate { get; set; }
     public bool? IsActive { get; set; }
+    public string? AssignmentStatusCode { get; set; }
     public int PageIndex { get; set; } = 1;
     public int PageSize { get; set; } = 20;
 }
@@ -34,6 +35,71 @@ public class CreateShiftAssignmentRequest
 
     [MaxLength(500)]
     public string? Notes { get; set; }
+
+    [MaxLength(200)]
+    public string? Tags { get; set; }
+
+    /// <summary>When true, the assignment is created in DRAFT status (not yet visible to staff).</summary>
+    public bool IsDraft { get; set; }
+}
+
+public class BulkCreateAssignmentRequest
+{
+    [Required]
+    public long ShiftTemplateId { get; set; }
+
+    [Required]
+    [MinLength(1)]
+    public List<long> StaffIds { get; set; } = new();
+
+    [Required]
+    public DateOnly WorkDate { get; set; }
+
+    public DateTime? PlannedStartAt { get; set; }
+    public DateTime? PlannedEndAt { get; set; }
+
+    [MaxLength(500)]
+    public string? Notes { get; set; }
+
+    [MaxLength(200)]
+    public string? Tags { get; set; }
+
+    public bool IsDraft { get; set; }
+}
+
+public class PublishAssignmentsRequest
+{
+    /// <summary>Specific assignment IDs to publish. If empty, publishes all DRAFT in the date range.</summary>
+    public List<long>? AssignmentIds { get; set; }
+
+    public DateOnly? FromDate { get; set; }
+    public DateOnly? ToDate { get; set; }
+}
+
+public class CopyWeekRequest
+{
+    [Required]
+    public DateOnly SourceWeekStart { get; set; }
+
+    [Required]
+    public DateOnly TargetWeekStart { get; set; }
+
+    /// <summary>When true, creates assignments in DRAFT status.</summary>
+    public bool AsDraft { get; set; } = true;
+}
+
+public class ReassignRequest
+{
+    [Required]
+    public long NewStaffId { get; set; }
+
+    [MaxLength(500)]
+    public string? Reason { get; set; }
+}
+
+public class ConfirmAssignmentRequest
+{
+    // placeholder for future: optional device ID or GPS
 }
 
 public class UpdateShiftAssignmentRequest
@@ -43,6 +109,9 @@ public class UpdateShiftAssignmentRequest
 
     [MaxLength(500)]
     public string? Notes { get; set; }
+
+    [MaxLength(200)]
+    public string? Tags { get; set; }
 }
 
 // Attendance Requests
@@ -68,4 +137,13 @@ public class AttendanceReportRequest
     public string? AttendanceStatusCode { get; set; }
     public int PageIndex { get; set; } = 1;
     public int PageSize { get; set; } = 20;
+}
+
+/// <summary>Request for the team (everyone) weekly schedule view.</summary>
+public class TeamScheduleRequest
+{
+    [Required]
+    public DateOnly WeekStart { get; set; }
+
+    public long? ShiftTemplateId { get; set; }
 }
