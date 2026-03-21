@@ -148,6 +148,24 @@ public class ShiftController : ControllerBase
         });
     }
 
+    /// <summary>Returns a live-board oriented view of shift attendance and current status.</summary>
+    [HttpGet("live-board")]
+    [HasPermission(Permissions.ViewShift)]
+    [ProducesResponseType(typeof(ApiResponse<List<ShiftLiveBoardItemDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetLiveBoard([FromQuery] GetShiftAssignmentRequest request, CancellationToken ct)
+    {
+        var items = await _assignmentService.GetLiveBoardAsync(request, ct);
+
+        return Ok(new ApiResponse<List<ShiftLiveBoardItemDto>>
+        {
+            Success = true,
+            Code = 200,
+            UserMessage = "Shift live board retrieved successfully.",
+            Data = items,
+            ServerTime = DateTimeOffset.UtcNow
+        });
+    }
+
     /// <summary>Gets full detail for a single shift assignment including attendance.</summary>
     [HttpGet("assignments/{id:long}")]
     [HasPermission(Permissions.ViewShift)]

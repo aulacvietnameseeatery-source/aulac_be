@@ -18,27 +18,33 @@ public class ShiftAssignmentService : IShiftAssignmentService
     private readonly IShiftAssignmentRepository _assignmentRepo;
     private readonly IShiftTemplateRepository _templateRepo;
     private readonly IAccountRepository _accountRepo;
+    private readonly IOrderRepository _orderRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly INotificationService _notificationService;
     private readonly ILookupResolver _lookupResolver;
     private readonly AttendanceOptions _options;
+    private readonly IShiftLiveRealtimePublisher _shiftLiveRealtimePublisher;
 
     public ShiftAssignmentService(
         IShiftAssignmentRepository assignmentRepo,
         IShiftTemplateRepository templateRepo,
         IAccountRepository accountRepo,
+        IOrderRepository orderRepository,
         IUnitOfWork unitOfWork,
         INotificationService notificationService,
         ILookupResolver lookupResolver,
-        IOptions<AttendanceOptions> options)
+        IOptions<AttendanceOptions> options,
+        IShiftLiveRealtimePublisher shiftLiveRealtimePublisher)
     {
         _assignmentRepo = assignmentRepo;
         _templateRepo = templateRepo;
         _accountRepo = accountRepo;
+        _orderRepository = orderRepository;
         _unitOfWork = unitOfWork;
         _notificationService = notificationService;
         _lookupResolver = lookupResolver;
         _options = options.Value;
+        _shiftLiveRealtimePublisher = shiftLiveRealtimePublisher;
     }
 
     public async Task<(List<ShiftAssignmentListDto> Items, int TotalCount)> GetAssignmentsAsync(
@@ -46,6 +52,52 @@ public class ShiftAssignmentService : IShiftAssignmentService
     {
         var (items, totalCount) = await _assignmentRepo.GetAssignmentsAsync(request, ct);
         return (items.Select(MapToListDto).ToList(), totalCount);
+    }
+
+    public async Task<List<ShiftLiveBoardItemDto>> GetLiveBoardAsync(
+        GetShiftAssignmentRequest request, CancellationToken ct = default)
+    {
+        var liveRequest = new GetShiftAssignmentRequest
+        {
+            StaffId = request.StaffId,
+            ShiftTemplateId = request.ShiftTemplateId,
+            FromDate = request.FromDate,
+            ToDate = request.ToDate,
+            IsActive = request.IsActive,
+            AssignmentStatusCode = request.AssignmentStatusCode,
+            PageIndex = 1,
+            PageSize = request.PageSize > 0 ? request.PageSize : 200,
+        };
+
+        var (items, _) = await _assignmentRepo.GetAssignmentsAsync(liveRequest, ct);
+        if (items.Count == 0)
+        {
+            return new List<ShiftLiveBoardItemDto>();
+        }
+
+        var now = DateTime.UtcNow;
+        var staffIds = items.Select(item => item.StaffId).Distinct().ToList();
+        var fromDate = request.FromDate ?? items.Min(item => item.WorkDate);
+        var toDate = request.ToDate ?? items.Max(item => item.WorkDate);
+        var queryStart = fromDate.ToDateTime(TimeOnly.MinValue);
+        var queryEnd = toDate.ToDateTime(TimeOnly.MaxValue);
+
+        var orderSnapshots = await _orderRepository.GetShiftLiveOrderSnapshotsAsync(queryStart, queryEnd, staffIds, ct);
+        var issueSnapshots = await _orderRepository.GetShiftLiveIssueSnapshotsAsync(queryStart, queryEnd, staffIds, ct);
+
+        var ordersByStaff = orderSnapshots
+            .GroupBy(snapshot => snapshot.StaffId)
+            .ToDictionary(group => group.Key, group => (IReadOnlyCollection<ShiftLiveOrderSnapshotDto>)group.ToList());
+
+        var issuesByStaff = issueSnapshots
+            .GroupBy(snapshot => snapshot.StaffId)
+            .ToDictionary(group => group.Key, group => (IReadOnlyCollection<ShiftLiveIssueSnapshotDto>)group.ToList());
+
+        return items.Select(item => MapToLiveBoardDto(
+            item,
+            now,
+            ordersByStaff.TryGetValue(item.StaffId, out var staffOrders) ? staffOrders : Array.Empty<ShiftLiveOrderSnapshotDto>(),
+            issuesByStaff.TryGetValue(item.StaffId, out var staffIssues) ? staffIssues : Array.Empty<ShiftLiveIssueSnapshotDto>())).ToList();
     }
 
     public async Task<ShiftAssignmentDetailDto> GetByIdAsync(long id, CancellationToken ct = default)
@@ -126,6 +178,7 @@ public class ShiftAssignmentService : IShiftAssignmentService
 
         var saved = await _assignmentRepo.GetByIdWithDetailsAsync(entity.ShiftAssignmentId, ct)
             ?? throw new NotFoundException("Assignment not found after creation");
+        await PublishShiftLiveUpdateAsync("assignment_created", entity.WorkDate, entity.ShiftAssignmentId, entity.StaffId, ct);
         return MapToDetailDto(saved);
     }
 
@@ -169,6 +222,7 @@ public class ShiftAssignmentService : IShiftAssignmentService
 
         var updated = await _assignmentRepo.GetByIdWithDetailsAsync(id, ct)
             ?? throw new NotFoundException("Assignment not found after update");
+        await PublishShiftLiveUpdateAsync("assignment_updated", updated.WorkDate, updated.ShiftAssignmentId, updated.StaffId, ct);
         return MapToDetailDto(updated);
     }
 
@@ -190,6 +244,7 @@ public class ShiftAssignmentService : IShiftAssignmentService
         assignment.AssignmentStatusLvId = cancelledStatusId;
         assignment.UpdatedAt = DateTime.UtcNow;
         await _unitOfWork.SaveChangesAsync(ct);
+        await PublishShiftLiveUpdateAsync("assignment_cancelled", assignment.WorkDate, assignment.ShiftAssignmentId, assignment.StaffId, ct);
     }
     public async Task<(List<ShiftAssignmentDetailDto> Items, int TotalCount)> GetMyShiftsAsync(
         long staffId, GetShiftAssignmentRequest request, CancellationToken ct = default)
@@ -306,6 +361,7 @@ public class ShiftAssignmentService : IShiftAssignmentService
         // Reload with full details
         var ids = entities.Select(e => e.ShiftAssignmentId).ToList();
         var saved = await _assignmentRepo.GetByIdsWithDetailsAsync(ids, ct);
+        await PublishShiftLiveUpdateAsync("assignments_bulk_created", request.WorkDate, null, null, ct);
         return saved.Select(MapToDetailDto).ToList();
     }
 
@@ -354,6 +410,8 @@ public class ShiftAssignmentService : IShiftAssignmentService
             if (draft.ShiftTemplate is not null)
                 await SendAssignmentNotificationAsync(draft, draft.ShiftTemplate, ct);
         }
+
+        await PublishShiftLiveUpdateAsync("assignments_published", request.FromDate ?? drafts.Min(d => d.WorkDate), null, null, ct);
 
         return drafts.Select(MapToListDto).ToList();
     }
@@ -423,6 +481,7 @@ public class ShiftAssignmentService : IShiftAssignmentService
 
         var ids = newEntities.Select(e => e.ShiftAssignmentId).ToList();
         var saved = await _assignmentRepo.GetByIdsWithDetailsAsync(ids, ct);
+        await PublishShiftLiveUpdateAsync("assignments_copied", request.TargetWeekStart, null, null, ct);
         return saved.Select(MapToListDto).ToList();
     }
 
@@ -438,21 +497,29 @@ public class ShiftAssignmentService : IShiftAssignmentService
         if (assignment.AttendanceRecord?.ActualCheckInAt is not null)
             throw new ConflictException("Cannot reassign after staff has checked in");
 
-        var newStaff = await _accountRepo.FindByIdWithRoleAsync(request.NewStaffId, ct)
+        var targetStaffId = request.NewStaffId;
+        var targetWorkDate = request.NewWorkDate ?? assignment.WorkDate;
+
+        var newStaff = await _accountRepo.FindByIdWithRoleAsync(targetStaffId, ct)
             ?? throw new NotFoundException($"New staff account {request.NewStaffId} not found");
 
-        if (assignment.StaffId == request.NewStaffId)
-            throw new ValidationException("New staff is the same as current staff");
+        if (assignment.StaffId == targetStaffId && assignment.WorkDate == targetWorkDate)
+            throw new ValidationException("Assignment already belongs to this staff on this date");
 
-        // Overlap check for new staff
+        // Overlap check for target staff/date
         if (await _assignmentRepo.HasOverlappingAssignmentAsync(
-            request.NewStaffId, assignment.WorkDate,
-            assignment.PlannedStartAt, assignment.PlannedEndAt, ct: ct))
+            targetStaffId, targetWorkDate,
+            assignment.PlannedStartAt, assignment.PlannedEndAt,
+            excludeAssignmentId: assignmentId,
+            ct: ct))
             throw new ConflictException(
-                $"Staff ID {request.NewStaffId} has an overlapping shift during this time window");
+                $"Staff ID {targetStaffId} has an overlapping shift during this time window");
 
         var oldStaffId = assignment.StaffId;
-        assignment.StaffId = request.NewStaffId;
+        assignment.StaffId = targetStaffId;
+        assignment.WorkDate = targetWorkDate;
+        assignment.PlannedStartAt = targetWorkDate.ToDateTime(TimeOnly.FromDateTime(assignment.PlannedStartAt));
+        assignment.PlannedEndAt = targetWorkDate.ToDateTime(TimeOnly.FromDateTime(assignment.PlannedEndAt));
         assignment.Notes = string.IsNullOrWhiteSpace(request.Reason)
             ? assignment.Notes
             : $"{assignment.Notes}\n[Reassigned] {request.Reason}".Trim();
@@ -465,6 +532,7 @@ public class ShiftAssignmentService : IShiftAssignmentService
 
         var updated = await _assignmentRepo.GetByIdWithDetailsAsync(assignmentId, ct)
             ?? throw new NotFoundException("Assignment not found after reassign");
+        await PublishShiftLiveUpdateAsync("assignment_reassigned", updated.WorkDate, updated.ShiftAssignmentId, updated.StaffId, ct);
         return MapToDetailDto(updated);
     }
 
@@ -492,14 +560,19 @@ public class ShiftAssignmentService : IShiftAssignmentService
 
         var updated = await _assignmentRepo.GetByIdWithDetailsAsync(assignmentId, ct)
             ?? throw new NotFoundException("Assignment not found after confirm");
+        await PublishShiftLiveUpdateAsync("assignment_confirmed", updated.WorkDate, updated.ShiftAssignmentId, updated.StaffId, ct);
         return MapToDetailDto(updated);
     }
 
     public async Task<List<ShiftAssignmentListDto>> GetTeamScheduleAsync(
         TeamScheduleRequest request, CancellationToken ct = default)
     {
+        var weekEnd = request.WeekEnd ?? request.WeekStart.AddDays(6);
+        if (weekEnd < request.WeekStart)
+            throw new ValidationException("WeekEnd must be on or after WeekStart");
+
         var assignments = await _assignmentRepo.GetTeamScheduleAsync(
-            request.WeekStart, request.ShiftTemplateId, ct);
+            request.WeekStart, weekEnd, request.ShiftTemplateId, ct);
         return assignments.Select(MapToListDto).ToList();
     }
 
@@ -569,4 +642,188 @@ public class ShiftAssignmentService : IShiftAssignmentService
         PunchDurationMinutes = tl.PunchDurationMinutes,
         CreatedAt = tl.CreatedAt
     };
+
+    internal static ShiftLiveBoardItemDto MapToLiveBoardDto(
+        ShiftAssignment assignment,
+        DateTime nowUtc,
+        IReadOnlyCollection<ShiftLiveOrderSnapshotDto> orderSnapshots,
+        IReadOnlyCollection<ShiftLiveIssueSnapshotDto> issueSnapshots)
+    {
+        var attendance = assignment.AttendanceRecord;
+        var attendanceStatusCode = attendance?.AttendanceStatusLv?.ValueCode;
+        var attendanceStatusName = attendance?.AttendanceStatusLv?.ValueName;
+        var effectiveWindowStart = attendance?.ActualCheckInAt ?? assignment.PlannedStartAt;
+        var effectiveWindowEnd = attendance?.ActualCheckOutAt
+            ?? (nowUtc < assignment.PlannedEndAt ? nowUtc : assignment.PlannedEndAt);
+
+        var relevantOrders = orderSnapshots
+            .Where(snapshot => IsWithinShiftWindow(snapshot.CreatedAt ?? snapshot.LastActivityAt, effectiveWindowStart, effectiveWindowEnd)
+                || IsWithinShiftWindow(snapshot.LatestPaidAt, effectiveWindowStart, effectiveWindowEnd))
+            .OrderByDescending(snapshot => snapshot.LastActivityAt ?? snapshot.UpdatedAt ?? snapshot.CreatedAt)
+            .ToList();
+
+        var latestOrder = relevantOrders.FirstOrDefault();
+        var ordersHandledCount = relevantOrders.Count(snapshot => IsWithinShiftWindow(snapshot.CreatedAt, effectiveWindowStart, effectiveWindowEnd));
+        var paidOrders = relevantOrders
+            .Where(snapshot => IsWithinShiftWindow(snapshot.LatestPaidAt, effectiveWindowStart, effectiveWindowEnd))
+            .ToList();
+
+        var unresolvedIssues = issueSnapshots
+            .Where(snapshot => !snapshot.IsResolved && IsWithinShiftWindow(snapshot.CreatedAt, effectiveWindowStart, effectiveWindowEnd))
+            .OrderByDescending(snapshot => snapshot.CreatedAt)
+            .ToList();
+
+        var liveStatusCode = ResolveLiveStatusCode(assignment, attendance, nowUtc);
+        var liveStatusName = liveStatusCode switch
+        {
+            "ON_DUTY" => "On Duty",
+            "WAITING" => "Waiting For Shift",
+            "COMPLETED" => "Completed",
+            "NOT_CHECKED_IN" => "Needs Attention",
+            _ => "Unknown"
+        };
+
+        var hasAlert = attendance?.LateMinutes > 0
+            || string.Equals(attendanceStatusCode, nameof(AttendanceStatusCode.ABSENT), StringComparison.OrdinalIgnoreCase)
+            || string.Equals(attendanceStatusCode, nameof(AttendanceStatusCode.EARLY_LEAVE), StringComparison.OrdinalIgnoreCase)
+            || liveStatusCode == "NOT_CHECKED_IN"
+            || unresolvedIssues.Count > 0;
+
+        var roleCode = assignment.Staff?.Role?.RoleCode ?? string.Empty;
+        var roleName = assignment.Staff?.Role?.RoleName ?? "Unknown";
+        var currentTaskLabel = BuildCurrentTaskLabel(roleCode, roleName, latestOrder?.TableCode, ordersHandledCount, paidOrders.Count, relevantOrders.Sum(snapshot => snapshot.PendingItemsCount));
+        var currentLocationLabel = BuildCurrentLocationLabel(roleCode, roleName, latestOrder?.TableCode);
+
+        return new ShiftLiveBoardItemDto
+        {
+            ShiftAssignmentId = assignment.ShiftAssignmentId,
+            ShiftTemplateId = assignment.ShiftTemplateId,
+            TemplateName = assignment.ShiftTemplate?.TemplateName ?? "Unknown",
+            StaffId = assignment.StaffId,
+            StaffName = assignment.Staff?.FullName ?? "Unknown",
+            StaffRoleCode = roleCode,
+            StaffRoleName = roleName,
+            WorkDate = assignment.WorkDate,
+            PlannedStartAt = assignment.PlannedStartAt,
+            PlannedEndAt = assignment.PlannedEndAt,
+            AssignmentStatusCode = assignment.AssignmentStatusLv?.ValueCode ?? "UNKNOWN",
+            AssignmentStatusName = assignment.AssignmentStatusLv?.ValueName ?? "Unknown",
+            IsActive = assignment.IsActive,
+            Tags = assignment.Tags,
+            Notes = assignment.Notes,
+            AssignedAt = assignment.AssignedAt,
+            AssignedByName = assignment.AssignedByStaff?.FullName ?? "Unknown",
+            AttendanceStatusCode = attendanceStatusCode,
+            AttendanceStatusName = attendanceStatusName,
+            ActualCheckInAt = attendance?.ActualCheckInAt,
+            ActualCheckOutAt = attendance?.ActualCheckOutAt,
+            LateMinutes = attendance?.LateMinutes ?? 0,
+            EarlyLeaveMinutes = attendance?.EarlyLeaveMinutes ?? 0,
+            WorkedMinutes = attendance?.WorkedMinutes ?? 0,
+            IsManualAdjustment = attendance?.IsManualAdjustment ?? false,
+            LiveStatusCode = liveStatusCode,
+            LiveStatusName = liveStatusName,
+            HasAlert = hasAlert,
+            CurrentTaskLabel = currentTaskLabel,
+            CurrentLocationLabel = currentLocationLabel,
+            OrdersHandledCount = ordersHandledCount,
+            PaidBillsCount = paidOrders.Count,
+            CurrentRevenue = paidOrders.Sum(snapshot => snapshot.PaidRevenue),
+            ItemsCompletedCount = relevantOrders.Sum(snapshot => snapshot.CompletedItemsCount),
+            PendingTicketsCount = relevantOrders.Sum(snapshot => snapshot.PendingItemsCount),
+            IssueCount = unresolvedIssues.Count,
+            LatestIssueText = unresolvedIssues.FirstOrDefault()?.Description,
+        };
+    }
+
+    private static bool IsWithinShiftWindow(DateTime? timestamp, DateTime windowStart, DateTime windowEnd)
+    {
+        return timestamp.HasValue && timestamp.Value >= windowStart && timestamp.Value <= windowEnd;
+    }
+
+    private static string? BuildCurrentTaskLabel(
+        string roleCode,
+        string roleName,
+        string? tableCode,
+        int ordersHandledCount,
+        int paidBillsCount,
+        int pendingTicketsCount)
+    {
+        var normalized = string.IsNullOrWhiteSpace(roleCode) ? roleName : roleCode;
+        normalized = normalized.Trim().ToUpperInvariant();
+
+        if ((normalized.Contains("SERVER") || normalized.Contains("WAITER") || normalized.Contains("PHUC")) && !string.IsNullOrWhiteSpace(tableCode))
+            return $"Dang phuc vu ban {tableCode}";
+
+        if ((normalized.Contains("CASH") || normalized.Contains("THU")) && paidBillsCount > 0)
+            return $"Da xu ly {paidBillsCount} bill trong ca";
+
+        if ((normalized.Contains("BAR") || normalized.Contains("BARTENDER") || normalized.Contains("PHA")) && pendingTicketsCount > 0)
+            return $"Dang xu ly {pendingTicketsCount} mon dang cho";
+
+        if (ordersHandledCount > 0)
+            return $"Da tiep nhan {ordersHandledCount} order trong ca";
+
+        return null;
+    }
+
+    private static string? BuildCurrentLocationLabel(string roleCode, string roleName, string? tableCode)
+    {
+        var normalized = string.IsNullOrWhiteSpace(roleCode) ? roleName : roleCode;
+        normalized = normalized.Trim().ToUpperInvariant();
+
+        if ((normalized.Contains("SERVER") || normalized.Contains("WAITER") || normalized.Contains("PHUC")) && !string.IsNullOrWhiteSpace(tableCode))
+            return $"Tai khu vuc ban {tableCode}";
+
+        if (normalized.Contains("CASH") || normalized.Contains("THU"))
+            return "Dang tai quay POS";
+
+        if (normalized.Contains("BAR") || normalized.Contains("BARTENDER") || normalized.Contains("PHA"))
+            return "Dang tai quay Bar";
+
+        return null;
+    }
+
+    private Task PublishShiftLiveUpdateAsync(
+        string eventType,
+        DateOnly workDate,
+        long? shiftAssignmentId,
+        long? staffId,
+        CancellationToken ct)
+    {
+        return _shiftLiveRealtimePublisher.PublishBoardChangedAsync(new ShiftLiveRealtimeEventDto
+        {
+            EventType = eventType,
+            WorkDate = workDate,
+            ShiftAssignmentId = shiftAssignmentId,
+            StaffId = staffId,
+            OccurredAt = DateTime.UtcNow,
+        }, ct);
+    }
+
+    private static string ResolveLiveStatusCode(
+        ShiftAssignment assignment,
+        AttendanceRecord? attendance,
+        DateTime nowUtc)
+    {
+        if (!assignment.IsActive)
+            return "COMPLETED";
+
+        if (attendance?.ActualCheckOutAt is not null)
+            return "COMPLETED";
+
+        if (attendance?.ActualCheckInAt is not null)
+            return "ON_DUTY";
+
+        if (nowUtc < assignment.PlannedStartAt)
+            return "WAITING";
+
+        if (string.Equals(attendance?.AttendanceStatusLv?.ValueCode, nameof(AttendanceStatusCode.ABSENT), StringComparison.OrdinalIgnoreCase))
+            return "NOT_CHECKED_IN";
+
+        if (nowUtc <= assignment.PlannedEndAt)
+            return "NOT_CHECKED_IN";
+
+        return "NOT_CHECKED_IN";
+    }
 }

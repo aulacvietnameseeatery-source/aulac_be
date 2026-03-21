@@ -348,6 +348,7 @@ builder.Services.AddScoped<IDishService, Core.Service.DishService>();
 builder.Services.AddScoped<IRealtimeNotificationService, SignalRNotificationService>();
 builder.Services.AddScoped<IJobSchedulerService, HangfireJobScheduler>();
 builder.Services.AddScoped<IOrderRealtimeService, OrderRealtimeService>();
+builder.Services.AddScoped<IShiftLiveRealtimePublisher, SignalRShiftLiveRealtimePublisher>();
 
 // Notification module
 builder.Services.AddScoped<INotificationRepository, Infa.Repo.NotificationRepository>();

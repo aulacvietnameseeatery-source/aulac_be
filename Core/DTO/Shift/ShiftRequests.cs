@@ -93,6 +93,9 @@ public class ReassignRequest
     [Required]
     public long NewStaffId { get; set; }
 
+    /// <summary>Optional target work date (yyyy-MM-dd). If omitted, keeps current date.</summary>
+    public DateOnly? NewWorkDate { get; set; }
+
     [MaxLength(500)]
     public string? Reason { get; set; }
 }
@@ -144,6 +147,11 @@ public class TeamScheduleRequest
 {
     [Required]
     public DateOnly WeekStart { get; set; }
+
+    /// <summary>
+    /// Optional range end date. If omitted, defaults to WeekStart + 6 days.
+    /// </summary>
+    public DateOnly? WeekEnd { get; set; }
 
     public long? ShiftTemplateId { get; set; }
 }

@@ -49,6 +49,7 @@ public class ShiftAssignmentRepository : IShiftAssignmentRepository
         var query = _context.ShiftAssignments
             .Include(a => a.ShiftTemplate)
             .Include(a => a.Staff)
+                .ThenInclude(s => s.Role)
             .Include(a => a.AssignedByStaff)
             .Include(a => a.AssignmentStatusLv)
             .Include(a => a.AttendanceRecord)
@@ -253,9 +254,8 @@ public class ShiftAssignmentRepository : IShiftAssignmentRepository
     }
 
     public async Task<List<ShiftAssignment>> GetTeamScheduleAsync(
-        DateOnly weekStart, long? shiftTemplateId, CancellationToken ct = default)
+        DateOnly weekStart, DateOnly weekEnd, long? shiftTemplateId, CancellationToken ct = default)
     {
-        var weekEnd = weekStart.AddDays(6);
         var query = _context.ShiftAssignments
             .Include(a => a.ShiftTemplate)
             .Include(a => a.Staff)
