@@ -67,7 +67,7 @@ public class SupplierController : ControllerBase
     /// <response code="200">Supplier found</response>
     /// <response code="404">Supplier not found</response>
     [HttpGet("{id}")]
-    [HasPermission(Permissions.EditSupplier)]
+    [HasPermission(Permissions.ViewSupplier)]
     [ProducesResponseType(typeof(ApiResponse<SupplierDetailDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetSupplierById(
