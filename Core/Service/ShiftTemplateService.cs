@@ -51,6 +51,8 @@ public class ShiftTemplateService : IShiftTemplateService
             DefaultStartTime = request.DefaultStartTime,
             DefaultEndTime = request.DefaultEndTime,
             Description = request.Description?.Trim(),
+            BufferBeforeMinutes = request.BufferBeforeMinutes,
+            BufferAfterMinutes = request.BufferAfterMinutes,
             IsActive = true,
             CreatedBy = createdByStaffId,
             CreatedAt = DateTime.UtcNow,
@@ -91,6 +93,8 @@ public class ShiftTemplateService : IShiftTemplateService
         if (request.DefaultEndTime.HasValue) template.DefaultEndTime = request.DefaultEndTime.Value;
         if (request.Description is not null) template.Description = request.Description.Trim();
         if (request.IsActive.HasValue) template.IsActive = request.IsActive.Value;
+        if (request.BufferBeforeMinutes.HasValue) template.BufferBeforeMinutes = request.BufferBeforeMinutes;
+        if (request.BufferAfterMinutes.HasValue) template.BufferAfterMinutes = request.BufferAfterMinutes;
 
         template.UpdatedBy = updatedByStaffId;
         template.UpdatedAt = DateTime.UtcNow;
@@ -124,6 +128,8 @@ public class ShiftTemplateService : IShiftTemplateService
         DefaultStartTime = t.DefaultStartTime,
         DefaultEndTime = t.DefaultEndTime,
         Description = t.Description,
+        BufferBeforeMinutes = t.BufferBeforeMinutes,
+        BufferAfterMinutes = t.BufferAfterMinutes,
         IsActive = t.IsActive,
         CreatedAt = t.CreatedAt
     };
@@ -135,6 +141,8 @@ public class ShiftTemplateService : IShiftTemplateService
         DefaultStartTime = t.DefaultStartTime,
         DefaultEndTime = t.DefaultEndTime,
         Description = t.Description,
+        BufferBeforeMinutes = t.BufferBeforeMinutes,
+        BufferAfterMinutes = t.BufferAfterMinutes,
         IsActive = t.IsActive,
         CreatedAt = t.CreatedAt,
         CreatedByName = t.CreatedByStaff?.FullName ?? "Unknown",

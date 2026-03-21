@@ -1,4 +1,6 @@
+using Core.Data;
 using Core.DTO.General;
+using Core.DTO.Notification;
 using Core.DTO.Order;
 using Core.Entity;
 using Core.Enum;
@@ -7,6 +9,7 @@ using Core.Extensions;
 using Core.Interface.Repo;
 using Core.Interface.Service.Customer;
 using Core.Interface.Service.Entity;
+using Core.Interface.Service.Notification;
 using Core.Interface.Service.Others;
 using LookupTypeEnum = Core.Enum.LookupType;
 
@@ -20,6 +23,7 @@ public class OrderService : IOrderService
     private readonly IDishRepository _dishRepository;
     private readonly ICustomerService _customerService;
     private readonly IUnitOfWork _uow;
+    private readonly INotificationService _notificationService;
     private readonly IOrderRealtimeService _realtime;
 
     public OrderService(
@@ -29,6 +33,7 @@ public class OrderService : IOrderService
         IDishRepository dishRepository,
         ICustomerService customerService,
         IUnitOfWork uow,
+        INotificationService notificationService,
         IOrderRealtimeService realtime)
     {
         _orderRepository = orderRepository;
@@ -37,6 +42,7 @@ public class OrderService : IOrderService
         _lookupResolver = lookupResolver;
         _customerService = customerService;
         _uow = uow;
+        _notificationService = notificationService;
         _realtime = realtime;
     }
     private const long GuestCustomerId = 68; // ID representing a visitor
@@ -154,6 +160,27 @@ public class OrderService : IOrderService
             await _uow.SaveChangesAsync(cancellationToken);
             await _uow.CommitAsync(cancellationToken);
 
+            // Notify about order status change
+            if (newStatus == OrderStatusCode.CANCELLED)
+            {
+                await _notificationService.PublishAsync(new PublishNotificationRequest
+                {
+                    Type = nameof(NotificationType.ORDER_CANCELLED),
+                    Title = "Order Cancelled",
+                    Body = $"Order #{orderId} has been cancelled",
+                    Priority = nameof(NotificationPriority.High),
+                    SoundKey = "notification_high",
+                    ActionUrl = "/dashboard/orders",
+                    EntityType = "Order",
+                    EntityId = orderId.ToString(),
+                    Metadata = new Dictionary<string, object>
+                    {
+                        ["orderId"] = orderId.ToString()
+                    },
+                    TargetPermissions = new List<string> { Permissions.UpdateOrderItemStatus }
+                }, cancellationToken);
+            }
+
             await _realtime.OrderUpdatedAsync(new OrderRealtimeDTO
             {
                 OrderId = orderId,
@@ -196,6 +223,47 @@ public class OrderService : IOrderService
 			cancelledOrderId,
 			availableTableId,
 			cancellationToken);
+
+		// Fire notification for READY / REJECTED item status changes
+		if (newStatusLvId == readyItemId)
+		{
+			await _notificationService.PublishAsync(new PublishNotificationRequest
+			{
+				Type = nameof(NotificationType.ORDER_ITEM_READY),
+				Title = "Order Item Ready",
+				Body = $"An item in order is ready to serve",
+				Priority = nameof(NotificationPriority.High),
+				SoundKey = "notification_high",
+				ActionUrl = "/dashboard/orders",
+				EntityType = "OrderItem",
+				EntityId = orderItemId.ToString(),
+				Metadata = new Dictionary<string, object>
+				{
+					["orderItemId"] = orderItemId.ToString()
+				},
+				TargetPermissions = new List<string> { Permissions.ViewOrder }
+			}, cancellationToken);
+		}
+		else if (newStatusLvId == rejectedItemId)
+		{
+			await _notificationService.PublishAsync(new PublishNotificationRequest
+			{
+				Type = nameof(NotificationType.ORDER_ITEM_REJECTED),
+				Title = "Order Item Rejected",
+				Body = $"An item in order was rejected" + (rejectReason != null ? $": {rejectReason}" : ""),
+				Priority = nameof(NotificationPriority.High),
+				SoundKey = "notification_high",
+				ActionUrl = "/dashboard/orders",
+				EntityType = "OrderItem",
+				EntityId = orderItemId.ToString(),
+				Metadata = new Dictionary<string, object>
+				{
+					["orderItemId"] = orderItemId.ToString(),
+					["reason"] = rejectReason ?? ""
+				},
+				TargetPermissions = new List<string> { Permissions.ViewOrder }
+			}, cancellationToken);
+		}
 
         await _realtime.OrderItemUpdatedAsync(new OrderItemRealtimeDTO
         {
@@ -341,6 +409,27 @@ public class OrderService : IOrderService
                 TableId = order.TableId,
                 UpdatedAt = DateTime.UtcNow
             });
+
+            // Notify kitchen staff about new order
+            await _notificationService.PublishAsync(new PublishNotificationRequest
+            {
+                Type = nameof(NotificationType.NEW_ORDER),
+                Title = "New Order",
+                Body = $"Order #{order.OrderId} with {request.Items.Count} item(s)",
+                Priority = nameof(NotificationPriority.High),
+                SoundKey = "notification_high",
+                ActionUrl = "/dashboard/kitchen",
+                EntityType = "Order",
+                EntityId = order.OrderId.ToString(),
+                Metadata = new Dictionary<string, object>
+                {
+                    ["orderId"] = order.OrderId.ToString(),
+                    ["itemCount"] = request.Items.Count.ToString(),
+                    ["tableCode"] = table?.TableCode ?? "Takeaway",
+                    ["totalAmount"] = total.ToString("F2")
+                },
+                TargetPermissions = new List<string> { Permissions.UpdateOrderItemStatus }
+            }, ct);
 
             return order.OrderId;
         }

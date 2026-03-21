@@ -25,6 +25,9 @@ public partial class StaffAccount
 
     public DateTime? LastLoginAt { get; set; }
 
+    /// <summary>Placeholder for device binding – the registered device identifier for shift punch-in.</summary>
+    public string? RegisteredDeviceId { get; set; }
+
     public uint AccountStatusLvId { get; set; }
 
     public virtual ICollection<AuditLog> AuditLogs { get; set; } = new List<AuditLog>();

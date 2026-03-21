@@ -94,3 +94,11 @@ public enum AttendanceStatusCode
     EARLY_LEAVE,
     EXCUSED
 }
+
+public enum ShiftAssignmentStatusCode
+{
+    DRAFT,
+    ASSIGNED,
+    CONFIRMED,
+    CANCELLED
+}

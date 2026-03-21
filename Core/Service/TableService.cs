@@ -1,6 +1,7 @@
 ﻿using Core.Data;
 using Core.DTO.General;
 using Core.DTO.LookUpValue;
+using Core.DTO.Notification;
 using Core.DTO.Table;
 using Core.Enum;
 using Core.Exceptions;
@@ -9,6 +10,7 @@ using Core.Interface.Repo;
 using Core.Interface.Service.Entity;
 using Core.Interface.Service.FileStorage;
 using Core.Interface.Service.LookUp;
+using Core.Interface.Service.Notification;
 using Microsoft.Extensions.Options;
 
 namespace Core.Service;
@@ -23,6 +25,7 @@ public class TableService : ITableService
     private readonly IMediaRepository _mediaRepository;
     private readonly IQrCodeGenerator _qrCodeGenerator;
     private readonly BaseUrlOptions _baseUrlOptions;
+    private readonly INotificationService _notificationService;
 
     /// <summary>
     /// Allowed status transitions — key: current code, value: set of permitted next codes.
@@ -47,7 +50,8 @@ public class TableService : ITableService
         IFileStorage fileStorage,
         IMediaRepository mediaRepository,
         IQrCodeGenerator qrCodeGenerator,
-        IOptions<BaseUrlOptions> baseUrlOptions)
+        IOptions<BaseUrlOptions> baseUrlOptions,
+        INotificationService notificationService)
     {
         _tableRepository = tableRepository;
         _unitOfWork = unitOfWork;
@@ -57,6 +61,7 @@ public class TableService : ITableService
         _mediaRepository = mediaRepository;
         _qrCodeGenerator = qrCodeGenerator;
         _baseUrlOptions = baseUrlOptions.Value;
+        _notificationService = notificationService;
     }
 
     #region ── List / Select ──
@@ -315,6 +320,27 @@ public class TableService : ITableService
         table.TableStatusLvId = request.StatusLvId;
         table.UpdatedAt = DateTime.UtcNow;
         await _unitOfWork.SaveChangesAsync(ct);
+
+        // Notify about table status change
+        await _notificationService.PublishAsync(new PublishNotificationRequest
+        {
+            Type = nameof(NotificationType.TABLE_STATUS_CHANGED),
+            Title = "Table Status Changed",
+            Body = $"Table {table.TableCode} status: {currentCode} → {newCode}",
+            Priority = nameof(NotificationPriority.Low),
+            SoundKey = "notification_low",
+            ActionUrl = "/dashboard/tables",
+            EntityType = "Table",
+            EntityId = id.ToString(),
+            Metadata = new Dictionary<string, object>
+            {
+                ["tableId"] = id.ToString(),
+                ["tableCode"] = table.TableCode,
+                ["oldStatus"] = currentCode,
+                ["newStatus"] = newCode
+            },
+            TargetPermissions = new List<string> { Permissions.ViewTable }
+        }, ct);
 
         var updated = await _tableRepository.GetByIdAsync(id, ct)!;
         return MapToManagementDto(updated!);

@@ -1,7 +1,10 @@
+using Core.Data;
+using Core.DTO.Notification;
 using Core.DTO.Reservation;
 using Core.Enum;
 using Core.Interface.Repo;
 using Core.Interface.Service.Entity;
+using Core.Interface.Service.Notification;
 using Core.Interface.Service.Others;
 using Core.Service.Utils;
 using Microsoft.Extensions.Logging;
@@ -27,6 +30,7 @@ namespace Core.Service
         private readonly IReservationBroadcastService _broadcastService;
         private readonly IOrderRepository _orderRepository;
         private readonly ICustomerService _customerService;
+        private readonly INotificationService _notificationService;
 
         private const long GuestCustomerId = 68;
 
@@ -44,7 +48,8 @@ namespace Core.Service
             ISystemSettingService systemSettingService,
             IReservationBroadcastService broadcastService,
             IOrderRepository orderRepository,
-            ICustomerService customerService)
+            ICustomerService customerService,
+            INotificationService notificationService)
         {
             _reservationRepository = reservationRepository;
             _tableRepository = tableRepository;
@@ -57,6 +62,7 @@ namespace Core.Service
             _broadcastService = broadcastService;
             _orderRepository = orderRepository;
             _customerService = customerService;
+            _notificationService = notificationService;
         }
 
         public async Task<(List<ReservationManagementDto> Items, int TotalCount)> GetReservationsAsync(GetReservationsRequest request, CancellationToken cancellationToken = default)
@@ -436,10 +442,28 @@ namespace Core.Service
 
             var created = await _reservationRepository.CreateAsync(reservation, ct);
 
-            foreach (var table in selectedTables)
+            var tableCodes_log = string.Join(", ", selectedTables.Select(x => x.TableCode));
+
+            await _notificationService.PublishAsync(new PublishNotificationRequest
             {
-                await _broadcastService.BroadcastReservationCreatedAsync(created.ReservationId, table.TableId);
-            }
+                Type = nameof(NotificationType.RESERVATION_CREATED),
+                Title = "New Reservation",
+                Body = $"Reservation #{created.ReservationId} for {request.CustomerName} ({request.PartySize} guests) at {tableCodes_log}",
+                Priority = nameof(NotificationPriority.Normal),
+                SoundKey = "notification_normal",
+                ActionUrl = $"/dashboard/reservations/{created.ReservationId}",
+                EntityType = "Reservation",
+                EntityId = created.ReservationId.ToString(),
+                Metadata = new Dictionary<string, object>
+                {
+                    ["reservationId"] = created.ReservationId.ToString(),
+                    ["customerName"] = request.CustomerName,
+                    ["partySize"] = request.PartySize.ToString(),
+                    ["tableCode"] = tableCodes_log,
+                    ["reservedTime"] = request.ReservedTime.ToString("yyyy-MM-dd HH:mm")
+                },
+                TargetPermissions = new List<string> { Permissions.ViewReservation }
+            });
 
             _logger.LogInformation(
                 "Reservation {ReservationId} created for {CustomerName} at tables {TableCodes}",
@@ -498,6 +522,22 @@ namespace Core.Service
                     {
                         await _tableRepository.UpdateStatusAsync(tableId, reservedTableStatusId, cancellationToken);
                         await _realtimeNotification.NotifyTableStatusChangedAsync(tableId, "RESERVED");
+                        await _notificationService.PublishAsync(new PublishNotificationRequest
+                        {
+                            Type = nameof(NotificationType.TABLE_STATUS_CHANGED),
+                            Title = "Table Status Changed",
+                            Priority = nameof(NotificationPriority.Low),
+                            SoundKey = "notification_low",
+                            ActionUrl = "/dashboard/tables",
+                            EntityType = "Table",
+                            EntityId = tableId.ToString(),
+                            Metadata = new Dictionary<string, object>
+                            {
+                                ["tableId"] = tableId.ToString(),
+                                ["newStatus"] = "RESERVED"
+                            },
+                            TargetPermissions = new List<string> { Permissions.ViewTable }
+                        }, cancellationToken);
                     }
                 }
                 else
@@ -517,6 +557,23 @@ namespace Core.Service
                 await _uow.CommitAsync(cancellationToken);
 
                 await _realtimeNotification.NotifyReservationUpdatedAsync(reservationId, "CONFIRMED");
+                await _notificationService.PublishAsync(new PublishNotificationRequest
+                {
+                    Type = nameof(NotificationType.RESERVATION_STATUS_CHANGED),
+                    Title = "Reservation Confirmed",
+                    Body = $"Reservation #{reservationId} has been confirmed",
+                    Priority = nameof(NotificationPriority.Normal),
+                    SoundKey = "notification_normal",
+                    ActionUrl = $"/dashboard/reservations/{reservationId}",
+                    EntityType = "Reservation",
+                    EntityId = reservationId.ToString(),
+                    Metadata = new Dictionary<string, object>
+                    {
+                        ["reservationId"] = reservationId.ToString(),
+                        ["newStatus"] = "CONFIRMED"
+                    },
+                    TargetPermissions = new List<string> { Permissions.ViewReservation }
+                }, cancellationToken);
             }
             catch (Exception)
             {
@@ -601,6 +658,23 @@ namespace Core.Service
                         {
                             await _tableRepository.UpdateStatusAsync(table.TableId, targetTableStatusId, cancellationToken);
                             await _realtimeNotification.NotifyTableStatusChangedAsync(table.TableId, targetTableStatusCode);
+                            await _notificationService.PublishAsync(new PublishNotificationRequest
+                            {
+                                Type = nameof(NotificationType.TABLE_STATUS_CHANGED),
+                                Title = "Table Status Changed",
+                                Priority = nameof(NotificationPriority.Low),
+                                SoundKey = "notification_low",
+                                ActionUrl = "/dashboard/tables",
+                                EntityType = "Table",
+                                EntityId = table.TableId.ToString(),
+                                Metadata = new Dictionary<string, object>
+                                {
+                                    ["tableId"] = table.TableId.ToString(),
+                                    ["tableCode"] = table.TableCode,
+                                    ["newStatus"] = targetTableStatusCode
+                                },
+                                TargetPermissions = new List<string> { Permissions.ViewTable }
+                            }, cancellationToken);
                         }
                     }
                 }
@@ -609,6 +683,23 @@ namespace Core.Service
                 await _uow.CommitAsync(cancellationToken);
 
                 await _realtimeNotification.NotifyReservationUpdatedAsync(reservationId, newStatusCode);
+                await _notificationService.PublishAsync(new PublishNotificationRequest
+                {
+                    Type = nameof(NotificationType.RESERVATION_STATUS_CHANGED),
+                    Title = "Reservation Status Changed",
+                    Body = $"Reservation #{reservationId} status changed to {newStatusCode}",
+                    Priority = nameof(NotificationPriority.Normal),
+                    SoundKey = "notification_normal",
+                    ActionUrl = $"/dashboard/reservations/{reservationId}",
+                    EntityType = "Reservation",
+                    EntityId = reservationId.ToString(),
+                    Metadata = new Dictionary<string, object>
+                    {
+                        ["reservationId"] = reservationId.ToString(),
+                        ["newStatus"] = newStatusCode
+                    },
+                    TargetPermissions = new List<string> { Permissions.ViewReservation }
+                }, cancellationToken);
             }
             catch (Exception)
             {
@@ -699,11 +790,45 @@ namespace Core.Service
                 await _uow.CommitAsync(CancellationToken.None);
 
                 await _realtimeNotification.NotifyReservationUpdatedAsync(reservationId, "NO_SHOW");
+                await _notificationService.PublishAsync(new PublishNotificationRequest
+                {
+                    Type = nameof(NotificationType.RESERVATION_STATUS_CHANGED),
+                    Title = "Reservation No-Show",
+                    Body = $"Reservation #{reservationId} marked as no-show",
+                    Priority = nameof(NotificationPriority.Normal),
+                    SoundKey = "notification_normal",
+                    ActionUrl = $"/dashboard/reservations/{reservationId}",
+                    EntityType = "Reservation",
+                    EntityId = reservationId.ToString(),
+                    Metadata = new Dictionary<string, object>
+                    {
+                        ["reservationId"] = reservationId.ToString(),
+                        ["newStatus"] = "NO_SHOW"
+                    },
+                    TargetPermissions = new List<string> { Permissions.ViewReservation }
+                });
                 if (reservation.Tables != null)
                 {
                     foreach (var table in reservation.Tables)
                     {
                         await _realtimeNotification.NotifyTableStatusChangedAsync(table.TableId, "AVAILABLE");
+                        await _notificationService.PublishAsync(new PublishNotificationRequest
+                        {
+                            Type = nameof(NotificationType.TABLE_STATUS_CHANGED),
+                            Title = "Table Status Changed",
+                            Priority = nameof(NotificationPriority.Low),
+                            SoundKey = "notification_low",
+                            ActionUrl = "/dashboard/tables",
+                            EntityType = "Table",
+                            EntityId = table.TableId.ToString(),
+                            Metadata = new Dictionary<string, object>
+                            {
+                                ["tableId"] = table.TableId.ToString(),
+                                ["tableCode"] = table.TableCode,
+                                ["newStatus"] = "AVAILABLE"
+                            },
+                            TargetPermissions = new List<string> { Permissions.ViewTable }
+                        });
                     }
                 }
             }
@@ -745,6 +870,22 @@ namespace Core.Service
                         {
                             await _tableRepository.UpdateStatusAsync(table.TableId, reservedTableStatusId, CancellationToken.None);
                             await _realtimeNotification.NotifyTableStatusChangedAsync(table.TableId, "RESERVED");
+                            await _notificationService.PublishAsync(new PublishNotificationRequest
+                            {
+                                Type = nameof(NotificationType.TABLE_STATUS_CHANGED),
+                                Title = "Table Status Changed",
+                                Priority = nameof(NotificationPriority.Low),
+                                SoundKey = "notification_low",
+                                ActionUrl = "/dashboard/tables",
+                                EntityType = "Table",
+                                EntityId = table.TableId.ToString(),
+                                Metadata = new Dictionary<string, object>
+                                {
+                                    ["tableId"] = table.TableId.ToString(),
+                                    ["newStatus"] = "RESERVED"
+                                },
+                                TargetPermissions = new List<string> { Permissions.ViewTable }
+                            });
                         }
                     }
                 }

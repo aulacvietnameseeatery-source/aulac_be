@@ -1,3 +1,5 @@
+using Core.Data;
+using Core.DTO.Notification;
 using Core.DTO.Order;
 using Core.Entity;
 using Core.Enum;
@@ -5,6 +7,7 @@ using LookupTypeEnum = Core.Enum.LookupType;
 using Core.Extensions;
 using Core.Interface.Repo;
 using Core.Interface.Service.Entity;
+using Core.Interface.Service.Notification;
 using Infa.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,15 +18,18 @@ public class PaymentService : IPaymentService
     private readonly RestaurantMgmtContext _context;
     private readonly ILookupResolver _lookupResolver;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly INotificationService _notificationService;
 
     public PaymentService(
         RestaurantMgmtContext context,
         ILookupResolver lookupResolver,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        INotificationService notificationService)
     {
         _context = context;
         _lookupResolver = lookupResolver;
         _unitOfWork = unitOfWork;
+        _notificationService = notificationService;
     }
 
     public async Task ProcessPaymentAsync(CreatePaymentDTO dto, CancellationToken cancellationToken = default)
@@ -82,6 +88,26 @@ public class PaymentService : IPaymentService
 
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             await _unitOfWork.CommitAsync(cancellationToken);
+
+            // Notify about payment completion
+            await _notificationService.PublishAsync(new PublishNotificationRequest
+            {
+                Type = nameof(NotificationType.PAYMENT_COMPLETED),
+                Title = "Payment Completed",
+                Body = $"Payment for Order #{dto.OrderId} completed",
+                Priority = nameof(NotificationPriority.Normal),
+                SoundKey = "notification_normal",
+                ActionUrl = $"/dashboard/invoices",
+                EntityType = "Order",
+                EntityId = dto.OrderId.ToString(),
+                Metadata = new Dictionary<string, object>
+                {
+                    ["orderId"] = dto.OrderId.ToString(),
+                    ["amount"] = dto.ReceivedAmount.ToString("F2"),
+                    ["method"] = dto.PaymentMethod.ToString()
+                },
+                TargetPermissions = new List<string> { Permissions.ViewOrder }
+            }, cancellationToken);
         }
         catch (Exception)
         {

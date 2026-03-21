@@ -339,6 +339,17 @@ this AccountStatusCode statusCode,
         return await statusCode.IdAsync(resolver, (ushort)LookupType.AttendanceStatus, ct);
     }
 
+    /// <summary>
+    /// Gets the lookup value_id for a ShiftAssignmentStatusCode enum asynchronously.
+    /// </summary>
+    public static async Task<uint> ToShiftAssignmentStatusIdAsync(
+        this ShiftAssignmentStatusCode statusCode,
+        ILookupResolver resolver,
+        CancellationToken ct = default)
+    {
+        return await statusCode.IdAsync(resolver, (ushort)LookupType.ShiftAssignmentStatus, ct);
+    }
+
     #endregion
 }
 
