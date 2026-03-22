@@ -8,6 +8,10 @@ public interface IShiftAssignmentService
     Task<(List<ShiftAssignmentListDto> Items, int TotalCount)> GetAssignmentsAsync(
         GetShiftAssignmentRequest request, CancellationToken ct = default);
 
+    /// <summary>Returns the live board view model for the selected date window.</summary>
+    Task<List<ShiftLiveBoardItemDto>> GetLiveBoardAsync(
+        GetShiftAssignmentRequest request, CancellationToken ct = default);
+
     /// <summary>Returns full detail for a single assignment including attendance.</summary>
     Task<ShiftAssignmentDetailDto> GetByIdAsync(long id, CancellationToken ct = default);
 

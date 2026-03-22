@@ -70,3 +70,17 @@ public enum ShiftTypeCode
     LUNCH,
     EVENING
 }
+
+public enum CouponTypeCode
+{
+    FIXED_AMOUNT,
+    PERCENT
+}
+
+public enum CouponStatusCode
+{
+    ACTIVE,
+    DISABLED,
+    SCHEDULED,
+    EXPIRED
+}

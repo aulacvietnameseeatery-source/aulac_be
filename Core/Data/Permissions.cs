@@ -39,6 +39,12 @@ namespace Core.Data
 		public const string EditSupplier = "SUPPLIER:EDIT";
 		public const string DeleteSupplier = "SUPPLIER:DELETE";
 
+		//Coupon
+		public const string ViewCoupon = "COUPON:READ";
+		public const string CreateCoupon = "COUPON:CREATE";
+		public const string EditCoupon = "COUPON:EDIT";
+		public const string DeleteCoupon = "COUPON:DELETE";
+
 		//Role
 		public const string ViewRole = "ROLE:READ";
         public const string CreateRole = "ROLE:CREATE";
