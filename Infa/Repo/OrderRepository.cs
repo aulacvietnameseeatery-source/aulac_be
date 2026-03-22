@@ -1,5 +1,6 @@
 using Core.DTO.General;
 using Core.DTO.Order;
+using Core.DTO.Shift;
 using Core.Entity;
 using Core.Exceptions;
 using Core.Interface.Repo;
@@ -95,7 +96,7 @@ public class OrderRepository : IOrderRepository
 					DishName = oi.Dish.DishName,
 					Quantity = oi.Quantity,
 					Price = oi.Price,
-					ItemStatus = oi.ItemStatusLv.ValueName,
+					ItemStatus = oi.ItemStatusLv.ValueCode,
 					RejectReason = oi.RejectReason,
 					Note = oi.Note
 				}).ToList()
@@ -193,6 +194,7 @@ public class OrderRepository : IOrderRepository
 		uint readyItemStatusId,
 		uint servedItemStatusId,
 		uint rejectedItemStatusId,
+		uint cancelledItemStatusId,
 		uint pendingOrderStatusId,
 		uint inProgressOrderStatusId,
 		uint completedOrderStatusId,
@@ -220,7 +222,7 @@ public class OrderRepository : IOrderRepository
 			bool orderStatusChanged = false;
 
 			// 1. Subtract rejected/cancelled item from total amount
-			if (newStatusLvId == rejectedItemStatusId)
+			if (newStatusLvId == rejectedItemStatusId || newStatusLvId == cancelledItemStatusId)
 			{
 				order.TotalAmount -= item.Price * item.Quantity;
 				orderStatusChanged = true;
@@ -435,7 +437,7 @@ public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, Can
                         DishName = oi.Dish.DishName,
                         Quantity = oi.Quantity,
                         Price = oi.Price,
-                        ItemStatus = oi.ItemStatusLv.ValueName,
+                        ItemStatus = oi.ItemStatusLv.ValueCode,
                         RejectReason = oi.RejectReason,
                         Note = oi.Note
                     })
@@ -509,4 +511,91 @@ public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, Can
             })
             .ToListAsync(ct);
     }
+
+	public async Task<List<ShiftLiveOrderSnapshotDto>> GetShiftLiveOrderSnapshotsAsync(
+		DateTime fromUtc,
+		DateTime toUtc,
+		IEnumerable<long> staffIds,
+		CancellationToken ct = default)
+	{
+		var idList = staffIds.Distinct().ToList();
+		if (idList.Count == 0)
+		{
+			return new List<ShiftLiveOrderSnapshotDto>();
+		}
+
+		return await _context.Orders
+			.AsNoTracking()
+			.Where(o => o.StaffId.HasValue
+				&& idList.Contains(o.StaffId.Value)
+				&& (
+					(o.CreatedAt.HasValue && o.CreatedAt.Value >= fromUtc && o.CreatedAt.Value <= toUtc)
+					|| (o.UpdatedAt.HasValue && o.UpdatedAt.Value >= fromUtc && o.UpdatedAt.Value <= toUtc)
+					|| o.Payments.Any(p => p.PaidAt.HasValue && p.PaidAt.Value >= fromUtc && p.PaidAt.Value <= toUtc)
+				))
+			.Select(o => new ShiftLiveOrderSnapshotDto
+			{
+				OrderId = o.OrderId,
+				StaffId = o.StaffId ?? 0,
+				TableCode = o.Table != null ? o.Table.TableCode : null,
+				CreatedAt = o.CreatedAt,
+				UpdatedAt = o.UpdatedAt,
+				LatestPaidAt = o.Payments
+					.Where(p => p.PaidAt.HasValue)
+					.Select(p => p.PaidAt)
+					.Max(),
+				LastActivityAt = new[]
+				{
+					o.CreatedAt,
+					o.UpdatedAt,
+					o.Payments.Where(p => p.PaidAt.HasValue).Select(p => p.PaidAt).Max(),
+				}
+				.Max(),
+				PaidRevenue = o.Payments.Any(p => p.PaidAt.HasValue)
+					? o.TotalAmount + (o.TipAmount ?? 0)
+					: 0,
+				CompletedItemsCount = o.OrderItems
+					.Where(oi => oi.ItemStatusLv.ValueCode == nameof(OrderItemStatusCode.READY)
+						|| oi.ItemStatusLv.ValueCode == nameof(OrderItemStatusCode.SERVED))
+					.Sum(oi => oi.Quantity),
+				PendingItemsCount = o.OrderItems
+					.Where(oi => oi.ItemStatusLv.ValueCode == nameof(OrderItemStatusCode.CREATED)
+						|| oi.ItemStatusLv.ValueCode == nameof(OrderItemStatusCode.IN_PROGRESS))
+					.Sum(oi => oi.Quantity),
+			})
+			.ToListAsync(ct);
+	}
+
+	public async Task<List<ShiftLiveIssueSnapshotDto>> GetShiftLiveIssueSnapshotsAsync(
+		DateTime fromUtc,
+		DateTime toUtc,
+		IEnumerable<long> staffIds,
+		CancellationToken ct = default)
+	{
+		var idList = staffIds.Distinct().ToList();
+		if (idList.Count == 0)
+		{
+			return new List<ShiftLiveIssueSnapshotDto>();
+		}
+
+		return await _context.ServiceErrors
+			.AsNoTracking()
+			.Where(se => idList.Contains(se.StaffId)
+				&& se.CreatedAt.HasValue
+				&& se.CreatedAt.Value >= fromUtc
+				&& se.CreatedAt.Value <= toUtc)
+			.Select(se => new ShiftLiveIssueSnapshotDto
+			{
+				StaffId = se.StaffId,
+				Description = se.Description,
+				IsResolved = se.IsResolved ?? false,
+				CreatedAt = se.CreatedAt,
+				TableCode = se.Table != null
+					? se.Table.TableCode
+					: se.Order != null && se.Order.Table != null
+						? se.Order.Table.TableCode
+						: null,
+			})
+			.ToListAsync(ct);
+	}
 }

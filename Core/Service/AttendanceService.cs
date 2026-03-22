@@ -21,6 +21,7 @@ public class AttendanceService : IAttendanceService
     private readonly ILookupResolver _lookupResolver;
     private readonly AttendanceOptions _options;
     private readonly INotificationService _notificationService;
+    private readonly IShiftLiveRealtimePublisher _shiftLiveRealtimePublisher;
 
     public AttendanceService(
         IAttendanceRepository attendanceRepo,
@@ -28,7 +29,8 @@ public class AttendanceService : IAttendanceService
         IUnitOfWork unitOfWork,
         ILookupResolver lookupResolver,
         IOptions<AttendanceOptions> options,
-        INotificationService notificationService)
+        INotificationService notificationService,
+        IShiftLiveRealtimePublisher shiftLiveRealtimePublisher)
     {
         _attendanceRepo = attendanceRepo;
         _assignmentRepo = assignmentRepo;
@@ -36,6 +38,7 @@ public class AttendanceService : IAttendanceService
         _lookupResolver = lookupResolver;
         _options = options.Value;
         _notificationService = notificationService;
+        _shiftLiveRealtimePublisher = shiftLiveRealtimePublisher;
     }
 
     #region Check-in / Check-out
@@ -116,6 +119,7 @@ public class AttendanceService : IAttendanceService
         }
 
         var updated = await _attendanceRepo.GetByAssignmentIdAsync(assignmentId, ct)!;
+        await PublishAttendanceRealtimeAsync("attendance_checked_in", assignment.WorkDate, assignmentId, assignment.StaffId, ct);
         return ShiftAssignmentService.MapAttendance(updated!);
     }
 
@@ -174,6 +178,7 @@ public class AttendanceService : IAttendanceService
         }
 
         var updated = await _attendanceRepo.GetByAssignmentIdAsync(assignmentId, ct)!;
+        await PublishAttendanceRealtimeAsync("attendance_checked_out", assignment.WorkDate, assignmentId, assignment.StaffId, ct);
         return ShiftAssignmentService.MapAttendance(updated!);
     }
 
@@ -235,7 +240,25 @@ public class AttendanceService : IAttendanceService
         await _unitOfWork.SaveChangesAsync(ct);
 
         var updated = await _attendanceRepo.GetByIdWithDetailsAsync(attendanceId, ct)!;
+        await PublishAttendanceRealtimeAsync("attendance_adjusted", assignment.WorkDate, assignment.ShiftAssignmentId, assignment.StaffId, ct);
         return ShiftAssignmentService.MapAttendance(updated!);
+    }
+
+    private Task PublishAttendanceRealtimeAsync(
+        string eventType,
+        DateOnly workDate,
+        long shiftAssignmentId,
+        long staffId,
+        CancellationToken ct)
+    {
+        return _shiftLiveRealtimePublisher.PublishBoardChangedAsync(new ShiftLiveRealtimeEventDto
+        {
+            EventType = eventType,
+            WorkDate = workDate,
+            ShiftAssignmentId = shiftAssignmentId,
+            StaffId = staffId,
+            OccurredAt = DateTime.UtcNow,
+        }, ct);
     }
 
     #endregion

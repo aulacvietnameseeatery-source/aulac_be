@@ -33,6 +33,8 @@ namespace Core.Enum
         ShiftStatus = 22, // SHIFT_STATUS
         ShiftAssignmentStatus = 23, // SHIFT_ASSIGNMENT_STATUS
         AttendanceStatus = 24,      // ATTENDANCE_STATUS
+        CouponType = 25,            // COUPON_TYPE
+        CouponStatus = 26,          // COUPON_STATUS
         IngredientUnit = 27 // INGREDIENT_UNIT
     }
 }

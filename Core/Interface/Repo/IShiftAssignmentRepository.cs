@@ -55,7 +55,7 @@ public interface IShiftAssignmentRepository
 
     /// <summary>Team schedule: returns all active assignments for a week, optionally filtered by template.</summary>
     Task<List<ShiftAssignment>> GetTeamScheduleAsync(
-        DateOnly weekStart, long? shiftTemplateId, CancellationToken ct = default);
+        DateOnly weekStart, DateOnly weekEnd, long? shiftTemplateId, CancellationToken ct = default);
 
     /// <summary>Calculates the total scheduled minutes for a staff member in a given week (Mon-Sun).</summary>
     Task<int> GetWeeklyScheduledMinutesAsync(

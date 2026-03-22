@@ -2,6 +2,7 @@ using Core.Data;
 using Core.DTO.General;
 using Core.DTO.Notification;
 using Core.DTO.Order;
+using Core.DTO.Shift;
 using Core.Entity;
 using Core.Enum;
 using Core.Exceptions;
@@ -11,6 +12,7 @@ using Core.Interface.Service.Customer;
 using Core.Interface.Service.Entity;
 using Core.Interface.Service.Notification;
 using Core.Interface.Service.Others;
+using Core.Interface.Service.Shift;
 using LookupTypeEnum = Core.Enum.LookupType;
 
 namespace Core.Service;
@@ -25,6 +27,7 @@ public class OrderService : IOrderService
     private readonly IUnitOfWork _uow;
     private readonly INotificationService _notificationService;
     private readonly IOrderRealtimeService _realtime;
+    private readonly IShiftLiveRealtimePublisher _shiftLiveRealtimePublisher;
 
     public OrderService(
         IOrderRepository orderRepository,
@@ -34,7 +37,8 @@ public class OrderService : IOrderService
         ICustomerService customerService,
         IUnitOfWork uow,
         INotificationService notificationService,
-        IOrderRealtimeService realtime)
+        IOrderRealtimeService realtime,
+        IShiftLiveRealtimePublisher shiftLiveRealtimePublisher)
     {
         _orderRepository = orderRepository;
         _tableRepository = tableRepository;
@@ -44,6 +48,7 @@ public class OrderService : IOrderService
         _uow = uow;
         _notificationService = notificationService;
         _realtime = realtime;
+        _shiftLiveRealtimePublisher = shiftLiveRealtimePublisher;
     }
     private const long GuestCustomerId = 68; // ID representing a visitor
 
@@ -188,6 +193,8 @@ public class OrderService : IOrderService
                 TableId = order.TableId,
                 UpdatedAt = DateTime.UtcNow
             });
+
+            await PublishShiftLiveOrderEventAsync("order_status_changed", orderId, order.StaffId, cancellationToken);
         }
         catch
         {
@@ -202,6 +209,7 @@ public class OrderService : IOrderService
 		var readyItemId      = await OrderItemStatusCode.READY.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
 		var servedItemId     = await OrderItemStatusCode.SERVED.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
 		var rejectedItemId   = await OrderItemStatusCode.REJECTED.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
+		var cancelledItemId  = await OrderItemStatusCode.CANCELLED.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
 
 		var pendingOrderId    = await OrderStatusCode.PENDING.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
 		var inProgressOrderId = await OrderStatusCode.IN_PROGRESS.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
@@ -217,6 +225,7 @@ public class OrderService : IOrderService
 			readyItemId,
 			servedItemId,
 			rejectedItemId,
+			cancelledItemId,
 			pendingOrderId,
 			inProgressOrderId,
 			completedOrderId,
@@ -272,6 +281,13 @@ public class OrderService : IOrderService
             Status = newStatusLvId.ToString(),
             UpdatedAt = DateTime.UtcNow
         });
+
+        await _shiftLiveRealtimePublisher.PublishBoardChangedAsync(new ShiftLiveRealtimeEventDto
+        {
+            EventType = "order_item_changed",
+            WorkDate = DateOnly.FromDateTime(DateTime.UtcNow),
+            OccurredAt = DateTime.UtcNow,
+        }, cancellationToken);
     }
 
 	public async Task CancelOrderItemAsync(long orderItemId, CancellationToken cancellationToken = default)
@@ -409,6 +425,8 @@ public class OrderService : IOrderService
                 TableId = order.TableId,
                 UpdatedAt = DateTime.UtcNow
             });
+
+            await PublishShiftLiveOrderEventAsync("order_created", order.OrderId, order.StaffId, ct);
 
             // Notify kitchen staff about new order
             await _notificationService.PublishAsync(new PublishNotificationRequest
@@ -557,6 +575,8 @@ public class OrderService : IOrderService
                 TableId = order.TableId,
                 UpdatedAt = DateTime.UtcNow
             });
+
+            await PublishShiftLiveOrderEventAsync("order_items_added", orderId, order.StaffId, ct);
         }
         catch
         {
@@ -687,6 +707,8 @@ public class OrderService : IOrderService
                 UpdatedAt = DateTime.UtcNow
             });
 
+            await PublishShiftLiveOrderEventAsync("customer_order_created", orderId, null, cancellationToken);
+
             return new CreateOrderResponseDTO
             {
                 OrderId = orderId,
@@ -715,6 +737,18 @@ public class OrderService : IOrderService
             limit = 20;
 
         return await _orderRepository.GetRecentOrdersAsync(userId, roles, limit, ct);
+    }
+
+    private Task PublishShiftLiveOrderEventAsync(string eventType, long orderId, long? staffId, CancellationToken ct)
+    {
+        return _shiftLiveRealtimePublisher.PublishBoardChangedAsync(new ShiftLiveRealtimeEventDto
+        {
+            EventType = eventType,
+            WorkDate = DateOnly.FromDateTime(DateTime.UtcNow),
+            StaffId = staffId,
+            OrderId = orderId,
+            OccurredAt = DateTime.UtcNow,
+        }, ct);
     }
 }
 

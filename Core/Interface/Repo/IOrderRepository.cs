@@ -1,5 +1,6 @@
 using Core.DTO.General;
 using Core.DTO.Order;
+using Core.DTO.Shift;
 using Core.Entity;
 
 namespace Core.Interface.Repo;
@@ -29,6 +30,7 @@ public interface IOrderRepository
 		uint readyItemStatusId,
 		uint servedItemStatusId,
 		uint rejectedItemStatusId,
+		uint cancelledItemStatusId,
 		uint pendingOrderStatusId,
 		uint inProgressOrderStatusId,
 		uint completedOrderStatusId,
@@ -63,4 +65,16 @@ public interface IOrderRepository
     Task<Order?> GetActiveOrderByTableAsync(long tableId, CancellationToken ct);
 
 	Task<List<RecentOrderDTO>> GetRecentOrdersAsync(long userId, List<string> roles, int limit, CancellationToken ct);
+
+	Task<List<ShiftLiveOrderSnapshotDto>> GetShiftLiveOrderSnapshotsAsync(
+		DateTime fromUtc,
+		DateTime toUtc,
+		IEnumerable<long> staffIds,
+		CancellationToken ct = default);
+
+	Task<List<ShiftLiveIssueSnapshotDto>> GetShiftLiveIssueSnapshotsAsync(
+		DateTime fromUtc,
+		DateTime toUtc,
+		IEnumerable<long> staffIds,
+		CancellationToken ct = default);
 }

@@ -71,6 +71,20 @@ public enum ShiftTypeCode
     EVENING
 }
 
+public enum CouponTypeCode
+{
+    FIXED_AMOUNT,
+    PERCENT
+}
+
+public enum CouponStatusCode
+{
+    ACTIVE,
+    DISABLED,
+    SCHEDULED,
+    EXPIRED
+}
+
 public enum IngredientUnitCode
 {
     KG,

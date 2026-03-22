@@ -1,6 +1,7 @@
 using Core.Data;
 using Core.DTO.Notification;
 using Core.DTO.Order;
+using Core.DTO.Shift;
 using Core.Entity;
 using Core.Enum;
 using LookupTypeEnum = Core.Enum.LookupType;
@@ -8,6 +9,7 @@ using Core.Extensions;
 using Core.Interface.Repo;
 using Core.Interface.Service.Entity;
 using Core.Interface.Service.Notification;
+using Core.Interface.Service.Shift;
 using Infa.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -19,17 +21,20 @@ public class PaymentService : IPaymentService
     private readonly ILookupResolver _lookupResolver;
     private readonly IUnitOfWork _unitOfWork;
     private readonly INotificationService _notificationService;
+    private readonly IShiftLiveRealtimePublisher _shiftLiveRealtimePublisher;
 
     public PaymentService(
         RestaurantMgmtContext context,
         ILookupResolver lookupResolver,
         IUnitOfWork unitOfWork,
-        INotificationService notificationService)
+        INotificationService notificationService,
+        IShiftLiveRealtimePublisher shiftLiveRealtimePublisher)
     {
         _context = context;
         _lookupResolver = lookupResolver;
         _unitOfWork = unitOfWork;
         _notificationService = notificationService;
+        _shiftLiveRealtimePublisher = shiftLiveRealtimePublisher;
     }
 
     public async Task ProcessPaymentAsync(CreatePaymentDTO dto, CancellationToken cancellationToken = default)
@@ -107,6 +112,15 @@ public class PaymentService : IPaymentService
                     ["method"] = dto.PaymentMethod.ToString()
                 },
                 TargetPermissions = new List<string> { Permissions.ViewOrder }
+            }, cancellationToken);
+
+            await _shiftLiveRealtimePublisher.PublishBoardChangedAsync(new ShiftLiveRealtimeEventDto
+            {
+                EventType = "payment_completed",
+                WorkDate = DateOnly.FromDateTime(DateTime.UtcNow),
+                OrderId = dto.OrderId,
+                StaffId = order.StaffId,
+                OccurredAt = DateTime.UtcNow,
             }, cancellationToken);
         }
         catch (Exception)
