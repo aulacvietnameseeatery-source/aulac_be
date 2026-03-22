@@ -29,6 +29,8 @@ public class SaleInvoiceRepository : ISaleInvoiceRepository
                 .ThenInclude(p => p.MethodLv)
             .Include(o => o.OrderItems)
                 .ThenInclude(oi => oi.Dish)
+            .Include(o => o.OrderItems)
+                .ThenInclude(oi => oi.ItemStatusLv)
             .FirstOrDefaultAsync(o => o.OrderId == orderId, cancellationToken);
     }
 

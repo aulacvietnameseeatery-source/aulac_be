@@ -209,6 +209,7 @@ public class OrderService : IOrderService
 		var readyItemId      = await OrderItemStatusCode.READY.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
 		var servedItemId     = await OrderItemStatusCode.SERVED.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
 		var rejectedItemId   = await OrderItemStatusCode.REJECTED.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
+		var cancelledItemId  = await OrderItemStatusCode.CANCELLED.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
 
 		var pendingOrderId    = await OrderStatusCode.PENDING.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
 		var inProgressOrderId = await OrderStatusCode.IN_PROGRESS.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
@@ -224,6 +225,7 @@ public class OrderService : IOrderService
 			readyItemId,
 			servedItemId,
 			rejectedItemId,
+			cancelledItemId,
 			pendingOrderId,
 			inProgressOrderId,
 			completedOrderId,
