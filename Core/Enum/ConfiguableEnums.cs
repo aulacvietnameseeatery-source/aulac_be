@@ -70,3 +70,12 @@ public enum ShiftTypeCode
     LUNCH,
     EVENING
 }
+
+public enum IngredientUnitCode
+{
+    KG,
+    GRAM,
+    LITER,
+    ML,
+    PCS
+}

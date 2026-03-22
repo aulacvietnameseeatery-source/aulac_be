@@ -9,7 +9,9 @@ public partial class Ingredient
 
     public string IngredientName { get; set; } = null!;
 
-    public string Unit { get; set; } = null!;
+    // public string Unit { get; set; } = null!;
+    public uint UnitLvId { get; set; }
+    public virtual LookupValue? UnitLv { get; set; }
 
     public uint? TypeLvId { get; set; }
 

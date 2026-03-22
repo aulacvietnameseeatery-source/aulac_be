@@ -49,7 +49,7 @@ namespace Core.Service
             var entity = new Ingredient
             {
                 IngredientName = request.IngredientName,
-                Unit = request.Unit,
+                UnitLvId = request.UnitLvId,
                 TypeLvId = request.TypeLvId,
                 ImageId = request.ImageId,
                 CurrentStock = new CurrentStock
@@ -79,7 +79,7 @@ namespace Core.Service
                 throw new Exception("Ingredient name already exists.");
 
             entity.IngredientName = request.IngredientName;
-            entity.Unit = request.Unit;
+            entity.UnitLvId = request.UnitLvId;
             entity.TypeLvId = request.TypeLvId;
             entity.ImageId = request.ImageId;
 
@@ -88,7 +88,6 @@ namespace Core.Service
                 entity.CurrentStock.MinStockLevel = request.MinStockLevel;
             }
 
-           
             entity.IngredientSuppliers.Clear();
             foreach (var sid in request.SupplierIds)
             {
@@ -122,11 +121,13 @@ namespace Core.Service
             if (entity?.CurrentStock != null &&
                 entity.CurrentStock.QuantityOnHand < entity.CurrentStock.MinStockLevel)
             {
+                string unitName = entity.UnitLv?.ValueName ?? "";
+
                 await _notificationService.PublishAsync(new PublishNotificationRequest
                 {
                     Type = nameof(NotificationType.LOW_STOCK_ALERT),
                     Title = "Low Stock Alert",
-                    Body = $"{entity.IngredientName} stock is low: {entity.CurrentStock.QuantityOnHand} {entity.Unit} (min: {entity.CurrentStock.MinStockLevel})",
+                    Body = $"{entity.IngredientName} stock is low: {entity.CurrentStock.QuantityOnHand} {unitName} (min: {entity.CurrentStock.MinStockLevel})", // 🟢 Cập nhật UnitName
                     Priority = nameof(NotificationPriority.High),
                     SoundKey = "notification_high",
                     ActionUrl = $"/dashboard/ingredients/{id}/history",
@@ -138,7 +139,7 @@ namespace Core.Service
                         ["ingredientName"] = entity.IngredientName,
                         ["currentStock"] = entity.CurrentStock.QuantityOnHand.ToString(),
                         ["minStock"] = entity.CurrentStock.MinStockLevel.ToString(),
-                        ["unit"] = entity.Unit
+                        ["unit"] = unitName 
                     },
                     TargetPermissions = new List<string> { Permissions.ViewDish }
                 });
@@ -164,7 +165,10 @@ namespace Core.Service
             {
                 IngredientId = entity.IngredientId,
                 IngredientName = entity.IngredientName,
-                Unit = entity.Unit,
+
+                UnitLvId = entity.UnitLvId, 
+                UnitName = entity.UnitLv?.ValueName, 
+
                 TypeLvId = entity.TypeLvId,
                 TypeName = entity.TypeLv?.ValueName,
                 ImageId = entity.ImageId,
@@ -178,10 +182,10 @@ namespace Core.Service
                     .Where(ise => ise.Supplier != null)
                     .Select(ise => new SupplierDto
                     {
-                         SupplierId = ise.Supplier!.SupplierId,
-                         SupplierName = ise.Supplier.SupplierName,
-                         Phone = ise.Supplier.Phone,
-                         Email = ise.Supplier.Email
+                        SupplierId = ise.Supplier!.SupplierId,
+                        SupplierName = ise.Supplier.SupplierName,
+                        Phone = ise.Supplier.Phone,
+                        Email = ise.Supplier.Email
                     }).ToList()
             };
         }
