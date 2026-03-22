@@ -28,6 +28,7 @@ public class OrderService : IOrderService
     private readonly INotificationService _notificationService;
     private readonly IOrderRealtimeService _realtime;
     private readonly IShiftLiveRealtimePublisher _shiftLiveRealtimePublisher;
+    private readonly ITaxRepository _taxRepository;
 
     public OrderService(
         IOrderRepository orderRepository,
@@ -38,7 +39,8 @@ public class OrderService : IOrderService
         IUnitOfWork uow,
         INotificationService notificationService,
         IOrderRealtimeService realtime,
-        IShiftLiveRealtimePublisher shiftLiveRealtimePublisher)
+        IShiftLiveRealtimePublisher shiftLiveRealtimePublisher,
+        ITaxRepository taxRepository)
     {
         _orderRepository = orderRepository;
         _tableRepository = tableRepository;
@@ -49,6 +51,7 @@ public class OrderService : IOrderService
         _notificationService = notificationService;
         _realtime = realtime;
         _shiftLiveRealtimePublisher = shiftLiveRealtimePublisher;
+        _taxRepository = taxRepository;
     }
     private const long GuestCustomerId = 68; // ID representing a visitor
 
@@ -414,7 +417,11 @@ public class OrderService : IOrderService
 
             order.TotalAmount = total;
 
+            await ApplyTaxToOrderAsync(order, ct);
+
             await _orderRepository.AddAsync(order, ct);
+
+
 
             await _uow.CommitAsync(ct);
 
@@ -556,7 +563,10 @@ public class OrderService : IOrderService
                 order.TotalAmount += additionalTotal;
                 order.UpdatedAt = DateTime.UtcNow;
 
+                await ApplyTaxToOrderAsync(order, ct);
+
                 // ===== Status transition logic =====
+
 
                 if (order.OrderStatusLvId == completedStatusId)
                 {
@@ -610,7 +620,16 @@ public class OrderService : IOrderService
         }).ToList();
 
         await _orderRepository.AddItemsToOrderAsync(orderId, orderItems, completedOrderStatusId, cancelledOrderStatusId, pendingOrderStatusId, cancellationToken);
+
+        // Recalculate tax after adding items
+        var order = await _orderRepository.GetByIdForUpdateAsync(orderId, cancellationToken);
+        if (order != null)
+        {
+            await ApplyTaxToOrderAsync(order, cancellationToken);
+            await _uow.SaveChangesAsync(cancellationToken);
+        }
     }
+
 
     public async Task<CreateOrderResponseDTO> CreateOrderAsync(CreateOrderRequestDTO request, CancellationToken cancellationToken = default)
     {
@@ -682,6 +701,9 @@ public class OrderService : IOrderService
                 UpdatedAt = DateTime.UtcNow,
             };
 
+            await ApplyTaxToOrderAsync(order, cancellationToken);
+
+
             // 8. Build OrderItem entities
             var orderItems = request.Items.Select(i => new OrderItem
             {
@@ -750,5 +772,41 @@ public class OrderService : IOrderService
             OccurredAt = DateTime.UtcNow,
         }, ct);
     }
+
+    private async Task ApplyTaxToOrderAsync(Order order, CancellationToken ct)
+    {
+        if (order.TaxId.HasValue)
+        {
+            var tax = await _taxRepository.GetByIdAsync(order.TaxId.Value, ct);
+            if (tax != null)
+            {
+                if (tax.TaxType == "EXCLUSIVE")
+                {
+                    order.TaxAmount = order.TotalAmount * (tax.TaxRate / 100);
+                }
+                else // INCLUSIVE
+                {
+                    order.TaxAmount = order.TotalAmount - (order.TotalAmount / (1 + tax.TaxRate / 100));
+                }
+            }
+        }
+        else
+        {
+            var defaultTax = await _taxRepository.GetDefaultTaxAsync(ct);
+            if (defaultTax != null)
+            {
+                order.TaxId = defaultTax.TaxId;
+                if (defaultTax.TaxType == "EXCLUSIVE")
+                {
+                    order.TaxAmount = order.TotalAmount * (defaultTax.TaxRate / 100);
+                }
+                else // INCLUSIVE
+                {
+                    order.TaxAmount = order.TotalAmount - (order.TotalAmount / (1 + defaultTax.TaxRate / 100));
+                }
+            }
+        }
+    }
 }
+
 

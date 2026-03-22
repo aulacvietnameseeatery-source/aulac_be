@@ -16,7 +16,10 @@ public class OrderHistoryDTO
 	public DateTime? CreatedAt { get; set; }
 	public DateTime? UpdatedAt { get; set; }
 	public bool IsPaid { get; set; }
+	public decimal TaxAmount { get; set; }
+	public long? TaxId { get; set; }
 	public List<OrderItemDTO> OrderItems { get; set; } = new();
 	public int ItemCount => OrderItems.Count;
 }
+
 

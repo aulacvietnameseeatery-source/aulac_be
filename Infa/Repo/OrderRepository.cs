@@ -83,7 +83,10 @@ public class OrderRepository : IOrderRepository
 				CustomerId = o.CustomerId,
 				CustomerName = o.Customer.FullName,
 				TotalAmount = o.TotalAmount,
+				TaxAmount = o.TaxAmount,
+				TaxId = o.TaxId,
 				TipAmount = o.TipAmount,
+
 				OrderStatus = o.OrderStatusLv.ValueName,
 				Source = o.SourceLv.ValueName,
 				CreatedAt = o.CreatedAt,
@@ -322,9 +325,11 @@ public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, Can
 			TableCode      = order.Table.TableCode,
 			TotalItems     = totalItems,
 			EstimatedTotal = estimatedTotal,
+			TaxAmount      = order.TaxAmount,
 			Items          = allItems
 		};
 	}
+
 
 	public async Task AddItemsToOrderAsync(long orderId, List<OrderItem> items, uint completedOrderStatusId, uint cancelledOrderStatusId, uint pendingOrderStatusId, CancellationToken cancellationToken = default)
 	{
@@ -389,9 +394,11 @@ public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, Can
 			TableCode      = tableCode,
 			TotalItems     = totalItems,
 			EstimatedTotal = estimatedTotal,
+			TaxAmount      = orders.Sum(o => o.TaxAmount),
 			Items          = allItems
 		};
 	}
+
 
     public async Task AddAsync(Order order, CancellationToken ct)
     {
@@ -419,7 +426,10 @@ public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, Can
                 CustomerName = o.Customer != null ? o.Customer.FullName : null,
 
                 TotalAmount = o.TotalAmount,
+                TaxAmount = o.TaxAmount,
+                TaxId = o.TaxId,
                 TipAmount = o.TipAmount,
+
 
                 OrderStatus = o.OrderStatusLv.ValueName,
                 Source = o.SourceLv.ValueName,
