@@ -271,6 +271,7 @@ builder.Services.AddScoped<IAttendanceService, AttendanceService>();
 
 builder.Services.AddHttpClient<ITranslationService, GoogleTranslationService>();
 builder.Services.AddScoped<IIngredientService, IngredientService>();
+builder.Services.AddScoped<IInventoryService, InventoryService>();
 builder.Services.AddScoped<IEmailTemplateService, EmailTemplateService>();
 
 
@@ -308,6 +309,7 @@ builder.Services.AddScoped<ISaleInvoiceRepository, SaleInvoiceRepository>();
 builder.Services.AddScoped<IShiftTemplateRepository, ShiftTemplateRepository>();
 builder.Services.AddScoped<IShiftAssignmentRepository, ShiftAssignmentRepository>();
 builder.Services.AddScoped<IAttendanceRepository, AttendanceRepository>();
+builder.Services.AddScoped<IInventoryRepository, InventoryRepository>();
 builder.Services.AddScoped<ILoginActivityRepository, LoginActivityRepository>();
 builder.Services.AddScoped<IEmailTemplateRepository, EmailTemplateRepository>();
 

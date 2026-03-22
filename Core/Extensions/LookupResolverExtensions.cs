@@ -350,6 +350,39 @@ this AccountStatusCode statusCode,
         return await statusCode.IdAsync(resolver, (ushort)LookupType.ShiftAssignmentStatus, ct);
     }
 
+    /// <summary>
+    /// Gets the lookup value_id for an InventoryCategoryCode enum asynchronously.
+    /// </summary>
+    public static async Task<uint> ToInventoryCategoryIdAsync(
+        this InventoryCategoryCode categoryCode,
+        ILookupResolver resolver,
+        CancellationToken ct = default)
+    {
+        return await categoryCode.IdAsync(resolver, (ushort)LookupType.InventoryCategory, ct);
+    }
+
+    /// <summary>
+    /// Gets the lookup value_id for an ExportReasonCode enum asynchronously.
+    /// </summary>
+    public static async Task<uint> ToExportReasonIdAsync(
+        this ExportReasonCode reasonCode,
+        ILookupResolver resolver,
+        CancellationToken ct = default)
+    {
+        return await reasonCode.IdAsync(resolver, (ushort)LookupType.ExportReason, ct);
+    }
+
+    /// <summary>
+    /// Gets the lookup value_id for a VarianceReasonCode enum asynchronously.
+    /// </summary>
+    public static async Task<uint> ToVarianceReasonIdAsync(
+        this VarianceReasonCode reasonCode,
+        ILookupResolver resolver,
+        CancellationToken ct = default)
+    {
+        return await reasonCode.IdAsync(resolver, (ushort)LookupType.VarianceReason, ct);
+    }
+
     #endregion
 }
 
