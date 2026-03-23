@@ -16,6 +16,10 @@ public sealed class InventoryTransactionItemConfiguration : IEntityTypeConfigura
 
         entity.HasIndex(e => e.TransactionId, "idx_inventory_transaction_item_transaction");
 
+        entity.HasIndex(e => e.UnitLvId, "idx_inventory_tx_item_unit_lv");
+
+        entity.HasIndex(e => e.VarianceReasonLvId, "idx_inventory_tx_item_variance_reason_lv");
+
         entity.HasIndex(e => new { e.TransactionId, e.IngredientId }, "uq_inventory_transaction_item").IsUnique();
 
         entity.Property(e => e.TransactionItemId).HasColumnName("transaction_item_id");
@@ -27,9 +31,21 @@ public sealed class InventoryTransactionItemConfiguration : IEntityTypeConfigura
         .HasPrecision(14, 3)
         .HasColumnName("quantity");
         entity.Property(e => e.TransactionId).HasColumnName("transaction_id");
-        entity.Property(e => e.Unit)
-        .HasMaxLength(20)
-        .HasColumnName("unit");
+        entity.Property(e => e.UnitLvId).HasColumnName("unit_lv_id");
+
+        entity.Property(e => e.UnitPrice)
+        .HasPrecision(14, 2)
+        .HasColumnName("unit_price");
+
+        entity.Property(e => e.SystemQuantity)
+        .HasPrecision(14, 3)
+        .HasColumnName("system_quantity");
+
+        entity.Property(e => e.ActualQuantity)
+        .HasPrecision(14, 3)
+        .HasColumnName("actual_quantity");
+
+        entity.Property(e => e.VarianceReasonLvId).HasColumnName("variance_reason_lv_id");
 
         entity.HasOne(d => d.Ingredient).WithMany(p => p.InventoryTransactionItems)
         .HasForeignKey(d => d.IngredientId)
@@ -39,5 +55,16 @@ public sealed class InventoryTransactionItemConfiguration : IEntityTypeConfigura
         entity.HasOne(d => d.Transaction).WithMany(p => p.InventoryTransactionItems)
         .HasForeignKey(d => d.TransactionId)
         .HasConstraintName("fk_inventory_transaction_item_transaction");
+
+        entity.HasOne(d => d.UnitLv)
+        .WithMany()
+        .HasForeignKey(d => d.UnitLvId)
+        .OnDelete(DeleteBehavior.ClientSetNull)
+        .HasConstraintName("fk_inventory_tx_item_unit_lv");
+
+        entity.HasOne(d => d.VarianceReasonLv)
+        .WithMany()
+        .HasForeignKey(d => d.VarianceReasonLvId)
+        .HasConstraintName("fk_inventory_tx_item_variance_reason_lv");
     }
 }

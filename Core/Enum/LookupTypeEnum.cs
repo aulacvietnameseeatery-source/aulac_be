@@ -35,6 +35,12 @@ namespace Core.Enum
         AttendanceStatus = 24,      // ATTENDANCE_STATUS
         CouponType = 25,            // COUPON_TYPE
         CouponStatus = 26,          // COUPON_STATUS
-        IngredientUnit = 27 // INGREDIENT_UNIT
+        IngredientUnit = 27,        // INGREDIENT_UNIT
+        InventoryCategory = 28,     // INVENTORY_CATEGORY
+        ExportReason = 29,          // EXPORT_REASON
+        VarianceReason = 30,        // VARIANCE_REASON
+        KitchenToolType = 31,       // KITCHEN_TOOL_TYPE
+        ConsumableType = 32,        // CONSUMABLE_TYPE
+        EquipmentType = 33          // EQUIPMENT_TYPE
     }
 }

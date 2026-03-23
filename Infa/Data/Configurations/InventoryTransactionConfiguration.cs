@@ -16,28 +16,58 @@ public sealed class InventoryTransactionConfiguration : IEntityTypeConfiguration
 
         entity.HasIndex(e => e.CreatedBy, "fk_inventory_transaction_staff");
 
+        entity.HasIndex(e => e.ApprovedBy, "fk_inventory_transaction_approved_by");
+
         entity.HasIndex(e => e.CreatedAt, "idx_inventory_transaction_dir_time");
 
         entity.HasIndex(e => e.StatusLvId, "idx_inventory_tx_status_lv");
 
         entity.HasIndex(e => e.TypeLvId, "idx_inventory_tx_type_lv");
 
+        entity.HasIndex(e => e.ExportReasonLvId, "idx_inventory_tx_export_reason_lv");
+
         entity.Property(e => e.TransactionId).HasColumnName("transaction_id");
+
+        entity.Property(e => e.TransactionCode)
+        .HasMaxLength(30)
+        .HasColumnName("transaction_code");
+
         entity.Property(e => e.CreatedAt)
         .HasDefaultValueSql("CURRENT_TIMESTAMP")
         .HasColumnType("datetime")
         .HasColumnName("created_at");
         entity.Property(e => e.CreatedBy).HasColumnName("created_by");
+
+        entity.Property(e => e.SubmittedAt)
+        .HasColumnType("datetime")
+        .HasColumnName("submitted_at");
+
+        entity.Property(e => e.ApprovedBy).HasColumnName("approved_by");
+
+        entity.Property(e => e.ApprovedAt)
+        .HasColumnType("datetime")
+        .HasColumnName("approved_at");
+
         entity.Property(e => e.Note)
-        .HasMaxLength(255)
+        .HasMaxLength(500)
         .HasColumnName("note");
         entity.Property(e => e.StatusLvId).HasColumnName("status_lv_id");
         entity.Property(e => e.SupplierId).HasColumnName("supplier_id");
         entity.Property(e => e.TypeLvId).HasColumnName("type_lv_id");
 
+        entity.Property(e => e.ExportReasonLvId).HasColumnName("export_reason_lv_id");
+
+        entity.Property(e => e.StockCheckAreaNote)
+        .HasMaxLength(500)
+        .HasColumnName("stock_check_area_note");
+
         entity.HasOne(d => d.CreatedByNavigation).WithMany(p => p.InventoryTransactions)
         .HasForeignKey(d => d.CreatedBy)
         .HasConstraintName("fk_inventory_transaction_staff");
+
+        entity.HasOne(d => d.ApprovedByNavigation).WithMany(p => p.ApprovedInventoryTransactions)
+        .HasForeignKey(d => d.ApprovedBy)
+        .HasConstraintName("fk_inventory_transaction_approved_by");
 
         entity.HasOne(d => d.StatusLv).WithMany(p => p.InventoryTransactionStatusLvs)
         .HasForeignKey(d => d.StatusLvId)
@@ -51,5 +81,10 @@ public sealed class InventoryTransactionConfiguration : IEntityTypeConfiguration
         .HasForeignKey(d => d.TypeLvId)
         .OnDelete(DeleteBehavior.ClientSetNull)
         .HasConstraintName("fk_inventory_tx_type_lv");
+
+        entity.HasOne(d => d.ExportReasonLv)
+        .WithMany()
+        .HasForeignKey(d => d.ExportReasonLvId)
+        .HasConstraintName("fk_inventory_tx_export_reason_lv");
     }
 }

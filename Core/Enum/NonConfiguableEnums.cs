@@ -102,3 +102,29 @@ public enum ShiftAssignmentStatusCode
     CONFIRMED,
     CANCELLED
 }
+
+public enum InventoryCategoryCode
+{
+    FOOD_INGREDIENT,
+    KITCHEN_TOOL,
+    CONSUMABLE_SUPPLY,
+    EQUIPMENT
+}
+
+public enum ExportReasonCode
+{
+    COOKING,
+    SPOILED,
+    EXPIRED,
+    BROKEN,
+    LOST,
+    DISPOSED,
+    WORN_OUT
+}
+
+public enum VarianceReasonCode
+{
+    BREAKAGE,
+    NATURAL_LOSS,
+    COUNTING_ERROR
+}

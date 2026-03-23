@@ -125,11 +125,12 @@ namespace Infa.Repo
             };
 
             // InventoryTransactionItem
+            // _OLD: Unit = unit (string field removed, now uses UnitLvId FK)
             var txItem = new InventoryTransactionItem
             {
                 IngredientId = ingredientId,
                 Quantity = quantityChanged,
-                Unit = unit,
+                UnitLvId = ingredient?.UnitLvId ?? 0,
                 Note = note,
                 Transaction = parentTransaction
             };
