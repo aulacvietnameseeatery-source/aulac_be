@@ -19,6 +19,8 @@ public partial class Order
 
     public decimal TotalAmount { get; set; }
 
+    public decimal SubTotalAmount { get; set; } = 0;
+
     public decimal? TipAmount { get; set; }
 
     public long? TaxId { get; set; }

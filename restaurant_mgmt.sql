@@ -2073,7 +2073,9 @@ INSERT INTO permission(permission_id, screen_code, action_code) VALUES
 -- Dumping data for table system_setting
 --
 INSERT INTO system_setting(setting_id, setting_key, value_type, value_string, value_int, value_decimal, value_bool, value_json, description, is_sensitive, updated_at, updated_by) VALUES
-(1, 'default_password', 'STRING', 'AuLac@123', NULL, NULL, NULL, NULL, 'Default password for password reset', 1, '2026-02-01 23:05:36', NULL);
+(1, 'default_password', 'STRING', 'AuLac@123', NULL, NULL, NULL, NULL, 'Default password for password reset', 1, '2026-02-01 23:05:36', NULL),
+(2, 'loyalty.enabled', 'BOOL', NULL, NULL, NULL, 0, NULL, 'Enable or disable loyalty point accrual.', 0, '2026-03-24 00:00:00', NULL),
+(3, 'loyalty.point_base_amount', 'DECIMAL', NULL, NULL, 10.00, NULL, NULL, 'Base amount to earn 1 loyalty point.', 0, '2026-03-24 00:00:00', NULL);
 
 -- Table restaurant_mgmt.service_error does not contain any data (it is empty)
 

@@ -416,6 +416,7 @@ public class OrderService : IOrderService
             }
 
             order.TotalAmount = total;
+            order.SubTotalAmount = total;
 
             await ApplyTaxToOrderAsync(order, ct);
 
@@ -561,6 +562,7 @@ public class OrderService : IOrderService
                 // ===== Update total =====
 
                 order.TotalAmount += additionalTotal;
+                order.SubTotalAmount += additionalTotal;
                 order.UpdatedAt = DateTime.UtcNow;
 
                 await ApplyTaxToOrderAsync(order, ct);
@@ -695,6 +697,7 @@ public class OrderService : IOrderService
                 CustomerId = customerId,
                 StaffId = null,
                 TotalAmount = totalAmount,
+                SubTotalAmount = totalAmount,
                 SourceLvId = dineInSourceLvId,
                 OrderStatusLvId = pendingOrderLvId,
                 CreatedAt = DateTime.UtcNow,

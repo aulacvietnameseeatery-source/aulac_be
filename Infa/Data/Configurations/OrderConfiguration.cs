@@ -40,6 +40,10 @@ public sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         entity.Property(e => e.TotalAmount)
         .HasPrecision(14, 2)
         .HasColumnName("total_amount");
+        entity.Property(e => e.SubTotalAmount)
+        .HasPrecision(14, 2)
+        .HasColumnName("sub_total_amount")
+        .HasDefaultValue(0);
         entity.Property(e => e.UpdatedAt)
         .HasColumnType("datetime")
         .HasColumnName("updated_at");
