@@ -21,6 +21,10 @@ public partial class Order
 
     public decimal? TipAmount { get; set; }
 
+    public long? TaxId { get; set; }
+
+    public decimal TaxAmount { get; set; } = 0;
+
     public uint SourceLvId { get; set; }
 
     public uint OrderStatusLvId { get; set; }
@@ -44,4 +48,7 @@ public partial class Order
     public virtual StaffAccount? Staff { get; set; }
 
     public virtual RestaurantTable? Table { get; set; }
+
+    public virtual Tax? Tax { get; set; }
 }
+
