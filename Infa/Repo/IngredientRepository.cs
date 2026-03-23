@@ -24,6 +24,7 @@ namespace Infa.Repo
         {
             var query = _context.Ingredients
                 .Include(i => i.TypeLv)
+                .Include(i => i.UnitLv)
                 .Include(i => i.Image)
                 .Include(i => i.CurrentStock)
                 .Include(i => i.IngredientSuppliers)
@@ -59,6 +60,7 @@ namespace Infa.Repo
         {
             return await _context.Ingredients
                 .Include(i => i.TypeLv)
+                .Include(i => i.UnitLv)
                 .Include(i => i.Image)
                 .Include(i => i.CurrentStock)
                 .Include(i => i.IngredientSuppliers)
@@ -111,7 +113,7 @@ namespace Infa.Repo
             stock.LastUpdatedAt = DateTime.UtcNow;
 
             var ingredient = await _context.Ingredients.FirstOrDefaultAsync(i => i.IngredientId == ingredientId);
-            string unit = ingredient?.Unit ?? "unit";
+            string unit = ingredient?.UnitLvId.ToString() ?? "unit";
 
             // InventoryTransaction
             var parentTransaction = new InventoryTransaction

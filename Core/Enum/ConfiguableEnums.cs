@@ -84,3 +84,12 @@ public enum CouponStatusCode
     SCHEDULED,
     EXPIRED
 }
+
+public enum IngredientUnitCode
+{
+    KG,
+    GRAM,
+    LITER,
+    ML,
+    PCS
+}

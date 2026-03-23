@@ -53,7 +53,7 @@ public class SupplierService : ISupplierService
                 {
                     IngredientId = is_.Ingredient!.IngredientId,
                     IngredientName = is_.Ingredient.IngredientName,
-                    Unit = is_.Ingredient.Unit
+                    UnitLvId = is_.Ingredient.UnitLvId
                 })
                 .ToList()
         };
