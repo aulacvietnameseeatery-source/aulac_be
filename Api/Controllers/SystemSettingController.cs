@@ -497,8 +497,7 @@ public class SystemSettingController : ControllerBase
                 ContentType = file.ContentType
             };
 
-            // Using existing validation options from TableService pattern if available, or just standard image validation
-            var result = await _fileStorage.SaveAsync(uploadRequest, "store-logo", null, cancellationToken);
+            var result = await _fileStorage.SaveAsync(uploadRequest, "store-logo", FileValidationOptions.ImageUpload, cancellationToken);
 
             _logger.LogInformation("Store logo uploaded: {PublicUrl}", result.PublicUrl);
 
@@ -507,7 +506,7 @@ public class SystemSettingController : ControllerBase
                 Success = true,
                 Code = 200,
                 UserMessage = "Logo uploaded successfully.",
-                Data = new { PublicUrl = result.PublicUrl },
+                Data = new { RelativePath = result.RelativePath, PublicUrl = result.PublicUrl },
                 ServerTime = DateTimeOffset.UtcNow
             });
         }
@@ -560,12 +559,12 @@ public class SystemSettingController : ControllerBase
                 ContentType = file.ContentType
             };
 
-            // Dynamically select validation and folder based on file type
-            var isVideo = file.ContentType.StartsWith("video/") || 
-                          Path.GetExtension(file.FileName).Equals(".mp4", StringComparison.OrdinalIgnoreCase) ||
-                          Path.GetExtension(file.FileName).Equals(".webm", StringComparison.OrdinalIgnoreCase);
-            
-            var validation = isVideo ? FileValidationOptions.StoreVideo : FileValidationOptions.ImageUpload;
+            var extension = Path.GetExtension(file.FileName);
+            var isVideo = file.ContentType.Equals("video/mp4", StringComparison.OrdinalIgnoreCase)
+                          || extension.Equals(".mp4", StringComparison.OrdinalIgnoreCase);
+
+            // Keep store folders, but align validation policy with dish media rules.
+            var validation = isVideo ? FileValidationOptions.DishVideo : FileValidationOptions.ImageUpload;
             var folder = isVideo ? "store-videos" : "store-media";
 
             var result = await _fileStorage.SaveAsync(uploadRequest, folder, validation, cancellationToken);
@@ -578,7 +577,7 @@ public class SystemSettingController : ControllerBase
                 Success = true,
                 Code = 200,
                 UserMessage = "File uploaded successfully.",
-                Data = new { PublicUrl = result.PublicUrl },
+                Data = new { RelativePath = result.RelativePath, PublicUrl = result.PublicUrl },
                 ServerTime = DateTimeOffset.UtcNow
             });
         }
