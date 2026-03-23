@@ -228,6 +228,7 @@ public class OrderRepository : IOrderRepository
 			if (newStatusLvId == rejectedItemStatusId || newStatusLvId == cancelledItemStatusId)
 			{
 				order.TotalAmount -= item.Price * item.Quantity;
+				order.SubTotalAmount -= item.Price * item.Quantity;
 				orderStatusChanged = true;
 			}
 
@@ -344,6 +345,7 @@ public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, Can
 
 		// Update total amount on the parent order
 		order.TotalAmount += items.Sum(i => i.Price * i.Quantity);
+		order.SubTotalAmount += items.Sum(i => i.Price * i.Quantity);
 		order.UpdatedAt = DateTime.UtcNow;
 
 		// If the order was completed/cancelled, reopen it to PENDING so kitchen sees the new items
@@ -562,7 +564,7 @@ public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, Can
 				}
 				.Max(),
 				PaidRevenue = o.Payments.Any(p => p.PaidAt.HasValue)
-					? o.TotalAmount + (o.TipAmount ?? 0)
+				? o.TotalAmount
 					: 0,
 				CompletedItemsCount = o.OrderItems
 					.Where(oi => oi.ItemStatusLv.ValueCode == nameof(OrderItemStatusCode.READY)
