@@ -31,22 +31,22 @@ namespace Core.Data
         public const string ViewDishCategory = "DISH_CATEGORY:READ";
         public const string CreateDishCategory = "DISH_CATEGORY:CREATE";
         public const string EditDishCategory = "DISH_CATEGORY:EDIT";
-		public const string DeleteDishCategory = "DISH_CATEGORY:DELETE";
+        public const string DeleteDishCategory = "DISH_CATEGORY:DELETE";
 
-		//Supplier
-		public const string ViewSupplier = "SUPPLIER:READ";
-		public const string CreateSupplier = "SUPPLIER:CREATE";
-		public const string EditSupplier = "SUPPLIER:EDIT";
-		public const string DeleteSupplier = "SUPPLIER:DELETE";
+        //Supplier
+        public const string ViewSupplier = "SUPPLIER:READ";
+        public const string CreateSupplier = "SUPPLIER:CREATE";
+        public const string EditSupplier = "SUPPLIER:EDIT";
+        public const string DeleteSupplier = "SUPPLIER:DELETE";
 
-		//Coupon
-		public const string ViewCoupon = "COUPON:READ";
-		public const string CreateCoupon = "COUPON:CREATE";
-		public const string EditCoupon = "COUPON:EDIT";
-		public const string DeleteCoupon = "COUPON:DELETE";
+        //Coupon
+        public const string ViewCoupon = "COUPON:READ";
+        public const string CreateCoupon = "COUPON:CREATE";
+        public const string EditCoupon = "COUPON:EDIT";
+        public const string DeleteCoupon = "COUPON:DELETE";
 
-		//Role
-		public const string ViewRole = "ROLE:READ";
+        //Role
+        public const string ViewRole = "ROLE:READ";
         public const string CreateRole = "ROLE:CREATE";
         public const string UpdateRole = "ROLE:UPDATE";
         public const string DeleteRole = "ROLE:DELETE";
@@ -92,14 +92,21 @@ namespace Core.Data
         public const string ManageShiftTemplate = "SHIFT:MANAGE_TEMPLATE";
         public const string PublishShift = "SHIFT:PUBLISH";
 
-		public const string ViewCustomer = "CUSTOMER:READ";
-		public const string CreateCustomer = "CUSTOMER:CREATE";
-		public const string UpdateCustomer = "CUSTOMER:UPDATE";
-		public const string DeleteCustomer = "CUSTOMER:DELETE";
+        public const string ViewCustomer = "CUSTOMER:READ";
+        public const string CreateCustomer = "CUSTOMER:CREATE";
+        public const string UpdateCustomer = "CUSTOMER:UPDATE";
+        public const string DeleteCustomer = "CUSTOMER:DELETE";
 
-		// Notification
-		public const string ViewNotification = "NOTIFICATION:READ";
-		public const string AcknowledgeNotification = "NOTIFICATION:ACK";
+        // Notification
+        public const string ViewNotification = "NOTIFICATION:READ";
+        public const string AcknowledgeNotification = "NOTIFICATION:ACK";
 
-	}
+        // Inventory
+        public const string ViewInventory = "INVENTORY:READ";
+        public const string CreateInventoryTx = "INVENTORY:CREATE";
+        public const string ApproveInventoryTx = "INVENTORY:APPROVE";
+        public const string StockCheck = "INVENTORY:STOCK_CHECK";
+        public const string ViewInventoryReport = "INVENTORY:REPORT_READ";
+
+    }
 }

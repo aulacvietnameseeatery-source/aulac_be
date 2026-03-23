@@ -4,6 +4,7 @@ using Infa.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Infa.Migrations
 {
     [DbContext(typeof(RestaurantMgmtContext))]
-    partial class RestaurantMgmtContextModelSnapshot : ModelSnapshot
+    [Migration("20260322175352_InventoryRework")]
+    partial class InventoryRework
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1534,27 +1537,9 @@ namespace Infa.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("staff_id");
 
-                    b.Property<decimal>("SubTotalAmount")
-                        .ValueGeneratedOnAdd()
-                        .HasPrecision(14, 2)
-                        .HasColumnType("decimal(14,2)")
-                        .HasDefaultValue(0m)
-                        .HasColumnName("sub_total_amount");
-
                     b.Property<long?>("TableId")
                         .HasColumnType("bigint")
                         .HasColumnName("table_id");
-
-                    b.Property<decimal>("TaxAmount")
-                        .ValueGeneratedOnAdd()
-                        .HasPrecision(14, 2)
-                        .HasColumnType("decimal(14,2)")
-                        .HasDefaultValue(0m)
-                        .HasColumnName("tax_amount");
-
-                    b.Property<long?>("TaxId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("tax_id");
 
                     b.Property<decimal?>("TipAmount")
                         .HasPrecision(14, 2)
@@ -1572,8 +1557,6 @@ namespace Infa.Migrations
 
                     b.HasKey("OrderId")
                         .HasName("PRIMARY");
-
-                    b.HasIndex("TaxId");
 
                     b.HasIndex(new[] { "CustomerId" }, "FK_orders_customer_id");
 
@@ -2712,66 +2695,6 @@ namespace Infa.Migrations
                     b.ToTable("table_media", (string)null);
                 });
 
-            modelBuilder.Entity("Core.Entity.Tax", b =>
-                {
-                    b.Property<long>("TaxId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("tax_id");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("TaxId"));
-
-                    b.Property<DateTime?>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime")
-                        .HasColumnName("created_at")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("tinyint(1)")
-                        .HasDefaultValue(true)
-                        .HasColumnName("is_active");
-
-                    b.Property<bool>("IsDefault")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("tinyint(1)")
-                        .HasDefaultValue(false)
-                        .HasColumnName("is_default");
-
-                    b.Property<string>("TaxName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)")
-                        .HasColumnName("tax_name");
-
-                    b.Property<decimal>("TaxRate")
-                        .HasPrecision(5, 2)
-                        .HasColumnType("decimal(5,2)")
-                        .HasColumnName("tax_rate");
-
-                    b.Property<string>("TaxType")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(50)
-                        .HasColumnType("varchar(50)")
-                        .HasDefaultValue("EXCLUSIVE")
-                        .HasColumnName("tax_type");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("datetime")
-                        .HasColumnName("updated_at")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlComputedColumn(b.Property<DateTime?>("UpdatedAt"));
-
-                    b.HasKey("TaxId")
-                        .HasName("PRIMARY");
-
-                    b.ToTable("tax", (string)null);
-                });
-
             modelBuilder.Entity("Core.Entity.TimeLog", b =>
                 {
                     b.Property<long>("TimeLogId")
@@ -3369,12 +3292,6 @@ namespace Infa.Migrations
                         .HasForeignKey("TableId")
                         .HasConstraintName("orders_ibfk_1");
 
-                    b.HasOne("Core.Entity.Tax", "Tax")
-                        .WithMany("Orders")
-                        .HasForeignKey("TaxId")
-                        .OnDelete(DeleteBehavior.SetNull)
-                        .HasConstraintName("fk_orders_tax");
-
                     b.Navigation("Customer");
 
                     b.Navigation("OrderStatusLv");
@@ -3384,8 +3301,6 @@ namespace Infa.Migrations
                     b.Navigation("Staff");
 
                     b.Navigation("Table");
-
-                    b.Navigation("Tax");
                 });
 
             modelBuilder.Entity("Core.Entity.OrderCoupon", b =>
@@ -4106,11 +4021,6 @@ namespace Infa.Migrations
                     b.Navigation("IngredientSuppliers");
 
                     b.Navigation("InventoryTransactions");
-                });
-
-            modelBuilder.Entity("Core.Entity.Tax", b =>
-                {
-                    b.Navigation("Orders");
                 });
 #pragma warning restore 612, 618
         }

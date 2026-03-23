@@ -36,6 +36,8 @@ public partial class StaffAccount
 
     public virtual ICollection<InventoryTransaction> InventoryTransactions { get; set; } = new List<InventoryTransaction>();
 
+    public virtual ICollection<InventoryTransaction> ApprovedInventoryTransactions { get; set; } = new List<InventoryTransaction>();
+
     public virtual ICollection<Order> Orders { get; set; } = new List<Order>();
 
     public virtual Role Role { get; set; } = null!;
