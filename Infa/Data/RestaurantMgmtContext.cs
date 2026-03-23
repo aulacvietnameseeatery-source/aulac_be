@@ -112,7 +112,10 @@ public partial class RestaurantMgmtContext : DbContext
 
     public virtual DbSet<NotificationPreference> NotificationPreferences { get; set; }
 
+    public virtual DbSet<Tax> Taxes { get; set; }
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+
     {
         
     }
