@@ -302,7 +302,7 @@ public class OrderService : IOrderService
 		await UpdateOrderItemStatusAsync(orderItemId, cancelledStatusId, null, cancellationToken);
 	}
 
-    public Task<OrderHistoryDTO> GetOrderByIdAsync(long orderId, CancellationToken cancellationToken = default)
+    public Task<OrderDetailDTO> GetOrderByIdAsync(long orderId, CancellationToken cancellationToken = default)
         => _orderRepository.GetOrderByIdAsync(orderId, cancellationToken);
 
     public async Task<long> CreateOrderAsync(long staffId, CreateOrderRequest request, CancellationToken ct)
