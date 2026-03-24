@@ -48,7 +48,9 @@ public class SupplierRepository : ISupplierRepository
                 SupplierId = s.SupplierId,
                 SupplierName = s.SupplierName,
                 Phone = s.Phone,
-                Email = s.Email
+                Email = s.Email,
+                Address = s.Address,
+                TaxCode = s.TaxCode
             })
             .ToListAsync(cancellationToken);
 
