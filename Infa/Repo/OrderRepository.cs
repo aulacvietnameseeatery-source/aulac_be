@@ -408,30 +408,31 @@ public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, Can
         await _context.SaveChangesAsync(ct);
     }
 
-    public async Task<OrderHistoryDTO> GetOrderByIdAsync(
+    public async Task<OrderDetailDTO> GetOrderByIdAsync(
     long orderId,
     CancellationToken cancellationToken = default)
     {
         var order = await _context.Orders
             .AsNoTracking()
             .Where(o => o.OrderId == orderId)
-            .Select(o => new OrderHistoryDTO
+            .Select(o => new OrderDetailDTO
             {
                 OrderId = o.OrderId,
+
                 TableId = o.TableId,
                 TableCode = o.Table != null ? o.Table.TableCode : "",
 
                 StaffId = o.StaffId,
-                StaffName = o.Staff.FullName,
+                StaffName = o.Staff != null ? o.Staff.FullName : "",
 
                 CustomerId = o.CustomerId,
                 CustomerName = o.Customer != null ? o.Customer.FullName : null,
 
+                SubTotalAmount = o.SubTotalAmount,
                 TotalAmount = o.TotalAmount,
                 TaxAmount = o.TaxAmount,
                 TaxId = o.TaxId,
                 TipAmount = o.TipAmount,
-
 
                 OrderStatus = o.OrderStatusLv.ValueName,
                 Source = o.SourceLv.ValueName,
@@ -441,19 +442,44 @@ public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, Can
 
                 IsPaid = o.Payments.Any(),
 
-                OrderItems = o.OrderItems
-                    .Select(oi => new OrderItemDTO
-                    {
-                        OrderItemId = oi.OrderItemId,
-                        DishId = oi.DishId,
-                        DishName = oi.Dish.DishName,
-                        Quantity = oi.Quantity,
-                        Price = oi.Price,
-                        ItemStatus = oi.ItemStatusLv.ValueCode,
-                        RejectReason = oi.RejectReason,
-                        Note = oi.Note
-                    })
-                    .ToList()
+                // ITEMS
+                OrderItems = o.OrderItems.Select(oi => new OrderItemDTO
+                {
+                    OrderItemId = oi.OrderItemId,
+                    DishId = oi.DishId,
+                    DishName = oi.Dish.DishName,
+                    Quantity = oi.Quantity,
+                    Price = oi.Price,
+                    ItemStatus = oi.ItemStatusLv.ValueCode,
+                    RejectReason = oi.RejectReason,
+                    Note = oi.Note
+                }).ToList(),
+
+                // PROMOTIONS
+                Promotions = o.OrderPromotions.Select(p => new OrderPromotionDTO
+                {
+                    PromotionId = p.PromotionId,
+                    PromotionName = p.Promotion.PromoName,
+                    DiscountAmount = p.DiscountAmount
+                }).ToList(),
+
+                // COUPONS
+                Coupons = o.OrderCoupons.Select(c => new OrderCouponDTO
+                {
+                    CouponId = c.CouponId,
+                    CouponCode = c.Coupon.CouponCode,
+                    DiscountAmount = c.DiscountAmount
+                }).ToList(),
+
+                // PAYMENTS
+                Payments = o.Payments.Select(p => new OrderPaymentDTO
+                {
+                    PaymentId = p.PaymentId,
+                    ReceivedAmount = p.ReceivedAmount,
+                    ChangeAmount = p.ChangeAmount,
+                    PaidAt = p.PaidAt,
+                    Method = p.MethodLv.ValueCode
+                }).ToList()
             })
             .FirstOrDefaultAsync(cancellationToken);
 
