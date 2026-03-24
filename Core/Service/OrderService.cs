@@ -53,7 +53,6 @@ public class OrderService : IOrderService
         _shiftLiveRealtimePublisher = shiftLiveRealtimePublisher;
         _taxRepository = taxRepository;
     }
-    private const long GuestCustomerId = 68; // ID representing a visitor
 
     public Task<PagedResultDTO<OrderHistoryDTO>> GetOrderHistoryAsync(OrderHistoryQueryDTO query, CancellationToken cancellationToken = default)
 		=> _orderRepository.GetOrderHistoryAsync(query, cancellationToken);
@@ -680,7 +679,7 @@ public class OrderService : IOrderService
             }
 
             // 4. Always use guest account for customer-facing orders
-            var customerId = GuestCustomerId;
+            var customerId = await _customerService.GetGuestCustomerIdAsync(cancellationToken);
 
             // 5. Calculate total amount from items
             var totalAmount = request.Items.Sum(i => i.Price * i.Quantity);

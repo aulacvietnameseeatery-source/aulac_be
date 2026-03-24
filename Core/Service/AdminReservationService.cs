@@ -39,8 +39,6 @@ namespace Core.Service
 
         private const string TemplateCodeReservationConfirmation = "RESERVATION_CONFIRM";
 
-        private const long GuestCustomerId = 68;
-
         private const string SettingReservationDuration = "reservation.default_duration_minutes";
         private const string SettingImmediateWindow = "reservation.immediate_window_minutes";
 
@@ -1162,7 +1160,7 @@ namespace Core.Service
             var order = new Order
             {
                 StaffId = staffId,
-                CustomerId = reservation.CustomerId ?? GuestCustomerId,
+                CustomerId = reservation.CustomerId ?? await _customerService.GetGuestCustomerIdAsync(ct),
                 TableId = table.TableId,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,

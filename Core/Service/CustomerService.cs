@@ -14,7 +14,6 @@ namespace Core.Service
 {
     public class CustomerService : ICustomerService
     {
-        private const long GuestCustomerId = 68;
 
         private readonly ICustomerRepository _customerRepository;
 
@@ -79,7 +78,7 @@ namespace Core.Service
             CancellationToken ct)
         {
             if (customerDto == null)
-                return GuestCustomerId;
+                return await GetGuestCustomerIdAsync(ct);
 
             // CASE 1: Update existing customer by ID
             if (customerDto.CustomerId.HasValue)
@@ -146,7 +145,7 @@ namespace Core.Service
                     Email = customerDto.Email,
                     CreatedAt = DateTime.UtcNow,
                     LoyaltyPoints = 0,
-                    IsMember = false
+                    IsMember = true
                 };
 
                 await _customerRepository.AddAsync(newCustomer, ct);
@@ -154,7 +153,7 @@ namespace Core.Service
                 return newCustomer.CustomerId;
             }
 
-            return GuestCustomerId;
+            return await GetGuestCustomerIdAsync(ct);
         }
 
         public async Task<CustomerDto> CreateCustomerAsync(CreateCustomerRequest request, CancellationToken ct = default)
@@ -259,6 +258,47 @@ namespace Core.Service
                 customerId,
                 orderId,
                 ct);
+        }
+
+        public async Task<long> GetGuestCustomerIdAsync(CancellationToken ct)
+        {
+            var guest = await _customerRepository.GetGuestCustomerAsync(ct);
+
+            if (guest != null)
+                return guest.CustomerId;
+
+            var newGuest = new Customer
+            {
+                Phone = "GUEST",
+                FullName = "Guest Customer",
+                Email = null,
+                IsMember = false,
+                LoyaltyPoints = 0,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await _customerRepository.AddAsync(newGuest, ct);
+
+            return newGuest.CustomerId;
+        }
+
+        public async Task<List<CustomerDto>> SearchByPhoneAsync(
+            string keyword,
+            int limit,
+            CancellationToken ct)
+        {
+            var customers = await _customerRepository.SearchByPhoneAsync(keyword, limit, ct);
+
+            return customers.Select(customer => new CustomerDto
+            {
+                CustomerId = customer.CustomerId,
+                FullName = customer.FullName,
+                Phone = customer.Phone,
+                Email = customer.Email,
+                IsMember = customer.IsMember,
+                LoyaltyPoints = customer.LoyaltyPoints,
+                CreatedAt = customer.CreatedAt
+            }).ToList();
         }
     }
 }
