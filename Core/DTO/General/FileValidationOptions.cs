@@ -54,6 +54,15 @@ public class FileValidationOptions
         MaxVideoDurationSeconds = 15
     };
 
+    public static readonly FileValidationOptions StoreIntroVideo = new()
+    {
+      MaxFileSizeBytes = 50 * 1024 * 1024,
+      MaxFileCount = 1,
+      AllowedMimeTypes = ["video/mp4"],
+      AllowedExtensions = [".mp4"],
+      MaxVideoDurationSeconds = 30
+    };
+
     public static readonly FileValidationOptions StoreVideo = new()
     {
         MaxFileSizeBytes = 100 * 1024 * 1024,
