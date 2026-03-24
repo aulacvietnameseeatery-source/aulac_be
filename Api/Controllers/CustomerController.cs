@@ -67,6 +67,26 @@ namespace Api.Controllers
             });
         }
 
+        [HttpGet("search")]
+        public async Task<IActionResult> SearchByPhone(
+            [FromQuery] string keyword,
+            [FromQuery] int limit = 10,
+            CancellationToken ct = default)
+        {
+            var result = await _customerService.SearchByPhoneAsync(keyword, limit, ct);
+
+            return Ok(new ApiResponse<List<CustomerDto>>
+            {
+                Success = true,
+                Code = 200,
+                UserMessage = result.Any()
+                    ? "Customers retrieved successfully."
+                    : "No customers found.",
+                Data = result,
+                ServerTime = DateTimeOffset.UtcNow
+            });
+        }
+
         [HttpGet("{id:long}")]
         [HasPermission(Permissions.ViewCustomer)]
         public async Task<IActionResult> GetById(long id, CancellationToken cancellationToken = default)

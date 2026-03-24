@@ -32,5 +32,7 @@ namespace Core.Interface.Service.Customer
         Task<CustomerDto> CreateCustomerAsync(CreateCustomerRequest request, CancellationToken ct = default);
         Task<CustomerDto> UpdateCustomerAsync(long id, UpdateCustomerRequest request, CancellationToken ct = default);
         Task DeleteCustomerAsync(long id, CancellationToken ct = default);
+        Task<long> GetGuestCustomerIdAsync(CancellationToken ct);
+        Task<List<CustomerDto>> SearchByPhoneAsync(string keyword, int limit, CancellationToken ct);
     }
 }

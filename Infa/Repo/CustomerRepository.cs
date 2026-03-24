@@ -327,5 +327,29 @@ namespace Infa.Repo
                 })
                 .FirstOrDefaultAsync(ct);
         }
+
+        public async Task<Customer?> GetGuestCustomerAsync(CancellationToken ct)
+        {
+            return await _context.Customers
+                .FirstOrDefaultAsync(c => c.IsMember == false, ct);
+        }
+
+        public async Task<List<Customer>> SearchByPhoneAsync(
+            string keyword,
+            int limit,
+            CancellationToken ct)
+        {
+            if (string.IsNullOrWhiteSpace(keyword))
+                return new List<Customer>();
+
+            keyword = keyword.Trim();
+
+            return await _context.Customers
+                .AsNoTracking()
+                .Where(c => c.Phone.StartsWith(keyword) || c.Phone.Contains(keyword))
+                .OrderByDescending(c => c.CreatedAt)
+                .Take(limit)
+                .ToListAsync(ct);
+        }
     }
 }
