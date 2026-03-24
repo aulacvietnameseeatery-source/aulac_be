@@ -563,8 +563,8 @@ public class SystemSettingController : ControllerBase
             var isVideo = file.ContentType.Equals("video/mp4", StringComparison.OrdinalIgnoreCase)
                           || extension.Equals(".mp4", StringComparison.OrdinalIgnoreCase);
 
-            // Keep store folders, but align validation policy with dish media rules.
-            var validation = isVideo ? FileValidationOptions.DishVideo : FileValidationOptions.ImageUpload;
+            // Keep store folders and enforce store intro video policy (30s, 50MB, MP4).
+            var validation = isVideo ? FileValidationOptions.StoreIntroVideo : FileValidationOptions.ImageUpload;
             var folder = isVideo ? "store-videos" : "store-media";
 
             var result = await _fileStorage.SaveAsync(uploadRequest, folder, validation, cancellationToken);
