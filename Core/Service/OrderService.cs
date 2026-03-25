@@ -294,12 +294,32 @@ public class OrderService : IOrderService
 
 	public async Task CancelOrderItemAsync(long orderItemId, CancellationToken cancellationToken = default)
 	{
-		// Get CREATED and CANCELLED status IDs
-		var createdStatusId = await OrderItemStatusCode.CREATED.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
+		// Fetch item details for rich notification before cancelling
+		var orderItem = await _orderRepository.GetOrderItemAsync(orderItemId, cancellationToken);
+		var dishName = orderItem?.Dish?.DishName ?? "";
+		var tableCode = orderItem?.Order?.Table?.TableCode ?? "";
+
 		var cancelledStatusId = await OrderItemStatusCode.CANCELLED.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
 
 		// Update to CANCELLED status (repository will validate if item is CREATED)
 		await UpdateOrderItemStatusAsync(orderItemId, cancelledStatusId, null, cancellationToken);
+
+		await _notificationService.PublishAsync(new PublishNotificationRequest
+		{
+			Type = nameof(NotificationType.ORDER_ITEM_CANCELLED),
+			Priority = nameof(NotificationPriority.High),
+			SoundKey = "notification_high",
+			ActionUrl = "/dashboard/kitchen",
+			EntityType = "OrderItem",
+			EntityId = orderItemId.ToString(),
+			Metadata = new Dictionary<string, object>
+			{
+				["orderItemId"] = orderItemId.ToString(),
+				["tableCode"] = tableCode,
+				["dishName"] = dishName
+			},
+			TargetPermissions = new List<string> { Permissions.UpdateOrderItemStatus }
+		}, cancellationToken);
 	}
 
     public Task<OrderDetailDTO> GetOrderByIdAsync(long orderId, CancellationToken cancellationToken = default)
@@ -622,6 +642,40 @@ public class OrderService : IOrderService
 
         await _orderRepository.AddItemsToOrderAsync(orderId, orderItems, completedOrderStatusId, cancelledOrderStatusId, pendingOrderStatusId, cancellationToken);
 
+
+        // Fetch dish names and table info for rich notification
+        var dishIds = request.Items.Select(i => i.DishId).Distinct().ToList();
+        var dishes = await _dishRepository.GetByIdsAsync(dishIds, cancellationToken);
+        var dishNames = string.Join(", ", request.Items
+            .Select(i => dishes.FirstOrDefault(d => d.DishId == i.DishId)?.DishName)
+            .Where(n => n != null));
+
+        var tableCode = "";
+        var existingOrder = await _orderRepository.GetByIdForUpdateAsync(orderId, cancellationToken);
+        if (existingOrder?.TableId != null)
+        {
+            var table = await _tableRepository.GetByIdAsync(existingOrder.TableId.Value, cancellationToken);
+            tableCode = table?.TableCode ?? "";
+        }
+
+        await _notificationService.PublishAsync(new PublishNotificationRequest
+        {
+            Type = nameof(NotificationType.ORDER_ITEMS_ADDED),
+            Priority = nameof(NotificationPriority.High),
+            SoundKey = "notification_high",
+            ActionUrl = "/dashboard/kitchen",
+            EntityType = "Order",
+            EntityId = orderId.ToString(),
+            Metadata = new Dictionary<string, object>
+            {
+                ["orderId"] = orderId.ToString(),
+                ["tableCode"] = tableCode,
+                ["itemCount"] = request.Items.Count.ToString(),
+                ["dishNames"] = dishNames
+            },
+            TargetPermissions = new List<string> { Permissions.UpdateOrderItemStatus }
+        }, cancellationToken);
+
         // Recalculate tax after adding items
         var order = await _orderRepository.GetByIdForUpdateAsync(orderId, cancellationToken);
         if (order != null)
@@ -629,6 +683,7 @@ public class OrderService : IOrderService
             await ApplyTaxToOrderAsync(order, cancellationToken);
             await _uow.SaveChangesAsync(cancellationToken);
         }
+
     }
 
 
@@ -732,6 +787,23 @@ public class OrderService : IOrderService
             });
 
             await PublishShiftLiveOrderEventAsync("customer_order_created", orderId, null, cancellationToken);
+
+            await _notificationService.PublishAsync(new PublishNotificationRequest
+            {
+                Type = nameof(NotificationType.NEW_ORDER),
+                Priority = nameof(NotificationPriority.High),
+                SoundKey = "notification_high",
+                ActionUrl = "/dashboard/kitchen",
+                EntityType = "Order",
+                EntityId = orderId.ToString(),
+                Metadata = new Dictionary<string, object>
+                {
+                    ["orderId"] = orderId.ToString(),
+                    ["itemCount"] = request.Items.Count.ToString(),
+                    ["tableCode"] = table.TableCode
+                },
+                TargetPermissions = new List<string> { Permissions.UpdateOrderItemStatus }
+            }, cancellationToken);
 
             return new CreateOrderResponseDTO
             {
