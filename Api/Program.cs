@@ -40,7 +40,6 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Core.Interface.Service.Reservation;
 using Core.Interface.Service.Notification;
-using Infa.Service;
 
 var builder = WebApplication.CreateBuilder(args);
 

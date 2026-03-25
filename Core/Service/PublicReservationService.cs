@@ -271,7 +271,7 @@ public class PublicReservationService : IPublicReservationService
                 Phone = created.Phone,
                 Email = created.Email,
                 PartySize = created.PartySize,
-                ReservedTime = created.ReservedTime,
+                ReservedTime = DateTime.SpecifyKind(created.ReservedTime, DateTimeKind.Utc),
                 TableCode = tableCodes,
                 Zone = zones.Count > 0 ? string.Join(", ", zones) : string.Empty,
                 Status = ReservationStatusCode.PENDING.ToString(),
