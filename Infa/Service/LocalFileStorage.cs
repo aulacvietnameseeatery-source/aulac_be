@@ -37,6 +37,8 @@ public class LocalFileStorage : IFileStorage
 
         ValidateFile(file, validation);
 
+        ValidateFileCustom(file, validation);
+
         var relativePath = await WriteFileAsync(file.Stream, file.FileName, folder, ct);
 
         return new FileUploadResult
@@ -71,7 +73,10 @@ public class LocalFileStorage : IFileStorage
 
         // Validate each file before saving any
         foreach (var file in files)
+        {
             ValidateFile(file, validation);
+            ValidateFileCustom(file, validation);
+        }
 
         // Save all — rollback on failure
         var savedPaths = new List<string>(files.Count);
@@ -190,7 +195,12 @@ public class LocalFileStorage : IFileStorage
     #endregion
 
     #region ── Private helpers ──
-
+    /// <summary>
+    /// Validates a single file against custom rules. Override in derived classes for specific validation logic (e.g. image dimensions, video codecs).
+    /// </summary>
+    /// <param name="file"></param>
+    /// <param name="validation"></param>
+    public virtual void ValidateFileCustom(FileUploadRequest file, FileValidationOptions? validation) { }
     /// <summary>
     /// Validates a single file against per-call and global rules.
     /// </summary>
@@ -222,8 +232,8 @@ public class LocalFileStorage : IFileStorage
         var allowedExtensions = validation?.AllowedExtensions ?? _options.AllowedExtensions;
         var extension = Path.GetExtension(file.FileName);
         if (allowedExtensions is { Count: > 0 }
-  && !string.IsNullOrEmpty(extension)
-     && !allowedExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase))
+            && !string.IsNullOrEmpty(extension)
+            && !allowedExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase))
         {
             throw new ValidationException(
                 $"File '{file.FileName}' has unsupported extension '{extension}'. " +
