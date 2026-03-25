@@ -14,6 +14,7 @@ public sealed class IngredientConfiguration : IEntityTypeConfiguration<Ingredien
 
         entity.HasIndex(e => e.ImageId, "FK_ingredient_image_id");
         entity.HasIndex(e => e.TypeLvId, "FK_ingredient_type_lv_id");
+        entity.HasIndex(e => e.CategoryLvId, "FK_ingredient_category_lv_id");
         entity.HasIndex(e => e.IngredientNameTextId, "fk_ingredient_name_text");
 
         entity.HasIndex(e => e.UnitLvId, "FK_ingredient_unit_lv_id");
@@ -27,6 +28,8 @@ public sealed class IngredientConfiguration : IEntityTypeConfiguration<Ingredien
 
         entity.Property(e => e.IngredientNameTextId).HasColumnName("ingredient_name_text_id");
         entity.Property(e => e.TypeLvId).HasColumnName("type_lv_id");
+
+        entity.Property(e => e.CategoryLvId).HasColumnName("category_lv_id");
 
         entity.Property(e => e.UnitLvId).HasColumnName("unit_lv_id");
 
@@ -46,5 +49,10 @@ public sealed class IngredientConfiguration : IEntityTypeConfiguration<Ingredien
         .WithMany() 
         .HasForeignKey(d => d.UnitLvId)
         .HasConstraintName("FK_ingredient_unit_lv_id");
+
+        entity.HasOne(d => d.CategoryLv)
+        .WithMany()
+        .HasForeignKey(d => d.CategoryLvId)
+        .HasConstraintName("FK_ingredient_category_lv_id");
     }
 }

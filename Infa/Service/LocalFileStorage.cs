@@ -233,10 +233,13 @@ public class LocalFileStorage : IFileStorage
         // =========================
         // VIDEO EXTRA VALIDATION
         // =========================
-        if (IsVideo(file.ContentType))
+        if (IsVideoFile(file.ContentType, extension))
         {
-            // Magic bytes
-            if (!IsValidMp4(file.Stream))
+            var isMp4 = file.ContentType.Equals("video/mp4", StringComparison.OrdinalIgnoreCase)
+                        || extension.Equals(".mp4", StringComparison.OrdinalIgnoreCase);
+
+            // Validate MP4 file signature when this upload is expected to be MP4.
+            if (isMp4 && !IsValidMp4(file.Stream))
                 throw new ValidationException($"File '{file.FileName}' is not a valid MP4.");
 
             // Duration
@@ -289,9 +292,11 @@ public class LocalFileStorage : IFileStorage
             .Replace('\\', '/');
     }
 
-    private static bool IsVideo(string contentType)
+    private static bool IsVideoFile(string contentType, string extension)
     {
-        return contentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase);
+        return (!string.IsNullOrWhiteSpace(contentType)
+            && contentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase))
+            || extension.Equals(".mp4", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsValidMp4(Stream stream)

@@ -62,9 +62,13 @@ public class DishService : IDishService
             CookTimeMinutes = dish.CookTimeMinutes,
             // Url stores RelativePath — resolve to public URL at read time
             ImageUrls = dish.DishMedia
-             .Where(dm => dm.Media != null)
+             .Where(dm => dm.Media != null && !string.Equals(dm.Media!.MimeType, "video/mp4", StringComparison.OrdinalIgnoreCase) && !(dm.Media!.MimeType ?? "").StartsWith("video/", StringComparison.OrdinalIgnoreCase))
              .Select(dm => _fileStorage.GetPublicUrl(dm.Media!.Url))
              .ToList(),
+            VideoUrl = dish.DishMedia
+             .Where(dm => dm.Media != null && (dm.Media!.MimeType ?? "").StartsWith("video/", StringComparison.OrdinalIgnoreCase))
+             .Select(dm => _fileStorage.GetPublicUrl(dm.Media!.Url))
+             .FirstOrDefault(),
             Composition = dish.Recipes
             .Select(r => new RecipeItemDto
             {

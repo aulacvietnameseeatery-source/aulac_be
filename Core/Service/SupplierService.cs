@@ -47,6 +47,8 @@ public class SupplierService : ISupplierService
             SupplierName = supplier.SupplierName,
             Phone = supplier.Phone,
             Email = supplier.Email,
+            Address = supplier.Address,
+            TaxCode = supplier.TaxCode,
             Ingredients = supplier.IngredientSuppliers
                 .Where(is_ => is_.Ingredient != null)
                 .Select(is_ => new IngredientDTO
@@ -74,7 +76,9 @@ public class SupplierService : ISupplierService
         {
             SupplierName = request.SupplierName,
             Phone = request.Phone,
-            Email = request.Email
+            Email = request.Email,
+            Address = request.Address,
+            TaxCode = request.TaxCode
         };
 
         var createdSupplier = await _supplierRepository.CreateAsync(supplier, cancellationToken);
@@ -114,6 +118,8 @@ public class SupplierService : ISupplierService
         supplier.SupplierName = request.SupplierName;
         supplier.Phone = request.Phone;
         supplier.Email = request.Email;
+        supplier.Address = request.Address;
+        supplier.TaxCode = request.TaxCode;
 
         var updatedSupplier = await _supplierRepository.UpdateAsync(supplier, cancellationToken);
         
@@ -163,7 +169,9 @@ public class SupplierService : ISupplierService
             SupplierId = supplier.SupplierId,
             SupplierName = supplier.SupplierName,
             Phone = supplier.Phone,
-            Email = supplier.Email
+            Email = supplier.Email,
+            Address = supplier.Address,
+            TaxCode = supplier.TaxCode
         };
     }
 }

@@ -84,7 +84,8 @@ public class IngredientsController : ControllerBase
         {
             IngredientId = i.IngredientId,
             IngredientName = i.IngredientName,
-            UnitLvId = i.UnitLvId.ToString()
+            UnitLvId = i.UnitLvId.ToString(),
+            UnitName = i.UnitName
         }).ToList();
 
         return Ok(new ApiResponse<List<IngredientSimpleDto>>

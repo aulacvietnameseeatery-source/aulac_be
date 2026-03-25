@@ -135,11 +135,12 @@ public class SupplierController : ControllerBase
         catch (InvalidOperationException ex)
         {
             _logger.LogWarning(ex, "Failed to create supplier");
-            return BadRequest(new ApiResponse<object>
+            return Conflict(new ApiResponse<object>
             {
                 Success = false,
-                Code = 400,
+                Code = 409,
                 UserMessage = ex.Message,
+                SystemMessage = "SUPPLIER_NAME_EXISTS",
                 Data = default!,
                 ServerTime = DateTimeOffset.UtcNow
             });
@@ -194,11 +195,12 @@ public class SupplierController : ControllerBase
         catch (InvalidOperationException ex)
         {
             _logger.LogWarning(ex, "Failed to update supplier");
-            return BadRequest(new ApiResponse<object>
+            return Conflict(new ApiResponse<object>
             {
                 Success = false,
-                Code = 400,
+                Code = 409,
                 UserMessage = ex.Message,
+                SystemMessage = "SUPPLIER_NAME_EXISTS",
                 Data = default!,
                 ServerTime = DateTimeOffset.UtcNow
             });
@@ -244,11 +246,12 @@ public class SupplierController : ControllerBase
         catch (InvalidOperationException ex)
         {
             _logger.LogWarning(ex, "Cannot delete supplier");
-            return BadRequest(new ApiResponse<object>
+            return Conflict(new ApiResponse<object>
             {
                 Success = false,
-                Code = 400,
+                Code = 409,
                 UserMessage = ex.Message,
+                SystemMessage = "SUPPLIER_HAS_DEPENDENCIES",
                 Data = default!,
                 ServerTime = DateTimeOffset.UtcNow
             });

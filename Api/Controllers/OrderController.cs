@@ -471,7 +471,7 @@ namespace Api.Controllers
         {
             var result = await _orderService.GetOrderByIdAsync(id, cancellationToken);
 
-            return Ok(new ApiResponse<OrderHistoryDTO>
+            return Ok(new ApiResponse<OrderDetailDTO>
             {
                 Success = true,
                 Code = StatusCodes.Status200OK,

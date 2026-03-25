@@ -36,9 +36,15 @@ public class SaleInvoiceRepository : ISaleInvoiceRepository
 
     public async Task<decimal> GetTotalDiscountAsync(long orderId, CancellationToken cancellationToken = default)
     {
-        return await _context.OrderPromotions
+        var promotionDiscount = await _context.OrderPromotions
             .Where(op => op.OrderId == orderId)
             .SumAsync(op => (decimal?)op.DiscountAmount, cancellationToken) ?? 0m;
+
+        var couponDiscount = await _context.OrderCoupons
+            .Where(oc => oc.OrderId == orderId)
+            .SumAsync(oc => (decimal?)oc.DiscountAmount, cancellationToken) ?? 0m;
+
+        return promotionDiscount + couponDiscount;
     }
 
     public async Task<PagedResultDTO<SaleInvoiceListDTO>> GetOrdersForInvoiceListAsync(SaleInvoiceListQueryDTO query, CancellationToken cancellationToken = default)
@@ -53,6 +59,7 @@ public class SaleInvoiceRepository : ISaleInvoiceRepository
                 .ThenInclude(p => p.MethodLv)
             .Include(o => o.OrderItems)
             .Include(o => o.OrderPromotions)
+            .Include(o => o.OrderCoupons)
             .AsQueryable();
 
         // Filter by search (InvoiceCode, CustomerName, StaffName, TableCode)
@@ -116,7 +123,7 @@ public class SaleInvoiceRepository : ISaleInvoiceRepository
                 TableCode = o.Table != null ? (o.Table.TableCode ?? "") : "",
                 StaffName = o.Staff != null ? (o.Staff.FullName ?? "") : "",
                 CustomerName = o.Customer != null ? (o.Customer.FullName ?? "") : "",
-                TotalAmount = o.TotalAmount - o.OrderPromotions.Sum(op => op.DiscountAmount),
+                TotalAmount = o.TotalAmount,
                 TipAmount = o.TipAmount ?? 0,
                 OrderStatus = o.OrderStatusLv != null ? (o.OrderStatusLv.ValueName ?? "") : "",
                 PaymentMethod = o.Payments.Any() ? (o.Payments.FirstOrDefault()!.MethodLv!.ValueName ?? "-") : "-"

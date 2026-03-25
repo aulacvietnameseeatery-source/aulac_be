@@ -49,10 +49,10 @@ public class SaleInvoiceService : ISaleInvoiceService
             }).ToList()
         };
 
-        invoice.SubTotal = invoice.Items.Sum(i => i.Amount);
+        invoice.SubTotal = order.SubTotalAmount > 0 ? order.SubTotalAmount : invoice.Items.Sum(i => i.Amount);
         invoice.DiscountAmount = promotions;
         invoice.TipAmount = order.TipAmount ?? 0;
-        invoice.TotalAmount = invoice.SubTotal - invoice.DiscountAmount + invoice.TipAmount;
+        invoice.TotalAmount = order.TotalAmount;
 
         return invoice;
     }

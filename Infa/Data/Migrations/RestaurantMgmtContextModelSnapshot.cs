@@ -805,6 +805,10 @@ namespace Infa.Migrations
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("IngredientId"));
 
+                    b.Property<uint?>("CategoryLvId")
+                        .HasColumnType("int unsigned")
+                        .HasColumnName("category_lv_id");
+
                     b.Property<long?>("ImageId")
                         .HasColumnType("bigint")
                         .HasColumnName("image_id");
@@ -829,6 +833,8 @@ namespace Infa.Migrations
 
                     b.HasKey("IngredientId")
                         .HasName("PRIMARY");
+
+                    b.HasIndex(new[] { "CategoryLvId" }, "FK_ingredient_category_lv_id");
 
                     b.HasIndex(new[] { "ImageId" }, "FK_ingredient_image_id");
 
@@ -881,6 +887,14 @@ namespace Infa.Migrations
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("TransactionId"));
 
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("datetime")
+                        .HasColumnName("approved_at");
+
+                    b.Property<long?>("ApprovedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("approved_by");
+
                     b.Property<DateTime?>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime")
@@ -891,18 +905,36 @@ namespace Infa.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("created_by");
 
+                    b.Property<uint?>("ExportReasonLvId")
+                        .HasColumnType("int unsigned")
+                        .HasColumnName("export_reason_lv_id");
+
                     b.Property<string>("Note")
-                        .HasMaxLength(255)
-                        .HasColumnType("varchar(255)")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)")
                         .HasColumnName("note");
 
                     b.Property<uint>("StatusLvId")
                         .HasColumnType("int unsigned")
                         .HasColumnName("status_lv_id");
 
+                    b.Property<string>("StockCheckAreaNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)")
+                        .HasColumnName("stock_check_area_note");
+
+                    b.Property<DateTime?>("SubmittedAt")
+                        .HasColumnType("datetime")
+                        .HasColumnName("submitted_at");
+
                     b.Property<long?>("SupplierId")
                         .HasColumnType("bigint")
                         .HasColumnName("supplier_id");
+
+                    b.Property<string>("TransactionCode")
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)")
+                        .HasColumnName("transaction_code");
 
                     b.Property<uint>("TypeLvId")
                         .HasColumnType("int unsigned")
@@ -913,9 +945,13 @@ namespace Infa.Migrations
 
                     b.HasIndex(new[] { "SupplierId" }, "FK_inventory_transaction_supplier_supplier_id");
 
+                    b.HasIndex(new[] { "ApprovedBy" }, "fk_inventory_transaction_approved_by");
+
                     b.HasIndex(new[] { "CreatedBy" }, "fk_inventory_transaction_staff");
 
                     b.HasIndex(new[] { "CreatedAt" }, "idx_inventory_transaction_dir_time");
+
+                    b.HasIndex(new[] { "ExportReasonLvId" }, "idx_inventory_tx_export_reason_lv");
 
                     b.HasIndex(new[] { "StatusLvId" }, "idx_inventory_tx_status_lv");
 
@@ -933,6 +969,11 @@ namespace Infa.Migrations
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("TransactionItemId"));
 
+                    b.Property<decimal?>("ActualQuantity")
+                        .HasPrecision(14, 3)
+                        .HasColumnType("decimal(14,3)")
+                        .HasColumnName("actual_quantity");
+
                     b.Property<long>("IngredientId")
                         .HasColumnType("bigint")
                         .HasColumnName("ingredient_id");
@@ -947,15 +988,27 @@ namespace Infa.Migrations
                         .HasColumnType("decimal(14,3)")
                         .HasColumnName("quantity");
 
+                    b.Property<decimal?>("SystemQuantity")
+                        .HasPrecision(14, 3)
+                        .HasColumnType("decimal(14,3)")
+                        .HasColumnName("system_quantity");
+
                     b.Property<long>("TransactionId")
                         .HasColumnType("bigint")
                         .HasColumnName("transaction_id");
 
-                    b.Property<string>("Unit")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("varchar(20)")
-                        .HasColumnName("unit");
+                    b.Property<uint>("UnitLvId")
+                        .HasColumnType("int unsigned")
+                        .HasColumnName("unit_lv_id");
+
+                    b.Property<decimal?>("UnitPrice")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("decimal(14,2)")
+                        .HasColumnName("unit_price");
+
+                    b.Property<uint?>("VarianceReasonLvId")
+                        .HasColumnType("int unsigned")
+                        .HasColumnName("variance_reason_lv_id");
 
                     b.HasKey("TransactionItemId")
                         .HasName("PRIMARY");
@@ -963,6 +1016,10 @@ namespace Infa.Migrations
                     b.HasIndex(new[] { "IngredientId" }, "idx_inventory_transaction_item_ingredient");
 
                     b.HasIndex(new[] { "TransactionId" }, "idx_inventory_transaction_item_transaction");
+
+                    b.HasIndex(new[] { "UnitLvId" }, "idx_inventory_tx_item_unit_lv");
+
+                    b.HasIndex(new[] { "VarianceReasonLvId" }, "idx_inventory_tx_item_variance_reason_lv");
 
                     b.HasIndex(new[] { "TransactionId", "IngredientId" }, "uq_inventory_transaction_item")
                         .IsUnique();
@@ -1477,9 +1534,27 @@ namespace Infa.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("staff_id");
 
+                    b.Property<decimal>("SubTotalAmount")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(14, 2)
+                        .HasColumnType("decimal(14,2)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("sub_total_amount");
+
                     b.Property<long?>("TableId")
                         .HasColumnType("bigint")
                         .HasColumnName("table_id");
+
+                    b.Property<decimal>("TaxAmount")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(14, 2)
+                        .HasColumnType("decimal(14,2)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("tax_amount");
+
+                    b.Property<long?>("TaxId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("tax_id");
 
                     b.Property<decimal?>("TipAmount")
                         .HasPrecision(14, 2)
@@ -1497,6 +1572,8 @@ namespace Infa.Migrations
 
                     b.HasKey("OrderId")
                         .HasName("PRIMARY");
+
+                    b.HasIndex("TaxId");
 
                     b.HasIndex(new[] { "CustomerId" }, "FK_orders_customer_id");
 
@@ -2508,6 +2585,11 @@ namespace Infa.Migrations
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("SupplierId"));
 
+                    b.Property<string>("Address")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)")
+                        .HasColumnName("address");
+
                     b.Property<string>("Email")
                         .HasMaxLength(150)
                         .HasColumnType("varchar(150)")
@@ -2523,6 +2605,11 @@ namespace Infa.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("varchar(200)")
                         .HasColumnName("supplier_name");
+
+                    b.Property<string>("TaxCode")
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("tax_code");
 
                     b.HasKey("SupplierId")
                         .HasName("PRIMARY");
@@ -2633,6 +2720,66 @@ namespace Infa.Migrations
                         .HasDatabaseName("media_id1");
 
                     b.ToTable("table_media", (string)null);
+                });
+
+            modelBuilder.Entity("Core.Entity.Tax", b =>
+                {
+                    b.Property<long>("TaxId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("tax_id");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("TaxId"));
+
+                    b.Property<DateTime?>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_active");
+
+                    b.Property<bool>("IsDefault")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_default");
+
+                    b.Property<string>("TaxName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)")
+                        .HasColumnName("tax_name");
+
+                    b.Property<decimal>("TaxRate")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("decimal(5,2)")
+                        .HasColumnName("tax_rate");
+
+                    b.Property<string>("TaxType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)")
+                        .HasDefaultValue("EXCLUSIVE")
+                        .HasColumnName("tax_type");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("datetime")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlComputedColumn(b.Property<DateTime?>("UpdatedAt"));
+
+                    b.HasKey("TaxId")
+                        .HasName("PRIMARY");
+
+                    b.ToTable("tax", (string)null);
                 });
 
             modelBuilder.Entity("Core.Entity.TimeLog", b =>
@@ -2963,6 +3110,11 @@ namespace Infa.Migrations
 
             modelBuilder.Entity("Core.Entity.Ingredient", b =>
                 {
+                    b.HasOne("Core.Entity.LookupValue", "CategoryLv")
+                        .WithMany()
+                        .HasForeignKey("CategoryLvId")
+                        .HasConstraintName("FK_ingredient_category_lv_id");
+
                     b.HasOne("Core.Entity.MediaAsset", "Image")
                         .WithMany("Ingredients")
                         .HasForeignKey("ImageId")
@@ -2984,6 +3136,8 @@ namespace Infa.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("FK_ingredient_unit_lv_id");
+
+                    b.Navigation("CategoryLv");
 
                     b.Navigation("Image");
 
@@ -3011,10 +3165,20 @@ namespace Infa.Migrations
 
             modelBuilder.Entity("Core.Entity.InventoryTransaction", b =>
                 {
+                    b.HasOne("Core.Entity.StaffAccount", "ApprovedByNavigation")
+                        .WithMany("ApprovedInventoryTransactions")
+                        .HasForeignKey("ApprovedBy")
+                        .HasConstraintName("fk_inventory_transaction_approved_by");
+
                     b.HasOne("Core.Entity.StaffAccount", "CreatedByNavigation")
                         .WithMany("InventoryTransactions")
                         .HasForeignKey("CreatedBy")
                         .HasConstraintName("fk_inventory_transaction_staff");
+
+                    b.HasOne("Core.Entity.LookupValue", "ExportReasonLv")
+                        .WithMany()
+                        .HasForeignKey("ExportReasonLvId")
+                        .HasConstraintName("fk_inventory_tx_export_reason_lv");
 
                     b.HasOne("Core.Entity.LookupValue", "StatusLv")
                         .WithMany("InventoryTransactionStatusLvs")
@@ -3032,7 +3196,11 @@ namespace Infa.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_inventory_tx_type_lv");
 
+                    b.Navigation("ApprovedByNavigation");
+
                     b.Navigation("CreatedByNavigation");
+
+                    b.Navigation("ExportReasonLv");
 
                     b.Navigation("StatusLv");
 
@@ -3056,9 +3224,24 @@ namespace Infa.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_inventory_transaction_item_transaction");
 
+                    b.HasOne("Core.Entity.LookupValue", "UnitLv")
+                        .WithMany()
+                        .HasForeignKey("UnitLvId")
+                        .IsRequired()
+                        .HasConstraintName("fk_inventory_tx_item_unit_lv");
+
+                    b.HasOne("Core.Entity.LookupValue", "VarianceReasonLv")
+                        .WithMany()
+                        .HasForeignKey("VarianceReasonLvId")
+                        .HasConstraintName("fk_inventory_tx_item_variance_reason_lv");
+
                     b.Navigation("Ingredient");
 
                     b.Navigation("Transaction");
+
+                    b.Navigation("UnitLv");
+
+                    b.Navigation("VarianceReasonLv");
                 });
 
             modelBuilder.Entity("Core.Entity.InventoryTransactionMedium", b =>
@@ -3196,6 +3379,12 @@ namespace Infa.Migrations
                         .HasForeignKey("TableId")
                         .HasConstraintName("orders_ibfk_1");
 
+                    b.HasOne("Core.Entity.Tax", "Tax")
+                        .WithMany("Orders")
+                        .HasForeignKey("TaxId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_orders_tax");
+
                     b.Navigation("Customer");
 
                     b.Navigation("OrderStatusLv");
@@ -3205,6 +3394,8 @@ namespace Infa.Migrations
                     b.Navigation("Staff");
 
                     b.Navigation("Table");
+
+                    b.Navigation("Tax");
                 });
 
             modelBuilder.Entity("Core.Entity.OrderCoupon", b =>
@@ -3903,6 +4094,8 @@ namespace Infa.Migrations
 
             modelBuilder.Entity("Core.Entity.StaffAccount", b =>
                 {
+                    b.Navigation("ApprovedInventoryTransactions");
+
                     b.Navigation("AuditLogs");
 
                     b.Navigation("AuthSessions");
@@ -3923,6 +4116,11 @@ namespace Infa.Migrations
                     b.Navigation("IngredientSuppliers");
 
                     b.Navigation("InventoryTransactions");
+                });
+
+            modelBuilder.Entity("Core.Entity.Tax", b =>
+                {
+                    b.Navigation("Orders");
                 });
 #pragma warning restore 612, 618
         }
