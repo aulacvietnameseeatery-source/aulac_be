@@ -84,21 +84,6 @@ public enum RoleStatusCode
     INACTIVE
 }
 
-public enum ShiftStatusCode
-{
-    DRAFT,
-    PUBLISHED,
-    CLOSED,
-    CANCELLED
-}
-
-public enum ShiftAssignmentStatusCode
-{
-    ASSIGNED,
-    CONFIRMED,
-    CANCELLED
-}
-
 public enum AttendanceStatusCode
 {
     SCHEDULED,
@@ -108,4 +93,38 @@ public enum AttendanceStatusCode
     ABSENT,
     EARLY_LEAVE,
     EXCUSED
+}
+
+public enum ShiftAssignmentStatusCode
+{
+    DRAFT,
+    ASSIGNED,
+    CONFIRMED,
+    CANCELLED
+}
+
+public enum InventoryCategoryCode
+{
+    FOOD_INGREDIENT,
+    KITCHEN_TOOL,
+    CONSUMABLE_SUPPLY,
+    EQUIPMENT
+}
+
+public enum ExportReasonCode
+{
+    COOKING,
+    SPOILED,
+    EXPIRED,
+    BROKEN,
+    LOST,
+    DISPOSED,
+    WORN_OUT
+}
+
+public enum VarianceReasonCode
+{
+    BREAKAGE,
+    NATURAL_LOSS,
+    COUNTING_ERROR
 }

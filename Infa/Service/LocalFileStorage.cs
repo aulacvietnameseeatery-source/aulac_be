@@ -3,6 +3,7 @@ using Core.Exceptions;
 using Core.Interface.Service.FileStorage;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.Diagnostics;
 
 namespace Infa.Service;
 
@@ -228,6 +229,30 @@ public class LocalFileStorage : IFileStorage
                 $"File '{file.FileName}' has unsupported extension '{extension}'. " +
                 $"Allowed: {string.Join(", ", allowedExtensions)}");
         }
+
+        // =========================
+        // VIDEO EXTRA VALIDATION
+        // =========================
+        if (IsVideoFile(file.ContentType, extension))
+        {
+            var isMp4 = file.ContentType.Equals("video/mp4", StringComparison.OrdinalIgnoreCase)
+                        || extension.Equals(".mp4", StringComparison.OrdinalIgnoreCase);
+
+            // Validate MP4 file signature when this upload is expected to be MP4.
+            if (isMp4 && !IsValidMp4(file.Stream))
+                throw new ValidationException($"File '{file.FileName}' is not a valid MP4.");
+
+            // Duration
+            var maxDuration = validation?.MaxVideoDurationSeconds;
+            if (maxDuration.HasValue)
+            {
+                var duration = GetVideoDurationSeconds(file.Stream, file.FileName);
+
+                if (duration > maxDuration.Value)
+                    throw new ValidationException(
+                        $"Video too long ({duration}s). Max is {maxDuration.Value}s.");
+            }
+        }
     }
 
     /// <summary>
@@ -265,6 +290,62 @@ public class LocalFileStorage : IFileStorage
    .Trim()
     .TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
             .Replace('\\', '/');
+    }
+
+    private static bool IsVideoFile(string contentType, string extension)
+    {
+        return (!string.IsNullOrWhiteSpace(contentType)
+            && contentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase))
+            || extension.Equals(".mp4", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsValidMp4(Stream stream)
+    {
+        Span<byte> buffer = stackalloc byte[12];
+
+        stream.Position = 0;
+        stream.Read(buffer);
+
+        var isFtyp =
+            buffer[4] == 'f' &&
+            buffer[5] == 't' &&
+            buffer[6] == 'y' &&
+            buffer[7] == 'p';
+
+        stream.Position = 0;
+        return isFtyp;
+    }
+
+    private static int GetVideoDurationSeconds(Stream stream, string fileName)
+    {
+        var extension = Path.GetExtension(fileName);
+        var tempPath = Path.Combine(
+            Path.GetTempPath(),
+            $"{Guid.NewGuid():N}{extension}" 
+        );
+
+        try
+        {
+            stream.Position = 0;
+
+            using (var fs = new FileStream(tempPath, FileMode.Create, FileAccess.Write))
+            {
+                stream.CopyTo(fs);
+            }
+
+            using var file = TagLib.File.Create(tempPath);
+
+            return (int)file.Properties.Duration.TotalSeconds;
+        }
+        catch (TagLib.UnsupportedFormatException)
+        {
+            throw new ValidationException("Invalid or unsupported video format.");
+        }
+        finally
+        {
+            try { File.Delete(tempPath); } catch { }
+            stream.Position = 0;
+        }
     }
 
     #endregion

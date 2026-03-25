@@ -40,9 +40,19 @@ public sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         entity.Property(e => e.TotalAmount)
         .HasPrecision(14, 2)
         .HasColumnName("total_amount");
+        entity.Property(e => e.SubTotalAmount)
+        .HasPrecision(14, 2)
+        .HasColumnName("sub_total_amount")
+        .HasDefaultValue(0);
         entity.Property(e => e.UpdatedAt)
         .HasColumnType("datetime")
         .HasColumnName("updated_at");
+
+        entity.Property(e => e.TaxId).HasColumnName("tax_id");
+        entity.Property(e => e.TaxAmount)
+        .HasPrecision(14, 2)
+        .HasColumnName("tax_amount")
+        .HasDefaultValue(0);
 
         entity.HasOne(d => d.Customer).WithMany(p => p.Orders)
         .HasForeignKey(d => d.CustomerId)
@@ -68,5 +78,11 @@ public sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         .HasForeignKey(d => d.TableId)
         .OnDelete(DeleteBehavior.ClientSetNull)
         .HasConstraintName("orders_ibfk_1");
+
+        entity.HasOne(d => d.Tax).WithMany(p => p.Orders)
+        .HasForeignKey(d => d.TaxId)
+        .OnDelete(DeleteBehavior.SetNull)
+        .HasConstraintName("fk_orders_tax");
     }
 }
+

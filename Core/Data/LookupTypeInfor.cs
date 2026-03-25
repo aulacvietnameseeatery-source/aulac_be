@@ -73,6 +73,7 @@ namespace Core.Data
         public static readonly LookupTypeInfo RoleStatus =
             new(20, "ROLE_STATUS", false);
 
+        // @deprecated: SHIFT_TYPE lookup is no longer used — ShiftTemplate entity replaces it.
         public static readonly LookupTypeInfo ShiftType =
             new(21, "SHIFT_TYPE", true);
 
@@ -85,6 +86,33 @@ namespace Core.Data
       public static readonly LookupTypeInfo AttendanceStatus =
             new(24, "ATTENDANCE_STATUS", false);
 
+        public static readonly LookupTypeInfo CouponType =
+            new(25, "COUPON_TYPE", true);
+
+        public static readonly LookupTypeInfo CouponStatus =
+            new(26, "COUPON_STATUS", false);
+
+        public static readonly LookupTypeInfo IngredientUnit =
+            new(27, "INGREDIENT_UNIT", true);
+
+        public static readonly LookupTypeInfo InventoryCategory =
+            new(28, "INVENTORY_CATEGORY", false);
+
+        public static readonly LookupTypeInfo ExportReason =
+            new(29, "EXPORT_REASON", false);
+
+        public static readonly LookupTypeInfo VarianceReason =
+            new(30, "VARIANCE_REASON", false);
+
+        public static readonly LookupTypeInfo KitchenToolType =
+            new(31, "KITCHEN_TOOL_TYPE", true);
+
+        public static readonly LookupTypeInfo ConsumableType =
+            new(32, "CONSUMABLE_TYPE", true);
+
+        public static readonly LookupTypeInfo EquipmentType =
+            new(33, "EQUIPMENT_TYPE", true);
+
     // Convenience: list all
         public static IReadOnlyList<LookupTypeInfo> All { get; } = new[]
         {
@@ -92,7 +120,10 @@ namespace Core.Data
             TableType, ReservationSource, ReservationStatus, OrderSource, OrderStatus,
             PaymentMethod, DishStatus, OrderItemStatus, Severity, PromotionType,
   PromotionStatus, IngredientType, RoleStatus,
-    ShiftType, ShiftStatus, ShiftAssignmentStatus, AttendanceStatus
+    ShiftType, ShiftStatus, ShiftAssignmentStatus, AttendanceStatus,
+    CouponType, CouponStatus, IngredientUnit,
+    InventoryCategory, ExportReason, VarianceReason,
+    KitchenToolType, ConsumableType, EquipmentType
         };
 
     }

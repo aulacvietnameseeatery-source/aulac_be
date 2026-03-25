@@ -57,5 +57,10 @@ namespace Core.Interface.Repo
         /// <param name="media">The MediaAsset to remove.</param>
         /// <param name="ct">Cancellation token.</param>
         Task RemoveMediaAsync(MediaAsset media, CancellationToken ct);
+
+        Task<List<DishMedium>> GetDishMediaByTypeAsync(
+        long dishId,
+        MediaTypeCode mediaTypeCode,
+        CancellationToken ct);
     }
 }

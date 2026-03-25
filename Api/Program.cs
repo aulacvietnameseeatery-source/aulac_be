@@ -1,4 +1,4 @@
-﻿using Api.Background;
+using Api.Background;
 using Api.Hubs;
 using Api.Middleware;
 using Api.SignalR;
@@ -38,6 +38,9 @@ using System.Reflection;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Core.Interface.Service.Reservation;
+using Core.Interface.Service.Notification;
+using Infa.Service;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -120,7 +123,10 @@ var connectionString = builder.Configuration.GetConnectionString("Default")
 
 builder.Services.AddDbContext<RestaurantMgmtContext>(options =>
 {
-    options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString));
+    options.UseMySql(
+        connectionString,
+        new MySqlServerVersion(new Version(8, 0, 32))
+    );
 });
 
 #endregion
@@ -258,13 +264,17 @@ builder.Services.AddScoped<IPaymentService, PaymentService>();
 builder.Services.AddScoped<ITableService, TableService>();
 builder.Services.AddScoped<IPromotionService, PromotionService>();
 builder.Services.AddScoped<ICouponService, CouponService>();
+builder.Services.AddScoped<ITaxService, TaxService>();
 
-builder.Services.AddScoped<IShiftScheduleService, ShiftScheduleService>();
+
+builder.Services.AddScoped<IShiftTemplateService, ShiftTemplateService>();
 builder.Services.AddScoped<IShiftAssignmentService, ShiftAssignmentService>();
 builder.Services.AddScoped<IAttendanceService, AttendanceService>();
 
 builder.Services.AddHttpClient<ITranslationService, GoogleTranslationService>();
 builder.Services.AddScoped<IIngredientService, IngredientService>();
+builder.Services.AddScoped<IInventoryService, InventoryService>();
+builder.Services.AddScoped<IEmailTemplateService, EmailTemplateService>();
 
 
 
@@ -297,11 +307,15 @@ builder.Services.AddScoped<IIngredientRepository, IngredientRepository>();
 builder.Services.AddScoped<IPromotionRepository, PromotionRepository>();
 builder.Services.AddScoped<ICouponRepository, CouponRepository>();
 builder.Services.AddScoped<ISaleInvoiceRepository, SaleInvoiceRepository>();
+builder.Services.AddScoped<ITaxRepository, TaxRepository>();
 
-builder.Services.AddScoped<IShiftScheduleRepository, ShiftScheduleRepository>();
+
+builder.Services.AddScoped<IShiftTemplateRepository, ShiftTemplateRepository>();
 builder.Services.AddScoped<IShiftAssignmentRepository, ShiftAssignmentRepository>();
 builder.Services.AddScoped<IAttendanceRepository, AttendanceRepository>();
+builder.Services.AddScoped<IInventoryRepository, InventoryRepository>();
 builder.Services.AddScoped<ILoginActivityRepository, LoginActivityRepository>();
+builder.Services.AddScoped<IEmailTemplateRepository, EmailTemplateRepository>();
 
 #endregion
 
@@ -339,6 +353,13 @@ builder.Services.AddScoped<IDishRepository, Infa.Repo.DishRepository>();
 builder.Services.AddScoped<IDishService, Core.Service.DishService>();
 builder.Services.AddScoped<IRealtimeNotificationService, SignalRNotificationService>();
 builder.Services.AddScoped<IJobSchedulerService, HangfireJobScheduler>();
+builder.Services.AddScoped<IOrderRealtimeService, OrderRealtimeService>();
+builder.Services.AddScoped<IShiftLiveRealtimePublisher, SignalRShiftLiveRealtimePublisher>();
+
+// Notification module
+builder.Services.AddScoped<INotificationRepository, Infa.Repo.NotificationRepository>();
+builder.Services.AddScoped<INotificationService, Core.Service.NotificationService>();
+builder.Services.AddScoped<INotificationRealtimePublisher, NotificationRealtimePublisher>();
 
 #endregion
 
@@ -443,7 +464,7 @@ using (var scope = app.Services.CreateScope())
 // Must be first in the pipeline to catch all exceptions
 app.UseMiddleware<HandleExceptionMiddleware>();
 
-//// Configure the HTTP request pipeline.
+// Configure the HTTP request pipeline.
 //if (app.Environment.IsDevelopment())
 //{
 //    app.UseSwagger();
@@ -462,6 +483,7 @@ app.UseStaticFiles();
 
 app.MapControllers();
 app.MapHub<ReservationHub>("/hubs/reservation");
+app.MapHub<RestaurantHub>("/hubs/restaurant");
 
 #endregion
 

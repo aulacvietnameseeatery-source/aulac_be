@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace Core.Entity;
 
@@ -6,7 +7,7 @@ public partial class AttendanceRecord
 {
     public long AttendanceId { get; set; }
 
-    /// <summary>FK ? shift_assignment (unique — one record per assignment).</summary>
+    /// <summary>FK ? shift_assignment (unique ï¿½ one record per assignment).</summary>
     public long ShiftAssignmentId { get; set; }
 
     /// <summary>FK ? lookup_value (ATTENDANCE_STATUS): SCHEDULED, ACTIVE, COMPLETED, LATE, ABSENT, EARLY_LEAVE, EXCUSED.</summary>
@@ -47,4 +48,6 @@ public partial class AttendanceRecord
     public virtual LookupValue AttendanceStatusLv { get; set; } = null!;
 
     public virtual StaffAccount? ReviewedByStaff { get; set; }
+
+    public virtual ICollection<TimeLog> TimeLogs { get; set; } = new List<TimeLog>();
 }

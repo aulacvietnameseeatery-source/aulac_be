@@ -23,5 +23,15 @@ namespace Core.Interface.Repo
 
         Task UpdateAsync(Customer customer, CancellationToken ct = default);
         Task AddAsync(Customer customer, CancellationToken ct = default);
+
+        Task<CustomerDetailDTO?> GetCustomerDetailAsync(long customerId, CancellationToken ct);
+
+        Task<PagedResultDTO<CustomerOrderDTO>> GetCustomerOrdersAsync(CustomerOrderQueryDTO query, CancellationToken ct);
+
+        Task<CustomerOrderDetailDTO?> GetCustomerOrderDetailAsync(long customerId, long orderId, CancellationToken ct);
+        Task DeleteAsync(Customer customer, CancellationToken ct = default);
+        Task<bool> HasOrdersOrReservationsAsync(long customerId, CancellationToken ct = default);
+        Task<Customer?> GetGuestCustomerAsync(CancellationToken ct);
+        Task<List<Customer>> SearchByPhoneAsync(string keyword, int limit, CancellationToken ct);
     }
 }

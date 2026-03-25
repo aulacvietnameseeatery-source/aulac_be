@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Core.Entity;
 using Microsoft.EntityFrameworkCore;
@@ -95,15 +95,27 @@ public partial class RestaurantMgmtContext : DbContext
 
     public virtual DbSet<TableMedium> TableMedia { get; set; }
 
-    public virtual DbSet<ShiftSchedule> ShiftSchedules { get; set; }
+    public virtual DbSet<ShiftTemplate> ShiftTemplates { get; set; }
 
     public virtual DbSet<ShiftAssignment> ShiftAssignments { get; set; }
 
     public virtual DbSet<AttendanceRecord> AttendanceRecords { get; set; }
 
+    public virtual DbSet<TimeLog> TimeLogs { get; set; }
+
     public virtual DbSet<LoginActivity> LoginActivities { get; set; }
+    public virtual DbSet<EmailTemplate> EmailTemplates { get; set; }
+
+    public virtual DbSet<Notification> Notifications { get; set; }
+
+    public virtual DbSet<NotificationReadState> NotificationReadStates { get; set; }
+
+    public virtual DbSet<NotificationPreference> NotificationPreferences { get; set; }
+
+    public virtual DbSet<Tax> Taxes { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+
     {
         
     }

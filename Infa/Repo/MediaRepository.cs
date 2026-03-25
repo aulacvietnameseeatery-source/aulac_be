@@ -60,6 +60,21 @@ namespace Infa.Repo
             _db.MediaAssets.Remove(media); // Remove media asset from context
             return Task.CompletedTask; // No async DB operation here, just mark for removal
         }
+
+        public async Task<List<DishMedium>> GetDishMediaByTypeAsync(
+            long dishId,
+            MediaTypeCode mediaTypeCode,
+            CancellationToken ct)
+        {
+            return await _db.DishMedia
+                .Include(dm => dm.Media)
+                .Where(dm =>
+                    dm.DishId == dishId &&
+                    dm.Media != null &&
+                    dm.Media.MediaTypeLv.ValueCode == mediaTypeCode.ToString()
+                )
+                .ToListAsync(ct);
+        }
     }
 
 }

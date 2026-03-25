@@ -1,3 +1,4 @@
+using Core.DTO.General;
 using Core.DTO.Order;
 using Core.Exceptions;
 using Core.Interface.Repo;
@@ -34,7 +35,10 @@ public class SaleInvoiceService : ISaleInvoiceService
             CustomerName = order.Customer?.FullName ?? "",
             CustomerPhone = order.Customer?.Phone ?? "",
             IsPaid = order.Payments.Any(),
-            Items = order.OrderItems.Select(oi => new SaleInvoiceItemDTO
+            PaymentMethod = order.Payments.Any() ? (order.Payments.FirstOrDefault()?.MethodLv?.ValueName ?? "-") : "-",
+            Items = order.OrderItems
+                .Where(oi => oi.ItemStatusLv.ValueCode != "REJECTED" && oi.ItemStatusLv.ValueCode != "CANCELLED")
+                .Select(oi => new SaleInvoiceItemDTO
             {
                 OrderItemId = oi.OrderItemId,
                 Quantity = oi.Quantity,
@@ -45,10 +49,16 @@ public class SaleInvoiceService : ISaleInvoiceService
             }).ToList()
         };
 
-        invoice.SubTotal = invoice.Items.Sum(i => i.Amount);
+        invoice.SubTotal = order.SubTotalAmount > 0 ? order.SubTotalAmount : invoice.Items.Sum(i => i.Amount);
         invoice.DiscountAmount = promotions;
-        invoice.TotalAmount = invoice.SubTotal - invoice.DiscountAmount;
+        invoice.TipAmount = order.TipAmount ?? 0;
+        invoice.TotalAmount = order.TotalAmount;
 
         return invoice;
+    }
+
+    public async Task<PagedResultDTO<SaleInvoiceListDTO>> GetSaleInvoiceListAsync(SaleInvoiceListQueryDTO query, CancellationToken cancellationToken = default)
+    {
+        return await _saleInvoiceRepository.GetOrdersForInvoiceListAsync(query, cancellationToken);
     }
 }

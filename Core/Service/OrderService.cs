@@ -1,5 +1,8 @@
+using Core.Data;
 using Core.DTO.General;
+using Core.DTO.Notification;
 using Core.DTO.Order;
+using Core.DTO.Shift;
 using Core.Entity;
 using Core.Enum;
 using Core.Exceptions;
@@ -7,6 +10,9 @@ using Core.Extensions;
 using Core.Interface.Repo;
 using Core.Interface.Service.Customer;
 using Core.Interface.Service.Entity;
+using Core.Interface.Service.Notification;
+using Core.Interface.Service.Others;
+using Core.Interface.Service.Shift;
 using LookupTypeEnum = Core.Enum.LookupType;
 
 namespace Core.Service;
@@ -19,6 +25,10 @@ public class OrderService : IOrderService
     private readonly IDishRepository _dishRepository;
     private readonly ICustomerService _customerService;
     private readonly IUnitOfWork _uow;
+    private readonly INotificationService _notificationService;
+    private readonly IOrderRealtimeService _realtime;
+    private readonly IShiftLiveRealtimePublisher _shiftLiveRealtimePublisher;
+    private readonly ITaxRepository _taxRepository;
 
     public OrderService(
         IOrderRepository orderRepository,
@@ -26,7 +36,11 @@ public class OrderService : IOrderService
         ILookupResolver lookupResolver,
         IDishRepository dishRepository,
         ICustomerService customerService,
-        IUnitOfWork uow)
+        IUnitOfWork uow,
+        INotificationService notificationService,
+        IOrderRealtimeService realtime,
+        IShiftLiveRealtimePublisher shiftLiveRealtimePublisher,
+        ITaxRepository taxRepository)
     {
         _orderRepository = orderRepository;
         _tableRepository = tableRepository;
@@ -34,8 +48,12 @@ public class OrderService : IOrderService
         _lookupResolver = lookupResolver;
         _customerService = customerService;
         _uow = uow;
+        _notificationService = notificationService;
+        _realtime = realtime;
+        _shiftLiveRealtimePublisher = shiftLiveRealtimePublisher;
+        _taxRepository = taxRepository;
     }
-    private const long GuestCustomerId = 68; // ID representing a visitor
+
     public Task<PagedResultDTO<OrderHistoryDTO>> GetOrderHistoryAsync(OrderHistoryQueryDTO query, CancellationToken cancellationToken = default)
 		=> _orderRepository.GetOrderHistoryAsync(query, cancellationToken);
 
@@ -148,6 +166,37 @@ public class OrderService : IOrderService
 
             await _uow.SaveChangesAsync(cancellationToken);
             await _uow.CommitAsync(cancellationToken);
+
+            // Notify about order status change
+            if (newStatus == OrderStatusCode.CANCELLED)
+            {
+                await _notificationService.PublishAsync(new PublishNotificationRequest
+                {
+                    Type = nameof(NotificationType.ORDER_CANCELLED),
+                    Title = "Order Cancelled",
+                    Body = $"Order #{orderId} has been cancelled",
+                    Priority = nameof(NotificationPriority.High),
+                    SoundKey = "notification_high",
+                    ActionUrl = "/dashboard/orders",
+                    EntityType = "Order",
+                    EntityId = orderId.ToString(),
+                    Metadata = new Dictionary<string, object>
+                    {
+                        ["orderId"] = orderId.ToString()
+                    },
+                    TargetPermissions = new List<string> { Permissions.UpdateOrderItemStatus }
+                }, cancellationToken);
+            }
+
+            await _realtime.OrderUpdatedAsync(new OrderRealtimeDTO
+            {
+                OrderId = orderId,
+                Status = newStatus.ToString(),
+                TableId = order.TableId,
+                UpdatedAt = DateTime.UtcNow
+            });
+
+            await PublishShiftLiveOrderEventAsync("order_status_changed", orderId, order.StaffId, cancellationToken);
         }
         catch
         {
@@ -162,6 +211,7 @@ public class OrderService : IOrderService
 		var readyItemId      = await OrderItemStatusCode.READY.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
 		var servedItemId     = await OrderItemStatusCode.SERVED.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
 		var rejectedItemId   = await OrderItemStatusCode.REJECTED.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
+		var cancelledItemId  = await OrderItemStatusCode.CANCELLED.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
 
 		var pendingOrderId    = await OrderStatusCode.PENDING.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
 		var inProgressOrderId = await OrderStatusCode.IN_PROGRESS.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
@@ -177,13 +227,70 @@ public class OrderService : IOrderService
 			readyItemId,
 			servedItemId,
 			rejectedItemId,
+			cancelledItemId,
 			pendingOrderId,
 			inProgressOrderId,
 			completedOrderId,
 			cancelledOrderId,
 			availableTableId,
 			cancellationToken);
-	}
+
+		// Fire notification for READY / REJECTED item status changes
+		if (newStatusLvId == readyItemId)
+		{
+			await _notificationService.PublishAsync(new PublishNotificationRequest
+			{
+				Type = nameof(NotificationType.ORDER_ITEM_READY),
+				Title = "Order Item Ready",
+				Body = $"An item in order is ready to serve",
+				Priority = nameof(NotificationPriority.High),
+				SoundKey = "notification_high",
+				ActionUrl = "/dashboard/orders",
+				EntityType = "OrderItem",
+				EntityId = orderItemId.ToString(),
+				Metadata = new Dictionary<string, object>
+				{
+					["orderItemId"] = orderItemId.ToString()
+				},
+				TargetPermissions = new List<string> { Permissions.ViewOrder }
+			}, cancellationToken);
+		}
+		else if (newStatusLvId == rejectedItemId)
+		{
+			await _notificationService.PublishAsync(new PublishNotificationRequest
+			{
+				Type = nameof(NotificationType.ORDER_ITEM_REJECTED),
+				Title = "Order Item Rejected",
+				Body = $"An item in order was rejected" + (rejectReason != null ? $": {rejectReason}" : ""),
+				Priority = nameof(NotificationPriority.High),
+				SoundKey = "notification_high",
+				ActionUrl = "/dashboard/orders",
+				EntityType = "OrderItem",
+				EntityId = orderItemId.ToString(),
+				Metadata = new Dictionary<string, object>
+				{
+					["orderItemId"] = orderItemId.ToString(),
+					["reason"] = rejectReason ?? ""
+				},
+				TargetPermissions = new List<string> { Permissions.ViewOrder }
+			}, cancellationToken);
+		}
+
+        await _realtime.OrderItemUpdatedAsync(new OrderItemRealtimeDTO
+        {
+            OrderItemId = orderItemId,
+            OrderId = 0,
+            Status = newStatusLvId.ToString(),
+            UpdatedAt = DateTime.UtcNow
+        });
+
+        await _shiftLiveRealtimePublisher.PublishBoardChangedAsync(new ShiftLiveRealtimeEventDto
+        {
+            EventType = "order_item_changed",
+            WorkDate = DateOnly.FromDateTime(DateTime.UtcNow),
+            OccurredAt = DateTime.UtcNow,
+        }, cancellationToken);
+    }
 
 	public async Task CancelOrderItemAsync(long orderItemId, CancellationToken cancellationToken = default)
 	{
@@ -195,7 +302,7 @@ public class OrderService : IOrderService
 		await UpdateOrderItemStatusAsync(orderItemId, cancelledStatusId, null, cancellationToken);
 	}
 
-    public Task<OrderHistoryDTO> GetOrderByIdAsync(long orderId, CancellationToken cancellationToken = default)
+    public Task<OrderDetailDTO> GetOrderByIdAsync(long orderId, CancellationToken cancellationToken = default)
         => _orderRepository.GetOrderByIdAsync(orderId, cancellationToken);
 
     public async Task<long> CreateOrderAsync(long staffId, CreateOrderRequest request, CancellationToken ct)
@@ -308,10 +415,46 @@ public class OrderService : IOrderService
             }
 
             order.TotalAmount = total;
+            order.SubTotalAmount = total;
+
+            await ApplyTaxToOrderAsync(order, ct);
 
             await _orderRepository.AddAsync(order, ct);
 
+
+
             await _uow.CommitAsync(ct);
+
+            await _realtime.OrderCreatedAsync(new OrderRealtimeDTO
+            {
+                OrderId = order.OrderId,
+                Status = OrderStatusCode.PENDING.ToString(),
+                TableId = order.TableId,
+                UpdatedAt = DateTime.UtcNow
+            });
+
+            await PublishShiftLiveOrderEventAsync("order_created", order.OrderId, order.StaffId, ct);
+
+            // Notify kitchen staff about new order
+            await _notificationService.PublishAsync(new PublishNotificationRequest
+            {
+                Type = nameof(NotificationType.NEW_ORDER),
+                Title = "New Order",
+                Body = $"Order #{order.OrderId} with {request.Items.Count} item(s)",
+                Priority = nameof(NotificationPriority.High),
+                SoundKey = "notification_high",
+                ActionUrl = "/dashboard/kitchen",
+                EntityType = "Order",
+                EntityId = order.OrderId.ToString(),
+                Metadata = new Dictionary<string, object>
+                {
+                    ["orderId"] = order.OrderId.ToString(),
+                    ["itemCount"] = request.Items.Count.ToString(),
+                    ["tableCode"] = table?.TableCode ?? "Takeaway",
+                    ["totalAmount"] = total.ToString("F2")
+                },
+                TargetPermissions = new List<string> { Permissions.UpdateOrderItemStatus }
+            }, ct);
 
             return order.OrderId;
         }
@@ -418,9 +561,13 @@ public class OrderService : IOrderService
                 // ===== Update total =====
 
                 order.TotalAmount += additionalTotal;
+                order.SubTotalAmount += additionalTotal;
                 order.UpdatedAt = DateTime.UtcNow;
 
+                await ApplyTaxToOrderAsync(order, ct);
+
                 // ===== Status transition logic =====
+
 
                 if (order.OrderStatusLvId == completedStatusId)
                 {
@@ -431,6 +578,16 @@ public class OrderService : IOrderService
             await _uow.SaveChangesAsync(ct);
 
             await _uow.CommitAsync(ct);
+
+            await _realtime.OrderUpdatedAsync(new OrderRealtimeDTO
+            {
+                OrderId = orderId,
+                Status = "ITEMS_ADDED",
+                TableId = order.TableId,
+                UpdatedAt = DateTime.UtcNow
+            });
+
+            await PublishShiftLiveOrderEventAsync("order_items_added", orderId, order.StaffId, ct);
         }
         catch
         {
@@ -464,7 +621,16 @@ public class OrderService : IOrderService
         }).ToList();
 
         await _orderRepository.AddItemsToOrderAsync(orderId, orderItems, completedOrderStatusId, cancelledOrderStatusId, pendingOrderStatusId, cancellationToken);
+
+        // Recalculate tax after adding items
+        var order = await _orderRepository.GetByIdForUpdateAsync(orderId, cancellationToken);
+        if (order != null)
+        {
+            await ApplyTaxToOrderAsync(order, cancellationToken);
+            await _uow.SaveChangesAsync(cancellationToken);
+        }
     }
+
 
     public async Task<CreateOrderResponseDTO> CreateOrderAsync(CreateOrderRequestDTO request, CancellationToken cancellationToken = default)
     {
@@ -513,7 +679,7 @@ public class OrderService : IOrderService
             }
 
             // 4. Always use guest account for customer-facing orders
-            var customerId = GuestCustomerId;
+            var customerId = await _customerService.GetGuestCustomerIdAsync(cancellationToken);
 
             // 5. Calculate total amount from items
             var totalAmount = request.Items.Sum(i => i.Price * i.Quantity);
@@ -530,11 +696,15 @@ public class OrderService : IOrderService
                 CustomerId = customerId,
                 StaffId = null,
                 TotalAmount = totalAmount,
+                SubTotalAmount = totalAmount,
                 SourceLvId = dineInSourceLvId,
                 OrderStatusLvId = pendingOrderLvId,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
             };
+
+            await ApplyTaxToOrderAsync(order, cancellationToken);
+
 
             // 8. Build OrderItem entities
             var orderItems = request.Items.Select(i => new OrderItem
@@ -552,6 +722,16 @@ public class OrderService : IOrderService
 
             // Commit transaction
             await _uow.CommitAsync(cancellationToken);
+
+            await _realtime.OrderCreatedAsync(new OrderRealtimeDTO
+            {
+                OrderId = orderId,
+                Status = OrderStatusCode.PENDING.ToString(),
+                TableId = table.TableId,
+                UpdatedAt = DateTime.UtcNow
+            });
+
+            await PublishShiftLiveOrderEventAsync("customer_order_created", orderId, null, cancellationToken);
 
             return new CreateOrderResponseDTO
             {
@@ -572,13 +752,63 @@ public class OrderService : IOrderService
     }
 
     public async Task<List<RecentOrderDTO>> GetRecentOrdersAsync(
+        long userId,
+        List<string> roles,
         int limit,
         CancellationToken ct)
     {
         if (limit <= 0 || limit > 100)
             limit = 20;
 
-        return await _orderRepository.GetRecentOrdersAsync(limit, ct);
+        return await _orderRepository.GetRecentOrdersAsync(userId, roles, limit, ct);
+    }
+
+    private Task PublishShiftLiveOrderEventAsync(string eventType, long orderId, long? staffId, CancellationToken ct)
+    {
+        return _shiftLiveRealtimePublisher.PublishBoardChangedAsync(new ShiftLiveRealtimeEventDto
+        {
+            EventType = eventType,
+            WorkDate = DateOnly.FromDateTime(DateTime.UtcNow),
+            StaffId = staffId,
+            OrderId = orderId,
+            OccurredAt = DateTime.UtcNow,
+        }, ct);
+    }
+
+    private async Task ApplyTaxToOrderAsync(Order order, CancellationToken ct)
+    {
+        if (order.TaxId.HasValue)
+        {
+            var tax = await _taxRepository.GetByIdAsync(order.TaxId.Value, ct);
+            if (tax != null)
+            {
+                if (tax.TaxType == "EXCLUSIVE")
+                {
+                    order.TaxAmount = order.TotalAmount * (tax.TaxRate / 100);
+                }
+                else // INCLUSIVE
+                {
+                    order.TaxAmount = order.TotalAmount - (order.TotalAmount / (1 + tax.TaxRate / 100));
+                }
+            }
+        }
+        else
+        {
+            var defaultTax = await _taxRepository.GetDefaultTaxAsync(ct);
+            if (defaultTax != null)
+            {
+                order.TaxId = defaultTax.TaxId;
+                if (defaultTax.TaxType == "EXCLUSIVE")
+                {
+                    order.TaxAmount = order.TotalAmount * (defaultTax.TaxRate / 100);
+                }
+                else // INCLUSIVE
+                {
+                    order.TaxAmount = order.TotalAmount - (order.TotalAmount / (1 + defaultTax.TaxRate / 100));
+                }
+            }
+        }
     }
 }
+
 

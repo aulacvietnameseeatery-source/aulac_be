@@ -31,4 +31,9 @@ public interface ILookupService
     /// Throws <c>ConflictException</c> if non-deleted tables still reference it.
     /// </summary>
     Task DeleteAsync(ushort typeId, uint valueId, string typeLabel, CancellationToken ct = default);
+
+    /// <summary>
+    /// Reorders a batch of lookup values. Validates that all IDs exist and belong to the type.
+    /// </summary>
+    Task<int> ReorderAsync(ushort typeId, ReorderLookupValuesRequest request, CancellationToken ct = default);
 }

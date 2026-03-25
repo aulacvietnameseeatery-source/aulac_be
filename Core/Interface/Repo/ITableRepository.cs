@@ -136,5 +136,13 @@ public interface ITableRepository
         uint occupiedLvId,
         CancellationToken ct);
 
+    /// <summary>
+    /// Acquires row-level locks for the given table IDs in the current transaction.
+    /// This is used to prevent concurrent reservations from selecting the same tables.
+    /// </summary>
+    /// <param name="tableIds">List of table IDs to lock</param>
+    /// <param name="ct">Cancellation token</param>
+    Task LockTablesForUpdateAsync(IEnumerable<long> tableIds, CancellationToken ct = default);
+
     Task<List<RestaurantTable>> GetAvailableTablesAsync(DateTime targetTime, CancellationToken ct = default);
 }

@@ -1,5 +1,6 @@
 using Core.DTO.General;
 using Core.DTO.Order;
+using Core.DTO.Shift;
 using Core.Entity;
 using Core.Exceptions;
 using Core.Interface.Repo;
@@ -82,7 +83,10 @@ public class OrderRepository : IOrderRepository
 				CustomerId = o.CustomerId,
 				CustomerName = o.Customer.FullName,
 				TotalAmount = o.TotalAmount,
+				TaxAmount = o.TaxAmount,
+				TaxId = o.TaxId,
 				TipAmount = o.TipAmount,
+
 				OrderStatus = o.OrderStatusLv.ValueName,
 				Source = o.SourceLv.ValueName,
 				CreatedAt = o.CreatedAt,
@@ -95,7 +99,7 @@ public class OrderRepository : IOrderRepository
 					DishName = oi.Dish.DishName,
 					Quantity = oi.Quantity,
 					Price = oi.Price,
-					ItemStatus = oi.ItemStatusLv.ValueName,
+					ItemStatus = oi.ItemStatusLv.ValueCode,
 					RejectReason = oi.RejectReason,
 					Note = oi.Note
 				}).ToList()
@@ -193,6 +197,7 @@ public class OrderRepository : IOrderRepository
 		uint readyItemStatusId,
 		uint servedItemStatusId,
 		uint rejectedItemStatusId,
+		uint cancelledItemStatusId,
 		uint pendingOrderStatusId,
 		uint inProgressOrderStatusId,
 		uint completedOrderStatusId,
@@ -220,9 +225,10 @@ public class OrderRepository : IOrderRepository
 			bool orderStatusChanged = false;
 
 			// 1. Subtract rejected/cancelled item from total amount
-			if (newStatusLvId == rejectedItemStatusId)
+			if (newStatusLvId == rejectedItemStatusId || newStatusLvId == cancelledItemStatusId)
 			{
 				order.TotalAmount -= item.Price * item.Quantity;
+				order.SubTotalAmount -= item.Price * item.Quantity;
 				orderStatusChanged = true;
 			}
 
@@ -320,9 +326,11 @@ public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, Can
 			TableCode      = order.Table.TableCode,
 			TotalItems     = totalItems,
 			EstimatedTotal = estimatedTotal,
+			TaxAmount      = order.TaxAmount,
 			Items          = allItems
 		};
 	}
+
 
 	public async Task AddItemsToOrderAsync(long orderId, List<OrderItem> items, uint completedOrderStatusId, uint cancelledOrderStatusId, uint pendingOrderStatusId, CancellationToken cancellationToken = default)
 	{
@@ -337,6 +345,7 @@ public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, Can
 
 		// Update total amount on the parent order
 		order.TotalAmount += items.Sum(i => i.Price * i.Quantity);
+		order.SubTotalAmount += items.Sum(i => i.Price * i.Quantity);
 		order.UpdatedAt = DateTime.UtcNow;
 
 		// If the order was completed/cancelled, reopen it to PENDING so kitchen sees the new items
@@ -387,9 +396,11 @@ public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, Can
 			TableCode      = tableCode,
 			TotalItems     = totalItems,
 			EstimatedTotal = estimatedTotal,
+			TaxAmount      = orders.Sum(o => o.TaxAmount),
 			Items          = allItems
 		};
 	}
+
 
     public async Task AddAsync(Order order, CancellationToken ct)
     {
@@ -397,26 +408,30 @@ public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, Can
         await _context.SaveChangesAsync(ct);
     }
 
-    public async Task<OrderHistoryDTO> GetOrderByIdAsync(
+    public async Task<OrderDetailDTO> GetOrderByIdAsync(
     long orderId,
     CancellationToken cancellationToken = default)
     {
         var order = await _context.Orders
             .AsNoTracking()
             .Where(o => o.OrderId == orderId)
-            .Select(o => new OrderHistoryDTO
+            .Select(o => new OrderDetailDTO
             {
                 OrderId = o.OrderId,
+
                 TableId = o.TableId,
                 TableCode = o.Table != null ? o.Table.TableCode : "",
 
                 StaffId = o.StaffId,
-                StaffName = o.Staff.FullName,
+                StaffName = o.Staff != null ? o.Staff.FullName : "",
 
                 CustomerId = o.CustomerId,
                 CustomerName = o.Customer != null ? o.Customer.FullName : null,
 
+                SubTotalAmount = o.SubTotalAmount,
                 TotalAmount = o.TotalAmount,
+                TaxAmount = o.TaxAmount,
+                TaxId = o.TaxId,
                 TipAmount = o.TipAmount,
 
                 OrderStatus = o.OrderStatusLv.ValueName,
@@ -427,19 +442,44 @@ public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, Can
 
                 IsPaid = o.Payments.Any(),
 
-                OrderItems = o.OrderItems
-                    .Select(oi => new OrderItemDTO
-                    {
-                        OrderItemId = oi.OrderItemId,
-                        DishId = oi.DishId,
-                        DishName = oi.Dish.DishName,
-                        Quantity = oi.Quantity,
-                        Price = oi.Price,
-                        ItemStatus = oi.ItemStatusLv.ValueName,
-                        RejectReason = oi.RejectReason,
-                        Note = oi.Note
-                    })
-                    .ToList()
+                // ITEMS
+                OrderItems = o.OrderItems.Select(oi => new OrderItemDTO
+                {
+                    OrderItemId = oi.OrderItemId,
+                    DishId = oi.DishId,
+                    DishName = oi.Dish.DishName,
+                    Quantity = oi.Quantity,
+                    Price = oi.Price,
+                    ItemStatus = oi.ItemStatusLv.ValueCode,
+                    RejectReason = oi.RejectReason,
+                    Note = oi.Note
+                }).ToList(),
+
+                // PROMOTIONS
+                Promotions = o.OrderPromotions.Select(p => new OrderPromotionDTO
+                {
+                    PromotionId = p.PromotionId,
+                    PromotionName = p.Promotion.PromoName,
+                    DiscountAmount = p.DiscountAmount
+                }).ToList(),
+
+                // COUPONS
+                Coupons = o.OrderCoupons.Select(c => new OrderCouponDTO
+                {
+                    CouponId = c.CouponId,
+                    CouponCode = c.Coupon.CouponCode,
+                    DiscountAmount = c.DiscountAmount
+                }).ToList(),
+
+                // PAYMENTS
+                Payments = o.Payments.Select(p => new OrderPaymentDTO
+                {
+                    PaymentId = p.PaymentId,
+                    ReceivedAmount = p.ReceivedAmount,
+                    ChangeAmount = p.ChangeAmount,
+                    PaidAt = p.PaidAt,
+                    Method = p.MethodLv.ValueCode
+                }).ToList()
             })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -481,10 +521,21 @@ public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, Can
     }
 
     public async Task<List<RecentOrderDTO>> GetRecentOrdersAsync(
-    int limit,
-    CancellationToken ct)
+		long userId,
+		List<string> roles,
+		int limit,
+		CancellationToken ct)
     {
-        return await _context.Orders
+        var query = _context.Orders.AsQueryable();
+
+        var isAdmin = roles.Any(r => r == "ADMIN");
+
+        if (!isAdmin)
+        {
+            query = query.Where(o => o.StaffId == null || o.StaffId == userId);
+        }
+
+        return await query
             .OrderByDescending(o => o.CreatedAt)
             .Take(limit)
             .Select(o => new RecentOrderDTO
@@ -498,4 +549,91 @@ public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, Can
             })
             .ToListAsync(ct);
     }
+
+	public async Task<List<ShiftLiveOrderSnapshotDto>> GetShiftLiveOrderSnapshotsAsync(
+		DateTime fromUtc,
+		DateTime toUtc,
+		IEnumerable<long> staffIds,
+		CancellationToken ct = default)
+	{
+		var idList = staffIds.Distinct().ToList();
+		if (idList.Count == 0)
+		{
+			return new List<ShiftLiveOrderSnapshotDto>();
+		}
+
+		return await _context.Orders
+			.AsNoTracking()
+			.Where(o => o.StaffId.HasValue
+				&& idList.Contains(o.StaffId.Value)
+				&& (
+					(o.CreatedAt.HasValue && o.CreatedAt.Value >= fromUtc && o.CreatedAt.Value <= toUtc)
+					|| (o.UpdatedAt.HasValue && o.UpdatedAt.Value >= fromUtc && o.UpdatedAt.Value <= toUtc)
+					|| o.Payments.Any(p => p.PaidAt.HasValue && p.PaidAt.Value >= fromUtc && p.PaidAt.Value <= toUtc)
+				))
+			.Select(o => new ShiftLiveOrderSnapshotDto
+			{
+				OrderId = o.OrderId,
+				StaffId = o.StaffId ?? 0,
+				TableCode = o.Table != null ? o.Table.TableCode : null,
+				CreatedAt = o.CreatedAt,
+				UpdatedAt = o.UpdatedAt,
+				LatestPaidAt = o.Payments
+					.Where(p => p.PaidAt.HasValue)
+					.Select(p => p.PaidAt)
+					.Max(),
+				LastActivityAt = new[]
+				{
+					o.CreatedAt,
+					o.UpdatedAt,
+					o.Payments.Where(p => p.PaidAt.HasValue).Select(p => p.PaidAt).Max(),
+				}
+				.Max(),
+				PaidRevenue = o.Payments.Any(p => p.PaidAt.HasValue)
+				? o.TotalAmount
+					: 0,
+				CompletedItemsCount = o.OrderItems
+					.Where(oi => oi.ItemStatusLv.ValueCode == nameof(OrderItemStatusCode.READY)
+						|| oi.ItemStatusLv.ValueCode == nameof(OrderItemStatusCode.SERVED))
+					.Sum(oi => oi.Quantity),
+				PendingItemsCount = o.OrderItems
+					.Where(oi => oi.ItemStatusLv.ValueCode == nameof(OrderItemStatusCode.CREATED)
+						|| oi.ItemStatusLv.ValueCode == nameof(OrderItemStatusCode.IN_PROGRESS))
+					.Sum(oi => oi.Quantity),
+			})
+			.ToListAsync(ct);
+	}
+
+	public async Task<List<ShiftLiveIssueSnapshotDto>> GetShiftLiveIssueSnapshotsAsync(
+		DateTime fromUtc,
+		DateTime toUtc,
+		IEnumerable<long> staffIds,
+		CancellationToken ct = default)
+	{
+		var idList = staffIds.Distinct().ToList();
+		if (idList.Count == 0)
+		{
+			return new List<ShiftLiveIssueSnapshotDto>();
+		}
+
+		return await _context.ServiceErrors
+			.AsNoTracking()
+			.Where(se => idList.Contains(se.StaffId)
+				&& se.CreatedAt.HasValue
+				&& se.CreatedAt.Value >= fromUtc
+				&& se.CreatedAt.Value <= toUtc)
+			.Select(se => new ShiftLiveIssueSnapshotDto
+			{
+				StaffId = se.StaffId,
+				Description = se.Description,
+				IsResolved = se.IsResolved ?? false,
+				CreatedAt = se.CreatedAt,
+				TableCode = se.Table != null
+					? se.Table.TableCode
+					: se.Order != null && se.Order.Table != null
+						? se.Order.Table.TableCode
+						: null,
+			})
+			.ToListAsync(ct);
+	}
 }

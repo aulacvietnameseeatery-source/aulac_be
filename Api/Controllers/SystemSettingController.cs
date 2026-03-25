@@ -497,8 +497,7 @@ public class SystemSettingController : ControllerBase
                 ContentType = file.ContentType
             };
 
-            // Using existing validation options from TableService pattern if available, or just standard image validation
-            var result = await _fileStorage.SaveAsync(uploadRequest, "store-logo", null, cancellationToken);
+            var result = await _fileStorage.SaveAsync(uploadRequest, "store-logo", FileValidationOptions.ImageUpload, cancellationToken);
 
             _logger.LogInformation("Store logo uploaded: {PublicUrl}", result.PublicUrl);
 
@@ -507,7 +506,7 @@ public class SystemSettingController : ControllerBase
                 Success = true,
                 Code = 200,
                 UserMessage = "Logo uploaded successfully.",
-                Data = new { PublicUrl = result.PublicUrl },
+                Data = new { RelativePath = result.RelativePath, PublicUrl = result.PublicUrl },
                 ServerTime = DateTimeOffset.UtcNow
             });
         }
@@ -520,6 +519,77 @@ public class SystemSettingController : ControllerBase
                 Success = false,
                 Code = 500,
                 UserMessage = "An error occurred while uploading the logo.",
+                SystemMessage = ex.Message,
+                Data = new { },
+                ServerTime = DateTimeOffset.UtcNow
+            });
+        }
+    }
+
+    /// <summary>
+    /// Uploads a generic file (e.g. video or image) for store settings.
+    /// </summary>
+    /// <param name="file">The file to upload</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Public URL of the uploaded file</returns>
+    [HttpPost("upload-file")]
+    [HasPermission(Permissions.ManageSystemSettings)]
+    [Consumes("multipart/form-data")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> UploadFile(IFormFile file, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            if (file == null || file.Length == 0)
+            {
+                return BadRequest(new ApiResponse<object>
+                {
+                    Success = false,
+                    Code = 400,
+                    UserMessage = "No file uploaded.",
+                    Data = new { },
+                    ServerTime = DateTimeOffset.UtcNow
+                });
+            }
+
+            var uploadRequest = new FileUploadRequest
+            {
+                Stream = file.OpenReadStream(),
+                FileName = file.FileName,
+                ContentType = file.ContentType
+            };
+
+            var extension = Path.GetExtension(file.FileName);
+            var isVideo = file.ContentType.Equals("video/mp4", StringComparison.OrdinalIgnoreCase)
+                          || extension.Equals(".mp4", StringComparison.OrdinalIgnoreCase);
+
+            // Keep store folders and enforce store intro video policy (30s, 50MB, MP4).
+            var validation = isVideo ? FileValidationOptions.StoreIntroVideo : FileValidationOptions.ImageUpload;
+            var folder = isVideo ? "store-videos" : "store-media";
+
+            var result = await _fileStorage.SaveAsync(uploadRequest, folder, validation, cancellationToken);
+
+            _logger.LogInformation("Store {Type} uploaded to {Folder}: {PublicUrl}", 
+                isVideo ? "video" : "image", folder, result.PublicUrl);
+
+            return Ok(new ApiResponse<object>
+            {
+                Success = true,
+                Code = 200,
+                UserMessage = "File uploaded successfully.",
+                Data = new { RelativePath = result.RelativePath, PublicUrl = result.PublicUrl },
+                ServerTime = DateTimeOffset.UtcNow
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error uploading store media");
+
+            return StatusCode(500, new ApiResponse<object>
+            {
+                Success = false,
+                Code = 500,
+                UserMessage = "An error occurred while uploading the file.",
                 SystemMessage = ex.Message,
                 Data = new { },
                 ServerTime = DateTimeOffset.UtcNow

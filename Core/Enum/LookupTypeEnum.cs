@@ -28,9 +28,19 @@ namespace Core.Enum
         Tag = 18,         // TAG
         TableZone = 19,   // TABLE_ZONE
         DishDiet = 20,   // DISH_DIET
+        // @deprecated: ShiftTemplate entity replaces the SHIFT_TYPE lookup.
         ShiftType = 21,             // SHIFT_TYPE
         ShiftStatus = 22, // SHIFT_STATUS
         ShiftAssignmentStatus = 23, // SHIFT_ASSIGNMENT_STATUS
         AttendanceStatus = 24,      // ATTENDANCE_STATUS
+        CouponType = 25,            // COUPON_TYPE
+        CouponStatus = 26,          // COUPON_STATUS
+        IngredientUnit = 27,        // INGREDIENT_UNIT
+        InventoryCategory = 28,     // INVENTORY_CATEGORY
+        ExportReason = 29,          // EXPORT_REASON
+        VarianceReason = 30,        // VARIANCE_REASON
+        KitchenToolType = 31,       // KITCHEN_TOOL_TYPE
+        ConsumableType = 32,        // CONSUMABLE_TYPE
+        EquipmentType = 33          // EQUIPMENT_TYPE
     }
 }

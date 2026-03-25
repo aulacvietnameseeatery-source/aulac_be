@@ -9,9 +9,16 @@ public partial class Ingredient
 
     public string IngredientName { get; set; } = null!;
 
-    public string Unit { get; set; } = null!;
+    // public string Unit { get; set; } = null!;
+    public uint UnitLvId { get; set; }
+    public virtual LookupValue? UnitLv { get; set; }
 
     public uint? TypeLvId { get; set; }
+
+    /// <summary>
+    /// FK → LookupValue (INVENTORY_CATEGORY): FOOD_INGREDIENT, KITCHEN_TOOL, CONSUMABLE_SUPPLY, EQUIPMENT
+    /// </summary>
+    public uint? CategoryLvId { get; set; }
 
     public long? IngredientNameTextId { get; set; }
 
@@ -30,4 +37,6 @@ public partial class Ingredient
     public virtual ICollection<Recipe> Recipes { get; set; } = new List<Recipe>();
 
     public virtual LookupValue? TypeLv { get; set; }
+
+    public virtual LookupValue? CategoryLv { get; set; }
 }

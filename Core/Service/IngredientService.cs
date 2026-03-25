@@ -1,8 +1,12 @@
-﻿using Core.DTO.Ingredient;
+﻿using Core.Data;
+using Core.DTO.Ingredient;
+using Core.DTO.Notification;
 using Core.DTO.Supplier;
 using Core.Entity;
+using Core.Enum;
 using Core.Interface.Repo;
 using Core.Interface.Service.Entity;
+using Core.Interface.Service.Notification;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,10 +18,12 @@ namespace Core.Service
     public class IngredientService : IIngredientService
     {
         private readonly IIngredientRepository _repo;
+        private readonly INotificationService _notificationService;
 
-        public IngredientService(IIngredientRepository repo)
+        public IngredientService(IIngredientRepository repo, INotificationService notificationService)
         {
             _repo = repo;
+            _notificationService = notificationService;
         }
 
         public async Task<(List<IngredientDTO> Items, int TotalCount)> GetListAsync(IngredientFilterParams filter)
@@ -43,7 +49,7 @@ namespace Core.Service
             var entity = new Ingredient
             {
                 IngredientName = request.IngredientName,
-                Unit = request.Unit,
+                UnitLvId = request.UnitLvId,
                 TypeLvId = request.TypeLvId,
                 ImageId = request.ImageId,
                 CurrentStock = new CurrentStock
@@ -73,7 +79,7 @@ namespace Core.Service
                 throw new Exception("Ingredient name already exists.");
 
             entity.IngredientName = request.IngredientName;
-            entity.Unit = request.Unit;
+            entity.UnitLvId = request.UnitLvId;
             entity.TypeLvId = request.TypeLvId;
             entity.ImageId = request.ImageId;
 
@@ -82,7 +88,6 @@ namespace Core.Service
                 entity.CurrentStock.MinStockLevel = request.MinStockLevel;
             }
 
-           
             entity.IngredientSuppliers.Clear();
             foreach (var sid in request.SupplierIds)
             {
@@ -110,6 +115,35 @@ namespace Core.Service
         public async Task AdjustStockAsync(long id, AdjustStockRequest request)
         {
             await _repo.AdjustStockAsync(id, request.Quantity, request.Note);
+
+            // Check if stock fell below minimum after adjustment
+            var entity = await _repo.GetByIdAsync(id);
+            if (entity?.CurrentStock != null &&
+                entity.CurrentStock.QuantityOnHand < entity.CurrentStock.MinStockLevel)
+            {
+                string unitName = entity.UnitLv?.ValueName ?? "";
+
+                await _notificationService.PublishAsync(new PublishNotificationRequest
+                {
+                    Type = nameof(NotificationType.LOW_STOCK_ALERT),
+                    Title = "Low Stock Alert",
+                    Body = $"{entity.IngredientName} stock is low: {entity.CurrentStock.QuantityOnHand} {unitName} (min: {entity.CurrentStock.MinStockLevel})", // 🟢 Cập nhật UnitName
+                    Priority = nameof(NotificationPriority.High),
+                    SoundKey = "notification_high",
+                    ActionUrl = $"/dashboard/ingredients/{id}/history",
+                    EntityType = "Ingredient",
+                    EntityId = id.ToString(),
+                    Metadata = new Dictionary<string, object>
+                    {
+                        ["ingredientId"] = id.ToString(),
+                        ["ingredientName"] = entity.IngredientName,
+                        ["currentStock"] = entity.CurrentStock.QuantityOnHand.ToString(),
+                        ["minStock"] = entity.CurrentStock.MinStockLevel.ToString(),
+                        ["unit"] = unitName 
+                    },
+                    TargetPermissions = new List<string> { Permissions.ViewDish }
+                });
+            }
         }
 
         public async Task<List<StockHistoryDto>> GetStockHistoryAsync(long id)
@@ -131,7 +165,10 @@ namespace Core.Service
             {
                 IngredientId = entity.IngredientId,
                 IngredientName = entity.IngredientName,
-                Unit = entity.Unit,
+
+                UnitLvId = entity.UnitLvId, 
+                UnitName = entity.UnitLv?.ValueName, 
+
                 TypeLvId = entity.TypeLvId,
                 TypeName = entity.TypeLv?.ValueName,
                 ImageId = entity.ImageId,
@@ -145,10 +182,10 @@ namespace Core.Service
                     .Where(ise => ise.Supplier != null)
                     .Select(ise => new SupplierDto
                     {
-                         SupplierId = ise.Supplier!.SupplierId,
-                         SupplierName = ise.Supplier.SupplierName,
-                         Phone = ise.Supplier.Phone,
-                         Email = ise.Supplier.Email
+                        SupplierId = ise.Supplier!.SupplierId,
+                        SupplierName = ise.Supplier.SupplierName,
+                        Phone = ise.Supplier.Phone,
+                        Email = ise.Supplier.Email
                     }).ToList()
             };
         }

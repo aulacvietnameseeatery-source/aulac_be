@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -31,16 +31,22 @@ namespace Core.Data
         public const string ViewDishCategory = "DISH_CATEGORY:READ";
         public const string CreateDishCategory = "DISH_CATEGORY:CREATE";
         public const string EditDishCategory = "DISH_CATEGORY:EDIT";
-		public const string DeleteDishCategory = "DISH_CATEGORY:DELETE";
+        public const string DeleteDishCategory = "DISH_CATEGORY:DELETE";
 
-		//Supplier
-		public const string ViewSupplier = "SUPPLIER:READ";
-		public const string CreateSupplier = "SUPPLIER:CREATE";
-		public const string EditSupplier = "SUPPLIER:EDIT";
-		public const string DeleteSupplier = "SUPPLIER:DELETE";
+        //Supplier
+        public const string ViewSupplier = "SUPPLIER:READ";
+        public const string CreateSupplier = "SUPPLIER:CREATE";
+        public const string EditSupplier = "SUPPLIER:EDIT";
+        public const string DeleteSupplier = "SUPPLIER:DELETE";
 
-		//Role
-		public const string ViewRole = "ROLE:READ";
+        //Coupon
+        public const string ViewCoupon = "COUPON:READ";
+        public const string CreateCoupon = "COUPON:CREATE";
+        public const string EditCoupon = "COUPON:EDIT";
+        public const string DeleteCoupon = "COUPON:DELETE";
+
+        //Role
+        public const string ViewRole = "ROLE:READ";
         public const string CreateRole = "ROLE:CREATE";
         public const string UpdateRole = "ROLE:UPDATE";
         public const string DeleteRole = "ROLE:DELETE";
@@ -75,6 +81,7 @@ namespace Core.Data
 
         // Shift
         public const string ViewShift = "SHIFT:READ";
+        public const string ViewOwnShift = "SHIFT:READ_OWN";
         public const string ScheduleShift = "SHIFT:SCHEDULE";
         public const string AssignShift = "SHIFT:ASSIGN";
         public const string CheckInShift = "SHIFT:CHECK_IN";
@@ -82,6 +89,24 @@ namespace Core.Data
         public const string AdjustAttendance = "SHIFT:ADJUST_ATTENDANCE";
         public const string ViewShiftReport = "SHIFT:REPORT_READ";
         public const string CloseShift = "SHIFT:CLOSE";
+        public const string ManageShiftTemplate = "SHIFT:MANAGE_TEMPLATE";
+        public const string PublishShift = "SHIFT:PUBLISH";
+
+        public const string ViewCustomer = "CUSTOMER:READ";
+        public const string CreateCustomer = "CUSTOMER:CREATE";
+        public const string UpdateCustomer = "CUSTOMER:UPDATE";
+        public const string DeleteCustomer = "CUSTOMER:DELETE";
+
+        // Notification
+        public const string ViewNotification = "NOTIFICATION:READ";
+        public const string AcknowledgeNotification = "NOTIFICATION:ACK";
+
+        // Inventory
+        public const string ViewInventory = "INVENTORY:READ";
+        public const string CreateInventoryTx = "INVENTORY:CREATE";
+        public const string ApproveInventoryTx = "INVENTORY:APPROVE";
+        public const string StockCheck = "INVENTORY:STOCK_CHECK";
+        public const string ViewInventoryReport = "INVENTORY:REPORT_READ";
 
     }
 }
