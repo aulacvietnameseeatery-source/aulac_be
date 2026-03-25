@@ -19,6 +19,7 @@ public class PaymentService : IPaymentService
 {
     private const string LoyaltyEnabledSettingKey = "loyalty.enabled";
     private const string LoyaltyPointBaseSettingKey = "loyalty.point_base_amount";
+    private const long GuestCustomerId = 68;
 
     private readonly RestaurantMgmtContext _context;
     private readonly ILookupResolver _lookupResolver;
@@ -209,7 +210,7 @@ public class PaymentService : IPaymentService
                 }
             }
 
-            if (loyaltyEnabled && order.Customer?.IsMember == true)
+            if (loyaltyEnabled && order.CustomerId != GuestCustomerId)
             {
                 var earnedPoints = CalculateLoyaltyPoints(finalAmount, loyaltyPointBaseAmount);
                 if (earnedPoints > 0)
