@@ -22,5 +22,11 @@ public sealed class SupplierConfiguration : IEntityTypeConfiguration<Supplier>
         entity.Property(e => e.SupplierName)
         .HasMaxLength(200)
         .HasColumnName("supplier_name");
+        entity.Property(e => e.Address)
+        .HasMaxLength(500)
+        .HasColumnName("address");
+        entity.Property(e => e.TaxCode)
+        .HasMaxLength(50)
+        .HasColumnName("tax_code");
     }
 }

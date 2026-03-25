@@ -125,7 +125,7 @@ public class ReservationRepository : IReservationRepository
             .Select(r => new ReservationManagementDto
             {
                 ReservationId = r.ReservationId,
-                ReservedTime = r.ReservedTime,
+                ReservedTime = DateTime.SpecifyKind(r.ReservedTime, DateTimeKind.Utc),
                 CustomerName = r.CustomerName,
                 Phone = r.Phone,
                 Email = r.Email,

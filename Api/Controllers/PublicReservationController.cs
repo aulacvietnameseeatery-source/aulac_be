@@ -1,8 +1,11 @@
 using API.Models;
 using Core.DTO.Customer;
+using Core.DTO.Notification;
 using Core.DTO.Reservation;
+using Core.Enum;
 using Core.Interface.Service.Customer;
 using Core.Interface.Service.Entity;
+using Core.Interface.Service.Notification;
 using Core.Interface.Service.Reservation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -21,17 +24,20 @@ public class PublicReservationController : ControllerBase
     private readonly IPublicReservationService _reservationService;
     private readonly ICustomerService _customerService;
     private readonly ITableService _tableService;
+    private readonly INotificationService _notificationService;
     private readonly ILogger<PublicReservationController> _logger;
 
     public PublicReservationController(
         IPublicReservationService reservationService,
         ICustomerService customerService,
         ITableService tableService,
+        INotificationService notificationService,
         ILogger<PublicReservationController> logger)
     {
         _reservationService = reservationService;
         _customerService = customerService;
         _tableService = tableService;
+        _notificationService = notificationService;
         _logger = logger;
     }
 
@@ -174,6 +180,63 @@ public class PublicReservationController : ControllerBase
             Code = 200,
             UserMessage = "Table marked as occupied successfully.",
             SystemMessage = "Table status updated",
+            Data = new { },
+            ServerTime = DateTimeOffset.UtcNow
+        });
+    }
+
+    /// <summary>
+    /// Allows a customer to request payment for their order.
+    /// Sends a PAYMENT_REQUEST notification to staff with ProcessPayment permission.
+    /// No authentication required — called directly from the customer-facing menu.
+    /// </summary>
+    [HttpPost("orders/{orderId:long}/request-payment")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> RequestPayment(
+        long orderId,
+        [FromQuery] string? tableCode = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (orderId <= 0)
+        {
+            return BadRequest(new ApiResponse<object>
+            {
+                Success = false,
+                Code = 400,
+                UserMessage = "Invalid order ID.",
+                ServerTime = DateTimeOffset.UtcNow
+            });
+        }
+
+        var tableInfo = string.IsNullOrWhiteSpace(tableCode) ? $"Order #{orderId}" : $"Table {tableCode}";
+
+        await _notificationService.PublishAsync(new PublishNotificationRequest
+        {
+            Type = nameof(NotificationType.PAYMENT_REQUEST),
+            Title = "Payment Requested",
+            Body = $"{tableInfo} has requested the bill.",
+            Priority = nameof(NotificationPriority.High),
+            RequireAck = true,
+            SoundKey = "notification_high",
+            ActionUrl = "/dashboard/orders",
+            EntityType = "Order",
+            EntityId = orderId.ToString(),
+            Metadata = new Dictionary<string, object>
+            {
+                ["orderId"] = orderId.ToString(),
+                ["tableCode"] = tableCode ?? ""
+            },
+            TargetPermissions = new List<string> { Core.Data.Permissions.ProcessPayment }
+        }, cancellationToken);
+
+        _logger.LogInformation("Payment request notification sent for order {OrderId}, table {TableCode}", orderId, tableCode);
+
+        return Ok(new ApiResponse<object>
+        {
+            Success = true,
+            Code = 200,
+            UserMessage = "Payment request sent. A server will be with you shortly.",
             Data = new { },
             ServerTime = DateTimeOffset.UtcNow
         });

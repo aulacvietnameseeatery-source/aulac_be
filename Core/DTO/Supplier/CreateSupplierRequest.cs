@@ -19,6 +19,12 @@ public class CreateSupplierRequest
     [EmailAddress(ErrorMessage = "Invalid email format")]
     public string? Email { get; set; }
 
+    [MaxLength(500, ErrorMessage = "Address cannot exceed 500 characters")]
+    public string? Address { get; set; }
+
+    [MaxLength(50, ErrorMessage = "Tax code cannot exceed 50 characters")]
+    public string? TaxCode { get; set; }
+
     /// <summary>
     /// List of ingredient IDs that this supplier provides
     /// </summary>

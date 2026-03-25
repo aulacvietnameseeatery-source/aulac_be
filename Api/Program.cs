@@ -40,9 +40,25 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Core.Interface.Service.Reservation;
 using Core.Interface.Service.Notification;
-using Infa.Service;
 
 var builder = WebApplication.CreateBuilder(args);
+
+const long maxRequestBodySizeBytes = 100L * 1024L * 1024L; // 100 MB
+
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxRequestBodySize = maxRequestBodySizeBytes;
+});
+
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = maxRequestBodySizeBytes;
+});
+
+builder.Services.Configure<Microsoft.AspNetCore.Builder.IISServerOptions>(options =>
+{
+    options.MaxRequestBodySize = maxRequestBodySizeBytes;
+});
 
 // Do NOT stop the whole API if a BackgroundService throws
 builder.Services.Configure<HostOptions>(options =>

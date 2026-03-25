@@ -13,6 +13,10 @@ public partial class Supplier
 
     public string? Email { get; set; }
 
+    public string? Address { get; set; }
+
+    public string? TaxCode { get; set; }
+
     public virtual ICollection<IngredientSupplier> IngredientSuppliers { get; set; } = new List<IngredientSupplier>();
 
     public virtual ICollection<InventoryTransaction> InventoryTransactions { get; set; } = new List<InventoryTransaction>();

@@ -520,6 +520,14 @@ public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, Can
             .FirstOrDefaultAsync(ct);
     }
 
+    public async Task<OrderItem?> GetOrderItemAsync(long orderItemId, CancellationToken ct)
+    {
+        return await _context.OrderItems
+            .Include(oi => oi.Dish)
+            .Include(oi => oi.Order).ThenInclude(o => o.Table)
+            .FirstOrDefaultAsync(oi => oi.OrderItemId == orderItemId, ct);
+    }
+
     public async Task<List<RecentOrderDTO>> GetRecentOrdersAsync(
 		long userId,
 		List<string> roles,
