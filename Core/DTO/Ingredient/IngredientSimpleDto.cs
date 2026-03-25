@@ -14,5 +14,6 @@ namespace Core.DTO.Ingredient
         public long IngredientId { get; set; }
         public string IngredientName { get; set; } = null!;
         public string UnitLvId { get; set; } = null!;
+        public string? UnitName { get; set; }
     }
 }
