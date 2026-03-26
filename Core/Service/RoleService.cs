@@ -261,7 +261,16 @@ namespace Core.Service
                 "ROLE" => "Role Management",
                 "ACCOUNT" => "Staff Management",
                 "DISH" => "Dish Management",
+                "DISH_CATEGORY" => "Dish Category Management",
                 "PROMOTION" => "Promotion Management",
+                "COUPON" => "Coupon Management",
+                "CUSTOMER" => "Customer Management",
+                "ORDER" => "Order Management",
+                "RESERVATION" => "Reservation Management",
+                "TABLE" => "Table Management",
+                "INVENTORY" => "Inventory Management",
+                "SUPPLIER" => "Supplier Management",
+                "NOTIFICATION" => "Notification Management",
                 "SYSTEM_SETTING" => "System Settings",
                 "SHIFT" => "Shift Management",
                 _ => screenCode
@@ -280,13 +289,26 @@ namespace Core.Service
                 "RESET_PASSWORD" => "Reset Password",
                 "ACTIVATE_DEACTIVATE" => "Activate/Deactivate",
                 // Shift-specific actions
-                "SCHEDULE"       => "Schedule Shift",
-                "ASSIGN"    => "Assign Staff",
-                "CHECK_IN"    => "Check In",
-                "CHECK_OUT"    => "Check Out",
+                "SCHEDULE"           => "Schedule Shift",
+                "ASSIGN"             => "Assign Staff",
+                "CHECK_IN"           => "Check In",
+                "CHECK_OUT"          => "Check Out",
                 "ADJUST_ATTENDANCE"  => "Adjust Attendance",
                 "REPORT_READ"        => "View Reports",
-                "CLOSE"  => "Close Shift",
+                "CLOSE"              => "Close Shift",
+                // Inventory-specific actions
+                "APPROVE"            => "Approve",
+                "STOCK_CHECK"        => "Stock Check",
+                // Notification-specific actions
+                "ACK"                => "Acknowledge",
+                // Order-specific actions
+                "PROCESS_PAYMENT"    => "Process Payment",
+                "UPDATE_ITEM_STATUS" => "Update Item Status",
+                // Table-specific actions
+                "MANAGE_MEDIA"       => "Manage Media",
+                "MANAGE_TYPE"        => "Manage Type",
+                "MANAGE_ZONE"        => "Manage Zone",
+                "UPDATE_STATUS"      => "Update Status",
                 _ => actionCode
             };
         }
@@ -298,9 +320,18 @@ namespace Core.Service
                 "ROLE" => 1,
                 "ACCOUNT" => 2,
                 "DISH" => 3,
-                "PROMOTION" => 4,
-                "SYSTEM_SETTING" => 5,
-                "SHIFT" => 6,
+                "DISH_CATEGORY" => 4,
+                "PROMOTION" => 5,
+                "COUPON" => 6,
+                "CUSTOMER" => 7,
+                "ORDER" => 8,
+                "RESERVATION" => 9,
+                "TABLE" => 10,
+                "INVENTORY" => 11,
+                "SUPPLIER" => 12,
+                "NOTIFICATION" => 13,
+                "SYSTEM_SETTING" => 14,
+                "SHIFT" => 15,
                 _ => 999
             };
         }
@@ -317,13 +348,26 @@ namespace Core.Service
                 "RESET_PASSWORD" => 5,
                 "ACTIVATE_DEACTIVATE" => 6,
                 // Shift-specific actions
-                "SCHEDULE"          => 7,
-                "ASSIGN"          => 8,
-                "CHECK_IN"        => 9,
-                "CHECK_OUT"         => 10,
-                "ADJUST_ATTENDANCE" => 11,
-                "REPORT_READ"       => 12,
-                "CLOSE"    => 13,
+                "SCHEDULE"           => 7,
+                "ASSIGN"             => 8,
+                "CHECK_IN"           => 9,
+                "CHECK_OUT"          => 10,
+                "ADJUST_ATTENDANCE"  => 11,
+                "REPORT_READ"        => 12,
+                "CLOSE"              => 13,
+                // Inventory-specific actions
+                "APPROVE"            => 14,
+                "STOCK_CHECK"        => 15,
+                // Notification-specific actions
+                "ACK"                => 16,
+                // Order-specific actions
+                "PROCESS_PAYMENT"    => 17,
+                "UPDATE_ITEM_STATUS" => 18,
+                // Table-specific actions
+                "MANAGE_MEDIA"       => 19,
+                "MANAGE_TYPE"        => 20,
+                "MANAGE_ZONE"        => 21,
+                "UPDATE_STATUS"      => 22,
                 _ => 999
             };
         }
