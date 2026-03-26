@@ -41,6 +41,7 @@ using System.Text.Json.Serialization;
 using Core.Interface.Service.Reservation;
 using Core.Interface.Service.Notification;
 using Infa.Service;
+using Infrastructure.Repository;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -276,6 +277,7 @@ builder.Services.AddScoped<IIngredientService, IngredientService>();
 builder.Services.AddScoped<IInventoryService, InventoryService>();
 builder.Services.AddScoped<IEmailTemplateService, EmailTemplateService>();
 
+builder.Services.AddScoped<IDashboardService, DashboardService>();    
 
 
 #endregion
@@ -316,7 +318,7 @@ builder.Services.AddScoped<IAttendanceRepository, AttendanceRepository>();
 builder.Services.AddScoped<IInventoryRepository, InventoryRepository>();
 builder.Services.AddScoped<ILoginActivityRepository, LoginActivityRepository>();
 builder.Services.AddScoped<IEmailTemplateRepository, EmailTemplateRepository>();
-
+builder.Services.AddScoped<IDashboardRepository, DashboardRepository>();
 #endregion
 
 #region Email Services + Background Worker
