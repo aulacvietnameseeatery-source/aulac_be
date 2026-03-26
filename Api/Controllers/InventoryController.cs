@@ -5,6 +5,7 @@ using Core.DTO.General;
 using Core.DTO.Inventory;
 using Core.Interface.Service.Entity;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
 
 namespace Api.Controllers;
 
@@ -108,16 +109,23 @@ public class InventoryController : ControllerBase
 
     /// <summary>
     /// Create a new inventory transaction (starts as DRAFT).
+    /// Accepts multipart/form-data with JSON payload and optional evidence files.
     /// </summary>
     [HttpPost("transactions")]
     [HasPermission(Permissions.CreateInventoryTx)]
+    [Consumes("multipart/form-data")]
     [ProducesResponseType(typeof(ApiResponse<InventoryTransactionDetailDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> CreateTransaction(
-        [FromBody] CreateInventoryTransactionRequest request,
+        [FromForm] CreateInventoryTransactionFormRequest formRequest,
         CancellationToken ct)
     {
+        var request = JsonSerializer.Deserialize<CreateInventoryTransactionRequest>(
+            formRequest.RequestJson,
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+            ?? throw new ArgumentException("Invalid RequestJson payload.");
+
         var userId = GetCurrentUserId();
-        var result = await _inventoryService.CreateTransactionAsync(request, userId, ct);
+        var result = await _inventoryService.CreateTransactionAsync(request, userId, formRequest.EvidenceFiles, ct);
 
         _logger.LogInformation("User {UserId} created inventory transaction {TxCode}",
             userId, result.TransactionCode);

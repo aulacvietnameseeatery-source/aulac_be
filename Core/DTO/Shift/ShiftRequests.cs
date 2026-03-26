@@ -52,8 +52,17 @@ public class BulkCreateAssignmentRequest
     [MinLength(1)]
     public List<long> StaffIds { get; set; } = new();
 
-    [Required]
+    /// <summary>
+    /// Single work date (kept for backward compatibility).
+    /// Ignored when <see cref="WorkDates"/> is provided.
+    /// </summary>
     public DateOnly WorkDate { get; set; }
+
+    /// <summary>
+    /// Multiple work dates for bulk-creating across a range.
+    /// When provided, takes precedence over <see cref="WorkDate"/>.
+    /// </summary>
+    public List<DateOnly>? WorkDates { get; set; }
 
     public DateTime? PlannedStartAt { get; set; }
     public DateTime? PlannedEndAt { get; set; }
@@ -65,6 +74,10 @@ public class BulkCreateAssignmentRequest
     public string? Tags { get; set; }
 
     public bool IsDraft { get; set; }
+
+    /// <summary>Returns the effective list of dates to assign.</summary>
+    public IReadOnlyList<DateOnly> GetEffectiveDates() =>
+        WorkDates is { Count: > 0 } ? WorkDates : [WorkDate];
 }
 
 public class PublishAssignmentsRequest
