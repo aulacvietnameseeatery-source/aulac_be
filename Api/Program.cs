@@ -498,7 +498,7 @@ app.UseAuthorization();
 app.UseStaticFiles();
 
 app.MapControllers();
-app.MapHub<ReservationHub>("/hubs/reservation");
+// _OLD: app.MapHub<ReservationHub>("/hubs/reservation"); — consolidated into RestaurantHub
 app.MapHub<RestaurantHub>("/hubs/restaurant");
 
 #endregion
