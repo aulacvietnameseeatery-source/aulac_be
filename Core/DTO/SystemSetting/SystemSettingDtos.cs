@@ -61,6 +61,7 @@ public record SystemSettingDetailDto
     public string Group { get; init; } = string.Empty;
     public string ValueType { get; init; } = string.Empty;
     public object? Value { get; init; }
+    public string? PublicUrl { get; init; }
     public string? Description { get; init; }
     public bool IsSensitive { get; init; }
     public DateTime UpdatedAt { get; init; }
