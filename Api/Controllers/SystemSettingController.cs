@@ -22,6 +22,18 @@ public class SystemSettingController : ControllerBase
     private readonly IFileStorage _fileStorage;
     private readonly ILogger<SystemSettingController> _logger;
 
+    private static readonly HashSet<string> StoreMediaKeys = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "store.intro.hero.image",
+        "store.intro.virtualTour.videoUrl",
+        "store.intro.virtualTour.videoUrlLeft",
+        "store.intro.virtualTour.videoUrlRight",
+        "store.intro.collection.dish1.image",
+        "store.intro.collection.dish2.image",
+        "store.intro.collection.dish3.image",
+        "store.logoUrl"
+    };
+
     public SystemSettingController(
         ISystemSettingService systemSettingService,
         IFileStorage fileStorage,
@@ -652,6 +664,10 @@ public class SystemSettingController : ControllerBase
         try
         {
             var settings = await _systemSettingService.GetGroupAsync(group, cancellationToken);
+            if (group.Equals("store", StringComparison.OrdinalIgnoreCase))
+            {
+                settings = settings.Select(AttachPublicUrlForStoreMedia).ToList();
+            }
 
             return Ok(new ApiResponse<object>
             {
@@ -691,6 +707,10 @@ public class SystemSettingController : ControllerBase
         try
         {
             var settings = await _systemSettingService.GetPublicGroupAsync(group, cancellationToken);
+            if (group.Equals("store", StringComparison.OrdinalIgnoreCase))
+            {
+                settings = settings.Select(AttachPublicUrlForStoreMedia).ToList();
+            }
 
             return Ok(new ApiResponse<object>
             {
@@ -736,6 +756,11 @@ public class SystemSettingController : ControllerBase
             var userIdClaim = User.FindFirst("user_id");
             long? userId = userIdClaim != null && long.TryParse(userIdClaim.Value, out var id) ? id : null;
 
+            if (group.Equals("store", StringComparison.OrdinalIgnoreCase))
+            {
+                request = NormalizeStoreMediaValues(request);
+            }
+
             await _systemSettingService.BulkUpdateGroupAsync(
                 group, request.Items, userId, cancellationToken);
 
@@ -765,5 +790,98 @@ public class SystemSettingController : ControllerBase
                 ServerTime = DateTimeOffset.UtcNow
             });
         }
+    }
+
+    private SystemSettingDetailDto AttachPublicUrlForStoreMedia(SystemSettingDetailDto setting)
+    {
+        if (!StoreMediaKeys.Contains(setting.SettingKey))
+            return setting;
+
+        if (setting.Value is not string value || string.IsNullOrWhiteSpace(value))
+            return setting;
+
+        var publicUrl = BuildPublicUrl(value);
+        return setting with { PublicUrl = publicUrl };
+    }
+
+    private string? BuildPublicUrl(string value)
+    {
+        var trimmed = value.Trim();
+        if (string.IsNullOrWhiteSpace(trimmed))
+            return null;
+
+        if (Uri.TryCreate(trimmed, UriKind.Absolute, out var absolute))
+            return absolute.ToString();
+
+        if (trimmed.StartsWith("/uploads/", StringComparison.OrdinalIgnoreCase))
+        {
+            var withoutPrefix = trimmed.Substring("/uploads/".Length);
+            return _fileStorage.GetPublicUrl(withoutPrefix);
+        }
+
+        if (trimmed.StartsWith("uploads/", StringComparison.OrdinalIgnoreCase))
+        {
+            var withoutPrefix = trimmed.Substring("uploads/".Length);
+            return _fileStorage.GetPublicUrl(withoutPrefix);
+        }
+
+        return _fileStorage.GetPublicUrl(trimmed.TrimStart('/'));
+    }
+
+    private static BulkUpdateGroupDto NormalizeStoreMediaValues(BulkUpdateGroupDto request)
+    {
+        var normalized = request.Items.Select(item =>
+        {
+            if (!StoreMediaKeys.Contains(item.Key))
+                return item;
+
+            var normalizedValue = NormalizeStoreMediaValue(item.Value);
+            return item with { Value = normalizedValue };
+        }).ToList();
+
+        return new BulkUpdateGroupDto { Items = normalized };
+    }
+
+    private static string NormalizeStoreMediaValue(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return string.Empty;
+
+        var trimmed = value.Trim();
+
+        if (Uri.TryCreate(trimmed, UriKind.Absolute, out var absolute))
+        {
+            var path = absolute.AbsolutePath;
+            if (path.StartsWith("/uploads/", StringComparison.OrdinalIgnoreCase))
+                return path.TrimStart('/');
+            return path.StartsWith("/") ? $"uploads{path}" : $"uploads/{path}";
+        }
+
+        if (trimmed.StartsWith("/uploads/", StringComparison.OrdinalIgnoreCase))
+            return trimmed.TrimStart('/');
+
+        if (trimmed.StartsWith("uploads/", StringComparison.OrdinalIgnoreCase))
+            return trimmed;
+
+        if (trimmed.StartsWith("/"))
+        {
+            if (trimmed.StartsWith("/store-media/", StringComparison.OrdinalIgnoreCase)
+                || trimmed.StartsWith("/store-videos/", StringComparison.OrdinalIgnoreCase)
+                || trimmed.StartsWith("/store-logo/", StringComparison.OrdinalIgnoreCase))
+            {
+                return "uploads" + trimmed;
+            }
+
+            return trimmed.TrimStart('/');
+        }
+
+        if (trimmed.StartsWith("store-media/", StringComparison.OrdinalIgnoreCase)
+            || trimmed.StartsWith("store-videos/", StringComparison.OrdinalIgnoreCase)
+            || trimmed.StartsWith("store-logo/", StringComparison.OrdinalIgnoreCase))
+        {
+            return "uploads/" + trimmed;
+        }
+
+        return trimmed;
     }
 }
