@@ -7,7 +7,9 @@ using Core.Enum;
 using Core.Extensions;
 using Core.Interface.Repo;
 using Core.Interface.Service.Entity;
+using Core.Interface.Service.FileStorage;
 using Core.Interface.Service.Notification;
+using Microsoft.AspNetCore.Http;
 
 namespace Core.Service;
 
@@ -17,6 +19,8 @@ public class InventoryService : IInventoryService
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILookupResolver _lookupResolver;
     private readonly INotificationService _notificationService;
+    private readonly IFileStorage _fileStorage;
+    private readonly IMediaRepository _mediaRepository;
 
     // Bảng ánh xạ: Loại item nào được dùng lý do xuất nào
     // COOKING/SPOILED/EXPIRED → chỉ cho FOOD_INGREDIENT
@@ -37,12 +41,16 @@ public class InventoryService : IInventoryService
         IInventoryRepository repo,
         IUnitOfWork unitOfWork,
         ILookupResolver lookupResolver,
-        INotificationService notificationService)
+        INotificationService notificationService,
+        IFileStorage fileStorage,
+        IMediaRepository mediaRepository)
     {
         _repo = repo;
         _unitOfWork = unitOfWork;
         _lookupResolver = lookupResolver;
         _notificationService = notificationService;
+        _fileStorage = fileStorage;
+        _mediaRepository = mediaRepository;
     }
 
     // ──────────────────────────────────────────────────────────
@@ -60,7 +68,7 @@ public class InventoryService : IInventoryService
     // ──────────────────────────────────────────────────────────
 
     public async Task<InventoryTransactionDetailDto> CreateTransactionAsync(
-        CreateInventoryTransactionRequest request, long createdByUserId, CancellationToken ct = default)
+        CreateInventoryTransactionRequest request, long createdByUserId, List<IFormFile>? evidenceFiles = null, CancellationToken ct = default)
     {
         var draftStatusId = await InventoryTxStatusCode.DRAFT.ToInventoryTxStatusIdAsync(_lookupResolver, ct);
 
@@ -92,7 +100,52 @@ public class InventoryService : IInventoryService
 
         var transactionId = await _repo.CreateTransactionAsync(transaction, items, ct);
 
+        // ── Save evidence files (if any) ──
+        if (evidenceFiles is { Count: > 0 })
+        {
+            await SaveEvidenceFilesAsync(transactionId, transaction, evidenceFiles, ct);
+        }
+
         return await GetTransactionDetailAsync(transactionId, ct);
+    }
+
+    private async Task SaveEvidenceFilesAsync(
+        long transactionId,
+        InventoryTransaction transaction,
+        IReadOnlyList<IFormFile> files,
+        CancellationToken ct)
+    {
+        var imageTypeLvId = await _lookupResolver.GetIdAsync(
+            (ushort)Enum.LookupType.MediaType, nameof(MediaTypeCode.IMAGE), ct);
+
+        var uploadRequests = files.Select(f => new FileUploadRequest
+        {
+            Stream = f.OpenReadStream(),
+            FileName = f.FileName,
+            ContentType = f.ContentType
+        }).ToList();
+
+        var uploadResults = await _fileStorage.SaveManyAsync(
+            uploadRequests, "inventory-evidence", FileValidationOptions.ImageUpload, ct);
+
+        foreach (var uploaded in uploadResults)
+        {
+            var asset = await _mediaRepository.AddMediaAsync(new MediaAsset
+            {
+                Url = uploaded.RelativePath,
+                MimeType = files.First(f => f.FileName == uploaded.OriginalFileName).ContentType,
+                MediaTypeLvId = imageTypeLvId,
+                CreatedAt = DateTime.UtcNow
+            }, ct);
+
+            transaction.InventoryTransactionMedia.Add(new InventoryTransactionMedium
+            {
+                TransactionId = transactionId,
+                MediaId = asset.MediaId,
+            });
+        }
+
+        await _repo.UpdateTransactionAsync(transaction, ct);
     }
 
     // ──────────────────────────────────────────────────────────

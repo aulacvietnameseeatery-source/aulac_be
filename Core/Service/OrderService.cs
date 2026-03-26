@@ -276,10 +276,11 @@ public class OrderService : IOrderService
 			}, cancellationToken);
 		}
 
+        var updatedOrderItem = await _orderRepository.GetOrderItemAsync(orderItemId, cancellationToken);
         await _realtime.OrderItemUpdatedAsync(new OrderItemRealtimeDTO
         {
             OrderItemId = orderItemId,
-            OrderId = 0,
+            OrderId = updatedOrderItem?.OrderId ?? 0,
             Status = newStatusLvId.ToString(),
             UpdatedAt = DateTime.UtcNow
         });
