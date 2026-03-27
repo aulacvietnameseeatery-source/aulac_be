@@ -431,17 +431,18 @@ namespace Api.Controllers
         /// <returns>Success response with order creation confirmation</returns>
         /// <response code="200">Order created successfully by staff</response>
         [HttpPost("staff")]
+        [HasPermission(Permissions.CreateOrder)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
         public async Task<IActionResult> CreateStaffOrder(
 			CreateOrderRequest request,
 			CancellationToken ct)
-		{
-			var staffId = long.Parse(User.FindFirstValue("user_id")!);
+        {
+            var staffId = long.Parse(User.FindFirstValue("user_id")!);
 
-			var result = await _orderService.CreateOrderAsync(
-				staffId,
-				request,
-				ct);
+            var result = await _orderService.CreateOrderAsync(
+            staffId,
+            request,
+            ct);
 
             return Ok(new ApiResponse<object>
             {
@@ -462,8 +463,8 @@ namespace Api.Controllers
         /// <response code="200">Order retrieved successfully</response>
         /// <response code="404">Order not found</response>
         [HttpGet("{id:long}")]
-        //[HasPermission(Permissions.ViewOrder)]
-        [ProducesResponseType(typeof(ApiResponse<OrderHistoryDTO>), StatusCodes.Status200OK)]
+        [HasPermission(Permissions.ViewOrder)]
+        [ProducesResponseType(typeof(ApiResponse<OrderDetailDTO>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetOrderById(
             long id,
@@ -493,6 +494,7 @@ namespace Api.Controllers
         /// <returns>Success response</returns>
         /// <response code="200">Items added successfully</response>
         [HttpPost("staff/{id:long}/items")]
+        [HasPermission(Permissions.EditOrder)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
         public async Task<IActionResult> AddStaffOrderItems(
 			long id,
@@ -510,10 +512,18 @@ namespace Api.Controllers
             });
         }
 
+        /// <summary>
+        /// Gets the most recent orders for the current user, limited by the specified count.
+        /// Requires authentication and appropriate permissions.
+        /// </summary>
+        /// <param name="limit">Maximum number of recent orders to return (default: 20)</param>
+        /// <param name="ct">Cancellation token</param>
+        /// <returns>List of recent orders for the user</returns>
         [HttpGet("recent")]
+        [HasPermission(Permissions.ViewOrder)]
         public async Task<IActionResult> GetRecentOrders(
-			[FromQuery] int limit = 20,
-			CancellationToken ct = default)
+        [FromQuery] int limit = 20,
+        CancellationToken ct = default)
         {
             var userId = long.Parse(User.FindFirst("user_id")!.Value);
 
