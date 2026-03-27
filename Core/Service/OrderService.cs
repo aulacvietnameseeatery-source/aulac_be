@@ -277,13 +277,6 @@ public class OrderService : IOrderService
 		}
 
         var updatedOrderItem = await _orderRepository.GetOrderItemAsync(orderItemId, cancellationToken);
-        await _realtime.OrderItemUpdatedAsync(new OrderItemRealtimeDTO
-        {
-            OrderItemId = orderItemId,
-            OrderId = updatedOrderItem?.OrderId ?? 0,
-            Status = newStatusLvId.ToString(),
-            UpdatedAt = DateTime.UtcNow
-        });
 
         await _shiftLiveRealtimePublisher.PublishBoardChangedAsync(new ShiftLiveRealtimeEventDto
         {
