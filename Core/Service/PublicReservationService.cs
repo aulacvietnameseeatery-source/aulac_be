@@ -34,6 +34,8 @@ public class PublicReservationService : IPublicReservationService
     private const string SettingReservationDuration = "reservation.default_duration_minutes";
     private const string SettingImmediateWindow = "reservation.immediate_window_minutes";
     private const string TemplateCodeReservationConfirmation = "RESERVATION_CONFIRM";
+    private const string TemplateCodeReservationConfirmationAdmin = "RESERVATION_CONFIRM_ADMIN";
+    private const string AdminNotificationEmail = "quantmhe186941@fpt.edu.vn";
 
     public PublicReservationService(
         ITableRepository tableRepository,
@@ -240,6 +242,7 @@ public class PublicReservationService : IPublicReservationService
             if (!string.IsNullOrWhiteSpace(created.Email))
             {
                 await SendReservationConfirmationEmailAsync(created, tableCodes);
+                await SendReservationConfirmationEmailToAdminAsync(created, tableCodes);
             }
             var zones = candidates
                 .Select(x => x.Zone)
@@ -396,6 +399,41 @@ public class PublicReservationService : IPublicReservationService
 
             var queuedEmail = new QueuedEmail(
                 To: reservation.Email!,
+                Subject: template.Subject,
+                HtmlBody: body,
+                CorrelationId: $"Res-{reservation.ReservationId}"
+            );
+
+            await _emailQueue.EnqueueAsync(queuedEmail);
+            _logger.LogInformation("Enqueued confirmation email for reservation {ReservationId} to {Email}", reservation.ReservationId, reservation.Email);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error enqueuing confirmation email for reservation {ReservationId}", reservation.ReservationId);
+        }
+    }
+
+    private async Task SendReservationConfirmationEmailToAdminAsync(Reservation reservation, string tableCodes)
+    {
+        try
+        {
+            var template = await _emailTemplateService.GetByCodeAsync(TemplateCodeReservationConfirmationAdmin);
+            if (template == null)
+            {
+                _logger.LogWarning("Email template {TemplateCode} not found. Skipping email.", TemplateCodeReservationConfirmationAdmin);
+                return;
+            }
+
+            var body = template.BodyHtml
+                .Replace("{{CustomerName}}", reservation.CustomerName)
+                .Replace("{{ReservedTime}}", reservation.ReservedTime.ToString("dd/MM/yyyy HH:mm"))
+                .Replace("{{PartySize}}", reservation.PartySize.ToString())
+                .Replace("{{TableCode}}", tableCodes)
+                .Replace("{{TableCodes}}", tableCodes)
+                .Replace("{{ReservationId}}", reservation.ReservationId.ToString());
+
+            var queuedEmail = new QueuedEmail(
+                To: AdminNotificationEmail!,
                 Subject: template.Subject,
                 HtmlBody: body,
                 CorrelationId: $"Res-{reservation.ReservationId}"
