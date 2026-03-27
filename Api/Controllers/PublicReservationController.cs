@@ -88,35 +88,6 @@ public class PublicReservationController : ControllerBase
         });
     }
 
-    /// <summary>
-    /// Gets available tables for reservation.
-    /// </summary>
-    /// <param name="reservedTime">Optional filter by reservation time</param>
-    /// <param name="partySize">Optional filter by minimum capacity</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>List of available tables</returns>
-    /// <response code="200">Returns list of available tables</response>
-    [HttpGet("availability")]
-    [ProducesResponseType(typeof(ApiResponse<List<TableAvailabilityDto>>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetAvailability(
-        [FromQuery] DateTime? reservedTime,
-        [FromQuery] int? partySize,
-        [FromQuery] string? zone,
-        CancellationToken cancellationToken = default)
-    {
-        var tables = await _reservationService.GetAvailableTablesAsync(
-            reservedTime, partySize, zone, cancellationToken);
-
-        return Ok(new ApiResponse<List<TableAvailabilityDto>>
-        {
-            Success = true,
-            Code = 200,
-            UserMessage = $"Found {tables.Count} tables.",
-            SystemMessage = "Availability check successful",
-            Data = tables,
-            ServerTime = DateTimeOffset.UtcNow
-        });
-    }
 
     /// <summary>
     /// Submits a final reservation.
