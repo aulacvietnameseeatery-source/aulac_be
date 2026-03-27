@@ -60,6 +60,7 @@ namespace Core.Data
 
         //Order
         public const string ViewOrder = "ORDER:READ";
+        public const string CreateOrder = "ORDER:CREATE";
         public const string EditOrder = "ORDER:EDIT";
         public const string UpdateOrderItemStatus = "ORDER:UPDATE_ITEM_STATUS";
         public const string ProcessPayment = "ORDER:PROCESS_PAYMENT";
@@ -108,5 +109,7 @@ namespace Core.Data
         public const string StockCheck = "INVENTORY:STOCK_CHECK";
         public const string ViewInventoryReport = "INVENTORY:REPORT_READ";
 
+        //Payment
+        public const string ViewPayment = "PAYMENT:READ";
     }
 }

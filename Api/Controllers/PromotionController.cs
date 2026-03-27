@@ -23,11 +23,17 @@ namespace Api.Controllers
             _logger = logger;
         }
 
+        /// <summary>
+        /// Get list of promotions with filter and paging
+        /// </summary>
+        /// <remarks>
+        /// Requires permission: ViewPromotion
+        /// </remarks>
         [HttpGet]
-        //[HasPermission(Permissions.ViewPromotion)]
+        [HasPermission(Permissions.ViewPromotion)]
         public async Task<IActionResult> GetPromotions(
-        [FromQuery] PromotionListQueryDTO query,
-        CancellationToken ct)
+            [FromQuery] PromotionListQueryDTO query,
+            CancellationToken ct)
         {
             var result = await _promotionService.GetPromotionsAsync(query, ct);
 
@@ -42,27 +48,14 @@ namespace Api.Controllers
             });
         }
 
-        // _OLD: coupon endpoint moved to CouponController using ICouponService and CouponDTO.
-        // [HttpGet("~/api/coupons")]
-        // public async Task<IActionResult> GetCoupons(CancellationToken ct)
-        // {
-        //     var result = await _promotionService.GetCouponListAsync(ct);
-        //
-        //     return Ok(new ApiResponse<List<PromotionListDTO>>
-        //     {
-        //         Success = true,
-        //         Code = 200,
-        //         SubCode = 0,
-        //         UserMessage = "Get coupons successfully",
-        //         Data = result,
-        //         ServerTime = DateTimeOffset.Now
-        //     });
-        // }
-
         /// <summary>
-        /// Create promotion
+        /// Create a new promotion
         /// </summary>
+        /// <remarks>
+        /// Requires permission: CreatePromotion
+        /// </remarks>
         [HttpPost]
+        [HasPermission(Permissions.CreatePromotion)]
         public async Task<IActionResult> CreatePromotion(
             [FromBody] PromotionDto request,
             CancellationToken ct)
@@ -80,9 +73,13 @@ namespace Api.Controllers
         }
 
         /// <summary>
-        /// Update promotion
+        /// Update an existing promotion
         /// </summary>
+        /// <remarks>
+        /// Requires permission: UpdatePromotion
+        /// </remarks>
         [HttpPut("{promotionId}")]
+        [HasPermission(Permissions.UpdatePromotion)]
         public async Task<IActionResult> UpdatePromotion(
             long promotionId,
             [FromBody] PromotionDto request,
@@ -101,11 +98,18 @@ namespace Api.Controllers
             });
         }
 
+        /// <summary>
+        /// Get promotion by id
+        /// </summary>
+        /// <remarks>
+        /// Requires permission: ViewPromotion
+        /// </remarks>
         [HttpGet("{promotionId}")]
+        [HasPermission(Permissions.ViewPromotion)]
         [ProducesResponseType(typeof(ApiResponse<PromotionDto>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetPromotionById(
-    long promotionId,
-    CancellationToken ct)
+            long promotionId,
+            CancellationToken ct)
         {
             var result = await _promotionService
                 .GetPromotionByIdAsync(promotionId, ct);
@@ -120,10 +124,17 @@ namespace Api.Controllers
             });
         }
 
+        /// <summary>
+        /// Get promotion detail by id
+        /// </summary>
+        /// <remarks>
+        /// Requires permission: ViewPromotion
+        /// </remarks>
         [HttpGet("detail/{promotionId}")]
+        [HasPermission(Permissions.ViewPromotion)]
         public async Task<IActionResult> GetPromotionDetail(
-        long promotionId,
-        CancellationToken ct)
+            long promotionId,
+            CancellationToken ct)
         {
             var result = await _promotionService
                 .GetPromotionDetailAsync(promotionId, ct);
@@ -137,7 +148,14 @@ namespace Api.Controllers
             });
         }
 
+        /// <summary>
+        /// Disable a promotion
+        /// </summary>
+        /// <remarks>
+        /// Requires permission: UpdatePromotion
+        /// </remarks>
         [HttpPut("{promotionId}/disable")]
+        [HasPermission(Permissions.UpdatePromotion)]
         public async Task<IActionResult> DisablePromotion(
             long promotionId,
             CancellationToken ct)
@@ -153,7 +171,14 @@ namespace Api.Controllers
             });
         }
 
+        /// <summary>
+        /// Activate a promotion
+        /// </summary>
+        /// <remarks>
+        /// Requires permission: UpdatePromotion
+        /// </remarks>
         [HttpPut("{promotionId}/activate")]
+        [HasPermission(Permissions.UpdatePromotion)]
         public async Task<IActionResult> ActivatePromotion(
             long promotionId,
             CancellationToken ct)
@@ -169,10 +194,17 @@ namespace Api.Controllers
             });
         }
 
+        /// <summary>
+        /// Get available promotions for an order
+        /// </summary>
+        /// <remarks>
+        /// Requires permission: ViewPromotion
+        /// </remarks>
         [HttpGet("available/{orderId}")]
+        [HasPermission(Permissions.ViewPromotion)]
         public async Task<IActionResult> GetAvailablePromotions(
-        long orderId,
-        CancellationToken ct)
+            long orderId,
+            CancellationToken ct)
         {
             var result = await _promotionService
                 .GetAvailablePromotionsAsync(orderId, ct);
