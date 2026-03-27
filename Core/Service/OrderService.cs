@@ -545,6 +545,8 @@ public class OrderService : IOrderService
                 }
             }
 
+            var newStatusCode = order.OrderStatusLv.ValueCode;
+
             if (request.Items.Any())
             {
                 // ===== Load dishes in 1 query =====
@@ -588,11 +590,11 @@ public class OrderService : IOrderService
                 await ApplyTaxToOrderAsync(order, ct);
 
                 // ===== Status transition logic =====
-
-
+  
                 if (order.OrderStatusLvId == completedStatusId)
                 {
                     order.OrderStatusLvId = inProgressStatusId;
+                    newStatusCode = OrderStatusCode.IN_PROGRESS.ToString();
                 }
             }
 
@@ -603,7 +605,7 @@ public class OrderService : IOrderService
             await _realtime.OrderUpdatedAsync(new OrderRealtimeDTO
             {
                 OrderId = orderId,
-                Status = "ITEMS_ADDED",
+                Status = newStatusCode,
                 TableId = order.TableId,
                 UpdatedAt = DateTime.UtcNow
             });

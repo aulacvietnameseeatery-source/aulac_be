@@ -1,6 +1,7 @@
 using Core.Data;
 using Core.DTO.Dish;
 using Core.DTO.Google;
+using Core.DTO.LookUpValue;
 using Core.Interface.Service.Others;
 using Microsoft.Extensions.Options;
 using System;
@@ -97,6 +98,46 @@ namespace Infa.Service
                 }
 
                 response[targetLangs[i]] = langResponse;
+            }
+
+            return response;
+        }
+
+        public async Task<Dictionary<string, LookupDto>> TranslateLookupAsync(
+    string sourceLang,
+    LookupDto sourceData)
+        {
+            var targetLangs = GetTargetLanguages(sourceLang);
+
+            // 1. Gom field
+            var fields = new List<string?>
+    {
+        sourceData.ValueName,
+        sourceData.Description
+    };
+
+            // giữ index
+            var normalized = fields.Select(x => x ?? string.Empty).ToList();
+
+            // 2. Translate parallel
+            var tasks = targetLangs
+                .Select(lang => TranslateBatch(normalized, sourceLang, lang))
+                .ToList();
+
+            var results = await Task.WhenAll(tasks);
+
+            // 3. Map lại
+            var response = new Dictionary<string, LookupDto>();
+
+            for (int i = 0; i < targetLangs.Count; i++)
+            {
+                var translatedList = results[i];
+
+                response[targetLangs[i]] = new LookupDto
+                {
+                    ValueName = translatedList.ElementAtOrDefault(0) ?? string.Empty,
+                    Description = translatedList.ElementAtOrDefault(1) ?? string.Empty
+                };
             }
 
             return response;

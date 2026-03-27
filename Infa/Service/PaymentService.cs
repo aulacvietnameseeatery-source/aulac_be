@@ -12,6 +12,9 @@ using Core.Interface.Service.Notification;
 using Core.Interface.Service.Shift;
 using Infa.Data;
 using Microsoft.EntityFrameworkCore;
+using Core.DTO.General;
+using Core.DTO.Payment;
+using Infa.Repo;
 
 namespace Infa.Service;
 
@@ -27,6 +30,7 @@ public class PaymentService : IPaymentService
     private readonly ISystemSettingService _systemSettingService;
     private readonly INotificationService _notificationService;
     private readonly IShiftLiveRealtimePublisher _shiftLiveRealtimePublisher;
+    private readonly IPaymentRepository _paymentRepository;
 
     public PaymentService(
         RestaurantMgmtContext context,
@@ -34,7 +38,8 @@ public class PaymentService : IPaymentService
         IUnitOfWork unitOfWork,
         ISystemSettingService systemSettingService,
         INotificationService notificationService,
-        IShiftLiveRealtimePublisher shiftLiveRealtimePublisher)
+        IShiftLiveRealtimePublisher shiftLiveRealtimePublisher,
+        IPaymentRepository paymentRepository)
     {
         _context = context;
         _lookupResolver = lookupResolver;
@@ -42,6 +47,7 @@ public class PaymentService : IPaymentService
         _systemSettingService = systemSettingService;
         _notificationService = notificationService;
         _shiftLiveRealtimePublisher = shiftLiveRealtimePublisher;
+        _paymentRepository = paymentRepository;
     }
 
     public async Task ProcessPaymentAsync(CreatePaymentDTO dto, CancellationToken cancellationToken = default)
@@ -256,6 +262,13 @@ public class PaymentService : IPaymentService
             await _unitOfWork.RollbackAsync(cancellationToken);
             throw;
         }
+    }
+
+    public Task<PagedResultDTO<PaymentListDTO>> GetPaymentsAsync(
+        PaymentListQueryDTO query,
+        CancellationToken ct)
+    {
+        return _paymentRepository.GetPaymentsAsync(query, ct);
     }
 
     private static decimal CalculateDiscountAmount(string discountType, decimal discountValue, decimal baseAmount)

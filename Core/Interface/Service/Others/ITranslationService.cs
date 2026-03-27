@@ -1,4 +1,5 @@
 using Core.DTO.Dish;
+using Core.DTO.LookUpValue;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -16,5 +17,9 @@ namespace Core.Interface.Service.Others
         Task<Dictionary<string, Dictionary<string, string>>> TranslateSystemSettingsAsync(
             string sourceLang,
             Dictionary<string, string> sourceData);
+
+        Task<Dictionary<string, LookupDto>> TranslateLookupAsync(
+            string sourceLang,
+            LookupDto sourceData);
     }
 }

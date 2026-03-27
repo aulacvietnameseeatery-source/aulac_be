@@ -543,6 +543,20 @@ public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, Can
             query = query.Where(o => o.StaffId == null || o.StaffId == userId);
         }
 
+        query = query.Where(o =>
+			// PENDING
+			o.OrderStatusLv.ValueCode == OrderStatusCode.PENDING.ToString()
+
+			// IN_PROGRESS
+			|| o.OrderStatusLv.ValueCode == OrderStatusCode.IN_PROGRESS.ToString()
+
+            // COMPLETED but NOT PAID
+            || (
+				o.OrderStatusLv.ValueCode == OrderStatusCode.COMPLETED.ToString()
+				&& !o.Payments.Any()
+			)
+		);
+
         return await query
             .OrderByDescending(o => o.CreatedAt)
             .Take(limit)

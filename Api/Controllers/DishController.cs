@@ -232,6 +232,7 @@ public class DishController : ControllerBase
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Returns the ID of the created dish.</returns>
     [HttpPost]
+    [HasPermission(Permissions.CreateDish)]
     [Consumes("multipart/form-data")]
     public async Task<IActionResult> CreateDish(
         [FromForm] CreateDishFormRequest dto,
@@ -264,6 +265,7 @@ public class DishController : ControllerBase
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Returns the dish details.</returns>
     [HttpGet("detail/{id}")]
+    [HasPermission(Permissions.ViewDish)]
     public async Task<ActionResult<DishDetailForActionsDto>> GetById(long id, CancellationToken ct)
     {
         var result = await _dishService.GetDishByIdAsync(id, ct);
@@ -285,6 +287,7 @@ public class DishController : ControllerBase
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Returns success message.</returns>
     [HttpPut("{id:long}/edit")]
+    [HasPermission(Permissions.EditDish)]
     [Consumes("multipart/form-data")]
     public async Task<IActionResult> UpdateDishMedia(
         long id,
@@ -325,6 +328,7 @@ public class DishController : ControllerBase
     /// </summary>
     /// <returns>Returns a list of active dish statuses.</returns>
     [HttpGet("status/active")]
+    [HasPermission(Permissions.ViewDish)]
     public async Task<IActionResult> GetActiveDishStatuses()
     {
         var result = await _lookupService.GetAllActiveByTypeAsync(
@@ -346,6 +350,7 @@ public class DishController : ControllerBase
     /// </summary>
     /// <returns>Returns a list of dish categories.</returns>
     [HttpGet("all-categories")]
+    [HasPermission(Permissions.ViewDish)]
     public async Task<IActionResult> GetDishCategories()
     {
         var result = await _dishService.GetAllDishCategoriesAsync();
@@ -364,6 +369,7 @@ public class DishController : ControllerBase
     /// </summary>
     /// <returns>Returns a list of active dish tags.</returns>
     [HttpGet("tags")]
+    [HasPermission(Permissions.ViewDish)]
     public async Task<IActionResult> GetAllTags()
     {
         var result = await _lookupService.GetAllActiveByTypeAsync(
@@ -385,6 +391,7 @@ public class DishController : ControllerBase
     /// </summary>
     /// <returns>Returns a list of active dish tags.</returns>
     [HttpGet("diets")]
+    [HasPermission(Permissions.ViewDish)]
     public async Task<IActionResult> GetAllDishDiet()
     {
         var result = await _lookupService.GetAllActiveByTypeAsync(
@@ -401,7 +408,13 @@ public class DishController : ControllerBase
         });
     }
 
+    /// <summary>
+    /// Gets the list of dishes for POS (Point of Sale) system.
+    /// </summary>
+    /// <param name="active">If true, only active dishes are returned. Default is true.</param>
+    /// <returns>Returns a list of dishes for POS.</returns>
     [HttpGet]
+    [HasPermission(Permissions.ViewDish)]
     public async Task<IActionResult> GetDishes([FromQuery] bool active = true)
     {
         var result = await _dishService.GetPosDishesAsync(active);
