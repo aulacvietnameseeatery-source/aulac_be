@@ -277,13 +277,6 @@ public class OrderService : IOrderService
 		}
 
         var updatedOrderItem = await _orderRepository.GetOrderItemAsync(orderItemId, cancellationToken);
-        await _realtime.OrderItemUpdatedAsync(new OrderItemRealtimeDTO
-        {
-            OrderItemId = orderItemId,
-            OrderId = updatedOrderItem?.OrderId ?? 0,
-            Status = newStatusLvId.ToString(),
-            UpdatedAt = DateTime.UtcNow
-        });
 
         await _shiftLiveRealtimePublisher.PublishBoardChangedAsync(new ShiftLiveRealtimeEventDto
         {
@@ -545,6 +538,8 @@ public class OrderService : IOrderService
                 }
             }
 
+            var newStatusCode = order.OrderStatusLv.ValueCode;
+
             if (request.Items.Any())
             {
                 // ===== Load dishes in 1 query =====
@@ -588,11 +583,11 @@ public class OrderService : IOrderService
                 await ApplyTaxToOrderAsync(order, ct);
 
                 // ===== Status transition logic =====
-
-
+  
                 if (order.OrderStatusLvId == completedStatusId)
                 {
                     order.OrderStatusLvId = inProgressStatusId;
+                    newStatusCode = OrderStatusCode.IN_PROGRESS.ToString();
                 }
             }
 
@@ -603,7 +598,7 @@ public class OrderService : IOrderService
             await _realtime.OrderUpdatedAsync(new OrderRealtimeDTO
             {
                 OrderId = orderId,
-                Status = "ITEMS_ADDED",
+                Status = newStatusCode,
                 TableId = order.TableId,
                 UpdatedAt = DateTime.UtcNow
             });

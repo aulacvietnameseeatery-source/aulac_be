@@ -17,8 +17,6 @@ public interface IPublicReservationService
     /// <returns>List of available tables</returns>
     Task<List<TableAvailabilityDto>> GetAvailableTablesAsync(
         DateTime? reservedTime,
-        int? partySize,
-        string? zone,
         CancellationToken ct = default);
 
     Task<ReservationFitCheckResponse> CheckReservationFitAsync(

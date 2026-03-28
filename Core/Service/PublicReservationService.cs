@@ -18,7 +18,6 @@ namespace Core.Service;
 
 /// <summary>
 /// Service implementation for public reservation operations.
-/// Uses Redis cache for soft-lock mechanism.
 /// </summary>
 public class PublicReservationService : IPublicReservationService
 {
@@ -35,6 +34,8 @@ public class PublicReservationService : IPublicReservationService
     private const string SettingReservationDuration = "reservation.default_duration_minutes";
     private const string SettingImmediateWindow = "reservation.immediate_window_minutes";
     private const string TemplateCodeReservationConfirmation = "RESERVATION_CONFIRM";
+    private const string TemplateCodeReservationConfirmationAdmin = "RESERVATION_CONFIRM_ADMIN";
+    private const string SettingStoreEmail = "store.email";
 
     public PublicReservationService(
         ITableRepository tableRepository,
@@ -84,18 +85,18 @@ public class PublicReservationService : IPublicReservationService
 
     public async Task<List<TableAvailabilityDto>> GetAvailableTablesAsync(
         DateTime? reservedTime,
-        int? partySize,
-        string? zone,
         CancellationToken ct = default)
     {
         // Get configurations
         var duration = (int)await _systemSettingService.GetIntAsync(SettingReservationDuration, 120, ct);
         var immediateWindow = (int)await _systemSettingService.GetIntAsync(SettingImmediateWindow, 120, ct);
 
-        // Use the same table pool as admin manual flow to avoid channel mismatch.
-        var tables = await _tableRepository.GetManualAvailableTablesAsync(ct);
+        _logger.LogInformation("[STEP 1] Fetching tables from Repo (isOnline=true)...");
+        // Fetch online tables
+        var tables = await _tableRepository.GetManualAvailableTablesAsync(isOnline: true, ct);
+        _logger.LogInformation("[STEP 1] Found {Count} raw tables: {Codes}", tables.Count, string.Join(", ", tables.Select(t => t.TableCode)));
 
-        // Fetch all required status IDs via _lookupResolver extension methods
+        // Fetch required status IDs
         var cancelledStatusId = await ReservationStatusCode.CANCELLED.ToReservationStatusIdAsync(_lookupResolver, ct);
         var noShowStatusId = await ReservationStatusCode.NO_SHOW.ToReservationStatusIdAsync(_lookupResolver, ct);
         var completedStatusId = await ReservationStatusCode.COMPLETED.ToReservationStatusIdAsync(_lookupResolver, ct);
@@ -103,20 +104,10 @@ public class PublicReservationService : IPublicReservationService
         var occupiedTableStatusId = await TableStatusCode.OCCUPIED.ToTableStatusIdAsync(_lookupResolver, ct);
         var reservedTableStatusId = await TableStatusCode.RESERVED.ToTableStatusIdAsync(_lookupResolver, ct);
 
-        // Filter by party size if specified
-        if (partySize.HasValue)
-        {
-            tables = tables.Where(t => t.Capacity >= partySize.Value).ToList();
-        }
-
-        // Filter by zone if specified and not "All"
-        if (!string.IsNullOrEmpty(zone) && !zone.Equals("All", StringComparison.OrdinalIgnoreCase))
-        {
-            tables = tables.Where(t => t.ZoneLv?.ValueName?.Equals(zone, StringComparison.OrdinalIgnoreCase) == true).ToList();
-        }
-
         var result = new List<TableAvailabilityDto>();
         var now = DateTime.UtcNow;
+
+        _logger.LogInformation("[STEP 4] Starting availability checks for {Count} tables at {Time}...", tables.Count, reservedTime);
 
         foreach (var table in tables)
         {
@@ -129,9 +120,9 @@ public class PublicReservationService : IPublicReservationService
 
                 if (timeDiff >= 0 && timeDiff <= immediateWindow)
                 {
-                    // If searching for "now", don't allow tables that are physically occupied or reserved manually
                     if (table.TableStatusLvId == occupiedTableStatusId || table.TableStatusLvId == reservedTableStatusId)
                     {
+                        _logger.LogInformation("[STEP 4] Table {TableCode} marked as NOT available due to real-time status (Occupied/Reserved)", table.TableCode);
                         isAvailable = false;
                     }
                 }
@@ -246,14 +237,13 @@ public class PublicReservationService : IPublicReservationService
             var created = await _reservationRepository.CreateAsync(reservation, ct);
             var tableCodes = string.Join(", ", candidates.Select(x => x.TableCode));
 
-            // Send confirmation email (inside transaction to ensure connection lives)
+            await _uow.CommitAsync(ct);
+            // Send confirmation email  
             if (!string.IsNullOrWhiteSpace(created.Email))
             {
                 await SendReservationConfirmationEmailAsync(created, tableCodes);
+                await SendReservationConfirmationEmailToAdminAsync(created, tableCodes);
             }
-
-            await _uow.CommitAsync(ct);
-
             var zones = candidates
                 .Select(x => x.Zone)
                 .Where(x => !string.IsNullOrWhiteSpace(x))
@@ -290,91 +280,46 @@ public class PublicReservationService : IPublicReservationService
         int partySize,
         CancellationToken ct)
     {
-        var available = await GetAvailableTablesAsync(reservedTime, null, null, ct);
-        var candidates = available.Where(x => x.IsAvailable).ToList();
+        _logger.LogInformation("Starting table search for Public Reservation: PartySize={PartySize}, ReservedTime={ReservedTime}", partySize, reservedTime);
 
-        return SelectCandidateTablesFromAvailablePool(candidates, partySize);
-    }
+        var available = await GetAvailableTablesAsync(reservedTime, ct);
+        var pool = available
+            .Where(x => x.IsAvailable)
+            .ToList();
+        
+        _logger.LogInformation("[STEP 5] Finalizing candidates. Total available in pool: {Count}, Capacity: {Cap}", 
+            pool.Count, pool.Sum(x => x.Capacity));
 
-    private static List<TableAvailabilityDto> SelectCandidateTablesFromAvailablePool(
-        List<TableAvailabilityDto> candidates,
-        int partySize)
-    {
-        if (partySize <= 0 || candidates.Count == 0)
+        var options = ReservationTableSelectionUtil.FindAllTableOptions(pool, partySize);
+        if (options.Count == 0)
         {
+            _logger.LogWarning("[STEP 6] No valid table combinations found for PartySize={PartySize}", partySize);
             return new List<TableAvailabilityDto>();
         }
 
-        var single = candidates
-            .Where(x => x.Capacity >= partySize)
-            .OrderBy(x => x.Capacity)
-            .ThenBy(x => x.TableCode)
-            .FirstOrDefault();
+        _logger.LogInformation("[STEP 6] Generated {Count} options. Picking Best Fit...", options.Count);
 
-        if (single != null)
+        var bestOption = options
+            .OrderBy(x => x.ExcessCapacity)
+            .ThenBy(x => x.TableCount)
+            .ThenBy(x => x.TableCodes, StringComparer.OrdinalIgnoreCase)
+            .First();
+
+        _logger.LogInformation("[STEP 6] SUCCESS: Selected Tables={TableCodes}, Exc={Exc}", 
+            bestOption.TableCodes, bestOption.ExcessCapacity);
+
+        var selectedTableIds = new HashSet<long>(bestOption.TableIds);
+        var result = pool.Where(t => selectedTableIds.Contains(t.TableId)).ToList();
+        
+        foreach (var table in result)
         {
-            return new List<TableAvailabilityDto> { single };
+            _logger.LogInformation("Selected Table: ID={Id}, Code={Code}, Capacity={Capacity}, Zone={Zone}", 
+                table.TableId, table.TableCode, table.Capacity, table.Zone);
         }
 
-        foreach (var zoneGroup in candidates.GroupBy(x => x.Zone))
-        {
-            var sorted = zoneGroup
-                .OrderBy(x => ParseTableOrder(x.TableCode))
-                .ThenBy(x => x.TableCode)
-                .ToList();
-
-            var contiguous = TryFindContiguousCombination(sorted, partySize);
-            if (contiguous.Count > 0)
-            {
-                return contiguous;
-            }
-
-            var sameZone = ReservationTableSelectionUtil.SelectBestFitTablesWithinZone(sorted, partySize);
-            if (sameZone.Count > 0)
-            {
-                return sameZone;
-            }
-        }
-
-        return new List<TableAvailabilityDto>();
+        return result;
     }
 
-    private static List<TableAvailabilityDto> TryFindContiguousCombination(
-        List<TableAvailabilityDto> sorted,
-        int partySize)
-    {
-        for (var i = 0; i < sorted.Count; i++)
-        {
-            var sum = sorted[i].Capacity;
-            var pick = new List<TableAvailabilityDto> { sorted[i] };
-            var prevOrder = ParseTableOrder(sorted[i].TableCode);
-
-            if (sum >= partySize)
-            {
-                return pick;
-            }
-
-            for (var j = i + 1; j < sorted.Count; j++)
-            {
-                var currentOrder = ParseTableOrder(sorted[j].TableCode);
-                if (currentOrder - prevOrder > 1)
-                {
-                    break;
-                }
-
-                pick.Add(sorted[j]);
-                sum += sorted[j].Capacity;
-                prevOrder = currentOrder;
-
-                if (sum >= partySize)
-                {
-                    return pick;
-                }
-            }
-        }
-
-        return new List<TableAvailabilityDto>();
-    }
 
     private async Task<bool> ValidateCandidateTablesAsync(
         List<TableAvailabilityDto> candidates,
@@ -432,16 +377,6 @@ public class PublicReservationService : IPublicReservationService
         return true;
     }
 
-    private static int ParseTableOrder(string tableCode)
-    {
-        var match = Regex.Match(tableCode, "(\\d+)(?!.*\\d)");
-        if (!match.Success)
-        {
-            return int.MaxValue;
-        }
-
-        return int.TryParse(match.Value, out var value) ? value : int.MaxValue;
-    }
 
     private async Task SendReservationConfirmationEmailAsync(Reservation reservation, string tableCodes)
     {
@@ -464,6 +399,43 @@ public class PublicReservationService : IPublicReservationService
 
             var queuedEmail = new QueuedEmail(
                 To: reservation.Email!,
+                Subject: template.Subject,
+                HtmlBody: body,
+                CorrelationId: $"Res-{reservation.ReservationId}"
+            );
+
+            await _emailQueue.EnqueueAsync(queuedEmail);
+            _logger.LogInformation("Enqueued confirmation email for reservation {ReservationId} to {Email}", reservation.ReservationId, reservation.Email);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error enqueuing confirmation email for reservation {ReservationId}", reservation.ReservationId);
+        }
+    }
+
+    private async Task SendReservationConfirmationEmailToAdminAsync(Reservation reservation, string tableCodes)
+    {
+        try
+        {
+            var template = await _emailTemplateService.GetByCodeAsync(TemplateCodeReservationConfirmationAdmin);
+            if (template == null)
+            {
+                _logger.LogWarning("Email template {TemplateCode} not found. Skipping email.", TemplateCodeReservationConfirmationAdmin);
+                return;
+            }
+
+            var body = template.BodyHtml
+                .Replace("{{CustomerName}}", reservation.CustomerName)
+                .Replace("{{ReservedTime}}", reservation.ReservedTime.ToString("dd/MM/yyyy HH:mm"))
+                .Replace("{{PartySize}}", reservation.PartySize.ToString())
+                .Replace("{{TableCode}}", tableCodes)
+                .Replace("{{TableCodes}}", tableCodes)
+                .Replace("{{ReservationId}}", reservation.ReservationId.ToString());
+
+            var adminEmail = await _systemSettingService.GetStringAsync(SettingStoreEmail);
+
+            var queuedEmail = new QueuedEmail(
+                To: adminEmail!,
                 Subject: template.Subject,
                 HtmlBody: body,
                 CorrelationId: $"Res-{reservation.ReservationId}"

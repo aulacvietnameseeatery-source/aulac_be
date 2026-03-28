@@ -144,14 +144,21 @@ public class TableRepository : ITableRepository
             .CountAsync(ct);
     }
 
-    public async Task<List<RestaurantTable>> GetManualAvailableTablesAsync(CancellationToken ct = default)
+    public async Task<List<RestaurantTable>> GetManualAvailableTablesAsync(bool? isOnline = null, CancellationToken ct = default)
     {
-        return await _context.RestaurantTables
+        var query = _context.RestaurantTables
             .AsNoTracking()
             .Include(t => t.TableTypeLv)
             .Include(t => t.ZoneLv)
             .Where(t => !t.IsDeleted)
-            .Where(t => t.TableStatusLvId != TableStatusLocked && t.TableStatusLvId != TableStatusOccupied)
+            .Where(t => t.TableStatusLvId != TableStatusLocked && t.TableStatusLvId != TableStatusOccupied);
+
+        if (isOnline.HasValue)
+        {
+            query = query.Where(t => t.IsOnline == isOnline.Value);
+        }
+
+        return await query
             .OrderBy(t => t.Capacity)
                 .ThenBy(t => t.TableCode)
             .ToListAsync(ct);

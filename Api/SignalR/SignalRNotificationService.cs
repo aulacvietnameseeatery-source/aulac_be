@@ -13,9 +13,9 @@ namespace Infa.Service
     public class SignalRNotificationService : IRealtimeNotificationService
     {
 
-        private readonly IHubContext<ReservationHub> _hubContext;
+        private readonly IHubContext<RestaurantHub> _hubContext;
 
-        public SignalRNotificationService(IHubContext<ReservationHub> hubContext)
+        public SignalRNotificationService(IHubContext<RestaurantHub> hubContext)
         {
             _hubContext = hubContext;
         }

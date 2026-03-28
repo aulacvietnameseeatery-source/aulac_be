@@ -1,7 +1,9 @@
 using API.Models;
 using Core.Attribute;
 using Core.Data;
+using Core.DTO.General;
 using Core.DTO.Order;
+using Core.DTO.Payment;
 using Core.Interface.Service.Entity;
 using Microsoft.AspNetCore.Mvc;
 
@@ -18,6 +20,23 @@ public class PaymentController : ControllerBase
     {
         _paymentService = paymentService;
         _logger = logger;
+    }
+
+    [HttpGet]
+    //[HasPermission(Permissions.ViewPayment)]
+    public async Task<IActionResult> GetPayments(
+    [FromQuery] PaymentListQueryDTO query,
+    CancellationToken ct)
+    {
+        var result = await _paymentService.GetPaymentsAsync(query, ct);
+
+        return Ok(new ApiResponse<PagedResultDTO<PaymentListDTO>>
+        {
+            Success = true,
+            Code = 200,
+            Data = result,
+            ServerTime = DateTimeOffset.UtcNow
+        });
     }
 
     [HttpPost]

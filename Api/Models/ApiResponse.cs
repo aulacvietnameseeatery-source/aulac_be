@@ -13,6 +13,6 @@
         public T Data { get; set; } = default!;
 
         public bool GetLastData { get; set; }
-        public DateTimeOffset ServerTime { get; set; }
+        public DateTimeOffset ServerTime { get; set; } = DateTimeOffset.UtcNow;
     }
 }

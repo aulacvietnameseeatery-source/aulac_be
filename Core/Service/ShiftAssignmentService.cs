@@ -292,21 +292,7 @@ public class ShiftAssignmentService : IShiftAssignmentService
         if (!template.IsActive)
             throw new ValidationException("Cannot assign to an inactive shift template");
 
-        var plannedStart = request.PlannedStartAt
-            ?? request.WorkDate.ToDateTime(template.DefaultStartTime);
-        var plannedEnd = request.PlannedEndAt
-            ?? request.WorkDate.ToDateTime(template.DefaultEndTime);
-
-        if (plannedStart >= plannedEnd)
-            throw new ValidationException("Planned start must be earlier than planned end");
-
-        // Filter out already-assigned staff
-        var alreadyAssigned = await _assignmentRepo.GetAlreadyAssignedStaffIdsAsync(
-            request.ShiftTemplateId, request.WorkDate, request.StaffIds, ct);
-        var validStaffIds = request.StaffIds.Except(alreadyAssigned).Distinct().ToList();
-
-        if (validStaffIds.Count == 0)
-            throw new ConflictException("All selected staff are already assigned to this shift on the given date");
+        var effectiveDates = request.GetEffectiveDates();
 
         var statusCode = request.IsDraft
             ? ShiftAssignmentStatusCode.DRAFT
@@ -315,38 +301,58 @@ public class ShiftAssignmentService : IShiftAssignmentService
 
         var now = DateTime.UtcNow;
         var entities = new List<ShiftAssignment>();
+        var distinctStaffIds = request.StaffIds.Distinct().ToList();
 
-        foreach (var staffId in validStaffIds)
+        // Validate all staff exist upfront
+        foreach (var staffId in distinctStaffIds)
         {
-            // Validate staff exists
             _ = await _accountRepo.FindByIdWithRoleAsync(staffId, ct)
                 ?? throw new NotFoundException($"Staff account {staffId} not found");
+        }
 
-            // Skip if overlapping (soft skip — don't fail the whole batch)
-            if (await _assignmentRepo.HasOverlappingAssignmentAsync(
-                staffId, request.WorkDate, plannedStart, plannedEnd, ct: ct))
-                continue;
+        foreach (var workDate in effectiveDates)
+        {
+            var plannedStart = request.PlannedStartAt
+                ?? workDate.ToDateTime(template.DefaultStartTime);
+            var plannedEnd = request.PlannedEndAt
+                ?? workDate.ToDateTime(template.DefaultEndTime);
 
-            entities.Add(new ShiftAssignment
+            if (plannedStart >= plannedEnd)
+                throw new ValidationException("Planned start must be earlier than planned end");
+
+            // Filter out already-assigned staff for this date
+            var alreadyAssigned = await _assignmentRepo.GetAlreadyAssignedStaffIdsAsync(
+                request.ShiftTemplateId, workDate, distinctStaffIds, ct);
+            var validStaffIds = distinctStaffIds.Except(alreadyAssigned).ToList();
+
+            foreach (var staffId in validStaffIds)
             {
-                ShiftTemplateId = request.ShiftTemplateId,
-                StaffId = staffId,
-                WorkDate = request.WorkDate,
-                PlannedStartAt = plannedStart,
-                PlannedEndAt = plannedEnd,
-                AssignmentStatusLvId = statusLvId,
-                IsActive = true,
-                Notes = request.Notes?.Trim(),
-                Tags = request.Tags?.Trim(),
-                AssignedBy = assignedByStaffId,
-                AssignedAt = now,
-                CreatedAt = now,
-                UpdatedAt = now
-            });
+                // Skip if overlapping (soft skip — don't fail the whole batch)
+                if (await _assignmentRepo.HasOverlappingAssignmentAsync(
+                    staffId, workDate, plannedStart, plannedEnd, ct: ct))
+                    continue;
+
+                entities.Add(new ShiftAssignment
+                {
+                    ShiftTemplateId = request.ShiftTemplateId,
+                    StaffId = staffId,
+                    WorkDate = workDate,
+                    PlannedStartAt = plannedStart,
+                    PlannedEndAt = plannedEnd,
+                    AssignmentStatusLvId = statusLvId,
+                    IsActive = true,
+                    Notes = request.Notes?.Trim(),
+                    Tags = request.Tags?.Trim(),
+                    AssignedBy = assignedByStaffId,
+                    AssignedAt = now,
+                    CreatedAt = now,
+                    UpdatedAt = now
+                });
+            }
         }
 
         if (entities.Count == 0)
-            throw new ConflictException("No assignments could be created — all staff have overlapping shifts");
+            throw new ConflictException("No assignments could be created — all staff have overlapping shifts or are already assigned");
 
         _assignmentRepo.AddRange(entities);
         await _unitOfWork.SaveChangesAsync(ct);
@@ -361,7 +367,11 @@ public class ShiftAssignmentService : IShiftAssignmentService
         // Reload with full details
         var ids = entities.Select(e => e.ShiftAssignmentId).ToList();
         var saved = await _assignmentRepo.GetByIdsWithDetailsAsync(ids, ct);
-        await PublishShiftLiveUpdateAsync("assignments_bulk_created", request.WorkDate, null, null, ct);
+        // Publish live update for each affected date
+        foreach (var workDate in effectiveDates)
+        {
+            await PublishShiftLiveUpdateAsync("assignments_bulk_created", workDate, null, null, ct);
+        }
         return saved.Select(MapToDetailDto).ToList();
     }
 
