@@ -620,47 +620,58 @@ public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, Can
 			return new List<ShiftLiveOrderSnapshotDto>();
 		}
 
-		return await _context.Orders
-			.AsNoTracking()
-			.Where(o => o.StaffId.HasValue
-				&& idList.Contains(o.StaffId.Value)
-				&& (
-					(o.CreatedAt.HasValue && o.CreatedAt.Value >= fromUtc && o.CreatedAt.Value <= toUtc)
-					|| (o.UpdatedAt.HasValue && o.UpdatedAt.Value >= fromUtc && o.UpdatedAt.Value <= toUtc)
-					|| o.Payments.Any(p => p.PaidAt.HasValue && p.PaidAt.Value >= fromUtc && p.PaidAt.Value <= toUtc)
-				))
-			.Select(o => new ShiftLiveOrderSnapshotDto
-			{
-				OrderId = o.OrderId,
-				StaffId = o.StaffId ?? 0,
-				TableCode = o.Table != null ? o.Table.TableCode : null,
-				CreatedAt = o.CreatedAt,
-				UpdatedAt = o.UpdatedAt,
-				LatestPaidAt = o.Payments
-					.Where(p => p.PaidAt.HasValue)
-					.Select(p => p.PaidAt)
-					.Max(),
-				LastActivityAt = new[]
-				{
-					o.CreatedAt,
-					o.UpdatedAt,
-					o.Payments.Where(p => p.PaidAt.HasValue).Select(p => p.PaidAt).Max(),
-				}
-				.Max(),
-				PaidRevenue = o.Payments.Any(p => p.PaidAt.HasValue)
-				? o.TotalAmount
-					: 0,
-				CompletedItemsCount = o.OrderItems
-					.Where(oi => oi.ItemStatusLv.ValueCode == nameof(OrderItemStatusCode.READY)
-						|| oi.ItemStatusLv.ValueCode == nameof(OrderItemStatusCode.SERVED))
-					.Sum(oi => oi.Quantity),
-				PendingItemsCount = o.OrderItems
-					.Where(oi => oi.ItemStatusLv.ValueCode == nameof(OrderItemStatusCode.CREATED)
-						|| oi.ItemStatusLv.ValueCode == nameof(OrderItemStatusCode.IN_PROGRESS))
-					.Sum(oi => oi.Quantity),
-			})
-			.ToListAsync(ct);
-	}
+        return await _context.Orders
+            .AsNoTracking()
+            .Where(o => o.StaffId.HasValue
+                && idList.Contains(o.StaffId.Value)
+                && (
+                    (o.CreatedAt.HasValue && o.CreatedAt.Value >= fromUtc && o.CreatedAt.Value <= toUtc)
+                    || (o.UpdatedAt.HasValue && o.UpdatedAt.Value >= fromUtc && o.UpdatedAt.Value <= toUtc)
+                    || o.Payments.Any(p => p.PaidAt.HasValue && p.PaidAt.Value >= fromUtc && p.PaidAt.Value <= toUtc)
+                ))
+            .Select(o => new
+            {
+                Order = o,
+                LatestPaidAt = o.Payments
+                    .Where(p => p.PaidAt.HasValue)
+                    .Select(p => p.PaidAt)
+                    .Max()
+            })
+            .Select(x => new ShiftLiveOrderSnapshotDto
+            {
+                OrderId = x.Order.OrderId,
+                StaffId = x.Order.StaffId ?? 0,
+                TableCode = x.Order.Table != null ? x.Order.Table.TableCode : null,
+                CreatedAt = x.Order.CreatedAt,
+                UpdatedAt = x.Order.UpdatedAt,
+
+                LatestPaidAt = x.LatestPaidAt,
+
+                LastActivityAt =
+                    (x.Order.CreatedAt > x.Order.UpdatedAt
+                        ? x.Order.CreatedAt
+                        : x.Order.UpdatedAt) > x.LatestPaidAt
+                    ? (x.Order.CreatedAt > x.Order.UpdatedAt
+                        ? x.Order.CreatedAt
+                        : x.Order.UpdatedAt)
+                    : x.LatestPaidAt,
+
+                PaidRevenue = x.Order.Payments.Any(p => p.PaidAt.HasValue)
+                    ? x.Order.TotalAmount
+                    : 0,
+
+                CompletedItemsCount = x.Order.OrderItems
+                    .Where(oi => oi.ItemStatusLv.ValueCode == nameof(OrderItemStatusCode.READY)
+                        || oi.ItemStatusLv.ValueCode == nameof(OrderItemStatusCode.SERVED))
+                    .Sum(oi => oi.Quantity),
+
+                PendingItemsCount = x.Order.OrderItems
+                    .Where(oi => oi.ItemStatusLv.ValueCode == nameof(OrderItemStatusCode.CREATED)
+                        || oi.ItemStatusLv.ValueCode == nameof(OrderItemStatusCode.IN_PROGRESS))
+                    .Sum(oi => oi.Quantity),
+            })
+            .ToListAsync(ct);
+    }
 
 	public async Task<List<ShiftLiveIssueSnapshotDto>> GetShiftLiveIssueSnapshotsAsync(
 		DateTime fromUtc,
