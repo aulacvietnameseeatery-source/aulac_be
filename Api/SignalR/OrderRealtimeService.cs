@@ -8,9 +8,9 @@ namespace Api.SignalR
 {
     public class OrderRealtimeService : IOrderRealtimeService
     {
-        private readonly IHubContext<ReservationHub> _hub;
+        private readonly IHubContext<RestaurantHub> _hub;
 
-        public OrderRealtimeService(IHubContext<ReservationHub> hub)
+        public OrderRealtimeService(IHubContext<RestaurantHub> hub)
         {
             _hub = hub;
         }

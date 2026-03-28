@@ -125,7 +125,9 @@ namespace Core.Service
             var duration = (int)await _systemSettingService.GetIntAsync(SettingReservationDuration, 120, ct);
             var immediateWindow = (int)await _systemSettingService.GetIntAsync(SettingImmediateWindow, 120, ct);
 
-            var tables = await _tableRepository.GetManualAvailableTablesAsync(ct);
+            _logger.LogInformation("[STEP 1] Fetching tables from Repo (Admin)...");
+            var tables = await _tableRepository.GetManualAvailableTablesAsync(null, ct);
+            _logger.LogInformation("[STEP 1] Found {Count} raw tables: {Codes}", tables.Count, string.Join(", ", tables.Select(t => t.TableCode)));
 
             var cancelledStatusId = await ReservationStatusCode.CANCELLED.ToReservationStatusIdAsync(_lookupResolver, ct);
             var noShowStatusId = await ReservationStatusCode.NO_SHOW.ToReservationStatusIdAsync(_lookupResolver, ct);
@@ -161,6 +163,8 @@ namespace Core.Service
 
                     if (conflicts.Any())
                     {
+                        _logger.LogInformation("[STEP 4] Table {TableCode} excluded due to {ConflictCount} existing reservation conflicts at {Time}", 
+                            table.TableCode, conflicts.Count, reservedTime.Value);
                         isAvailable = false;
                     }
                 }
@@ -196,6 +200,7 @@ namespace Core.Service
                     .ToList();
             }
 
+            var party = partySize.Value;
             var availabilityPool = availableTables.Select(x => new TableAvailabilityDto
             {
                 TableId = x.TableId,
@@ -206,107 +211,22 @@ namespace Core.Service
                 IsAvailable = true,
             }).ToList();
 
-            var party = partySize.Value;
+            _logger.LogInformation("[STEP 5] Finalizing candidates. Total available in pool: {Count}, Capacity: {Cap}", 
+                availabilityPool.Count, availabilityPool.Sum(x => x.Capacity));
+
             var optionMap = new Dictionary<string, ManualTableOptionDto>(StringComparer.Ordinal);
+            var options = ReservationTableSelectionUtil.FindAllTableOptions(availabilityPool, party);
 
-            void AddOption(List<TableAvailabilityDto> optionTables)
+            _logger.LogInformation("[STEP 6] Generated {Count} options. Picking Best Fit...", options.Count);
+
+            foreach (var opt in options)
             {
-                if (optionTables.Count == 0)
-                {
-                    return;
-                }
-
-                var totalCapacity = optionTables.Sum(x => x.Capacity);
-                if (totalCapacity < party)
-                {
-                    return;
-                }
-
-                var sortedById = optionTables
-                    .Select(x => x.TableId)
-                    .OrderBy(x => x)
-                    .ToList();
-
-                var key = string.Join("-", sortedById);
-                if (optionMap.ContainsKey(key))
-                {
-                    return;
-                }
-
-                var distinctZones = optionTables
-                    .Select(x => x.Zone)
-                    .Where(z => !string.IsNullOrWhiteSpace(z))
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .ToList();
-
-                optionMap[key] = new ManualTableOptionDto
-                {
-                    OptionId = key,
-                    TableIds = sortedById,
-                    TableCodes = string.Join(", ", optionTables
-                        .Select(x => x.TableCode)
-                        .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)),
-                    Zone = distinctZones.Count == 1 ? distinctZones[0] : "MIXED",
-                    TotalCapacity = totalCapacity,
-                    ExcessCapacity = totalCapacity - party,
-                    TableCount = optionTables.Count,
-                    IsBestFit = false,
-                };
-            }
-
-            foreach (var single in availabilityPool.Where(x => x.Capacity >= party))
-            {
-                AddOption(new List<TableAvailabilityDto> { single });
-            }
-
-            foreach (var zoneGroup in availabilityPool.GroupBy(x => x.Zone))
-            {
-                var sortedByOrder = zoneGroup
-                    .OrderBy(x => ParseTableOrder(x.TableCode))
-                    .ThenBy(x => x.TableCode)
-                    .ToList();
-
-                for (var i = 0; i < sortedByOrder.Count; i++)
-                {
-                    var pick = new List<TableAvailabilityDto> { sortedByOrder[i] };
-                    var sum = sortedByOrder[i].Capacity;
-                    var prevOrder = ParseTableOrder(sortedByOrder[i].TableCode);
-
-                    if (sum >= party)
-                    {
-                        AddOption(pick);
-                        continue;
-                    }
-
-                    for (var j = i + 1; j < sortedByOrder.Count; j++)
-                    {
-                        var currentOrder = ParseTableOrder(sortedByOrder[j].TableCode);
-                        if (currentOrder - prevOrder > 1)
-                        {
-                            break;
-                        }
-
-                        pick.Add(sortedByOrder[j]);
-                        sum += sortedByOrder[j].Capacity;
-                        prevOrder = currentOrder;
-
-                        if (sum >= party)
-                        {
-                            AddOption(new List<TableAvailabilityDto>(pick));
-                            break;
-                        }
-                    }
-                }
-
-                var bestFitInZone = ReservationTableSelectionUtil.SelectBestFitTablesWithinZone(sortedByOrder, party);
-                if (bestFitInZone.Count > 0)
-                {
-                    AddOption(bestFitInZone);
-                }
+                optionMap[opt.OptionId] = opt;
             }
 
             if (optionMap.Count == 0)
             {
+                _logger.LogWarning("[STEP 6] No valid table combinations found for PartySize={PartySize}", party);
                 return new List<ManualTableOptionDto>();
             }
 
@@ -315,6 +235,9 @@ namespace Core.Service
                 .ThenBy(x => x.TableCount)
                 .ThenBy(x => x.TableCodes, StringComparer.OrdinalIgnoreCase)
                 .First();
+
+            _logger.LogInformation("[STEP 6] SUCCESS: Selected Tables={TableCodes}, Exc={Exc}", 
+                bestOption.TableCodes, bestOption.ExcessCapacity);
 
             bestOption.IsBestFit = true;
 
@@ -1178,16 +1101,6 @@ namespace Core.Service
             return order.OrderId;
         }
 
-        private static int ParseTableOrder(string tableCode)
-        {
-            var match = Regex.Match(tableCode, "(\\d+)(?!.*\\d)");
-            if (!match.Success)
-            {
-                return int.MaxValue;
-            }
-
-            return int.TryParse(match.Value, out var value) ? value : int.MaxValue;
-        }
 
         public async Task DeleteReservationAsync(long id, CancellationToken ct = default)
         {

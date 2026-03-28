@@ -6,9 +6,9 @@ namespace Api.SignalR;
 
 public class SignalRReservationBroadcastService : IReservationBroadcastService
 {
-    private readonly IHubContext<ReservationHub> _hubContext;
+    private readonly IHubContext<RestaurantHub> _hubContext;
 
-    public SignalRReservationBroadcastService(IHubContext<ReservationHub> hubContext)
+    public SignalRReservationBroadcastService(IHubContext<RestaurantHub> hubContext)
     {
         _hubContext = hubContext;
     }

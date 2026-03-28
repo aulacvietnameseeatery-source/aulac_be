@@ -292,6 +292,7 @@ builder.Services.AddScoped<IIngredientService, IngredientService>();
 builder.Services.AddScoped<IInventoryService, InventoryService>();
 builder.Services.AddScoped<IEmailTemplateService, EmailTemplateService>();
 
+builder.Services.AddScoped<IDashboardService, DashboardService>();    
 
 
 #endregion
@@ -324,6 +325,7 @@ builder.Services.AddScoped<IPromotionRepository, PromotionRepository>();
 builder.Services.AddScoped<ICouponRepository, CouponRepository>();
 builder.Services.AddScoped<ISaleInvoiceRepository, SaleInvoiceRepository>();
 builder.Services.AddScoped<ITaxRepository, TaxRepository>();
+builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
 
 
 builder.Services.AddScoped<IShiftTemplateRepository, ShiftTemplateRepository>();
@@ -332,7 +334,7 @@ builder.Services.AddScoped<IAttendanceRepository, AttendanceRepository>();
 builder.Services.AddScoped<IInventoryRepository, InventoryRepository>();
 builder.Services.AddScoped<ILoginActivityRepository, LoginActivityRepository>();
 builder.Services.AddScoped<IEmailTemplateRepository, EmailTemplateRepository>();
-
+builder.Services.AddScoped<IDashboardRepository, DashboardRepository>();
 #endregion
 
 #region Email Services + Background Worker
@@ -498,7 +500,7 @@ app.UseAuthorization();
 app.UseStaticFiles();
 
 app.MapControllers();
-app.MapHub<ReservationHub>("/hubs/reservation");
+// _OLD: app.MapHub<ReservationHub>("/hubs/reservation"); — consolidated into RestaurantHub
 app.MapHub<RestaurantHub>("/hubs/restaurant");
 
 #endregion

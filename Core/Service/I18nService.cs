@@ -86,5 +86,34 @@ namespace Core.Service
                 }
             }
         }
+        public async Task UpdateStringsAsync(long textId, Dictionary<string, string> translations, CancellationToken ct)
+        {
+            var text = await _repo.GetTextWithTranslationsAsync(textId, ct);
+            if (text == null)
+                throw new InvalidOperationException($"I18nText {textId} not found");
+
+            foreach (var (lang, value) in translations)
+            {
+                if (string.IsNullOrWhiteSpace(value))
+                    continue;
+
+                var existing = text.I18nTranslations.FirstOrDefault(x => x.LangCode == lang);
+                if (existing == null)
+                {
+                    await _repo.AddTranslationAsync(new I18nTranslation
+                    {
+                        TextId = textId,
+                        LangCode = lang,
+                        TranslatedText = value,
+                        UpdatedAt = DateTime.UtcNow
+                    }, ct);
+                }
+                else
+                {
+                    existing.TranslatedText = value;
+                    existing.UpdatedAt = DateTime.UtcNow;
+                }
+            }
+        }
     }
 }

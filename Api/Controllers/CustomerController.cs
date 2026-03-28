@@ -21,6 +21,12 @@ namespace Api.Controllers
             _logger = logger;
         }
 
+        /// <summary>
+        /// Get a paginated list of customers.
+        /// </summary>
+        /// <param name="query">Query parameters for filtering and pagination.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Paged list of customers.</returns>
         [HttpGet]
         [HasPermission(Permissions.ViewCustomer)]
         public async Task<IActionResult> GetCustomers(
@@ -40,7 +46,13 @@ namespace Api.Controllers
             });
         }
 
+        /// <summary>
+        /// Get a customer by phone number.
+        /// </summary>
+        /// <param name="phone">Customer phone number.</param>
+        /// <returns>Customer details if found.</returns>
         [HttpGet("phone/{phone}")]
+        [HasPermission(Permissions.ViewCustomer)]
         public async Task<IActionResult> GetByPhone(string phone)
         {
             var customer = await _customerService.GetByPhoneAsync(phone);
@@ -67,7 +79,15 @@ namespace Api.Controllers
             });
         }
 
+        /// <summary>
+        /// Search customers by phone keyword.
+        /// </summary>
+        /// <param name="keyword">Phone keyword to search.</param>
+        /// <param name="limit">Maximum number of results.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>List of matching customers.</returns>
         [HttpGet("search")]
+        [HasPermission(Permissions.ViewCustomer)]
         public async Task<IActionResult> SearchByPhone(
             [FromQuery] string keyword,
             [FromQuery] int limit = 10,
@@ -87,6 +107,12 @@ namespace Api.Controllers
             });
         }
 
+        /// <summary>
+        /// Get a customer by ID.
+        /// </summary>
+        /// <param name="id">Customer ID.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Customer details if found.</returns>
         [HttpGet("{id:long}")]
         [HasPermission(Permissions.ViewCustomer)]
         public async Task<IActionResult> GetById(long id, CancellationToken cancellationToken = default)
@@ -115,6 +141,12 @@ namespace Api.Controllers
             });
         }
 
+        /// <summary>
+        /// Create a new customer.
+        /// </summary>
+        /// <param name="request">Customer creation request.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Created customer details.</returns>
         [HttpPost]
         [HasPermission(Permissions.CreateCustomer)]
         public async Task<IActionResult> CreateCustomer(
@@ -151,6 +183,13 @@ namespace Api.Controllers
             }
         }
 
+        /// <summary>
+        /// Update an existing customer.
+        /// </summary>
+        /// <param name="id">Customer ID.</param>
+        /// <param name="request">Customer update request.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Updated customer details.</returns>
         [HttpPut("{id:long}")]
         [HasPermission(Permissions.UpdateCustomer)]
         public async Task<IActionResult> UpdateCustomer(
@@ -197,6 +236,12 @@ namespace Api.Controllers
             }
         }
 
+        /// <summary>
+        /// Delete a customer by ID.
+        /// </summary>
+        /// <param name="id">Customer ID.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>No content if deleted.</returns>
         [HttpDelete("{id:long}")]
         [HasPermission(Permissions.DeleteCustomer)]
         public async Task<IActionResult> DeleteCustomer(
@@ -234,10 +279,17 @@ namespace Api.Controllers
             }
         }
 
+        /// <summary>
+        /// Get detailed information of a customer.
+        /// </summary>
+        /// <param name="customerId">Customer ID.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Customer detail.</returns>
         [HttpGet("detail/{customerId}")]
+        [HasPermission(Permissions.ViewCustomer)]
         public async Task<IActionResult> GetCustomerDetail(
-        long customerId,
-        CancellationToken ct)
+            long customerId,
+            CancellationToken ct)
         {
             var result = await _customerService
                 .GetCustomerDetailAsync(customerId, ct);
@@ -253,7 +305,15 @@ namespace Api.Controllers
             });
         }
 
+        /// <summary>
+        /// Get paginated orders of a customer.
+        /// </summary>
+        /// <param name="customerId">Customer ID.</param>
+        /// <param name="query">Order query parameters.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Paged list of customer orders.</returns>
         [HttpGet("{customerId}/orders")]
+        [HasPermission(Permissions.ViewCustomer)]
         public async Task<IActionResult> GetCustomerOrders(
             long customerId,
             [FromQuery] CustomerOrderQueryDTO query,
@@ -275,7 +335,15 @@ namespace Api.Controllers
             });
         }
 
+        /// <summary>
+        /// Get detail of a specific order for a customer.
+        /// </summary>
+        /// <param name="customerId">Customer ID.</param>
+        /// <param name="orderId">Order ID.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Order detail.</returns>
         [HttpGet("{customerId}/orders/{orderId}")]
+        [HasPermission(Permissions.ViewCustomer)]
         public async Task<IActionResult> GetCustomerOrderDetail(
             long customerId,
             long orderId,

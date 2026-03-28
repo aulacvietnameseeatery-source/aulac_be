@@ -1,3 +1,5 @@
+using Core.DTO.Dish;
+
 namespace Core.DTO.DishCategory;
 
 /// <summary>
@@ -9,4 +11,10 @@ public class DishCategoryDto
     public string CategoryName { get; set; } = string.Empty;
     public string? Description { get; set; }
     public bool IsDisabled { get; set; }
+
+    /// <summary>Translated names for vi / en / fr</summary>
+    public I18nTextDto NameI18n { get; set; } = new();
+
+    /// <summary>Translated descriptions for vi / en / fr</summary>
+    public I18nTextDto DescriptionI18n { get; set; } = new();
 }

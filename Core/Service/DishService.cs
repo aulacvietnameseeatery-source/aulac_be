@@ -26,10 +26,19 @@ public class DishService : IDishService
     private readonly IMediaRepository _mediaRepo;
     private readonly IUnitOfWork _uow;
     private readonly IFileStorage _fileStorage;
+    private readonly ISystemSettingService _systemSettingService;
 
     private static readonly string[] SupportedLangs = { "en", "vi", "fr" };
 
-    public DishService(IDishRepository dishRepository, ILookupResolver lookupResolver, ILogger<DishService> logger, IDishI18nService dishI18NService, IMediaRepository mediaRepository, IUnitOfWork unitOfWork, IFileStorage fileStorage)
+    public DishService(
+        IDishRepository dishRepository,
+        ILookupResolver lookupResolver,
+        ILogger<DishService> logger,
+        IDishI18nService dishI18NService,
+        IMediaRepository mediaRepository,
+        IUnitOfWork unitOfWork,
+        IFileStorage fileStorage,
+        ISystemSettingService systemSettingService)
     {
         _dishRepository = dishRepository;
         _lookupResolver = lookupResolver;
@@ -38,6 +47,7 @@ public class DishService : IDishService
         _mediaRepo = mediaRepository;
         _uow = unitOfWork;
         _fileStorage = fileStorage;
+        _systemSettingService = systemSettingService;
     }
 
     /// <inheritdoc/>
@@ -61,14 +71,18 @@ public class DishService : IDishService
             PrepTimeMinutes = dish.PrepTimeMinutes,
             CookTimeMinutes = dish.CookTimeMinutes,
             // Url stores RelativePath — resolve to public URL at read time
-            ImageUrls = dish.DishMedia
-             .Where(dm => dm.Media != null && !string.Equals(dm.Media!.MimeType, "video/mp4", StringComparison.OrdinalIgnoreCase) && !(dm.Media!.MimeType ?? "").StartsWith("video/", StringComparison.OrdinalIgnoreCase))
-             .Select(dm => _fileStorage.GetPublicUrl(dm.Media!.Url))
-             .ToList(),
-            VideoUrl = dish.DishMedia
-             .Where(dm => dm.Media != null && (dm.Media!.MimeType ?? "").StartsWith("video/", StringComparison.OrdinalIgnoreCase))
-             .Select(dm => _fileStorage.GetPublicUrl(dm.Media!.Url))
-             .FirstOrDefault(),
+            ImageUrls = await ShouldShowMedia("landing_page.show_dish_image", cancellationToken)
+                ? dish.DishMedia
+                    .Where(dm => dm.Media != null && !string.Equals(dm.Media!.MimeType, "video/mp4", StringComparison.OrdinalIgnoreCase) && !(dm.Media!.MimeType ?? "").StartsWith("video/", StringComparison.OrdinalIgnoreCase))
+                    .Select(dm => _fileStorage.GetPublicUrl(dm.Media!.Url))
+                    .ToList()
+                : new List<string>(),
+            VideoUrl = await ShouldShowMedia("landing_page.show_dish_video", cancellationToken)
+                ? dish.DishMedia
+                    .Where(dm => dm.Media != null && (dm.Media!.MimeType ?? "").StartsWith("video/", StringComparison.OrdinalIgnoreCase))
+                    .Select(dm => _fileStorage.GetPublicUrl(dm.Media!.Url))
+                    .FirstOrDefault()
+                : null,
             Composition = dish.Recipes
             .Select(r => new RecipeItemDto
             {
@@ -199,6 +213,8 @@ public class DishService : IDishService
     {
         request.IsCustomerView = true;
         var (entities, totalCount) = await _dishRepository.GetDishesAsync(request, cancellationToken);
+        
+        var showImages = await ShouldShowMedia("landing_page.show_dish_image", cancellationToken);
 
         var dtos = entities.Select(d => new DishDisplayDto
         {
@@ -209,9 +225,11 @@ public class DishService : IDishService
             ? MapTranslations(d.Category.CategoryNameText, d.Category.CategoryName) : new I18nTextDto(),
             Description = MapTranslations(d.DescriptionText, string.Empty),
             // Url stores RelativePath — resolve to public URL at read time
-            ImageUrl = d.DishMedia.FirstOrDefault(dm => dm.IsPrimary == true)?.Media?.Url is { } primaryUrl
-            ? _fileStorage.GetPublicUrl(primaryUrl)
-            : d.DishMedia.FirstOrDefault()?.Media?.Url is { } firstUrl ? _fileStorage.GetPublicUrl(firstUrl) : null,
+            ImageUrl = showImages 
+                ? (d.DishMedia.FirstOrDefault(dm => dm.IsPrimary == true)?.Media?.Url is { } primaryUrl
+                    ? _fileStorage.GetPublicUrl(primaryUrl)
+                    : d.DishMedia.FirstOrDefault()?.Media?.Url is { } firstUrl ? _fileStorage.GetPublicUrl(firstUrl) : null)
+                : null,
             IsChefRecommended = d.ChefRecommended ?? false
         }).ToList();
 
@@ -629,6 +647,12 @@ public class DishService : IDishService
             .FirstOrDefault(t => t.LangCode == lang)
             ?.TranslatedText
             ?? text.SourceText;
+    }
+
+    private async Task<bool> ShouldShowMedia(string settingKey, CancellationToken ct)
+    {
+        var show = await _systemSettingService.GetBoolAsync(settingKey, true, ct);
+        return show ?? true;
     }
 }
 

@@ -21,7 +21,7 @@ public interface ITableRepository
     /// </summary>
     /// <param name="ct">Cancellation token</param>
     /// <returns>List of available tables</returns>
-    Task<List<RestaurantTable>> GetManualAvailableTablesAsync(CancellationToken ct = default);
+    Task<List<RestaurantTable>> GetManualAvailableTablesAsync(bool? isOnline = null, CancellationToken ct = default);
 
     /// <summary>
     /// Finds a table by its ID.
