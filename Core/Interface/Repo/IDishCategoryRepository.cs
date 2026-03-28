@@ -59,4 +59,9 @@ public interface IDishCategoryRepository
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>True if name exists</returns>
     Task<bool> ExistsByNameAsync(string name, long? excludeId = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Get the maximum DisplayOrder value among all categories
+    /// </summary>
+    Task<int> GetMaxDisplayOrderAsync(CancellationToken cancellationToken = default);
 }
