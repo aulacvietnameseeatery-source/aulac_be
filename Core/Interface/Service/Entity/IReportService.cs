@@ -14,4 +14,6 @@ public interface IReportService
     Task<(List<SalesItemDto> Items, int TotalCount)> GetSalesItemsAsync(ReportFilterRequest request, int pageIndex, int pageSize, CancellationToken ct = default);
 
     Task<(List<TopCustomerDto> Items, int TotalCount)> GetTopSpendersAsync(ReportFilterRequest request, int pageIndex, int pageSize, CancellationToken ct = default);
+
+    Task<List<TopCustomerDto>> GetTop5SpendersAsync(DateTime startDate, DateTime endDate, CancellationToken ct = default);
 }

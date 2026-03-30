@@ -136,4 +136,19 @@ public class ReportService : IReportService
             throw;
         }
     }
+
+    public async Task<List<TopCustomerDto>> GetTop5SpendersAsync(DateTime startDate, DateTime endDate, CancellationToken ct = default)
+    {
+        var completedId = await GetOrderStatusIdAsync(OrderStatusCode.COMPLETED, ct);
+
+        var top5Customers = await _reportRepository.GetDashboardTopSpendersAsync(
+            startDate,
+            endDate,
+            completedId,
+            ct
+        );
+
+        return top5Customers;
+    }
+
 }

@@ -22,5 +22,7 @@ namespace Core.Interface.Repo
 
         // Customers
         Task<(List<TopCustomerDto> Data, int TotalCount)> GetTopSpendersAsync(DateTime startDate, DateTime endDate, uint completedStatusId, int skip, int take, CancellationToken ct = default);
+
+        Task<List<TopCustomerDto>> GetDashboardTopSpendersAsync(DateTime startDate, DateTime endDate, uint completedStatusId, CancellationToken ct = default);
     }
 }

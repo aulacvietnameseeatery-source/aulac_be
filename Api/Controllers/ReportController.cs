@@ -236,4 +236,19 @@ public class ReportController : ControllerBase
             ServerTime = DateTimeOffset.UtcNow
         });
     }
+
+    [HttpGet("top-spenders")]
+    public async Task<IActionResult> GetTop5Spenders(
+    [FromQuery] DateTime? startDate,
+    [FromQuery] DateTime? endDate,
+    CancellationToken ct)
+    {
+        // set default date range to last 30 days if not provided
+        var start = startDate ?? DateTime.UtcNow.AddDays(-30);
+        var end = endDate ?? DateTime.UtcNow;
+
+        var result = await _reportService.GetTop5SpendersAsync(start, end, ct);
+
+        return Ok(result);
+    }
 }

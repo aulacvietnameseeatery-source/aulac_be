@@ -175,5 +175,29 @@ namespace Infa.Repository
 
             return (data, totalCount);
         }
+
+        public async Task<List<TopCustomerDto>> GetDashboardTopSpendersAsync(DateTime startDate, DateTime endDate, uint completedStatusId, CancellationToken ct = default)
+        {
+            var data = await _context.Orders
+                .Where(o => o.CreatedAt >= startDate 
+                && o.CreatedAt <= endDate 
+                && o.OrderStatusLvId == completedStatusId
+                && o.Customer.FullName != "Guest")
+                .GroupBy(o => new { o.CustomerId, o.Customer.FullName, o.Customer.Phone })
+                .Select(g => new TopCustomerDto
+                {
+                    CustomerId = g.Key.CustomerId,
+                    CustomerName = string.IsNullOrEmpty(g.Key.FullName) ? "Guest" : g.Key.FullName,
+                    Phone = g.Key.Phone,
+                    TotalOrders = g.Count(),
+                    TotalSpent = g.Sum(o => o.TotalAmount),
+                    LastVisitDate = g.Max(o => o.CreatedAt)
+                })
+                .OrderByDescending(x => x.TotalSpent)
+                .Take(5) 
+                .ToListAsync(ct);
+
+            return data;
+        }
     }
 }
