@@ -340,14 +340,26 @@ builder.Services.AddScoped<IDashboardRepository, DashboardRepository>();
 
 #region Email Services + Background Worker
 
-// Always route email enqueue calls to Hangfire so delivery remains asynchronous
-// even when CacheMode is None (cache disabled).
-builder.Services.AddSingleton<IEmailQueue, HangfireEmailQueue>();
+// Email queue implementation based on cache mode
+var emailQueueCacheMode = builder.Configuration.GetValue<string>("CacheMode", "None")?.ToLower();
+
+if (emailQueueCacheMode == "none")
+{
+    // Direct email sending (synchronous) - no background worker needed
+    builder.Services.AddSingleton<IEmailQueue, DirectEmailQueue>();
+    // Note: EmailBackgroundService will NOT be registered
+}
+else
+{
+    // Cache-based email queue (async with background worker)
+    builder.Services.AddSingleton<IEmailQueue, CacheEmailQueue>();
+    // Register Background Service for async email processing
+    builder.Services.AddHostedService<EmailBackgroundService>();
+}
 
 // Other email services (work with all modes)
 builder.Services.AddSingleton<IDeadLetterSink, CacheDeadLetterSink>();
 builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();
-builder.Services.AddScoped<EmailJobRunner>();
 
 
 #endregion
@@ -359,7 +371,6 @@ builder.Services.AddScoped<IReservationBroadcastService, SignalRReservationBroad
 builder.Services.AddScoped<IDishRepository, Infa.Repo.DishRepository>();
 builder.Services.AddScoped<IDishService, Core.Service.DishService>();
 builder.Services.AddScoped<IRealtimeNotificationService, SignalRNotificationService>();
-builder.Services.AddScoped<AdminReservationJobRunner>();
 builder.Services.AddScoped<IJobSchedulerService, HangfireJobScheduler>();
 builder.Services.AddScoped<IOrderRealtimeService, OrderRealtimeService>();
 builder.Services.AddScoped<IShiftLiveRealtimePublisher, SignalRShiftLiveRealtimePublisher>();
@@ -486,7 +497,6 @@ app.UseHttpsRedirection();
 // Must be before UseAuthorization
 app.UseAuthentication();
 app.UseAuthorization();
-app.UseHangfireDashboard("/hangfire");
 
 app.UseStaticFiles();
 
