@@ -4,6 +4,7 @@ using Core.DTO.Shift;
 using Core.Entity;
 using Core.Exceptions;
 using Core.Interface.Repo;
+using Core.Interface.Service.Others;
 using Infa.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,11 +13,15 @@ namespace Infa.Repo;
 public class OrderRepository : IOrderRepository
 {
 	private readonly RestaurantMgmtContext _context;
+    private readonly IOrderRealtimeService _realtime;
 
-	public OrderRepository(RestaurantMgmtContext context)
+    public OrderRepository(
+		RestaurantMgmtContext context,
+        IOrderRealtimeService realtime)
 	{
 		_context = context;
-	}
+        _realtime = realtime;
+    }
 
 	public async Task<PagedResultDTO<OrderHistoryDTO>> GetOrderHistoryAsync(OrderHistoryQueryDTO query, CancellationToken cancellationToken = default)
 	{
@@ -270,9 +275,40 @@ public class OrderRepository : IOrderRepository
 			{
 				order.UpdatedAt = DateTime.UtcNow;
 				await _context.SaveChangesAsync(cancellationToken);
-			}
+                string orderStatusCode = order.OrderStatusLvId switch
+                {
+                    var x when x == pendingOrderStatusId => OrderStatusCode.PENDING.ToString(),
+                    var x when x == inProgressOrderStatusId => OrderStatusCode.IN_PROGRESS.ToString(),
+                    var x when x == completedOrderStatusId => OrderStatusCode.COMPLETED.ToString(),
+                    var x when x == cancelledOrderStatusId => OrderStatusCode.CANCELLED.ToString(),
+                    _ => "UNKNOWN"
+                };
+                await _realtime.OrderUpdatedAsync(new OrderRealtimeDTO
+                {
+                    OrderId = order.OrderId,
+                    Status = orderStatusCode,
+                    TableId = order.TableId,
+                    UpdatedAt = DateTime.UtcNow
+                });
+            }
 		}
-	}
+        string newStatusCode = newStatusLvId switch
+        {
+            var x when x == inProgressItemStatusId => OrderItemStatusCode.IN_PROGRESS.ToString(),
+            var x when x == readyItemStatusId => OrderItemStatusCode.READY.ToString(),
+            var x when x == servedItemStatusId => OrderItemStatusCode.SERVED.ToString(),
+            var x when x == rejectedItemStatusId => OrderItemStatusCode.REJECTED.ToString(),
+            var x when x == cancelledItemStatusId => OrderItemStatusCode.CANCELLED.ToString(),
+            _ => "UNKNOWN"
+        };
+        await _realtime.OrderItemUpdatedAsync(new OrderItemRealtimeDTO
+        {
+            OrderItemId = orderItemId,
+            OrderId = item?.OrderId ?? 0,
+            Status = newStatusCode,
+            UpdatedAt = DateTime.UtcNow
+        });
+    }
 
 
 public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, CancellationToken cancellationToken = default)
@@ -584,47 +620,58 @@ public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, Can
 			return new List<ShiftLiveOrderSnapshotDto>();
 		}
 
-		return await _context.Orders
-			.AsNoTracking()
-			.Where(o => o.StaffId.HasValue
-				&& idList.Contains(o.StaffId.Value)
-				&& (
-					(o.CreatedAt.HasValue && o.CreatedAt.Value >= fromUtc && o.CreatedAt.Value <= toUtc)
-					|| (o.UpdatedAt.HasValue && o.UpdatedAt.Value >= fromUtc && o.UpdatedAt.Value <= toUtc)
-					|| o.Payments.Any(p => p.PaidAt.HasValue && p.PaidAt.Value >= fromUtc && p.PaidAt.Value <= toUtc)
-				))
-			.Select(o => new ShiftLiveOrderSnapshotDto
-			{
-				OrderId = o.OrderId,
-				StaffId = o.StaffId ?? 0,
-				TableCode = o.Table != null ? o.Table.TableCode : null,
-				CreatedAt = o.CreatedAt,
-				UpdatedAt = o.UpdatedAt,
-				LatestPaidAt = o.Payments
-					.Where(p => p.PaidAt.HasValue)
-					.Select(p => p.PaidAt)
-					.Max(),
-				LastActivityAt = new[]
-				{
-					o.CreatedAt,
-					o.UpdatedAt,
-					o.Payments.Where(p => p.PaidAt.HasValue).Select(p => p.PaidAt).Max(),
-				}
-				.Max(),
-				PaidRevenue = o.Payments.Any(p => p.PaidAt.HasValue)
-				? o.TotalAmount
-					: 0,
-				CompletedItemsCount = o.OrderItems
-					.Where(oi => oi.ItemStatusLv.ValueCode == nameof(OrderItemStatusCode.READY)
-						|| oi.ItemStatusLv.ValueCode == nameof(OrderItemStatusCode.SERVED))
-					.Sum(oi => oi.Quantity),
-				PendingItemsCount = o.OrderItems
-					.Where(oi => oi.ItemStatusLv.ValueCode == nameof(OrderItemStatusCode.CREATED)
-						|| oi.ItemStatusLv.ValueCode == nameof(OrderItemStatusCode.IN_PROGRESS))
-					.Sum(oi => oi.Quantity),
-			})
-			.ToListAsync(ct);
-	}
+        return await _context.Orders
+            .AsNoTracking()
+            .Where(o => o.StaffId.HasValue
+                && idList.Contains(o.StaffId.Value)
+                && (
+                    (o.CreatedAt.HasValue && o.CreatedAt.Value >= fromUtc && o.CreatedAt.Value <= toUtc)
+                    || (o.UpdatedAt.HasValue && o.UpdatedAt.Value >= fromUtc && o.UpdatedAt.Value <= toUtc)
+                    || o.Payments.Any(p => p.PaidAt.HasValue && p.PaidAt.Value >= fromUtc && p.PaidAt.Value <= toUtc)
+                ))
+            .Select(o => new
+            {
+                Order = o,
+                LatestPaidAt = o.Payments
+                    .Where(p => p.PaidAt.HasValue)
+                    .Select(p => p.PaidAt)
+                    .Max()
+            })
+            .Select(x => new ShiftLiveOrderSnapshotDto
+            {
+                OrderId = x.Order.OrderId,
+                StaffId = x.Order.StaffId ?? 0,
+                TableCode = x.Order.Table != null ? x.Order.Table.TableCode : null,
+                CreatedAt = x.Order.CreatedAt,
+                UpdatedAt = x.Order.UpdatedAt,
+
+                LatestPaidAt = x.LatestPaidAt,
+
+                LastActivityAt =
+                    (x.Order.CreatedAt > x.Order.UpdatedAt
+                        ? x.Order.CreatedAt
+                        : x.Order.UpdatedAt) > x.LatestPaidAt
+                    ? (x.Order.CreatedAt > x.Order.UpdatedAt
+                        ? x.Order.CreatedAt
+                        : x.Order.UpdatedAt)
+                    : x.LatestPaidAt,
+
+                PaidRevenue = x.Order.Payments.Any(p => p.PaidAt.HasValue)
+                    ? x.Order.TotalAmount
+                    : 0,
+
+                CompletedItemsCount = x.Order.OrderItems
+                    .Where(oi => oi.ItemStatusLv.ValueCode == nameof(OrderItemStatusCode.READY)
+                        || oi.ItemStatusLv.ValueCode == nameof(OrderItemStatusCode.SERVED))
+                    .Sum(oi => oi.Quantity),
+
+                PendingItemsCount = x.Order.OrderItems
+                    .Where(oi => oi.ItemStatusLv.ValueCode == nameof(OrderItemStatusCode.CREATED)
+                        || oi.ItemStatusLv.ValueCode == nameof(OrderItemStatusCode.IN_PROGRESS))
+                    .Sum(oi => oi.Quantity),
+            })
+            .ToListAsync(ct);
+    }
 
 	public async Task<List<ShiftLiveIssueSnapshotDto>> GetShiftLiveIssueSnapshotsAsync(
 		DateTime fromUtc,

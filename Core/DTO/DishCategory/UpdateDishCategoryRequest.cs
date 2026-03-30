@@ -3,16 +3,15 @@ using System.ComponentModel.DataAnnotations;
 namespace Core.DTO.DishCategory;
 
 /// <summary>
-/// Request DTO for updating an existing dish category
+/// Request DTO for updating an existing dish category.
+/// I18n dictionary keys are language codes ("en", "vi", "fr").
 /// </summary>
-public class UpdateDishCategoryRequest
+public class UpdateDishCategoryRequest 
 {
-    [Required(ErrorMessage = "Category name is required")]
-    [StringLength(100, ErrorMessage = "Category name cannot exceed 200 characters")]
-    public string CategoryName { get; set; } = string.Empty;
-
-    [StringLength(100, ErrorMessage = "Description cannot exceed 1000 characters")]
-    public string? Description { get; set; }
+    [Required]
+    public Dictionary<string, CategoryI18nDto> I18n { get; set; } = new();
 
     public bool IsDisabled { get; set; }
+
+
 }

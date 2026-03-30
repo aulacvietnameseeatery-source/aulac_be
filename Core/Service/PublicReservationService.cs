@@ -35,7 +35,7 @@ public class PublicReservationService : IPublicReservationService
     private const string SettingImmediateWindow = "reservation.immediate_window_minutes";
     private const string TemplateCodeReservationConfirmation = "RESERVATION_CONFIRM";
     private const string TemplateCodeReservationConfirmationAdmin = "RESERVATION_CONFIRM_ADMIN";
-    private const string AdminNotificationEmail = "quantmhe186941@fpt.edu.vn";
+    private const string SettingStoreEmail = "store.email";
 
     public PublicReservationService(
         ITableRepository tableRepository,
@@ -432,8 +432,10 @@ public class PublicReservationService : IPublicReservationService
                 .Replace("{{TableCodes}}", tableCodes)
                 .Replace("{{ReservationId}}", reservation.ReservationId.ToString());
 
+            var adminEmail = await _systemSettingService.GetStringAsync(SettingStoreEmail);
+
             var queuedEmail = new QueuedEmail(
-                To: AdminNotificationEmail!,
+                To: adminEmail!,
                 Subject: template.Subject,
                 HtmlBody: body,
                 CorrelationId: $"Res-{reservation.ReservationId}"

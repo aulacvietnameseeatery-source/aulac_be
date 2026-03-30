@@ -23,5 +23,15 @@ namespace Core.Interface.Service.I18n
             Func<DishI18nDto, string?> selector,
             CancellationToken ct
         );
+
+        /// <summary>
+        /// Updates plain string translations for an existing I18nText entry.
+        /// Adds a new translation row when a language doesn't exist yet.
+        /// </summary>
+        Task UpdateStringsAsync(
+            long textId,
+            Dictionary<string, string> translations,
+            CancellationToken ct
+        );
     }
 }

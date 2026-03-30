@@ -40,4 +40,14 @@ public class RestaurantHub : Hub
     {
         await Groups.AddToGroupAsync(Context.ConnectionId, $"order-{orderId}");
     }
+
+    public async Task LeaveOrders()
+    {
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"orders");
+    }
+
+    public async Task LeaveOrder(int orderId)
+    {
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"order-{orderId}");
+    }
 }
