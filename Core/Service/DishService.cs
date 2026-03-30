@@ -9,7 +9,6 @@ using Microsoft.Extensions.Logging;
 using Core.Interface.Service.FileStorage;
 using Core.Interface.Service.I18n;
 using Core.Mappers;
-using Microsoft.AspNetCore.Http;
 
 namespace Core.Service;
 
@@ -256,9 +255,9 @@ public class DishService : IDishService
 
     public async Task<long> CreateDishAsync(
         CreateDishRequest request,
-        IReadOnlyList<IFormFile> staticImages,
-        IReadOnlyList<IFormFile> images360,
-        IFormFile? video,
+        IReadOnlyList<MediaFileInput> staticImages,
+        IReadOnlyList<MediaFileInput> images360,
+        MediaFileInput? video,
         CancellationToken ct)
     {
         var savedFilePaths = new List<string>();
@@ -303,7 +302,7 @@ public class DishService : IDishService
                 var uploadResult = await _fileStorage.SaveAsync(
                new FileUploadRequest
                {
-                   Stream = file.OpenReadStream(),
+                   Stream = file.Stream,
                    FileName = file.FileName,
                    ContentType = file.ContentType
                },"dishes",FileValidationOptions.ImageUpload,ct);
@@ -329,12 +328,10 @@ public class DishService : IDishService
 
             if (video is not null)
             {
-                using var stream = video.OpenReadStream();
-
                 var uploadResult = await _fileStorage.SaveAsync(
                     new FileUploadRequest
                     {
-                        Stream = stream,
+                        Stream = video.Stream,
                         FileName = video.FileName,
                         ContentType = video.ContentType
                     },
@@ -433,9 +430,9 @@ public class DishService : IDishService
 
     public async Task UpdateDishAsync(
         UpdateDishRequest request,
-        IReadOnlyList<IFormFile> staticImages,
-        IReadOnlyList<IFormFile> images360,
-        IFormFile? video,
+        IReadOnlyList<MediaFileInput> staticImages,
+        IReadOnlyList<MediaFileInput> images360,
+        MediaFileInput? video,
         IReadOnlyList<long> removedMediaIds,
         CancellationToken ct)
     {
@@ -505,7 +502,7 @@ public class DishService : IDishService
                 var uploadResult = await _fileStorage.SaveAsync(
                     new FileUploadRequest
                     {
-                        Stream = file.OpenReadStream(),
+                        Stream = file.Stream,
                         FileName = file.FileName,
                         ContentType = file.ContentType
                     },
@@ -546,12 +543,10 @@ public class DishService : IDishService
                     await _mediaRepo.RemoveMediaAsync(v.Media, ct);
                 }
 
-                using var stream = video.OpenReadStream();
-
                 var uploadResult = await _fileStorage.SaveAsync(
                     new FileUploadRequest
                     {
-                        Stream = stream,
+                        Stream = video.Stream,
                         FileName = video.FileName,
                         ContentType = video.ContentType
                     },

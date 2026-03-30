@@ -1,6 +1,5 @@
 ﻿using Core.Interface.Service;
 using Core.Interface.Service.Others;
-using Core.Interface.Service.Reservation;
 using Hangfire;
 using System;
 
@@ -18,16 +17,16 @@ namespace Infa.Service
         //  (No-Show)
         public string ScheduleNoShowCheck(long reservationId, TimeSpan delay)
         {
-            return _backgroundJobClient.Schedule<IAdminReservationService>(
-                service => service.CheckAndMarkNoShowAsync(reservationId),
+            return _backgroundJobClient.Schedule<AdminReservationJobRunner>(
+                runner => runner.CheckAndMarkNoShowAsync(reservationId),
                 delay);
         }
 
         //  (Auto-Lock)
         public string ScheduleTableLock(long reservationId, TimeSpan delay)
         {
-            return _backgroundJobClient.Schedule<IAdminReservationService>(
-                service => service.LockTablesForReservationAsync(reservationId),
+            return _backgroundJobClient.Schedule<AdminReservationJobRunner>(
+                runner => runner.LockTablesForReservationAsync(reservationId),
                 delay);
         }
 

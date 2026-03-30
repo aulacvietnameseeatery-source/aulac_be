@@ -1,9 +1,8 @@
 using API.Models;
-using Core.Attribute;
+using API.Attributes;
 using Core.Data;
 using Core.DTO.General;
 using Core.DTO.Supplier;
-using Core.Interface.Repo;
 using Core.Interface.Service.Entity;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -18,16 +17,13 @@ namespace Api.Controllers;
 public class SupplierController : ControllerBase
 {
     private readonly ISupplierService _supplierService;
-    private readonly ISupplierRepository _supplierRepository;
     private readonly ILogger<SupplierController> _logger;
 
     public SupplierController(
         ISupplierService supplierService,
-        ISupplierRepository supplierRepository,
         ILogger<SupplierController> logger)
     {
         _supplierService = supplierService;
-        _supplierRepository = supplierRepository;
         _logger = logger;
     }
 

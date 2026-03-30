@@ -1,4 +1,4 @@
-using Core.Attribute;
+using API.Attributes;
 using Core.Data;
 using Core.DTO.SystemSetting;
 using Core.Interface.Service.Entity;

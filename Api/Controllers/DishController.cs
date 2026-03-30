@@ -1,13 +1,16 @@
 ﻿using API.Models;
-using Core.Attribute;
+using API.Models.Requests;
+using API.Attributes;
 using Core.Data;
 using Core.DTO.Auth;
 using Core.DTO.Dish;
+using Core.DTO.General;
 using Core.DTO.LookUpValue;
 using Core.Entity;
 using Core.Interface.Service.Entity;
 using Core.Interface.Service.LookUp;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Net;
 using System.Text.Json;
@@ -33,6 +36,31 @@ public class DishController : ControllerBase
         _dishService = dishService;
         _logger = logger;
         _lookupService = lookupService;
+    }
+
+    private static List<MediaFileInput> MapFiles(IEnumerable<IFormFile>? files)
+    {
+        return files?.Select(file => new MediaFileInput
+        {
+            Stream = file.OpenReadStream(),
+            FileName = file.FileName,
+            ContentType = file.ContentType
+        }).ToList() ?? [];
+    }
+
+    private static MediaFileInput? MapFile(IFormFile? file)
+    {
+        if (file is null)
+        {
+            return null;
+        }
+
+        return new MediaFileInput
+        {
+            Stream = file.OpenReadStream(),
+            FileName = file.FileName,
+            ContentType = file.ContentType
+        };
     }
 
     /// <summary>
@@ -245,9 +273,9 @@ public class DishController : ControllerBase
 
         var result = await _dishService.CreateDishAsync(
             request,
-            dto.StaticImages,
-            dto.Images360,
-            dto.Video,
+            MapFiles(dto.StaticImages),
+            MapFiles(dto.Images360),
+            MapFile(dto.Video),
             ct
         );
 
@@ -306,9 +334,9 @@ public class DishController : ControllerBase
 
         await _dishService.UpdateDishAsync(
             request,
-            dto.StaticImages,
-            dto.Images360,
-            dto.Video,
+            MapFiles(dto.StaticImages),
+            MapFiles(dto.Images360),
+            MapFile(dto.Video),
             removedMediaIds,
             ct
         );
