@@ -347,6 +347,17 @@ namespace Core.Service
                 }
 
                 var discount = CalculateDiscount(order, promo);
+                var appliedRule = FormatRule(promo.PromotionRules.FirstOrDefault());
+
+                if (appliedRule == null && !promo.PromotionTargets.Any())
+                {
+                    appliedRule = new Dictionary<string, string>
+                    {
+                        { "vi", "Sự kiện khuyến mãi" },
+                        { "en", "Promotion event" },
+                        { "fr", "Événement promotionnel" }
+                    };
+                }
 
                 result.Add(new PromotionAvailableDTO
                 {
@@ -356,8 +367,11 @@ namespace Core.Service
                     PromotionType = promo.TypeLv.ValueCode,
                     HasTarget = promo.PromotionTargets.Any(),
                     DiscountValue = promo.DiscountValue,
+                    AppliedRule = appliedRule,
                     EstimatedDiscount = discount,
                     FinalAmount = order.TotalAmount - discount,
+                    TargetDishIds = promo.PromotionTargets.Where(t => t.DishId.HasValue).Select(t => t.DishId!.Value).ToList(),
+                    TargetCategoryIds = promo.PromotionTargets.Where(t => t.CategoryId.HasValue).Select(t => t.CategoryId!.Value).ToList()
                 });
             }
 
@@ -458,6 +472,71 @@ namespace Core.Service
             }
 
             return total;
+        }
+
+        private Dictionary<string, string>? FormatRule(PromotionRule? rule)
+        {
+            if (rule == null) return null;
+
+            var results = new Dictionary<string, string>();
+            var languages = new[] { "vi", "en", "fr" };
+
+            foreach (var lang in languages)
+            {
+                var parts = new List<string>();
+
+                if (rule.MinOrderValue.HasValue)
+                {
+                    parts.Add(lang switch
+                    {
+                        "vi" => $"Hóa đơn tối thiểu: {rule.MinOrderValue.Value:N0} CHF",
+                        "fr" => $"Commande minimum: {rule.MinOrderValue.Value:N0} CHF",
+                        _ => $"Min order value: {rule.MinOrderValue.Value:N0} CHF"
+                    });
+                }
+
+                if (rule.MinQuantity.HasValue)
+                {
+                    parts.Add(lang switch
+                    {
+                        "vi" => $"Số lượng tối thiểu: {rule.MinQuantity.Value} món",
+                        "fr" => $"Quantité minimum: {rule.MinQuantity.Value} plats",
+                        _ => $"Min quantity: {rule.MinQuantity.Value} items"
+                    });
+                }
+
+                if (rule.RequiredDishId.HasValue && rule.RequiredDish != null)
+                {
+                    var dishName = GetTranslation(rule.RequiredDish.DishNameText, lang) ?? rule.RequiredDish.DishName;
+                    parts.Add(lang switch
+                    {
+                        "vi" => $"Yêu cầu món: {dishName}",
+                        "fr" => $"Plat requis: {dishName}",
+                        _ => $"Required dish: {dishName}"
+                    });
+                }
+
+                if (rule.RequiredCategoryId.HasValue && rule.RequiredCategory != null)
+                {
+                    var categoryName = GetTranslation(rule.RequiredCategory.CategoryNameText, lang) ?? rule.RequiredCategory.CategoryName;
+                    parts.Add(lang switch
+                    {
+                        "vi" => $"Yêu cầu danh mục: {categoryName}",
+                        "fr" => $"Catégorie requise: {categoryName}",
+                        _ => $"Required category: {categoryName}"
+                    });
+                }
+
+                results[lang] = string.Join(", ", parts);
+            }
+
+            return results;
+        }
+
+        private string? GetTranslation(I18nText? text, string langCode)
+        {
+            if (text == null) return null;
+            return text.I18nTranslations.FirstOrDefault(t => t.LangCode == langCode)?.TranslatedText ?? text.SourceText;
         }
     }
 }

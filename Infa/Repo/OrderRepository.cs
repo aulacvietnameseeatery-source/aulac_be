@@ -101,6 +101,7 @@ public class OrderRepository : IOrderRepository
 				{
 					OrderItemId = oi.OrderItemId,
 					DishId = oi.DishId,
+					CategoryId = oi.Dish.CategoryId,
 					DishName = oi.Dish.DishName,
 					Quantity = oi.Quantity,
 					Price = oi.Price,
@@ -250,7 +251,7 @@ public class OrderRepository : IOrderRepository
 				.Select(oi => oi.ItemStatusLvId)
 				.ToListAsync(cancellationToken);
 
-			bool allFinished = allItems.All(lvId => lvId == servedItemStatusId || lvId == readyItemStatusId || lvId == rejectedItemStatusId);
+			bool allFinished = allItems.All(lvId => lvId == servedItemStatusId || lvId == readyItemStatusId || lvId == rejectedItemStatusId || lvId == cancelledItemStatusId);
 
 			if (allFinished)
 			{
@@ -344,6 +345,7 @@ public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, Can
 		{
 			OrderItemId  = oi.OrderItemId,
 			DishId       = oi.DishId,
+			CategoryId   = oi.Dish.CategoryId,
 			DishName     = oi.Dish.DishName,
 			Quantity     = oi.Quantity,
 			Price        = oi.Price,
@@ -413,6 +415,7 @@ public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, Can
 			{
 				OrderItemId = oi.OrderItemId,
 				DishId      = oi.DishId,
+				CategoryId  = oi.Dish.CategoryId,
 				DishName    = oi.Dish.DishName,
 				Quantity    = oi.Quantity,
 				Price       = oi.Price,
@@ -483,6 +486,7 @@ public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, Can
                 {
                     OrderItemId = oi.OrderItemId,
                     DishId = oi.DishId,
+                    CategoryId = oi.Dish.CategoryId,
                     DishName = oi.Dish.DishName,
                     Quantity = oi.Quantity,
                     Price = oi.Price,
