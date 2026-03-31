@@ -94,46 +94,41 @@ public class PaymentService : IPaymentService
             var tipAmount = dto.TipAmount ?? order.TipAmount ?? 0m;
             decimal totalDiscountAmount = 0m;
 
-            if (dto.CouponId.HasValue)
+            if (dto.CouponIds != null && dto.CouponIds.Any())
             {
-                var coupon = await _context.Coupons
-                    .Include(c => c.TypeLv)
-                    .FirstOrDefaultAsync(c => c.CouponId == dto.CouponId.Value, cancellationToken)
-                    ?? throw new InvalidOperationException("Coupon not found.");
-
-                if (coupon.CouponStatusLvId != activeCouponStatusId)
+                foreach (var couponId in dto.CouponIds.Distinct())
                 {
-                    throw new InvalidOperationException("Coupon is not active.");
-                }
+                    var coupon = await _context.Coupons
+                        .Include(c => c.TypeLv)
+                        .FirstOrDefaultAsync(c => c.CouponId == couponId, cancellationToken)
+                        ?? throw new InvalidOperationException($"Coupon {couponId} not found.");
 
-                if (now < coupon.StartTime || now > coupon.EndTime)
-                {
-                    throw new InvalidOperationException("Coupon is outside its valid period.");
-                }
+                    if (coupon.CouponStatusLvId != activeCouponStatusId)
+                        throw new InvalidOperationException($"Coupon {coupon.CouponCode} is not active.");
 
-                if (coupon.MaxUsage.HasValue && (coupon.UsedCount ?? 0) >= coupon.MaxUsage.Value)
-                {
-                    throw new InvalidOperationException("Coupon usage limit has been reached.");
-                }
+                    if (now < coupon.StartTime || now > coupon.EndTime)
+                        throw new InvalidOperationException($"Coupon {coupon.CouponCode} is outside its valid period.");
 
-                var existingOrderCoupon = order.OrderCoupons.FirstOrDefault(oc => oc.CouponId == coupon.CouponId);
-                if (existingOrderCoupon is null)
-                {
-                    var couponDiscountAmount = CalculateDiscountAmount(coupon.TypeLv.ValueCode, coupon.DiscountValue, subTotal);
+                    if (coupon.MaxUsage.HasValue && (coupon.UsedCount ?? 0) >= coupon.MaxUsage.Value)
+                        throw new InvalidOperationException($"Coupon {coupon.CouponCode} usage limit has been reached.");
 
-                    order.OrderCoupons.Add(new OrderCoupon
+                    var existingOrderCoupon = order.OrderCoupons.FirstOrDefault(oc => oc.CouponId == coupon.CouponId);
+                    if (existingOrderCoupon is null)
                     {
-                        CouponId = coupon.CouponId,
-                        DiscountAmount = couponDiscountAmount,
-                        AppliedAt = now
-                    });
-
-                    coupon.UsedCount = (coupon.UsedCount ?? 0) + 1;
-                    totalDiscountAmount += couponDiscountAmount;
-                }
-                else
-                {
-                    totalDiscountAmount += existingOrderCoupon.DiscountAmount;
+                        var couponDiscountAmount = CalculateDiscountAmount(coupon.TypeLv.ValueCode, coupon.DiscountValue, subTotal);
+                        order.OrderCoupons.Add(new OrderCoupon
+                        {
+                            CouponId = coupon.CouponId,
+                            DiscountAmount = couponDiscountAmount,
+                            AppliedAt = now
+                        });
+                        coupon.UsedCount = (coupon.UsedCount ?? 0) + 1;
+                        totalDiscountAmount += couponDiscountAmount;
+                    }
+                    else
+                    {
+                        totalDiscountAmount += existingOrderCoupon.DiscountAmount;
+                    }
                 }
             }
 
