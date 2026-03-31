@@ -250,7 +250,7 @@ public class OrderRepository : IOrderRepository
 				.Select(oi => oi.ItemStatusLvId)
 				.ToListAsync(cancellationToken);
 
-			bool allFinished = allItems.All(lvId => lvId == servedItemStatusId || lvId == readyItemStatusId || lvId == rejectedItemStatusId);
+			bool allFinished = allItems.All(lvId => lvId == servedItemStatusId || lvId == readyItemStatusId || lvId == rejectedItemStatusId || lvId == cancelledItemStatusId);
 
 			if (allFinished)
 			{
