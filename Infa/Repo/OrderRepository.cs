@@ -101,6 +101,7 @@ public class OrderRepository : IOrderRepository
 				{
 					OrderItemId = oi.OrderItemId,
 					DishId = oi.DishId,
+					CategoryId = oi.Dish.CategoryId,
 					DishName = oi.Dish.DishName,
 					Quantity = oi.Quantity,
 					Price = oi.Price,
@@ -344,6 +345,7 @@ public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, Can
 		{
 			OrderItemId  = oi.OrderItemId,
 			DishId       = oi.DishId,
+			CategoryId   = oi.Dish.CategoryId,
 			DishName     = oi.Dish.DishName,
 			Quantity     = oi.Quantity,
 			Price        = oi.Price,
@@ -413,6 +415,7 @@ public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, Can
 			{
 				OrderItemId = oi.OrderItemId,
 				DishId      = oi.DishId,
+				CategoryId  = oi.Dish.CategoryId,
 				DishName    = oi.Dish.DishName,
 				Quantity    = oi.Quantity,
 				Price       = oi.Price,
@@ -483,6 +486,7 @@ public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, Can
                 {
                     OrderItemId = oi.OrderItemId,
                     DishId = oi.DishId,
+                    CategoryId = oi.Dish.CategoryId,
                     DishName = oi.Dish.DishName,
                     Quantity = oi.Quantity,
                     Price = oi.Price,
