@@ -248,7 +248,6 @@ public class DishService : IDishService
         return (dtos, totalCount);
     }
 
-    // --- CÁC HÀM HỖ TRỢ DROPDOWN (Giữ nguyên) ---
 
     public async Task<List<string>> GetAllCategoriesAsync(CancellationToken cancellationToken = default)
     {
