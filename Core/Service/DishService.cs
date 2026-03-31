@@ -148,33 +148,45 @@ public class DishService : IDishService
     /// Lấy danh sách cho Admin (Map sang DishManagementDto)
     /// </summary>
     public async Task<(List<DishManagementDto> Items, int TotalCount)> GetDishesForAdminAsync(
-        GetDishesRequest request,
-        CancellationToken cancellationToken = default)
+    GetDishesRequest request,
+    CancellationToken cancellationToken = default)
     {
         try
         {
-            // 1. Gọi Repository để lấy dữ liệu
             var (entities, totalCount) = await _dishRepository.GetDishesAsync(request, cancellationToken);
 
-            // 2. Map sang DTO của bạn
             var dtos = entities.Select(d => new DishManagementDto
             {
                 DishId = d.DishId,
                 DishName = d.DishName,
-
-                // Xử lý null cho Category
                 CategoryName = d.Category?.CategoryName ?? "Uncategorized",
-
                 Price = d.Price,
-
-                // Map Status (Tên hiển thị)
                 Status = d.DishStatusLv?.ValueName ?? "Unknown",
-
-                // Map StatusId (Quan trọng để Frontend tô màu Badge)
                 StatusId = d.DishStatusLvId,
-
                 IsOnline = d.IsOnline ?? false,
-                CreatedAt = d.CreatedAt
+                CreatedAt = d.CreatedAt,
+
+
+                NameI18n = new I18nTextDto
+                {
+                    Vi = d.DishNameText?.I18nTranslations?.FirstOrDefault(t => t.LangCode == "vi")?.TranslatedText ?? string.Empty,
+                    En = d.DishNameText?.I18nTranslations?.FirstOrDefault(t => t.LangCode == "en")?.TranslatedText ?? string.Empty,
+                    Fr = d.DishNameText?.I18nTranslations?.FirstOrDefault(t => t.LangCode == "fr")?.TranslatedText ?? string.Empty
+                },
+
+                DescriptionI18n = new I18nTextDto
+                {
+                    Vi = d.DescriptionText?.I18nTranslations?.FirstOrDefault(t => t.LangCode == "vi")?.TranslatedText ?? string.Empty,
+                    En = d.DescriptionText?.I18nTranslations?.FirstOrDefault(t => t.LangCode == "en")?.TranslatedText ?? string.Empty,
+                    Fr = d.DescriptionText?.I18nTranslations?.FirstOrDefault(t => t.LangCode == "fr")?.TranslatedText ?? string.Empty
+                },
+
+                CategoryNameI18n = new I18nTextDto
+                {
+                    Vi = d.Category?.CategoryNameText?.I18nTranslations?.FirstOrDefault(t => t.LangCode == "vi")?.TranslatedText ?? string.Empty,
+                    En = d.Category?.CategoryNameText?.I18nTranslations?.FirstOrDefault(t => t.LangCode == "en")?.TranslatedText ?? string.Empty,
+                    Fr = d.Category?.CategoryNameText?.I18nTranslations?.FirstOrDefault(t => t.LangCode == "fr")?.TranslatedText ?? string.Empty
+                }
             }).ToList();
 
             return (dtos, totalCount);
