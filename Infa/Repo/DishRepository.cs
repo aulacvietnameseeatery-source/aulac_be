@@ -27,24 +27,24 @@ public class DishRepository : IDishRepository
     }
 
     public async Task<(List<Dish> Items, int TotalCount)> GetDishesAsync(
-        GetDishesRequest request,
-        CancellationToken cancellationToken = default)
+    GetDishesRequest request,
+    CancellationToken cancellationToken = default)
     {
         var query = _context.Dishes
             .Include(d => d.Category)
-                .ThenInclude(c => c.CategoryNameText)       
-                    .ThenInclude(t => t.I18nTranslations)   
+                .ThenInclude(c => c.CategoryNameText)
+                    .ThenInclude(t => t.I18nTranslations)
             .Include(d => d.DishStatusLv)
             .Include(d => d.DishMedia)
-                .ThenInclude(dm => dm.Media)                
-            .Include(d => d.DishNameText)                   
-                .ThenInclude(t => t.I18nTranslations)       
-            .Include(d => d.DescriptionText)                
-                .ThenInclude(t => t.I18nTranslations)       
-            .AsNoTracking() // Tối ưu hiệu năng cho việc chỉ đọc (Read-only)
+                .ThenInclude(dm => dm.Media)
+            .Include(d => d.DishNameText)
+                .ThenInclude(t => t.I18nTranslations)
+            .Include(d => d.DescriptionText)
+                .ThenInclude(t => t.I18nTranslations)
+            .AsNoTracking()
             .AsQueryable();
 
-        // 2. Logic Searching (Tìm kiếm)
+        // Logic Searching 
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
             var searchTerm = request.Search.Trim().ToLower();
@@ -55,28 +55,26 @@ public class DishRepository : IDishRepository
             );
         }
 
-        // 3. Logic Filtering (Bộ lọc)
 
-        // 3a. Filter cho Customer (Logic nghiệp vụ đặc thù)
+        //  Filter Customer
         if (request.IsCustomerView)
         {
-            // 1. Chuyển Enum thành chữ "AVAILABLE"
             var availableCode = DishStatusCode.AVAILABLE.ToString();
             var lookupTypeId = (long)Core.Enum.LookupType.DishStatus;
 
-            // 2. Query DB để tìm ID thực tế của trạng thái này
             var availableId = await _context.LookupValues
                 .Where(lv => lv.TypeId == lookupTypeId && lv.ValueCode == availableCode)
                 .Select(lv => lv.ValueId)
                 .FirstOrDefaultAsync(cancellationToken);
 
-            // 3. Filter bằng ID vừa tìm được
             query = query.Where(d => d.IsOnline == true &&
-                                     d.DishStatusLvId == availableId);
+                                     d.DishStatusLvId == availableId &&
+                                     d.Category != null &&
+                                     d.Category.IsDisabled == false);
         }
         else
         {
-            // 3b. Filter cho Admin (Theo Status cụ thể nếu có)
+            // Filter Admin 
             if (request.Status.HasValue)
             {
                 var statusId = (long)request.Status.Value;
@@ -84,10 +82,9 @@ public class DishRepository : IDishRepository
             }
         }
 
-        // 4. Logic Sorting (Sắp xếp)
+        // Logic Sorting
         if (string.IsNullOrWhiteSpace(request.SortBy))
         {
-            // Mặc định sắp xếp theo ID giảm dần (Mới nhất lên đầu)
             query = query.OrderByDescending(d => d.DishId);
         }
         else
@@ -110,12 +107,10 @@ public class DishRepository : IDishRepository
             }
         }
 
-        // 5. Pagination (Phân trang)
+        // Pagination 
 
-        // Đếm tổng số bản ghi thỏa mãn điều kiện TRƯỚC khi cắt trang
         var totalCount = await query.CountAsync(cancellationToken);
 
-        // Xử lý trang hợp lệ (giống code mẫu)
         var pageIndex = request.PageIndex < 1 ? 1 : request.PageIndex;
         var pageSize = request.PageSize < 1 ? 10 : request.PageSize;
 
@@ -127,16 +122,15 @@ public class DishRepository : IDishRepository
         return (items, totalCount);
     }
 
-    // Lấy danh sách Categories để đổ vào dropdown filter
     public async Task<List<string>> GetAllCategoriesAsync(CancellationToken cancellationToken = default)
     {
         return await _context.DishCategories
+            .Where(c => c.IsDisabled == false)
             .OrderBy(c => c.DisPlayOrder)
             .Select(c => c.CategoryName)
             .ToListAsync(cancellationToken);
     }
 
-    // Lấy danh sách Statuses để đổ vào dropdown filter 
     public async Task<List<LookupValue>> GetDishStatusesAsync(CancellationToken cancellationToken = default)
     {
 
@@ -146,7 +140,7 @@ public class DishRepository : IDishRepository
             .Where(lv => lv.TypeId == typeId
                          && lv.IsActive == true
                          && lv.DeletedAt == null)
-            .OrderBy(lv => lv.ValueId) // Sẽ trả về 42, 43, 44 theo thứ tự
+            .OrderBy(lv => lv.ValueId) 
             .ToListAsync(cancellationToken);
     }
 

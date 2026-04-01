@@ -40,6 +40,8 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Core.Interface.Service.Reservation;
 using Core.Interface.Service.Notification;
+using Core.Interface.Service.Report;
+using Infa.Repository;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -294,6 +296,7 @@ builder.Services.AddScoped<IInventoryService, InventoryService>();
 builder.Services.AddScoped<IEmailTemplateService, EmailTemplateService>();
 
 builder.Services.AddScoped<IDashboardService, DashboardService>();    
+builder.Services.AddScoped<IReportService, ReportService>();
 
 
 #endregion
@@ -336,6 +339,8 @@ builder.Services.AddScoped<IInventoryRepository, InventoryRepository>();
 builder.Services.AddScoped<ILoginActivityRepository, LoginActivityRepository>();
 builder.Services.AddScoped<IEmailTemplateRepository, EmailTemplateRepository>();
 builder.Services.AddScoped<IDashboardRepository, DashboardRepository>();
+
+builder.Services.AddScoped<IReportRepository, ReportRepository>();
 #endregion
 
 #region Email Services + Background Worker
@@ -484,11 +489,11 @@ using (var scope = app.Services.CreateScope())
 app.UseMiddleware<HandleExceptionMiddleware>();
 
 // Configure the HTTP request pipeline.
-//if (app.Environment.IsDevelopment())
-//{
-//    app.UseSwagger();
-//    app.UseSwaggerUI();
-//}
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
 
 app.UseCors("AllowFrontend");
 app.UseHttpsRedirection();

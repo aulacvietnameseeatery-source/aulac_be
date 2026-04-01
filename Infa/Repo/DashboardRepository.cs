@@ -121,7 +121,7 @@ public class DashboardRepository : IDashboardRepository
         return new DashboardStatisticsDto
         {
             OrdersByType = ordersByType.ToDictionary(x => x.Source, x => x.Count),
-            TopCustomer = topCustomer
+            TopCustomers = topCustomer
         };
     }
 }

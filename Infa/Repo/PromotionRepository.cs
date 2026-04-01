@@ -133,6 +133,13 @@ namespace Infa.Repo
         {
             return await _context.Promotions
                 .Include(p => p.PromotionRules)
+                    .ThenInclude(r => r.RequiredDish)
+                        .ThenInclude(d => d.DishNameText)
+                            .ThenInclude(t => t.I18nTranslations)
+                .Include(p => p.PromotionRules)
+                    .ThenInclude(r => r.RequiredCategory)
+                        .ThenInclude(c => c.CategoryNameText)
+                            .ThenInclude(t => t.I18nTranslations)
                 .Include(p => p.PromotionTargets)
                 .Include(p => p.TypeLv)
                 .Include(p => p.PromotionStatusLv)
