@@ -1,6 +1,5 @@
 using Core.DTO.General;
 using Core.DTO.Inventory;
-using Microsoft.AspNetCore.Http;
 
 namespace Core.Interface.Service.Entity;
 
@@ -10,7 +9,7 @@ public interface IInventoryService
     Task<PagedResultDTO<InventoryItemDto>> GetItemsAsync(GetInventoryItemsFilterRequest filter, CancellationToken ct = default);
 
     // ── Transactions ──
-    Task<InventoryTransactionDetailDto> CreateTransactionAsync(CreateInventoryTransactionRequest request, long createdByUserId, List<IFormFile>? evidenceFiles = null, CancellationToken ct = default);
+    Task<InventoryTransactionDetailDto> CreateTransactionAsync(CreateInventoryTransactionRequest request, long createdByUserId, IReadOnlyList<MediaFileInput>? evidenceFiles = null, CancellationToken ct = default);
     Task<InventoryTransactionDetailDto> GetTransactionDetailAsync(long transactionId, CancellationToken ct = default);
     Task<PagedResultDTO<InventoryTransactionListDto>> GetTransactionsAsync(GetTransactionsFilterRequest filter, CancellationToken ct = default);
 

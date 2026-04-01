@@ -123,7 +123,7 @@ public class TableService : ITableService
     }
 
     /// <inheritdoc />
-    public async Task<TableDetailDto> CreateTableAsync(CreateTableFormRequest request, CancellationToken ct = default)
+    public async Task<TableDetailDto> CreateTableAsync(CreateTableRequest request, IReadOnlyList<MediaFileInput> images, CancellationToken ct = default)
     {
         // ── Validate ──
         if (string.IsNullOrWhiteSpace(request.TableCode))
@@ -168,8 +168,8 @@ public class TableService : ITableService
             savedQrPath = await SaveQrImageAsync(entity.TableId, request.TableCode.Trim(), qrToken, ct);
 
             // ── Upload optional table images ──
-            if (request.Images.Count > 0)
-                await SaveTableImagesAsync(entity.TableId, request.Images, savedImagePaths, ct);
+            if (images.Count > 0)
+                await SaveTableImagesAsync(entity.TableId, images, savedImagePaths, ct);
 
             await _unitOfWork.CommitAsync(ct);
         }
@@ -187,7 +187,7 @@ public class TableService : ITableService
         return MapToDetailDto(saved);
     }
 
-    public async Task<TableDetailDto> UpdateTableAsync(long id, UpdateTableFormRequest request, CancellationToken ct = default)
+    public async Task<TableDetailDto> UpdateTableAsync(long id, UpdateTableRequest request, IReadOnlyList<MediaFileInput> images, IReadOnlyList<long> removedImageIds, CancellationToken ct = default)
     {
         var table = await _tableRepository.GetByIdWithDetailsAsync(id, ct)
                     ?? throw new NotFoundException("Table not found");
@@ -239,7 +239,7 @@ public class TableService : ITableService
         try
         {
             // ── Remove requested images ──
-            foreach (var mediaId in request.ParsedRemovedImageIds)
+            foreach (var mediaId in removedImageIds)
             {
                 var link = await _tableRepository.GetTableMediaAsync(id, mediaId, ct);
                 if (link is null) continue;
@@ -258,8 +258,8 @@ public class TableService : ITableService
             }
 
             // ── Upload new table images ──
-            if (request.Images.Count > 0)
-                await SaveTableImagesAsync(id, request.Images, savedImagePaths, ct);
+            if (images.Count > 0)
+                await SaveTableImagesAsync(id, images, savedImagePaths, ct);
 
             await _unitOfWork.CommitAsync(ct);
         }
@@ -623,12 +623,12 @@ public class TableService : ITableService
     }
 
     /// <summary>
-    /// Saves a batch of <see cref="IFormFile"/> images and links them to the table.
+    /// Saves a batch of uploaded images and links them to the table.
     /// Appends written relative paths to <paramref name="savedPaths"/> for rollback cleanup.
     /// </summary>
     private async Task SaveTableImagesAsync(
         long tableId,
-        IReadOnlyList<Microsoft.AspNetCore.Http.IFormFile> files,
+        IReadOnlyList<MediaFileInput> files,
         List<string> savedPaths,
         CancellationToken ct)
     {
@@ -636,7 +636,7 @@ public class TableService : ITableService
 
         var uploadRequests = files.Select(f => new FileUploadRequest
         {
-            Stream = f.OpenReadStream(),
+            Stream = f.Stream,
             FileName = f.FileName,
             ContentType = f.ContentType
         }).ToList();

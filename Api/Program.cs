@@ -257,6 +257,7 @@ builder.Services.AddAuthorization(options =>
 builder.Services.AddScoped<ISystemSettingService, SystemSettingService>();
 builder.Services.AddScoped<ILoyaltyService, LoyaltyService>();
 builder.Services.AddScoped<IAccountService, AccountService>();
+builder.Services.AddScoped<IAccountActivityService, AccountActivityService>();
 // Forgot password token store uses cache
 builder.Services.AddSingleton<IPasswordResetTokenStore, CachePasswordResetTokenStore>();
 

@@ -1,9 +1,12 @@
 ﻿using API.Models;
-using Core.Attribute;
+using API.Models.Requests;
+using API.Attributes;
 using Core.Data;
+using Core.DTO.General;
 using Core.DTO.Table;
 using Core.Interface.Service.Entity;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace API.Controllers;
@@ -21,6 +24,16 @@ public class TableController : ControllerBase
     public TableController(ITableService tableService)
     {
         _tableService = tableService;
+    }
+
+    private static List<MediaFileInput> MapFiles(IEnumerable<IFormFile>? files)
+    {
+        return files?.Select(file => new MediaFileInput
+        {
+            Stream = file.OpenReadStream(),
+            FileName = file.FileName,
+            ContentType = file.ContentType
+        }).ToList() ?? [];
     }
 
     // ── List / Select ─────────────────────────────────────────────────────────
@@ -138,7 +151,17 @@ public class TableController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> CreateTable([FromForm] CreateTableFormRequest request, CancellationToken ct)
     {
-        var dto = await _tableService.CreateTableAsync(request, ct);
+        var createRequest = new CreateTableRequest
+        {
+            TableCode = request.TableCode,
+            Capacity = request.Capacity,
+            IsOnline = request.IsOnline,
+            StatusLvId = request.StatusLvId,
+            TypeLvId = request.TypeLvId,
+            ZoneLvId = request.ZoneLvId
+        };
+
+        var dto = await _tableService.CreateTableAsync(createRequest, MapFiles(request.Images), ct);
 
         return StatusCode(StatusCodes.Status201Created, new ApiResponse<TableDetailDto>
         {
@@ -178,7 +201,17 @@ public class TableController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> UpdateTable(long id, [FromForm] UpdateTableFormRequest request, CancellationToken ct)
     {
-        var dto = await _tableService.UpdateTableAsync(id, request, ct);
+        var updateRequest = new UpdateTableRequest
+        {
+            TableCode = request.TableCode,
+            Capacity = request.Capacity,
+            IsOnline = request.IsOnline,
+            StatusLvId = request.StatusLvId,
+            TypeLvId = request.TypeLvId,
+            ZoneLvId = request.ZoneLvId
+        };
+
+        var dto = await _tableService.UpdateTableAsync(id, updateRequest, MapFiles(request.Images), request.ParseRemovedImageIds(), ct);
 
         return Ok(new ApiResponse<TableDetailDto>
         {
