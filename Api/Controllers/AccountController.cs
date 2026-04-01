@@ -1,4 +1,4 @@
-﻿using Core.Attribute;
+﻿using API.Attributes;
 using Core.Data;
 using Core.DTO.Auth;
 using Core.Interface.Service.Entity;
@@ -16,13 +16,16 @@ namespace Api.Controllers
     public class AccountController : ControllerBase
     {
         private readonly IAccountService _accountService;
+        private readonly IAccountActivityService _activityService;
         private readonly ILogger<AccountController> _logger;
 
         public AccountController(
             IAccountService accountService,
+            IAccountActivityService activityService,
             ILogger<AccountController> logger)
         {
             _accountService = accountService;
+            _activityService = activityService;
             _logger = logger;
         }
 
@@ -514,6 +517,23 @@ namespace Api.Controllers
 			});
 		}
 
+        [HttpGet("roles/active")]
+        [HasPermission(Permissions.ViewAccount)]
+        public async Task<IActionResult> GetActiveRoles(CancellationToken cancellationToken = default)
+        {
+            var roles = await _accountService.GetActiveRolesAsync(cancellationToken);
+
+            return Ok(new ApiResponse<List<RoleDTO>>
+            {
+                Success = true,
+                Code = 200,
+                SubCode = 0,
+                UserMessage = "Get active roles successfully",
+                Data = roles,
+                ServerTime = DateTimeOffset.Now
+            });
+        }
+
 		[HttpGet("statuses")]
 		[HasPermission(Permissions.ViewAccount)]
 		public async Task<IActionResult> GetAccountStatuses(CancellationToken cancellationToken = default)
@@ -531,6 +551,125 @@ namespace Api.Controllers
 			});
 		}
 
+
+        #region Account Activity Endpoints
+
+        /// <summary>
+        /// Gets paginated orders handled by a specific staff member.
+        /// </summary>
+        [HttpGet("{id}/orders")]
+        [HasPermission(Permissions.ViewAccount)]
+        [ProducesResponseType(typeof(ApiResponse<PagedResultDTO<AccountOrderSummaryDTO>>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetAccountOrders(
+            long id,
+            [FromQuery] AccountSubResourceQueryDTO query,
+            CancellationToken ct = default)
+        {
+            var result = await _activityService.GetAccountOrdersAsync(id, query, ct);
+
+            return Ok(new ApiResponse<PagedResultDTO<AccountOrderSummaryDTO>>
+            {
+                Success = true,
+                Code = 200,
+                UserMessage = "Account orders retrieved successfully.",
+                Data = result,
+                ServerTime = DateTimeOffset.UtcNow
+            });
+        }
+
+        /// <summary>
+        /// Gets paginated audit log entries for a specific staff member.
+        /// </summary>
+        [HttpGet("{id}/audit-logs")]
+        [HasPermission(Permissions.ViewAccount)]
+        [ProducesResponseType(typeof(ApiResponse<PagedResultDTO<AccountAuditLogDTO>>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetAccountAuditLogs(
+            long id,
+            [FromQuery] AccountSubResourceQueryDTO query,
+            CancellationToken ct = default)
+        {
+            var result = await _activityService.GetAccountAuditLogsAsync(id, query, ct);
+
+            return Ok(new ApiResponse<PagedResultDTO<AccountAuditLogDTO>>
+            {
+                Success = true,
+                Code = 200,
+                UserMessage = "Account audit logs retrieved successfully.",
+                Data = result,
+                ServerTime = DateTimeOffset.UtcNow
+            });
+        }
+
+        /// <summary>
+        /// Gets paginated login activity for a specific staff member.
+        /// </summary>
+        [HttpGet("{id}/login-activity")]
+        [HasPermission(Permissions.ViewAccount)]
+        [ProducesResponseType(typeof(ApiResponse<PagedResultDTO<AccountLoginActivityDTO>>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetAccountLoginActivity(
+            long id,
+            [FromQuery] AccountSubResourceQueryDTO query,
+            CancellationToken ct = default)
+        {
+            var result = await _activityService.GetAccountLoginActivityAsync(id, query, ct);
+
+            return Ok(new ApiResponse<PagedResultDTO<AccountLoginActivityDTO>>
+            {
+                Success = true,
+                Code = 200,
+                UserMessage = "Account login activity retrieved successfully.",
+                Data = result,
+                ServerTime = DateTimeOffset.UtcNow
+            });
+        }
+
+        /// <summary>
+        /// Gets paginated service errors attributed to a specific staff member.
+        /// </summary>
+        [HttpGet("{id}/service-errors")]
+        [HasPermission(Permissions.ViewAccount)]
+        [ProducesResponseType(typeof(ApiResponse<PagedResultDTO<AccountServiceErrorDTO>>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetAccountServiceErrors(
+            long id,
+            [FromQuery] AccountSubResourceQueryDTO query,
+            CancellationToken ct = default)
+        {
+            var result = await _activityService.GetAccountServiceErrorsAsync(id, query, ct);
+
+            return Ok(new ApiResponse<PagedResultDTO<AccountServiceErrorDTO>>
+            {
+                Success = true,
+                Code = 200,
+                UserMessage = "Account service errors retrieved successfully.",
+                Data = result,
+                ServerTime = DateTimeOffset.UtcNow
+            });
+        }
+
+        /// <summary>
+        /// Gets paginated inventory transactions created or approved by a specific staff member.
+        /// </summary>
+        [HttpGet("{id}/inventory-activity")]
+        [HasPermission(Permissions.ViewAccount)]
+        [ProducesResponseType(typeof(ApiResponse<PagedResultDTO<AccountInventoryActivityDTO>>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetAccountInventoryActivity(
+            long id,
+            [FromQuery] AccountSubResourceQueryDTO query,
+            CancellationToken ct = default)
+        {
+            var result = await _activityService.GetAccountInventoryActivityAsync(id, query, ct);
+
+            return Ok(new ApiResponse<PagedResultDTO<AccountInventoryActivityDTO>>
+            {
+                Success = true,
+                Code = 200,
+                UserMessage = "Account inventory activity retrieved successfully.",
+                Data = result,
+                ServerTime = DateTimeOffset.UtcNow
+            });
+        }
+
+        #endregion
 
 		#region Helper Methods
 

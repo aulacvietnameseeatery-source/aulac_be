@@ -1,9 +1,11 @@
 using API.Models;
-using Core.Attribute;
+using API.Models.Requests;
+using API.Attributes;
 using Core.Data;
 using Core.DTO.General;
 using Core.DTO.Inventory;
 using Core.Interface.Service.Entity;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
 
@@ -25,6 +27,16 @@ public class InventoryController : ControllerBase
     {
         _inventoryService = inventoryService;
         _logger = logger;
+    }
+
+    private static List<MediaFileInput> MapFiles(IEnumerable<IFormFile>? files)
+    {
+        return files?.Select(file => new MediaFileInput
+        {
+            Stream = file.OpenReadStream(),
+            FileName = file.FileName,
+            ContentType = file.ContentType
+        }).ToList() ?? [];
     }
 
     private long GetCurrentUserId()
@@ -125,7 +137,7 @@ public class InventoryController : ControllerBase
             ?? throw new ArgumentException("Invalid RequestJson payload.");
 
         var userId = GetCurrentUserId();
-        var result = await _inventoryService.CreateTransactionAsync(request, userId, formRequest.EvidenceFiles, ct);
+        var result = await _inventoryService.CreateTransactionAsync(request, userId, MapFiles(formRequest.EvidenceFiles), ct);
 
         _logger.LogInformation("User {UserId} created inventory transaction {TxCode}",
             userId, result.TransactionCode);

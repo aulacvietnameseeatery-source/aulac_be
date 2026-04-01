@@ -122,6 +122,13 @@ public interface IAccountService
 	/// <returns>List of all roles</returns>
 	Task<List<RoleDTO>> GetAllRolesAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Gets only active roles for dropdown/filter purposes.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>List of active roles</returns>
+    Task<List<RoleDTO>> GetActiveRolesAsync(CancellationToken cancellationToken = default);
+
 	/// <summary>
 	/// Gets all account statuses for dropdown/filter purposes.
 	/// </summary>

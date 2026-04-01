@@ -577,6 +577,9 @@ else
 	public Task<List<RoleDTO>> GetAllRolesAsync(CancellationToken cancellationToken = default)
 		=> _accountRepository.GetAllRolesAsync(cancellationToken);
 
+    public Task<List<RoleDTO>> GetActiveRolesAsync(CancellationToken cancellationToken = default)
+        => _accountRepository.GetActiveRolesAsync(cancellationToken);
+
 	public Task<List<AccountStatusDTO>> GetAccountStatusesAsync(CancellationToken cancellationToken = default)
 		=> _accountRepository.GetAccountStatusesAsync(cancellationToken);
 

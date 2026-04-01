@@ -2,6 +2,7 @@ using Core.Data;
 using Core.DTO.Account;
 using Core.DTO.General;
 using Core.Entity;
+using Core.Enum;
 using Core.Interface.Repo;
 using Infa.Data;
 using Microsoft.EntityFrameworkCore;
@@ -193,6 +194,18 @@ public class AccountRepository : IAccountRepository
     public async Task<List<RoleDTO>> GetAllRolesAsync(CancellationToken cancellationToken = default)
     {
         return await _context.Roles
+            .Select(r => new RoleDTO
+            {
+                RoleId = r.RoleId,
+                RoleName = r.RoleName
+            })
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<List<RoleDTO>> GetActiveRolesAsync(CancellationToken cancellationToken = default)
+    {
+        return await _context.Roles
+            .Where(r => r.RoleStatusLv != null && r.RoleStatusLv.ValueCode == RoleStatusCode.ACTIVE.ToString())
             .Select(r => new RoleDTO
             {
                 RoleId = r.RoleId,

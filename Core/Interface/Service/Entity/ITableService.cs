@@ -1,4 +1,5 @@
-﻿using Core.DTO.LookUpValue;
+﻿using Core.DTO.General;
+using Core.DTO.LookUpValue;
 using Core.DTO.Table;
 
 
@@ -31,12 +32,12 @@ public interface ITableService
     /// <summary>
     /// Creates a new table. Optionally uploads images in the same request.
     /// </summary>
-    Task<TableDetailDto> CreateTableAsync(CreateTableFormRequest request, CancellationToken ct = default);
+    Task<TableDetailDto> CreateTableAsync(CreateTableRequest request, IReadOnlyList<MediaFileInput> images, CancellationToken ct = default);
 
     /// <summary>
     /// Updates a table. Optionally adds new images and/or removes existing ones in the same request.
     /// </summary>
-    Task<TableDetailDto> UpdateTableAsync(long id, UpdateTableFormRequest request, CancellationToken ct = default);
+    Task<TableDetailDto> UpdateTableAsync(long id, UpdateTableRequest request, IReadOnlyList<MediaFileInput> images, IReadOnlyList<long> removedImageIds, CancellationToken ct = default);
 
     /// <summary>
     /// Soft-deletes a table. Returns 409 if the table has active orders or upcoming reservations.
@@ -112,9 +113,3 @@ public interface ITableService
 /// <summary>
 /// Represents a file to be uploaded for table media operations.
 /// </summary>
-public class MediaFileInput
-{
-    public Stream Stream { get; set; } = null!;
-    public string FileName { get; set; } = null!;
-    public string ContentType { get; set; } = null!;
-}
