@@ -103,6 +103,11 @@ public class PaymentService : IPaymentService
                         .FirstOrDefaultAsync(c => c.CouponId == couponId, cancellationToken)
                         ?? throw new InvalidOperationException($"Coupon {couponId} not found.");
 
+                    if (coupon.CustomerId.HasValue && coupon.CustomerId.Value != order.CustomerId)
+                    {
+                        throw new InvalidOperationException($"Coupon {coupon.CouponCode} does not belong to this customer.");
+                    }
+
                     if (coupon.CouponStatusLvId != activeCouponStatusId)
                         throw new InvalidOperationException($"Coupon {coupon.CouponCode} is not active.");
 

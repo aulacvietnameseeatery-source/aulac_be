@@ -12,6 +12,7 @@ public sealed class CouponConfiguration : IEntityTypeConfiguration<Coupon>
 
         entity.ToTable("coupon");
 
+        entity.HasIndex(e => e.CustomerId, "idx_coupon_customer_id");
         entity.HasIndex(e => e.CouponStatusLvId, "idx_coupon_status_lv");
 
         entity.HasIndex(e => e.TypeLvId, "idx_coupon_type_lv");
@@ -19,6 +20,7 @@ public sealed class CouponConfiguration : IEntityTypeConfiguration<Coupon>
         entity.HasIndex(e => e.CouponCode, "uq_coupon_code").IsUnique();
 
         entity.Property(e => e.CouponId).HasColumnName("coupon_id");
+        entity.Property(e => e.CustomerId).HasColumnName("customer_id");
         entity.Property(e => e.CouponCode)
         .HasMaxLength(50)
         .HasColumnName("coupon_code");
@@ -52,6 +54,11 @@ public sealed class CouponConfiguration : IEntityTypeConfiguration<Coupon>
         .HasForeignKey(d => d.CouponStatusLvId)
         .OnDelete(DeleteBehavior.ClientSetNull)
         .HasConstraintName("fk_coupon_status_lv");
+
+        entity.HasOne(d => d.Customer).WithMany(p => p.Coupons)
+        .HasForeignKey(d => d.CustomerId)
+        .OnDelete(DeleteBehavior.SetNull)
+        .HasConstraintName("fk_coupon_customer");
 
         entity.HasOne(d => d.TypeLv).WithMany(p => p.CouponTypeLvs)
         .HasForeignKey(d => d.TypeLvId)

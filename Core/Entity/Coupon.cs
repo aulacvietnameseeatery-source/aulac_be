@@ -7,6 +7,8 @@ public partial class Coupon
 {
     public long CouponId { get; set; }
 
+    public long? CustomerId { get; set; }
+
     public string CouponCode { get; set; } = null!;
 
     public string CouponName { get; set; } = null!;
@@ -28,6 +30,8 @@ public partial class Coupon
     public uint TypeLvId { get; set; }
 
     public uint CouponStatusLvId { get; set; }
+
+    public virtual Customer? Customer { get; set; }
 
     public virtual LookupValue CouponStatusLv { get; set; } = null!;
 
