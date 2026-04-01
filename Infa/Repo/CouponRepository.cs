@@ -62,6 +62,7 @@ namespace Infa.Repo
                     CouponId = c.CouponId,
                     CouponCode = c.CouponCode,
                     CouponName = c.CouponName,
+                    CustomerName = c.Customer != null ? c.Customer.FullName : null,
                     StartTime = c.StartTime,
                     EndTime = c.EndTime,
                     DiscountValue = c.DiscountValue,

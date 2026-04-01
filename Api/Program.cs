@@ -12,6 +12,7 @@ using Core.Interface.Service.Auth;
 using Core.Interface.Service.Customer;
 using Core.Interface.Service.Email;
 using Core.Interface.Service.Entity;
+using Core.Interface.Service.Loyalty;
 using Core.Interface.Service.FileStorage;
 using Core.Interface.Service.I18n;
 using Core.Interface.Service.LookUp;
@@ -254,6 +255,7 @@ builder.Services.AddAuthorization(options =>
 #region Business Services
 
 builder.Services.AddScoped<ISystemSettingService, SystemSettingService>();
+builder.Services.AddScoped<ILoyaltyService, LoyaltyService>();
 builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddScoped<IAccountActivityService, AccountActivityService>();
 // Forgot password token store uses cache
