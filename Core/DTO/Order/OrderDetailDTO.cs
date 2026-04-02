@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Core.DTO.LookUpValue;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -33,7 +34,7 @@ namespace Core.DTO.Order
 
         public bool IsPaid { get; set; }
 
-        public List<OrderItemDTO> OrderItems { get; set; } = new();
+        public List<OrderItemI18nDTO> OrderItems { get; set; } = new();
 
         public List<OrderPromotionDTO> Promotions { get; set; } = new();
 
@@ -65,5 +66,18 @@ namespace Core.DTO.Order
         public decimal ChangeAmount { get; set; }
         public DateTime? PaidAt { get; set; }
         public string Method { get; set; } = null!;
+    }
+
+    public class OrderItemI18nDTO
+    {
+        public long OrderItemId { get; set; }
+        public long DishId { get; set; }
+        public long CategoryId { get; set; }
+        public LookupValueTranslationDto DishNameI18n { get; set; } = new();
+        public int Quantity { get; set; }
+        public decimal Price { get; set; }
+        public string ItemStatus { get; set; } = "";
+        public string? RejectReason { get; set; }
+        public string? Note { get; set; }
     }
 }
