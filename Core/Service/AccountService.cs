@@ -33,6 +33,7 @@ public class AccountService : IAccountService
     private readonly ILogger<AccountService> _logger;
 
     private const string TemplateCodeAccountCreated = "ACCOUNT_CREATED";
+    private const string TemplateCodeDefaultPasswordReset = "DEFAULT_PASSWORD_RESET";
 
     public AccountService(
         IAccountRepository accountRepository,
@@ -370,10 +371,59 @@ public class AccountService : IAccountService
 
         await _accountRepository.UpdateAccountAsync(account, cancellationToken);
 
+        // Send reset notification email (async, do not fail password reset if email delivery fails)
+        var resetEmailSent = false;
+        if (string.IsNullOrWhiteSpace(account.Email))
+        {
+            _logger.LogWarning(
+                "Password reset completed for account ID {AccountId}, but account has no email address. Skipping email notification.",
+                accountId);
+        }
+        else
+        {
+            try
+            {
+                var template = await _emailTemplateService.GetByCodeAsync(TemplateCodeDefaultPasswordReset, cancellationToken);
+
+                if (template != null)
+                {
+                    var emailHtml = template.BodyHtml
+                        .Replace("{{fullName}}", account.FullName)
+                        .Replace("{{username}}", account.Username)
+                        .Replace("{{defaultPassword}}", defaultPassword);
+
+                    await _emailQueue.EnqueueAsync(new QueuedEmail(
+                        To: account.Email,
+                        Subject: template.Subject,
+                        HtmlBody: emailHtml,
+                        CorrelationId: $"default_password_reset:{account.AccountId}:{DateTimeOffset.UtcNow.Ticks}"
+                    ), cancellationToken);
+
+                    resetEmailSent = true;
+                }
+                else
+                {
+                    _logger.LogWarning(
+                        "Email template {TemplateCode} not found. Skipping default password reset email for account ID {AccountId}.",
+                        TemplateCodeDefaultPasswordReset,
+                        accountId);
+                }
+            }
+            catch (System.Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Failed to queue default password reset email for account ID {AccountId} ({Email})",
+                    accountId,
+                    account.Email);
+            }
+        }
+
         _logger.LogInformation(
-       "Password reset to default for account ID {AccountId} (Username: {Username}). Account is now LOCKED.",
-        accountId,
-             account.Username);
+            "Password reset to default for account ID {AccountId} (Username: {Username}). Account is now LOCKED. Email queued: {ResetEmailSent}",
+            accountId,
+            account.Username,
+            resetEmailSent);
 
         return new PasswordResetResult
         {
@@ -627,6 +677,52 @@ else
         <p>If you did not request this account, please contact your system administrator immediately.</p>
         
     <p>Best regards,<br>Restaurant Management Team</p>
+    </div>
+</body>
+</html>
+";
+    }
+
+    /// <summary>
+    /// Builds the HTML email body for default password reset notification.
+    /// </summary>
+    private static string BuildDefaultPasswordResetEmail(string fullName, string username, string defaultPassword)
+    {
+        return $@"
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset=""utf-8"">
+    <style>
+        body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+        .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+        .credentials {{ background-color: #f8f9fa; padding: 15px; border-left: 4px solid #007bff; margin: 20px 0; }}
+        .warning {{ color: #856404; background-color: #fff3cd; padding: 10px; border-radius: 4px; margin: 20px 0; }}
+        .code {{ font-family: 'Courier New', monospace; font-size: 16px; font-weight: bold; color: #007bff; }}
+    </style>
+</head>
+<body>
+    <div class=""container"">
+        <h2>Your Password Has Been Reset</h2>
+        <p>Hello {fullName},</p>
+        <p>Your account password has been reset by an administrator. Please use the credentials below to sign in:</p>
+
+        <div class=""credentials"">
+            <p><strong>Username:</strong> <span class=""code"">{username}</span></p>
+            <p><strong>Default Password:</strong> <span class=""code"">{defaultPassword}</span></p>
+        </div>
+
+        <div class=""warning"">
+            <strong>Important Security Notice:</strong>
+            <ul>
+                <li>Your account is now locked and requires a password change on next login</li>
+                <li>Never share this password with anyone</li>
+                <li>Please change your password immediately after signing in</li>
+            </ul>
+        </div>
+
+        <p>If you did not expect this change, please contact your system administrator immediately.</p>
+        <p>Best regards,<br>Restaurant Management Team</p>
     </div>
 </body>
 </html>

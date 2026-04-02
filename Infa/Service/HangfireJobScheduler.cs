@@ -34,5 +34,30 @@ namespace Infa.Service
         {
             return _backgroundJobClient.Delete(jobId);
         }
+
+        public string EnqueueReservationCustomerEmail(
+            long reservationId,
+            string toEmail,
+            string customerName,
+            DateTime reservedTime,
+            int partySize,
+            string tableCodes)
+        {
+            return _backgroundJobClient.Enqueue<EmailJobRunner>(
+                runner => runner.SendReservationCustomerEmailAsync(
+                    reservationId, toEmail, customerName, reservedTime, partySize, tableCodes));
+        }
+
+        public string EnqueueReservationAdminEmail(
+            long reservationId,
+            string customerName,
+            DateTime reservedTime,
+            int partySize,
+            string tableCodes)
+        {
+            return _backgroundJobClient.Enqueue<EmailJobRunner>(
+                runner => runner.SendReservationAdminEmailAsync(
+                    reservationId, customerName, reservedTime, partySize, tableCodes));
+        }
     }
 }

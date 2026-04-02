@@ -37,6 +37,7 @@ public class PublicReservationService : IPublicReservationService
     private readonly IEmailQueue _emailQueue;
     private readonly IRealtimeNotificationService _realtimeNotification;
     private readonly INotificationService _notificationService;
+    private readonly IJobSchedulerService _jobScheduler;
 
     private const string SettingReservationDuration = "reservation.default_duration_minutes";
     private const string SettingImmediateWindow = "reservation.immediate_window_minutes";
@@ -55,7 +56,8 @@ public class PublicReservationService : IPublicReservationService
         IEmailTemplateService emailTemplateService,
         IEmailQueue emailQueue,
         IRealtimeNotificationService realtimeNotification,
-        INotificationService notificationService)
+        INotificationService notificationService,
+        IJobSchedulerService jobScheduler)
     {
         _tableRepository = tableRepository;
         _reservationRepository = reservationRepository;
@@ -68,6 +70,7 @@ public class PublicReservationService : IPublicReservationService
         _emailQueue = emailQueue;
         _realtimeNotification = realtimeNotification;
         _notificationService = notificationService;
+        _jobScheduler = jobScheduler;
     }
 
     public async Task<ReservationFitCheckResponse> CheckReservationFitAsync(
@@ -249,12 +252,16 @@ public class PublicReservationService : IPublicReservationService
             var tableCodes = string.Join(", ", candidates.Select(x => x.TableCode));
 
             await _uow.CommitAsync(ct);
-            // Send confirmation email  
+
+            // Fire-and-forget via Hangfire — does NOT block the response
             if (!string.IsNullOrWhiteSpace(created.Email))
-            {
-                await SendReservationConfirmationEmailAsync(created, tableCodes);
-                await SendReservationConfirmationEmailToAdminAsync(created, tableCodes);
-            }
+                _jobScheduler.EnqueueReservationCustomerEmail(
+                    created.ReservationId, created.Email, created.CustomerName,
+                    created.ReservedTime, created.PartySize, tableCodes);
+
+            _jobScheduler.EnqueueReservationAdminEmail(
+                created.ReservationId, created.CustomerName,
+                created.ReservedTime, created.PartySize, tableCodes);
             var zones = candidates
                 .Select(x => x.Zone)
                 .Where(x => !string.IsNullOrWhiteSpace(x))

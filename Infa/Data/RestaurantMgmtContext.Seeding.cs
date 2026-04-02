@@ -139,6 +139,49 @@ public partial class RestaurantMgmtContext
 </html>",
                 Description = "Email sent to customers after a successful online reservation.",
                 CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+            },
+            new EmailTemplate
+            {
+                TemplateId = 4,
+                TemplateCode = "DEFAULT_PASSWORD_RESET",
+                TemplateName = "Default Password Reset",
+                Subject = "Your Password Has Been Reset",
+                BodyHtml = @"<!DOCTYPE html>
+<html>
+<head>
+    <meta charset=""utf-8"">
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .credentials { background-color: #f8f9fa; padding: 15px; border-left: 4px solid #007bff; margin: 20px 0; }
+        .warning { color: #856404; background-color: #fff3cd; padding: 10px; border-radius: 4px; margin: 20px 0; }
+        .code { font-family: 'Courier New', monospace; font-size: 16px; font-weight: bold; color: #007bff; }
+    </style>
+</head>
+<body>
+    <div class=""container"">
+        <h2>Your Password Has Been Reset</h2>
+        <p>Hello {{fullName}},</p>
+        <p>Your account password has been reset by an administrator. Please use the credentials below to sign in:</p>
+        <div class=""credentials"">
+            <p><strong>Username:</strong> <span class=""code"">{{username}}</span></p>
+            <p><strong>Default Password:</strong> <span class=""code"">{{defaultPassword}}</span></p>
+        </div>
+        <div class=""warning"">
+            <strong>Important Security Notice:</strong>
+            <ul>
+                <li>Your account is now locked and requires a password change on next login</li>
+                <li>Never share this password with anyone</li>
+                <li>Please change your password immediately after signing in</li>
+            </ul>
+        </div>
+        <p>If you did not expect this change, please contact your system administrator immediately.</p>
+        <p>Best regards,<br>Restaurant Management Team</p>
+    </div>
+</body>
+</html>",
+                Description = "Email sent when an administrator resets a staff account to the default password.",
+                CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc)
             }
         );
     }

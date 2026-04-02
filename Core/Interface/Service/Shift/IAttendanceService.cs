@@ -4,11 +4,11 @@ namespace Core.Interface.Service.Shift;
 
 public interface IAttendanceService
 {
-    /// <summary>Staff check-in for an assigned shift.</summary>
-    Task<AttendanceRecordDto> CheckInAsync(long assignmentId, CancellationToken ct = default);
+    /// <summary>Staff check-in for an assigned shift. Validates that the caller owns the assignment.</summary>
+    Task<AttendanceRecordDto> CheckInAsync(long assignmentId, long staffId, CancellationToken ct = default);
 
-    /// <summary>Staff check-out for an assigned shift.</summary>
-    Task<AttendanceRecordDto> CheckOutAsync(long assignmentId, CancellationToken ct = default);
+    /// <summary>Staff check-out for an assigned shift. Validates that the caller owns the assignment.</summary>
+    Task<AttendanceRecordDto> CheckOutAsync(long assignmentId, long staffId, CancellationToken ct = default);
 
     /// <summary>Manager adjustment of an attendance record.</summary>
     Task<AttendanceRecordDto> AdjustAttendanceAsync(

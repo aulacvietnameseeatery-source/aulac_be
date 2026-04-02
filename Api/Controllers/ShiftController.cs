@@ -372,7 +372,7 @@ public class ShiftController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> CheckIn(long id, CancellationToken ct)
     {
-        var dto = await _attendanceService.CheckInAsync(id, ct);
+        var dto = await _attendanceService.CheckInAsync(id, GetStaffId(), ct);
         return Ok(new ApiResponse<AttendanceRecordDto>
         {
             Success = true, Code = 200,
@@ -389,7 +389,7 @@ public class ShiftController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> CheckOut(long id, CancellationToken ct)
     {
-        var dto = await _attendanceService.CheckOutAsync(id, ct);
+        var dto = await _attendanceService.CheckOutAsync(id, GetStaffId(), ct);
         return Ok(new ApiResponse<AttendanceRecordDto>
         {
             Success = true, Code = 200,

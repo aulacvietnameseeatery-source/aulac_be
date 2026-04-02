@@ -6,8 +6,8 @@ namespace Core.Data;
 /// </summary>
 public class AttendanceOptions
 {
-    /// <summary>How many minutes before planned start a staff member may check in.</summary>
-    public int AllowedEarlyCheckInMinutes { get; set; } = 30;
+    /// <summary>How many minutes before planned start a staff member may check in (default: 2 hours).</summary>
+    public int AllowedEarlyCheckInMinutes { get; set; } = 120;
 
     /// <summary>Grace period after planned start before marking as LATE.</summary>
     public int LateGraceMinutes { get; set; } = 5;

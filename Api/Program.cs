@@ -290,6 +290,7 @@ builder.Services.AddScoped<ITaxService, TaxService>();
 
 builder.Services.AddScoped<IShiftTemplateService, ShiftTemplateService>();
 builder.Services.AddScoped<IShiftAssignmentService, ShiftAssignmentService>();
+builder.Services.AddScoped<IShiftSettingsProvider, ShiftSettingsProvider>();
 builder.Services.AddScoped<IAttendanceService, AttendanceService>();
 
 builder.Services.AddHttpClient<ITranslationService, GoogleTranslationService>();

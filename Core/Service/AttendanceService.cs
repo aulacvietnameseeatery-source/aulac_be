@@ -9,7 +9,7 @@ using Core.Interface.Repo;
 using Core.Interface.Service.Entity;
 using Core.Interface.Service.Notification;
 using Core.Interface.Service.Shift;
-using Microsoft.Extensions.Options;
+// _OLD: using Microsoft.Extensions.Options; — no longer needed, using IShiftSettingsProvider
 
 namespace Core.Service;
 
@@ -19,7 +19,8 @@ public class AttendanceService : IAttendanceService
     private readonly IShiftAssignmentRepository _assignmentRepo;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILookupResolver _lookupResolver;
-    private readonly AttendanceOptions _options;
+    // _OLD: private readonly AttendanceOptions _options; — replaced by IShiftSettingsProvider
+    private readonly IShiftSettingsProvider _shiftSettings;
     private readonly INotificationService _notificationService;
     private readonly IShiftLiveRealtimePublisher _shiftLiveRealtimePublisher;
 
@@ -28,7 +29,8 @@ public class AttendanceService : IAttendanceService
         IShiftAssignmentRepository assignmentRepo,
         IUnitOfWork unitOfWork,
         ILookupResolver lookupResolver,
-        IOptions<AttendanceOptions> options,
+        // _OLD: IOptions<AttendanceOptions> options — replaced by IShiftSettingsProvider
+        IShiftSettingsProvider shiftSettings,
         INotificationService notificationService,
         IShiftLiveRealtimePublisher shiftLiveRealtimePublisher)
     {
@@ -36,17 +38,21 @@ public class AttendanceService : IAttendanceService
         _assignmentRepo = assignmentRepo;
         _unitOfWork = unitOfWork;
         _lookupResolver = lookupResolver;
-        _options = options.Value;
+        // _OLD: _options = options.Value;
+        _shiftSettings = shiftSettings;
         _notificationService = notificationService;
         _shiftLiveRealtimePublisher = shiftLiveRealtimePublisher;
     }
 
     #region Check-in / Check-out
 
-    public async Task<AttendanceRecordDto> CheckInAsync(long assignmentId, CancellationToken ct = default)
+    public async Task<AttendanceRecordDto> CheckInAsync(long assignmentId, long staffId, CancellationToken ct = default)
     {
         var assignment = await _assignmentRepo.GetByIdWithDetailsAsync(assignmentId, ct)
             ?? throw new NotFoundException("Shift assignment not found");
+
+        if (assignment.StaffId != staffId)
+            throw new ForbiddenException("You can only check in for your own assigned shifts");
 
         if (!assignment.IsActive)
             throw new ValidationException("Cannot check in for a cancelled assignment");
@@ -59,14 +65,16 @@ public class AttendanceService : IAttendanceService
         var plannedStart = assignment.PlannedStartAt;
         var plannedEnd = assignment.PlannedEndAt;
 
-        if (now < plannedStart.AddMinutes(-_options.AllowedEarlyCheckInMinutes))
+        var allowedEarlyMinutes = await _shiftSettings.GetAllowedEarlyCheckInMinutesAsync(ct);
+        if (now < plannedStart.AddMinutes(-allowedEarlyMinutes))
             throw new ValidationException(
-                $"Too early to check in. Earliest allowed: {plannedStart.AddMinutes(-_options.AllowedEarlyCheckInMinutes):HH:mm}");
+                $"Too early to check in. Earliest allowed: {plannedStart.AddMinutes(-allowedEarlyMinutes):HH:mm}");
 
         if (now > plannedEnd)
             throw new ValidationException("Shift has already ended, cannot check in");
 
-        var isLate = now > plannedStart.AddMinutes(_options.LateGraceMinutes);
+        var lateGraceMinutes = await _shiftSettings.GetLateGraceMinutesAsync(ct);
+        var isLate = now > plannedStart.AddMinutes(lateGraceMinutes);
         var lateMinutes = isLate ? (int)(now - plannedStart).TotalMinutes : 0;
 
         AttendanceStatusCode status = isLate ? AttendanceStatusCode.LATE : AttendanceStatusCode.ACTIVE;
@@ -123,7 +131,7 @@ public class AttendanceService : IAttendanceService
         return ShiftAssignmentService.MapAttendance(updated!);
     }
 
-    public async Task<AttendanceRecordDto> CheckOutAsync(long assignmentId, CancellationToken ct = default)
+    public async Task<AttendanceRecordDto> CheckOutAsync(long assignmentId, long staffId, CancellationToken ct = default)
     {
         var record = await _attendanceRepo.GetByAssignmentIdAsync(assignmentId, ct)
             ?? throw new NotFoundException("No attendance record found — did you check in?");
@@ -135,10 +143,14 @@ public class AttendanceService : IAttendanceService
             throw new ConflictException("Already checked out for this shift");
 
         var assignment = await _assignmentRepo.GetByIdAsync(assignmentId, ct)!;
+
+        if (assignment!.StaffId != staffId)
+            throw new ForbiddenException("You can only check out for your own assigned shifts");
         var now = DateTime.UtcNow;
         var plannedEnd = assignment!.PlannedEndAt;
 
-        var isEarlyLeave = now < plannedEnd.AddMinutes(-_options.EarlyLeaveBufferMinutes);
+        var earlyLeaveBuffer = await _shiftSettings.GetEarlyLeaveBufferMinutesAsync(ct);
+        var isEarlyLeave = now < plannedEnd.AddMinutes(-earlyLeaveBuffer);
         var earlyLeaveMinutes = isEarlyLeave ? (int)(plannedEnd - now).TotalMinutes : 0;
         var workedMinutes = Math.Max(0, (int)(now - record.ActualCheckInAt.Value).TotalMinutes);
 
@@ -201,7 +213,8 @@ public class AttendanceService : IAttendanceService
         {
             record.ActualCheckInAt = request.ActualCheckInAt.Value;
 
-            var isLate = request.ActualCheckInAt.Value > assignment.PlannedStartAt.AddMinutes(_options.LateGraceMinutes);
+            var adjustLateGrace = await _shiftSettings.GetLateGraceMinutesAsync(ct);
+            var isLate = request.ActualCheckInAt.Value > assignment.PlannedStartAt.AddMinutes(adjustLateGrace);
             record.LateMinutes = isLate
                 ? (int)(request.ActualCheckInAt.Value - assignment.PlannedStartAt).TotalMinutes : 0;
         }
@@ -216,8 +229,9 @@ public class AttendanceService : IAttendanceService
 
             record.ActualCheckOutAt = request.ActualCheckOutAt.Value;
 
+            var adjustEarlyBuffer = await _shiftSettings.GetEarlyLeaveBufferMinutesAsync(ct);
             var isEarlyLeave = request.ActualCheckOutAt.Value
-                < assignment.PlannedEndAt.AddMinutes(-_options.EarlyLeaveBufferMinutes);
+                < assignment.PlannedEndAt.AddMinutes(-adjustEarlyBuffer);
 
             record.EarlyLeaveMinutes = isEarlyLeave
                 ? (int)(assignment.PlannedEndAt - request.ActualCheckOutAt.Value).TotalMinutes : 0;
