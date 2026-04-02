@@ -5,7 +5,7 @@ namespace Core.Interface.Service.Coupon
 {
     public interface ICouponService
     {
-        Task<List<CouponDTO>> GetCouponsAsync(CancellationToken ct);
+        Task<List<CouponDTO>> GetCouponsAsync(long? customerId, CancellationToken ct);
         Task<PagedResultDTO<CouponDTO>> GetAllCouponsAsync(CouponListQueryDTO query, CancellationToken ct);
         Task<CouponDetailDto> GetCouponDetailAsync(long id, CancellationToken ct);
         Task<CouponDTO> CreateCouponAsync(CreateCouponRequest request, CancellationToken ct);

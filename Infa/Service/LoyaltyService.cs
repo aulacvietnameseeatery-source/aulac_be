@@ -73,7 +73,7 @@ public class LoyaltyService : ILoyaltyService
         var couponTypeId = await CouponTypeCode.FIXED_AMOUNT.IdAsync(_lookupResolver, (ushort)LookupTypeEnum.CouponType, ct);
         var couponStatusId = await CouponStatusCode.ACTIVE.IdAsync(_lookupResolver, (ushort)LookupTypeEnum.CouponStatus, ct);
 
-        var discountValue = decimal.Round(request.Points * pointsToCurrencyRatio, 2, MidpointRounding.AwayFromZero);
+        var discountValue = request.Points * pointsToCurrencyRatio;
         if (discountValue <= 0)
         {
             throw new InvalidOperationException("Calculated coupon value must be greater than 0.");

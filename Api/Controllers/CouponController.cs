@@ -27,9 +27,9 @@ namespace Api.Controllers
         /// Get active coupons (for public use)
         /// </summary>
         [HttpGet]
-        public async Task<IActionResult> GetCoupons(CancellationToken ct)
+        public async Task<IActionResult> GetCoupons([FromQuery] long? customerId, CancellationToken ct)
         {
-            var result = await _couponService.GetCouponsAsync(ct);
+            var result = await _couponService.GetCouponsAsync(customerId, ct);
 
             return Ok(new ApiResponse<List<CouponDTO>>
             {
