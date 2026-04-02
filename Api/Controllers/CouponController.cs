@@ -74,7 +74,7 @@ namespace Api.Controllers
         /// <response code="200">Coupon found</response>
         /// <response code="404">Coupon not found</response>
         [HttpGet("{id}")]
-        [HasPermission(Permissions.EditCoupon)]
+        [HasPermission(Permissions.ViewCoupon)]
         [ProducesResponseType(typeof(ApiResponse<CouponDetailDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetCouponById(
