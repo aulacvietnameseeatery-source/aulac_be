@@ -220,17 +220,21 @@ public class PaymentService : IPaymentService
             }
 
             var finalAmount = Math.Max(0m, subTotal + order.TaxAmount + tipAmount - totalDiscountAmount);
-            if (dto.ReceivedAmount < finalAmount)
+            var finalAmountRounded = decimal.Round(finalAmount, 2, MidpointRounding.AwayFromZero);
+            var receivedAmountRounded = decimal.Round(dto.ReceivedAmount, 2, MidpointRounding.AwayFromZero);
+
+            if (receivedAmountRounded < finalAmountRounded)
             {
-                throw new InvalidOperationException("Received amount cannot be less than final amount.");
+                throw new InvalidOperationException(
+                    $"Received amount cannot be less than final amount. Received: {receivedAmountRounded:0.00}, Final: {finalAmountRounded:0.00}.");
             }
 
             // Create Payment record
             var payment = new Payment
             {
                 OrderId = dto.OrderId,
-                ReceivedAmount = dto.ReceivedAmount,
-                ChangeAmount = Math.Max(0m, dto.ReceivedAmount - finalAmount),
+                ReceivedAmount = receivedAmountRounded,
+                ChangeAmount = Math.Max(0m, receivedAmountRounded - finalAmountRounded),
                 PaidAt = DateTime.UtcNow,
                 MethodLvId = methodLvId
             };
@@ -239,7 +243,7 @@ public class PaymentService : IPaymentService
 
             // Update Order status to COMPLETED
             order.SubTotalAmount = subTotal;
-            order.TotalAmount = finalAmount;
+            order.TotalAmount = finalAmountRounded;
             order.OrderStatusLvId = completedStatusId;
             order.UpdatedAt = DateTime.UtcNow;
             order.TipAmount = tipAmount;
@@ -257,7 +261,7 @@ public class PaymentService : IPaymentService
 
             if (loyaltyEnabled && order.CustomerId != GuestCustomerId)
             {
-                var earnedPoints = CalculateLoyaltyPoints(finalAmount, loyaltyPointBaseAmount);
+                var earnedPoints = CalculateLoyaltyPoints(finalAmountRounded, loyaltyPointBaseAmount);
                 if (earnedPoints > 0)
                 {
                     order.Customer.LoyaltyPoints = (order.Customer.LoyaltyPoints ?? 0) + earnedPoints;
@@ -281,7 +285,7 @@ public class PaymentService : IPaymentService
                 Metadata = new Dictionary<string, object>
                 {
                     ["orderId"] = dto.OrderId.ToString(),
-                    ["amount"] = finalAmount.ToString("F2"),
+                    ["amount"] = finalAmountRounded.ToString(),
                     ["method"] = dto.PaymentMethod.ToString()
                 },
                 TargetPermissions = new List<string> { Permissions.ViewOrder }
@@ -320,7 +324,7 @@ public class PaymentService : IPaymentService
         if (string.Equals(discountType, CouponTypeCode.PERCENT.ToString(), StringComparison.OrdinalIgnoreCase)
             || string.Equals(discountType, PromotionTypeCode.PERCENT.ToString(), StringComparison.OrdinalIgnoreCase))
         {
-            var percentDiscount = Math.Round(baseAmount * (discountValue / 100m), 2);
+            var percentDiscount = baseAmount * (discountValue / 100m);
             return Math.Min(percentDiscount, baseAmount);
         }
 

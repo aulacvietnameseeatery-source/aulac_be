@@ -21,10 +21,17 @@ namespace Core.Service
             _lookupResolver = lookupResolver;
         }
 
-        public async Task<List<CouponDTO>> GetCouponsAsync(CancellationToken ct)
+        public async Task<List<CouponDTO>> GetCouponsAsync(long? customerId, CancellationToken ct)
         {
             var now = DateTime.Now;
             var coupons = await _couponRepository.GetActiveCouponsAsync(now, ct);
+
+            if (customerId.HasValue)
+            {
+                coupons = coupons
+                    .Where(c => !c.CustomerId.HasValue || c.CustomerId == customerId.Value)
+                    .ToList();
+            }
 
             return coupons
                 .Select(c => new CouponDTO
@@ -32,6 +39,8 @@ namespace Core.Service
                     CouponId = c.CouponId,
                     CouponCode = c.CouponCode,
                     CouponName = c.CouponName,
+                    CustomerId = c.CustomerId,
+                    CustomerName = c.Customer?.FullName,
                     StartTime = c.StartTime,
                     EndTime = c.EndTime,
                     DiscountValue = c.DiscountValue,

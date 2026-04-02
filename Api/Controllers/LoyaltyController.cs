@@ -1,5 +1,5 @@
+using API.Attributes;
 using API.Models;
-using Core.Attribute;
 using Core.Data;
 using Core.DTO.Loyalty;
 using Core.Interface.Service.Loyalty;
