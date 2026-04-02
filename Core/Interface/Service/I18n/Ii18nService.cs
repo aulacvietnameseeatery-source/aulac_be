@@ -1,4 +1,6 @@
 ﻿using Core.DTO.Dish;
+using Core.DTO.LookUpValue;
+using Core.Entity;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -33,5 +35,10 @@ namespace Core.Interface.Service.I18n
             Dictionary<string, string> translations,
             CancellationToken ct
         );
+
+        LookupValueTranslationDto Map(I18nText? text, string? fallback = null);
+
+        Dictionary<long, LookupValueTranslationDto> MapBatch(
+            IEnumerable<I18nText> texts);
     }
 }
