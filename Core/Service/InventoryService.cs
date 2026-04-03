@@ -9,7 +9,6 @@ using Core.Interface.Repo;
 using Core.Interface.Service.Entity;
 using Core.Interface.Service.FileStorage;
 using Core.Interface.Service.Notification;
-using Microsoft.AspNetCore.Http;
 
 namespace Core.Service;
 
@@ -68,7 +67,7 @@ public class InventoryService : IInventoryService
     // ──────────────────────────────────────────────────────────
 
     public async Task<InventoryTransactionDetailDto> CreateTransactionAsync(
-        CreateInventoryTransactionRequest request, long createdByUserId, List<IFormFile>? evidenceFiles = null, CancellationToken ct = default)
+        CreateInventoryTransactionRequest request, long createdByUserId, IReadOnlyList<MediaFileInput>? evidenceFiles = null, CancellationToken ct = default)
     {
         var draftStatusId = await InventoryTxStatusCode.DRAFT.ToInventoryTxStatusIdAsync(_lookupResolver, ct);
 
@@ -112,7 +111,7 @@ public class InventoryService : IInventoryService
     private async Task SaveEvidenceFilesAsync(
         long transactionId,
         InventoryTransaction transaction,
-        IReadOnlyList<IFormFile> files,
+        IReadOnlyList<MediaFileInput> files,
         CancellationToken ct)
     {
         var imageTypeLvId = await _lookupResolver.GetIdAsync(
@@ -120,7 +119,7 @@ public class InventoryService : IInventoryService
 
         var uploadRequests = files.Select(f => new FileUploadRequest
         {
-            Stream = f.OpenReadStream(),
+            Stream = f.Stream,
             FileName = f.FileName,
             ContentType = f.ContentType
         }).ToList();

@@ -9,6 +9,6 @@ namespace Core.DTO.Dashboard
     public class DashboardStatisticsDto
     {
         public Dictionary<string, int> OrdersByType { get; set; } = new();
-        public TopCustomerDto? TopCustomer { get; set; }
+        public TopCustomerDto? TopCustomers { get; set; }
     }
 }

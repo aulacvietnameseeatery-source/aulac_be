@@ -1,3 +1,4 @@
+using Core.DTO.General;
 using Core.DTO.SystemSetting;
 
 namespace Core.Interface.Service.Entity;
@@ -143,4 +144,18 @@ public interface ISystemSettingService
 
     /// <summary>Clears all system settings from cache.</summary>
     Task ClearAllCacheAsync();
+
+    /// <summary>Uploads a store logo image.</summary>
+    Task<FileUploadResult> UploadStoreLogoAsync(
+        Stream stream,
+        string fileName,
+        string contentType,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Uploads a generic store file (image or video).</summary>
+    Task<FileUploadResult> UploadStoreFileAsync(
+        Stream stream,
+        string fileName,
+        string contentType,
+        CancellationToken cancellationToken = default);
 }

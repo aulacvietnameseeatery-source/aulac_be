@@ -10,7 +10,6 @@ using Core.Service.Utils;
 using Microsoft.Extensions.Logging;
 using Core.Extensions;
 using System.Text.RegularExpressions;
-using Hangfire;
 using Core.Interface.Service.Reservation;
 using Core.Entity;
 using Core.Interface.Service.Customer;
@@ -712,7 +711,6 @@ namespace Core.Service
         }
 
         // 3. HANGFIRE JOB: ĐÁNH DẤU NO-SHOW (Sau 15 phút)
-        [AutomaticRetry(Attempts = 2)]
         public async Task CheckAndMarkNoShowAsync(long reservationId)
         {
             try
@@ -790,7 +788,6 @@ namespace Core.Service
         }
 
         // 4. HANGFIRE JOB: TỰ ĐỘNG KHÓA BÀN (Trước 2 tiếng)
-        [AutomaticRetry(Attempts = 2)]
         public async Task LockTablesForReservationAsync(long reservationId)
         {
             try

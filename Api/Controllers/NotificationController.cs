@@ -1,5 +1,5 @@
 using API.Models;
-using Core.Attribute;
+using API.Attributes;
 using Core.Data;
 using Core.DTO.Notification;
 using Core.Interface.Service.Notification;

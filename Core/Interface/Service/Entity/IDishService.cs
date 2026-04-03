@@ -1,6 +1,6 @@
 ﻿using Core.DTO.Dish;
+using Core.DTO.General;
 using Core.Entity;
-using Microsoft.AspNetCore.Http;
 
 namespace Core.Interface.Service.Entity;
 
@@ -68,9 +68,9 @@ public interface IDishService
     /// <returns>The ID of the newly created dish.</returns>
     Task<long> CreateDishAsync(
         CreateDishRequest request,
-        IReadOnlyList<IFormFile> staticImages,
-        IReadOnlyList<IFormFile> images360,
-        IFormFile? video,
+        IReadOnlyList<MediaFileInput> staticImages,
+        IReadOnlyList<MediaFileInput> images360,
+        MediaFileInput? video,
         CancellationToken ct
     );
 
@@ -95,9 +95,9 @@ public interface IDishService
     /// <param name="ct">Cancellation token.</param>
     Task UpdateDishAsync(
         UpdateDishRequest request,
-        IReadOnlyList<IFormFile> staticImages,
-        IReadOnlyList<IFormFile> images360,
-        IFormFile? video,
+        IReadOnlyList<MediaFileInput> staticImages,
+        IReadOnlyList<MediaFileInput> images360,
+        MediaFileInput? video,
         IReadOnlyList<long> removedMediaIds,
         CancellationToken ct
     );

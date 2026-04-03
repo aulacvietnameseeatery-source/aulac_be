@@ -20,6 +20,7 @@ namespace Infa.Repo
         {
             return await _context.Coupons
                 .AsNoTracking()
+                .Include(c => c.Customer)
                 .Include(c => c.TypeLv)
                 .Include(c => c.CouponStatusLv)
                 .Where(c =>
@@ -62,6 +63,8 @@ namespace Infa.Repo
                     CouponId = c.CouponId,
                     CouponCode = c.CouponCode,
                     CouponName = c.CouponName,
+                    CustomerId = c.CustomerId,
+                    CustomerName = c.Customer != null ? c.Customer.FullName : null,
                     StartTime = c.StartTime,
                     EndTime = c.EndTime,
                     DiscountValue = c.DiscountValue,

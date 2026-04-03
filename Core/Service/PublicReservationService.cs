@@ -13,6 +13,11 @@ using System.Text.RegularExpressions;
 using Core.Interface.Service.Email;
 using Core.DTO.Email;
 using Core.Interface.Service;
+using Core.Interface.Service.Others;
+using Core.Interface.Service.Notification;
+using Core.DTO.Notification;
+using Core.Data;
+
 
 namespace Core.Service;
 
@@ -30,6 +35,9 @@ public class PublicReservationService : IPublicReservationService
     private readonly ICustomerService _customerService;
     private readonly IEmailTemplateService _emailTemplateService;
     private readonly IEmailQueue _emailQueue;
+    private readonly IRealtimeNotificationService _realtimeNotification;
+    private readonly INotificationService _notificationService;
+    private readonly IJobSchedulerService _jobScheduler;
 
     private const string SettingReservationDuration = "reservation.default_duration_minutes";
     private const string SettingImmediateWindow = "reservation.immediate_window_minutes";
@@ -46,7 +54,10 @@ public class PublicReservationService : IPublicReservationService
         ISystemSettingService systemSettingService,
         ICustomerService customerService,
         IEmailTemplateService emailTemplateService,
-        IEmailQueue emailQueue)
+        IEmailQueue emailQueue,
+        IRealtimeNotificationService realtimeNotification,
+        INotificationService notificationService,
+        IJobSchedulerService jobScheduler)
     {
         _tableRepository = tableRepository;
         _reservationRepository = reservationRepository;
@@ -57,6 +68,9 @@ public class PublicReservationService : IPublicReservationService
         _customerService = customerService;
         _emailTemplateService = emailTemplateService;
         _emailQueue = emailQueue;
+        _realtimeNotification = realtimeNotification;
+        _notificationService = notificationService;
+        _jobScheduler = jobScheduler;
     }
 
     public async Task<ReservationFitCheckResponse> CheckReservationFitAsync(
@@ -238,12 +252,16 @@ public class PublicReservationService : IPublicReservationService
             var tableCodes = string.Join(", ", candidates.Select(x => x.TableCode));
 
             await _uow.CommitAsync(ct);
-            // Send confirmation email  
+
+            // Fire-and-forget via Hangfire — does NOT block the response
             if (!string.IsNullOrWhiteSpace(created.Email))
-            {
-                await SendReservationConfirmationEmailAsync(created, tableCodes);
-                await SendReservationConfirmationEmailToAdminAsync(created, tableCodes);
-            }
+                _jobScheduler.EnqueueReservationCustomerEmail(
+                    created.ReservationId, created.Email, created.CustomerName,
+                    created.ReservedTime, created.PartySize, tableCodes);
+
+            _jobScheduler.EnqueueReservationAdminEmail(
+                created.ReservationId, created.CustomerName,
+                created.ReservedTime, created.PartySize, tableCodes);
             var zones = candidates
                 .Select(x => x.Zone)
                 .Where(x => !string.IsNullOrWhiteSpace(x))
@@ -253,6 +271,29 @@ public class PublicReservationService : IPublicReservationService
             _logger.LogInformation(
                 "Reservation {ReservationId} created for {CustomerName} in PENDING status with tables: {TableCodes}",
                 created.ReservationId, request.CustomerName, tableCodes);
+
+            // Send notifications to dashboard
+            await _realtimeNotification.NotifyReservationUpdatedAsync(created.ReservationId, ReservationStatusCode.PENDING.ToString());
+            await _notificationService.PublishAsync(new PublishNotificationRequest
+            {
+                Type = nameof(NotificationType.RESERVATION_CREATED),
+                Title = "New Public Reservation",
+                Body = $"Reservation #{created.ReservationId} for {request.CustomerName} ({request.PartySize} guests) at {tableCodes}",
+                Priority = nameof(NotificationPriority.Normal),
+                SoundKey = "notification_normal",
+                ActionUrl = $"/dashboard/reservations/{created.ReservationId}",
+                EntityType = "Reservation",
+                EntityId = created.ReservationId.ToString(),
+                Metadata = new Dictionary<string, object>
+                {
+                    ["reservationId"] = created.ReservationId.ToString(),
+                    ["customerName"] = request.CustomerName,
+                    ["partySize"] = request.PartySize.ToString(),
+                    ["tableCode"] = tableCodes,
+                    ["reservedTime"] = request.ReservedTime.ToString("yyyy-MM-dd HH:mm")
+                },
+                TargetPermissions = new List<string> { Permissions.ViewReservation }
+            }, ct);
 
             return new ReservationResponseDto
             {

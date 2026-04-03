@@ -1,13 +1,16 @@
 ﻿using API.Models;
-using Core.Attribute;
+using API.Models.Requests;
+using API.Attributes;
 using Core.Data;
 using Core.DTO.Auth;
 using Core.DTO.Dish;
+using Core.DTO.General;
 using Core.DTO.LookUpValue;
 using Core.Entity;
 using Core.Interface.Service.Entity;
 using Core.Interface.Service.LookUp;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Net;
 using System.Text.Json;
@@ -33,6 +36,31 @@ public class DishController : ControllerBase
         _dishService = dishService;
         _logger = logger;
         _lookupService = lookupService;
+    }
+
+    private static List<MediaFileInput> MapFiles(IEnumerable<IFormFile>? files)
+    {
+        return files?.Select(file => new MediaFileInput
+        {
+            Stream = file.OpenReadStream(),
+            FileName = file.FileName,
+            ContentType = file.ContentType
+        }).ToList() ?? [];
+    }
+
+    private static MediaFileInput? MapFile(IFormFile? file)
+    {
+        if (file is null)
+        {
+            return null;
+        }
+
+        return new MediaFileInput
+        {
+            Stream = file.OpenReadStream(),
+            FileName = file.FileName,
+            ContentType = file.ContentType
+        };
     }
 
     /// <summary>
@@ -77,18 +105,16 @@ public class DishController : ControllerBase
         });
     }
 
-    // --- 1. ADMIN ENDPOINT (Quản lý món ăn) ---
+    // --- 1. ADMIN ENDPOINT 
     [HttpGet("management")]
-    // [HasPermission(Permissions.ViewDish)] // Bật lại khi có Auth
+    // [HasPermission(Permissions.ViewDish)] 
     [ProducesResponseType(typeof(ApiResponse<PagedResult<DishManagementDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetDishesForAdmin(
         [FromQuery] GetDishesRequest request,
         CancellationToken cancellationToken)
     {
-        // Gọi Service
         var (items, totalCount) = await _dishService.GetDishesForAdminAsync(request, cancellationToken);
 
-        // Đóng gói PagedResult 
         var pagedResult = new PagedResult<DishManagementDto>
         {
             PageData = items,
@@ -104,7 +130,7 @@ public class DishController : ControllerBase
         {
             Success = true,
             Code = 200,
-            UserMessage = "Dishes retrieved successfully.", // Message nên tổng quát
+            UserMessage = "Dishes retrieved successfully.",
             Data = pagedResult,
             ServerTime = DateTimeOffset.UtcNow
         });
@@ -112,7 +138,7 @@ public class DishController : ControllerBase
 
     // --- 2. CUSTOMER ENDPOINT (Menu hiển thị) ---
     [HttpGet("menu")]
-    [AllowAnonymous] // Khách không cần login
+    [AllowAnonymous] 
     [ProducesResponseType(typeof(ApiResponse<PagedResult<DishDisplayDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMenuForCustomer(
         [FromQuery] GetDishesRequest request,
@@ -141,10 +167,10 @@ public class DishController : ControllerBase
         });
     }
 
-    // --- 3. FILTER DROPDOWNS (Dữ liệu cho Frontend Dropdown) ---
+    // --- 3. FILTER DROPDOWNS  ---
 
     [HttpGet("categories")]
-    [AllowAnonymous] // Hoặc authorize tùy nghiệp vụ
+    [AllowAnonymous] 
     [ProducesResponseType(typeof(ApiResponse<List<string>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAllCategories(CancellationToken cancellationToken)
     {
@@ -160,11 +186,10 @@ public class DishController : ControllerBase
     }
 
     [HttpGet("statuses")]
-    // [HasPermission(Permissions.ViewDish)] // Chỉ Admin mới cần lọc status
+    // [HasPermission(Permissions.ViewDish)] 
     [ProducesResponseType(typeof(ApiResponse<List<DishStatusDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetDishStatuses(CancellationToken cancellationToken)
     {
-        // Lưu ý: DTO trả về ở đây phụ thuộc vào cái bạn chọn ở bước trước (DishStatusDto hoặc DishStatusFilterDto)
         var statuses = await _dishService.GetDishStatusesAsync(cancellationToken);
 
         return Ok(new ApiResponse<List<DishStatusDto>> // Hoặc List<DishStatusFilterDto>
@@ -245,9 +270,9 @@ public class DishController : ControllerBase
 
         var result = await _dishService.CreateDishAsync(
             request,
-            dto.StaticImages,
-            dto.Images360,
-            dto.Video,
+            MapFiles(dto.StaticImages),
+            MapFiles(dto.Images360),
+            MapFile(dto.Video),
             ct
         );
 
@@ -306,9 +331,9 @@ public class DishController : ControllerBase
 
         await _dishService.UpdateDishAsync(
             request,
-            dto.StaticImages,
-            dto.Images360,
-            dto.Video,
+            MapFiles(dto.StaticImages),
+            MapFiles(dto.Images360),
+            MapFile(dto.Video),
             removedMediaIds,
             ct
         );

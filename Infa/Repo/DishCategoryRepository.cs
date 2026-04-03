@@ -24,13 +24,17 @@ public class DishCategoryRepository : IDishCategoryRepository
     {
         var dbQuery = _context.DishCategories.AsQueryable();
 
-        // Apply search filter
+        // Apply search filter (searches English fallback + all i18n translations)
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
             var searchLower = query.Search.ToLower();
-            dbQuery = dbQuery.Where(c => 
+            dbQuery = dbQuery.Where(c =>
                 c.CategoryName.ToLower().Contains(searchLower) ||
-                (c.Description != null && c.Description.ToLower().Contains(searchLower))
+                (c.Description != null && c.Description.ToLower().Contains(searchLower)) ||
+                (c.CategoryNameText != null && c.CategoryNameText.I18nTranslations.Any(t =>
+                    t.TranslatedText.ToLower().Contains(searchLower))) ||
+                (c.DescriptionText != null && c.DescriptionText.I18nTranslations.Any(t =>
+                    t.TranslatedText.ToLower().Contains(searchLower)))
             );
         }
 

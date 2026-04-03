@@ -1,4 +1,4 @@
-using Core.Attribute;
+using API.Attributes;
 using Core.Data;
 using Core.DTO.General;
 using Core.DTO.Order;
@@ -463,7 +463,7 @@ namespace Api.Controllers
         /// <response code="200">Order retrieved successfully</response>
         /// <response code="404">Order not found</response>
         [HttpGet("{id:long}")]
-        [HasPermission(Permissions.ViewOrder)]
+        //[HasPermission(Permissions.ViewOrder)]
         [ProducesResponseType(typeof(ApiResponse<OrderDetailDTO>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetOrderById(

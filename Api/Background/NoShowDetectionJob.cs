@@ -3,7 +3,8 @@ using Core.DTO.Notification;
 using Core.Enum;
 using Core.Interface.Repo;
 using Core.Interface.Service.Notification;
-using Microsoft.Extensions.Options;
+using Core.Interface.Service.Shift;
+// _OLD: using Microsoft.Extensions.Options; — replaced by IShiftSettingsProvider
 
 namespace Api.Background;
 
@@ -55,9 +56,10 @@ public sealed class NoShowDetectionJob : BackgroundService
         using var scope = _scopeFactory.CreateScope();
         var assignmentRepo = scope.ServiceProvider.GetRequiredService<IShiftAssignmentRepository>();
         var notificationService = scope.ServiceProvider.GetRequiredService<INotificationService>();
-        var options = scope.ServiceProvider.GetRequiredService<IOptions<AttendanceOptions>>().Value;
+        var shiftSettings = scope.ServiceProvider.GetRequiredService<IShiftSettingsProvider>();
 
-        var threshold = DateTime.UtcNow.AddMinutes(-options.NoShowThresholdMinutes);
+        var noShowThreshold = await shiftSettings.GetNoShowThresholdMinutesAsync(ct);
+        var threshold = DateTime.UtcNow.AddMinutes(-noShowThreshold);
         var candidates = await assignmentRepo.GetNoShowCandidatesAsync(threshold, ct);
 
         if (candidates.Count == 0) return;
