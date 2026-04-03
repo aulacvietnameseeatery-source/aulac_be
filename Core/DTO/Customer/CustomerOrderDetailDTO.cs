@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Core.DTO.LookUpValue;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -39,7 +40,7 @@ namespace Core.DTO.Customer
 
         public long DishId { get; set; }
 
-        public string DishName { get; set; } = null!;
+        public LookupValueTranslationDto DishNameI18n { get; set; } = new();
 
         public int Quantity { get; set; }
 
