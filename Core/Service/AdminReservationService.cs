@@ -2,13 +2,14 @@ using Core.Data;
 using Core.DTO.Notification;
 using Core.DTO.Reservation;
 using Core.Enum;
+using Core.Extensions;
 using Core.Interface.Repo;
 using Core.Interface.Service.Entity;
 using Core.Interface.Service.Notification;
 using Core.Interface.Service.Others;
 using Core.Service.Utils;
 using Microsoft.Extensions.Logging;
-using Core.Extensions;
+using Microsoft.Extensions.Options;
 using System.Text.RegularExpressions;
 using Core.Interface.Service.Reservation;
 using Core.Entity;
@@ -41,6 +42,8 @@ namespace Core.Service
         private const string SettingReservationDuration = "reservation.default_duration_minutes";
         private const string SettingImmediateWindow = "reservation.immediate_window_minutes";
 
+        private readonly TimeZoneInfo _restaurantTz;
+
         public AdminReservationService(
             IReservationRepository reservationRepository,
             ITableRepository tableRepository,
@@ -55,7 +58,8 @@ namespace Core.Service
             ICustomerService customerService,
             INotificationService notificationService,
             IEmailTemplateService emailTemplateService,
-            IEmailQueue emailQueue)
+            IEmailQueue emailQueue,
+            IOptions<RestaurantOptions> restaurantOptions)
         {
             _reservationRepository = reservationRepository;
             _tableRepository = tableRepository;
@@ -71,6 +75,7 @@ namespace Core.Service
             _notificationService = notificationService;
             _emailTemplateService = emailTemplateService;
             _emailQueue = emailQueue;
+            _restaurantTz = restaurantOptions.Value.TimeZone;
         }
 
         public async Task<(List<ReservationManagementDto> Items, int TotalCount)> GetReservationsAsync(GetReservationsRequest request, CancellationToken cancellationToken = default)
@@ -1136,7 +1141,9 @@ namespace Core.Service
 
                 var body = template.BodyHtml
                     .Replace("{{CustomerName}}", reservation.CustomerName)
-                    .Replace("{{ReservedTime}}", reservation.ReservedTime.ToString("dd/MM/yyyy HH:mm"))
+                    .Replace("{{ReservedTime}}", TimeZoneInfo.ConvertTimeFromUtc(
+                        DateTime.SpecifyKind(reservation.ReservedTime, DateTimeKind.Utc), _restaurantTz)
+                        .ToString("dd/MM/yyyy HH:mm"))
                     .Replace("{{PartySize}}", reservation.PartySize.ToString())
                     .Replace("{{TableCode}}", tableCodes)
                     .Replace("{{TableCodes}}", tableCodes)

@@ -8,6 +8,7 @@ using Core.Interface.Service.Entity;
 using Core.Interface.Service.Reservation;
 using Core.Service.Utils;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using System;
 using System.Text.RegularExpressions;
 using Core.Interface.Service.Email;
@@ -38,6 +39,7 @@ public class PublicReservationService : IPublicReservationService
     private readonly IRealtimeNotificationService _realtimeNotification;
     private readonly INotificationService _notificationService;
     private readonly IJobSchedulerService _jobScheduler;
+    private readonly TimeZoneInfo _restaurantTz;
 
     private const string SettingReservationDuration = "reservation.default_duration_minutes";
     private const string SettingImmediateWindow = "reservation.immediate_window_minutes";
@@ -57,7 +59,8 @@ public class PublicReservationService : IPublicReservationService
         IEmailQueue emailQueue,
         IRealtimeNotificationService realtimeNotification,
         INotificationService notificationService,
-        IJobSchedulerService jobScheduler)
+        IJobSchedulerService jobScheduler,
+        IOptions<RestaurantOptions> restaurantOptions)
     {
         _tableRepository = tableRepository;
         _reservationRepository = reservationRepository;
@@ -71,6 +74,7 @@ public class PublicReservationService : IPublicReservationService
         _realtimeNotification = realtimeNotification;
         _notificationService = notificationService;
         _jobScheduler = jobScheduler;
+        _restaurantTz = restaurantOptions.Value.TimeZone;
     }
 
     public async Task<ReservationFitCheckResponse> CheckReservationFitAsync(
@@ -253,15 +257,14 @@ public class PublicReservationService : IPublicReservationService
 
             await _uow.CommitAsync(ct);
 
-            // Fire-and-forget via Hangfire — does NOT block the response
-            if (!string.IsNullOrWhiteSpace(created.Email))
-                _jobScheduler.EnqueueReservationCustomerEmail(
-                    created.ReservationId, created.Email, created.CustomerName,
-                    created.ReservedTime, created.PartySize, tableCodes);
-
-            _jobScheduler.EnqueueReservationAdminEmail(
-                created.ReservationId, created.CustomerName,
-                created.ReservedTime, created.PartySize, tableCodes);
+            // Fire-and-forget via Hangfire — one combined job runs customer + admin emails concurrently.
+            _jobScheduler.EnqueueReservationEmails(
+                created.ReservationId,
+                created.Email,
+                created.CustomerName,
+                created.ReservedTime,
+                created.PartySize,
+                tableCodes);
             var zones = candidates
                 .Select(x => x.Zone)
                 .Where(x => !string.IsNullOrWhiteSpace(x))
@@ -432,7 +435,9 @@ public class PublicReservationService : IPublicReservationService
 
             var body = template.BodyHtml
                 .Replace("{{CustomerName}}", reservation.CustomerName)
-                .Replace("{{ReservedTime}}", reservation.ReservedTime.ToString("dd/MM/yyyy HH:mm"))
+                .Replace("{{ReservedTime}}", TimeZoneInfo.ConvertTimeFromUtc(
+                    DateTime.SpecifyKind(reservation.ReservedTime, DateTimeKind.Utc), _restaurantTz)
+                    .ToString("dd/MM/yyyy HH:mm"))
                 .Replace("{{PartySize}}", reservation.PartySize.ToString())
                 .Replace("{{TableCode}}", tableCodes)
                 .Replace("{{TableCodes}}", tableCodes)
@@ -467,7 +472,9 @@ public class PublicReservationService : IPublicReservationService
 
             var body = template.BodyHtml
                 .Replace("{{CustomerName}}", reservation.CustomerName)
-                .Replace("{{ReservedTime}}", reservation.ReservedTime.ToString("dd/MM/yyyy HH:mm"))
+                .Replace("{{ReservedTime}}", TimeZoneInfo.ConvertTimeFromUtc(
+                    DateTime.SpecifyKind(reservation.ReservedTime, DateTimeKind.Utc), _restaurantTz)
+                    .ToString("dd/MM/yyyy HH:mm"))
                 .Replace("{{PartySize}}", reservation.PartySize.ToString())
                 .Replace("{{TableCode}}", tableCodes)
                 .Replace("{{TableCodes}}", tableCodes)

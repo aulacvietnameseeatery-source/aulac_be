@@ -16,5 +16,11 @@ public sealed class SmtpOptions
 
     public string DefaultFrom { get; init; } = default!;
     public string DefaultFromName { get; init; } = "No-Reply";
+
+    /// <summary>
+    /// Maximum number of recipient emails sent in parallel per job.
+    /// Set 1 to disable parallel fan-out.
+    /// </summary>
+    public int MaxParallelSends { get; init; } = 3;
 }
 

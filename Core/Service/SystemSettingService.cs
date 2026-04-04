@@ -287,8 +287,15 @@ public class SystemSettingService : ISystemSettingService
                     UpdatedBy = updatedBy
                 };
 
+                var shouldForceJsonRecipients =
+                    item.Key.StartsWith("notification.", StringComparison.OrdinalIgnoreCase) &&
+                    item.Key.EndsWith(".recipients", StringComparison.OrdinalIgnoreCase);
+
+                if (shouldForceJsonRecipients)
+                    updated.ValueType = "JSON";
+
                 // Parse value according to existing type
-                switch (existingSetting.ValueType)
+                switch (updated.ValueType)
                 {
                     case "STRING":
                         updated.ValueString = item.Value;
