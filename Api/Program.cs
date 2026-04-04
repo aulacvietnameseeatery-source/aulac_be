@@ -133,6 +133,12 @@ builder.Services.Configure<GoogleTranslateOptions>(
 builder.Services.Configure<AttendanceOptions>(
     builder.Configuration.GetSection("Attendance"));
 
+builder.Services.Configure<Core.Extensions.RestaurantOptions>(
+    builder.Configuration.GetSection(Core.Extensions.RestaurantOptions.SectionName));
+
+// In-process memory cache for email templates etc. (independent of CacheMode)
+builder.Services.AddMemoryCache();
+
 #endregion
 
 #region Database (DbContext)
@@ -158,7 +164,7 @@ builder.Services.AddHangfire(config => config
     .UseStorage(new MySqlStorage(connectionString, new MySqlStorageOptions
     {
         TransactionIsolationLevel = (System.Transactions.IsolationLevel?)System.Data.IsolationLevel.ReadCommitted,
-        QueuePollInterval = TimeSpan.FromSeconds(15),
+        QueuePollInterval = TimeSpan.FromSeconds(1),
         JobExpirationCheckInterval = TimeSpan.FromHours(1),
         CountersAggregateInterval = TimeSpan.FromMinutes(5),
         PrepareSchemaIfNecessary = true, 
@@ -492,11 +498,11 @@ using (var scope = app.Services.CreateScope())
 app.UseMiddleware<HandleExceptionMiddleware>();
 
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+//if (app.Environment.IsDevelopment())
+//{
+//    app.UseSwagger();
+//    app.UseSwaggerUI();
+//}
 
 app.UseCors("AllowFrontend");
 app.UseHttpsRedirection();

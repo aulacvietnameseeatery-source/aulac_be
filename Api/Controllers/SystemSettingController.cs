@@ -3,7 +3,9 @@ using Core.Data;
 using Core.DTO.SystemSetting;
 using Core.Interface.Service.Entity;
 using Core.DTO.General;
+using Core.Extensions;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using API.Models;
 using Microsoft.AspNetCore.Authorization;
 
@@ -19,13 +21,16 @@ public class SystemSettingController : ControllerBase
 {
     private readonly ISystemSettingService _systemSettingService;
     private readonly ILogger<SystemSettingController> _logger;
+    private readonly RestaurantOptions _restaurantOptions;
 
     public SystemSettingController(
         ISystemSettingService systemSettingService,
-        ILogger<SystemSettingController> logger)
+        ILogger<SystemSettingController> logger,
+        IOptions<RestaurantOptions> restaurantOptions)
     {
         _systemSettingService = systemSettingService;
         _logger = logger;
+        _restaurantOptions = restaurantOptions.Value;
     }
 
     /// <summary>
@@ -689,6 +694,24 @@ public class SystemSettingController : ControllerBase
                 ServerTime = DateTimeOffset.UtcNow
             });
         }
+    }
+
+    /// <summary>
+    /// Returns the configured restaurant timezone ID (e.g. "Europe/Zurich").
+    /// Public endpoint — used by FE to format dates in the restaurant's local time.
+    /// </summary>
+    [HttpGet("public/timezone")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    public IActionResult GetPublicTimezone()
+    {
+        return Ok(new ApiResponse<object>
+        {
+            Success = true,
+            Code = 200,
+            Data = new { timeZoneId = _restaurantOptions.TimeZoneId },
+            ServerTime = DateTimeOffset.UtcNow
+        });
     }
 
     /// <summary>

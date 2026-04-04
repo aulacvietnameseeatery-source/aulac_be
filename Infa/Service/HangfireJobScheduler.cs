@@ -59,5 +59,18 @@ namespace Infa.Service
                 runner => runner.SendReservationAdminEmailAsync(
                     reservationId, customerName, reservedTime, partySize, tableCodes));
         }
+
+        public string EnqueueReservationEmails(
+            long reservationId,
+            string? customerEmail,
+            string customerName,
+            DateTime reservedTime,
+            int partySize,
+            string tableCodes)
+        {
+            return _backgroundJobClient.Enqueue<EmailJobRunner>(
+                runner => runner.SendReservationBothEmailsAsync(
+                    reservationId, customerEmail, customerName, reservedTime, partySize, tableCodes));
+        }
     }
 }
