@@ -7,6 +7,7 @@ using Core.Interface.Service.Entity;
 using Hangfire;
 using Infa.Email;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Diagnostics;
@@ -27,6 +28,7 @@ public sealed class EmailJobRunner
     private readonly TimeZoneInfo _restaurantTz;
     private readonly IMemoryCache _cache;
     private readonly int _maxParallelSends;
+    private readonly IServiceScopeFactory _scopeFactory;
 
     private const string SettingStoreEmail = "store.email";
     private static readonly TimeSpan TemplateCacheDuration = TimeSpan.FromMinutes(30);
@@ -38,6 +40,7 @@ public sealed class EmailJobRunner
         IOptions<RestaurantOptions> restaurantOptions,
         IOptions<SmtpOptions> smtpOptions,
         IMemoryCache cache,
+        IServiceScopeFactory scopeFactory,
         ILogger<EmailJobRunner> logger)
     {
         _emailSender = emailSender;
@@ -46,6 +49,7 @@ public sealed class EmailJobRunner
         _restaurantTz = restaurantOptions.Value.TimeZone;
         _maxParallelSends = Math.Max(1, smtpOptions.Value.MaxParallelSends);
         _cache = cache;
+        _scopeFactory = scopeFactory;
         _logger = logger;
     }
 
@@ -141,19 +145,24 @@ public sealed class EmailJobRunner
 
         var tasks = new List<Task>
         {
-            SendReservationAdminEmailAsync(reservationId, customerName, reservedTime, partySize, tableCodes)
+            RunInIsolatedScopeAsync(runner => runner.SendReservationAdminEmailAsync(
+                reservationId,
+                customerName,
+                reservedTime,
+                partySize,
+                tableCodes))
         };
 
         if (!string.IsNullOrWhiteSpace(customerEmail))
         {
             tasks.Add(
-                SendReservationCustomerEmailAsync(
+                RunInIsolatedScopeAsync(runner => runner.SendReservationCustomerEmailAsync(
                     reservationId,
                     customerEmail,
                     customerName,
                     reservedTime,
                     partySize,
-                    tableCodes));
+                    tableCodes)));
         }
 
         await Task.WhenAll(tasks);
@@ -163,6 +172,13 @@ public sealed class EmailJobRunner
             reservationId,
             tasks.Count,
             sw.ElapsedMilliseconds);
+    }
+
+    private async Task RunInIsolatedScopeAsync(Func<EmailJobRunner, Task> action)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var runner = ActivatorUtilities.CreateInstance<EmailJobRunner>(scope.ServiceProvider);
+        await action(runner);
     }
 
     /// <summary>
