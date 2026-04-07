@@ -116,6 +116,14 @@ public class AuthService : IAuthService
             return AuthResult.Failed("INVALID_CREDENTIALS", "Invalid username or password.");
         }
 
+        // Step 2b: Block INACTIVE accounts
+        var inactiveStatusId = await AccountStatusCode.INACTIVE.ToAccountStatusIdAsync(_lookupResolver, cancellationToken);
+        if (account.AccountStatusLvId == inactiveStatusId)
+        {
+            _logger.LogWarning("Login blocked for deactivated account {AccountId} ({Username})", account.AccountId, account.Username);
+            return AuthResult.Failed("ACCOUNT_DEACTIVATED", "Your account has been deactivated. Please contact an administrator.");
+        }
+
         // Step 3: Check if account requires password change (LOCKED status)
         // Allow login but flag for required password change
         var requirePasswordChange = account.AccountStatusLvId == await AccountStatusCode.LOCKED.ToAccountStatusIdAsync(_lookupResolver, cancellationToken);
@@ -245,6 +253,15 @@ public class AuthService : IAuthService
             return AuthResult.Failed("ACCOUNT_UNAVAILABLE", "Account not found or has been locked.");
         }
 
+        // Step 4b: Block INACTIVE accounts during refresh
+        var inactiveStatusId = await AccountStatusCode.INACTIVE.ToAccountStatusIdAsync(_lookupResolver, cancellationToken);
+        if (account.AccountStatusLvId == inactiveStatusId)
+        {
+            await _sessionRepository.RevokeAllUserSessionsAsync(userId, cancellationToken: cancellationToken);
+            _logger.LogWarning("Refresh blocked — account {AccountId} is deactivated. All sessions revoked.", account.AccountId);
+            return AuthResult.Failed("ACCOUNT_DEACTIVATED", "Your account has been deactivated. Please contact an administrator.");
+        }
+
         // Step 5: Generate new refresh token (rotation)
         var newRefreshToken = _tokenService.GenerateRefreshToken();
         var newRefreshTokenHash = _tokenService.HashToken(newRefreshToken);
@@ -305,7 +322,22 @@ public class AuthService : IAuthService
     public async Task<bool> ValidateSessionAsync(long sessionId, CancellationToken cancellationToken = default)
     {
         var session = await _sessionRepository.GetValidSessionAsync(sessionId, cancellationToken);
-        return session != null;
+        if (session == null) return false;
+
+        // Also verify account is still active
+        var account = await _accountRepository.FindByIdAsync(session.UserId, cancellationToken);
+        if (account == null) return false;
+
+        var inactiveStatusId = await AccountStatusCode.INACTIVE.ToAccountStatusIdAsync(_lookupResolver, cancellationToken);
+        if (account.AccountStatusLvId == inactiveStatusId)
+        {
+            // Revoke session immediately so future checks are fast
+            await _sessionRepository.RevokeSessionAsync(sessionId, cancellationToken);
+            _logger.LogWarning("Session {SessionId} revoked — account {AccountId} is deactivated.", sessionId, account.AccountId);
+            return false;
+        }
+
+        return true;
     }
 
     #region Password Reset
