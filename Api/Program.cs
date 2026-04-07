@@ -12,6 +12,7 @@ using Core.Interface.Service.Auth;
 using Core.Interface.Service.Customer;
 using Core.Interface.Service.Email;
 using Core.Interface.Service.Entity;
+using Core.Interface.Service.Loyalty;
 using Core.Interface.Service.FileStorage;
 using Core.Interface.Service.I18n;
 using Core.Interface.Service.LookUp;
@@ -40,6 +41,8 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Core.Interface.Service.Reservation;
 using Core.Interface.Service.Notification;
+using Core.Interface.Service.Report;
+using Infa.Repository;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -130,6 +133,12 @@ builder.Services.Configure<GoogleTranslateOptions>(
 builder.Services.Configure<AttendanceOptions>(
     builder.Configuration.GetSection("Attendance"));
 
+builder.Services.Configure<Core.Extensions.RestaurantOptions>(
+    builder.Configuration.GetSection(Core.Extensions.RestaurantOptions.SectionName));
+
+// In-process memory cache for email templates etc. (independent of CacheMode)
+builder.Services.AddMemoryCache();
+
 #endregion
 
 #region Database (DbContext)
@@ -155,7 +164,7 @@ builder.Services.AddHangfire(config => config
     .UseStorage(new MySqlStorage(connectionString, new MySqlStorageOptions
     {
         TransactionIsolationLevel = (System.Transactions.IsolationLevel?)System.Data.IsolationLevel.ReadCommitted,
-        QueuePollInterval = TimeSpan.FromSeconds(15),
+        QueuePollInterval = TimeSpan.FromSeconds(1),
         JobExpirationCheckInterval = TimeSpan.FromHours(1),
         CountersAggregateInterval = TimeSpan.FromMinutes(5),
         PrepareSchemaIfNecessary = true, 
@@ -252,7 +261,9 @@ builder.Services.AddAuthorization(options =>
 #region Business Services
 
 builder.Services.AddScoped<ISystemSettingService, SystemSettingService>();
+builder.Services.AddScoped<ILoyaltyService, LoyaltyService>();
 builder.Services.AddScoped<IAccountService, AccountService>();
+builder.Services.AddScoped<IAccountActivityService, AccountActivityService>();
 // Forgot password token store uses cache
 builder.Services.AddSingleton<IPasswordResetTokenStore, CachePasswordResetTokenStore>();
 
@@ -285,6 +296,7 @@ builder.Services.AddScoped<ITaxService, TaxService>();
 
 builder.Services.AddScoped<IShiftTemplateService, ShiftTemplateService>();
 builder.Services.AddScoped<IShiftAssignmentService, ShiftAssignmentService>();
+builder.Services.AddScoped<IShiftSettingsProvider, ShiftSettingsProvider>();
 builder.Services.AddScoped<IAttendanceService, AttendanceService>();
 
 builder.Services.AddHttpClient<ITranslationService, GoogleTranslationService>();
@@ -293,6 +305,7 @@ builder.Services.AddScoped<IInventoryService, InventoryService>();
 builder.Services.AddScoped<IEmailTemplateService, EmailTemplateService>();
 
 builder.Services.AddScoped<IDashboardService, DashboardService>();    
+builder.Services.AddScoped<IReportService, ReportService>();
 
 
 #endregion
@@ -335,6 +348,8 @@ builder.Services.AddScoped<IInventoryRepository, InventoryRepository>();
 builder.Services.AddScoped<ILoginActivityRepository, LoginActivityRepository>();
 builder.Services.AddScoped<IEmailTemplateRepository, EmailTemplateRepository>();
 builder.Services.AddScoped<IDashboardRepository, DashboardRepository>();
+
+builder.Services.AddScoped<IReportRepository, ReportRepository>();
 #endregion
 
 #region Email Services + Background Worker

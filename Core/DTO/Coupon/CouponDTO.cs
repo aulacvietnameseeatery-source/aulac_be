@@ -8,6 +8,8 @@ namespace Core.DTO.Coupon
 
         public string CouponCode { get; set; } = string.Empty;
         public string CouponName { get; set; } = string.Empty;
+        public long? CustomerId { get; set; }
+        public string? CustomerName { get; set; }
 
         public DateTime StartTime { get; set; }
         public DateTime EndTime { get; set; }

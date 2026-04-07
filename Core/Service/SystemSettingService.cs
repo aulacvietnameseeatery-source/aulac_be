@@ -4,6 +4,8 @@ using Core.Interface.Repo;
 using Core.Interface.Service.Others;
 using Core.Interface.Service.Entity;
 using System.Text.Json;
+using Core.DTO.General;
+using Core.Interface.Service.FileStorage;
 
 namespace Core.Service;
 
@@ -15,15 +17,30 @@ public class SystemSettingService : ISystemSettingService
 {
     private readonly ISystemSettingRepository _repository;
     private readonly ICacheService _cacheService;
+    private readonly IFileStorage _fileStorage;
     private const string CacheKeyPrefix = "system_setting:";
     private const int CacheExpirationMinutes = 60;
 
+    private static readonly HashSet<string> StoreMediaKeys = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "store.intro.hero.image",
+        "store.intro.virtualTour.videoUrl",
+        "store.intro.virtualTour.videoUrlLeft",
+        "store.intro.virtualTour.videoUrlRight",
+        "store.intro.collection.dish1.image",
+        "store.intro.collection.dish2.image",
+        "store.intro.collection.dish3.image",
+        "store.logoUrl"
+    };
+
     public SystemSettingService(
         ISystemSettingRepository repository,
-        ICacheService cacheService)
+        ICacheService cacheService,
+        IFileStorage fileStorage)
     {
         _repository = repository;
         _cacheService = cacheService;
+        _fileStorage = fileStorage;
     }
 
     /// <inheritdoc />
@@ -210,7 +227,14 @@ public class SystemSettingService : ISystemSettingService
         CancellationToken cancellationToken = default)
     {
         var settings = await _repository.GetByGroupPrefixAsync(group, cancellationToken);
-        return settings.Select(MapToDetailDto).ToList();
+        var dtos = settings.Select(MapToDetailDto).ToList();
+
+        if (group.Equals("store", StringComparison.OrdinalIgnoreCase))
+        {
+            dtos = dtos.Select(AttachPublicUrlForStoreMedia).ToList();
+        }
+
+        return dtos;
     }
 
     /// <inheritdoc />
@@ -219,10 +243,17 @@ public class SystemSettingService : ISystemSettingService
         CancellationToken cancellationToken = default)
     {
         var settings = await _repository.GetByGroupPrefixAsync(group, cancellationToken);
-        return settings
+        var dtos = settings
             .Where(s => !s.IsSensitive)
             .Select(MapToDetailDto)
             .ToList();
+
+        if (group.Equals("store", StringComparison.OrdinalIgnoreCase))
+        {
+            dtos = dtos.Select(AttachPublicUrlForStoreMedia).ToList();
+        }
+
+        return dtos;
     }
 
     /// <inheritdoc />
@@ -232,6 +263,11 @@ public class SystemSettingService : ISystemSettingService
         long? updatedBy = null,
         CancellationToken cancellationToken = default)
     {
+        if (group.Equals("store", StringComparison.OrdinalIgnoreCase))
+        {
+            items = NormalizeStoreMediaValues(items);
+        }
+
         // Load existing settings for the group to preserve ValueType and IsSensitive
         var existing = await _repository.GetByGroupPrefixAsync(group, cancellationToken);
         var existingDict = existing.ToDictionary(s => s.SettingKey, StringComparer.OrdinalIgnoreCase);
@@ -251,8 +287,15 @@ public class SystemSettingService : ISystemSettingService
                     UpdatedBy = updatedBy
                 };
 
+                var shouldForceJsonRecipients =
+                    item.Key.StartsWith("notification.", StringComparison.OrdinalIgnoreCase) &&
+                    item.Key.EndsWith(".recipients", StringComparison.OrdinalIgnoreCase);
+
+                if (shouldForceJsonRecipients)
+                    updated.ValueType = "JSON";
+
                 // Parse value according to existing type
-                switch (existingSetting.ValueType)
+                switch (updated.ValueType)
                 {
                     case "STRING":
                         updated.ValueString = item.Value;
@@ -352,6 +395,39 @@ public class SystemSettingService : ISystemSettingService
         await Task.CompletedTask;
     }
 
+    /// <inheritdoc />
+    public async Task<FileUploadResult> UploadStoreLogoAsync(Stream stream, string fileName, string contentType, CancellationToken cancellationToken = default)
+    {
+        var uploadRequest = new FileUploadRequest
+        {
+            Stream = stream,
+            FileName = fileName,
+            ContentType = contentType
+        };
+
+        return await _fileStorage.SaveAsync(uploadRequest, "store-logo", FileValidationOptions.ImageUpload, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<FileUploadResult> UploadStoreFileAsync(Stream stream, string fileName, string contentType, CancellationToken cancellationToken = default)
+    {
+        var uploadRequest = new FileUploadRequest
+        {
+            Stream = stream,
+            FileName = fileName,
+            ContentType = contentType
+        };
+
+        var extension = Path.GetExtension(fileName);
+        var isVideo = contentType.Equals("video/mp4", StringComparison.OrdinalIgnoreCase)
+                      || (extension != null && extension.Equals(".mp4", StringComparison.OrdinalIgnoreCase));
+
+        var validation = isVideo ? FileValidationOptions.StoreIntroVideo : FileValidationOptions.ImageUpload;
+        var folder = isVideo ? "store-videos" : "store-media";
+
+        return await _fileStorage.SaveAsync(uploadRequest, folder, validation, cancellationToken);
+    }
+
     #region Private Helpers
 
     private async Task<SystemSetting?> GetSettingWithCacheAsync(
@@ -398,6 +474,97 @@ public class SystemSettingService : ISystemSettingService
         IsSensitive = s.IsSensitive,
         UpdatedAt = s.UpdatedAt
     };
+
+    private SystemSettingDetailDto AttachPublicUrlForStoreMedia(SystemSettingDetailDto setting)
+    {
+        if (!StoreMediaKeys.Contains(setting.SettingKey))
+            return setting;
+
+        if (setting.Value is not string value || string.IsNullOrWhiteSpace(value))
+            return setting;
+
+        var publicUrl = BuildPublicUrl(value);
+        return setting with { PublicUrl = publicUrl };
+    }
+
+    private string? BuildPublicUrl(string value)
+    {
+        var trimmed = value.Trim();
+        if (string.IsNullOrWhiteSpace(trimmed))
+            return null;
+
+        if (Uri.TryCreate(trimmed, UriKind.Absolute, out var absolute))
+            return absolute.ToString();
+
+        if (trimmed.StartsWith("/uploads/", StringComparison.OrdinalIgnoreCase))
+        {
+            var withoutPrefix = trimmed.Substring("/uploads/".Length);
+            return _fileStorage.GetPublicUrl(withoutPrefix);
+        }
+
+        if (trimmed.StartsWith("uploads/", StringComparison.OrdinalIgnoreCase))
+        {
+            var withoutPrefix = trimmed.Substring("uploads/".Length);
+            return _fileStorage.GetPublicUrl(withoutPrefix);
+        }
+
+        return _fileStorage.GetPublicUrl(trimmed.TrimStart('/'));
+    }
+
+    private List<BulkUpdateSettingItemDto> NormalizeStoreMediaValues(List<BulkUpdateSettingItemDto> items)
+    {
+        return items.Select(item =>
+        {
+            if (!StoreMediaKeys.Contains(item.Key))
+                return item;
+
+            var normalizedValue = NormalizeStoreMediaValue(item.Value);
+            return item with { Value = normalizedValue };
+        }).ToList();
+    }
+
+    private string NormalizeStoreMediaValue(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return string.Empty;
+
+        var trimmed = value.Trim();
+
+        if (Uri.TryCreate(trimmed, UriKind.Absolute, out var absolute))
+        {
+            var path = absolute.AbsolutePath;
+            if (path.StartsWith("/uploads/", StringComparison.OrdinalIgnoreCase))
+                return path.TrimStart('/');
+            return path.StartsWith("/") ? $"uploads{path}" : $"uploads/{path}";
+        }
+
+        if (trimmed.StartsWith("/uploads/", StringComparison.OrdinalIgnoreCase))
+            return trimmed.TrimStart('/');
+
+        if (trimmed.StartsWith("uploads/", StringComparison.OrdinalIgnoreCase))
+            return trimmed;
+
+        if (trimmed.StartsWith("/"))
+        {
+            if (trimmed.StartsWith("/store-media/", StringComparison.OrdinalIgnoreCase)
+                || trimmed.StartsWith("/store-videos/", StringComparison.OrdinalIgnoreCase)
+                || trimmed.StartsWith("/store-logo/", StringComparison.OrdinalIgnoreCase))
+            {
+                return "uploads" + trimmed;
+            }
+
+            return trimmed.TrimStart('/');
+        }
+
+        if (trimmed.StartsWith("store-media/", StringComparison.OrdinalIgnoreCase)
+            || trimmed.StartsWith("store-videos/", StringComparison.OrdinalIgnoreCase)
+            || trimmed.StartsWith("store-logo/", StringComparison.OrdinalIgnoreCase))
+        {
+            return "uploads/" + trimmed;
+        }
+
+        return trimmed;
+    }
 
     #endregion
 }

@@ -1,5 +1,5 @@
 using API.Models;
-using Core.Attribute;
+using API.Attributes;
 using Core.Data;
 using Core.DTO.Coupon;
 using Core.DTO.General;
@@ -27,9 +27,9 @@ namespace Api.Controllers
         /// Get active coupons (for public use)
         /// </summary>
         [HttpGet]
-        public async Task<IActionResult> GetCoupons(CancellationToken ct)
+        public async Task<IActionResult> GetCoupons([FromQuery] long? customerId, CancellationToken ct)
         {
-            var result = await _couponService.GetCouponsAsync(ct);
+            var result = await _couponService.GetCouponsAsync(customerId, ct);
 
             return Ok(new ApiResponse<List<CouponDTO>>
             {
@@ -74,7 +74,7 @@ namespace Api.Controllers
         /// <response code="200">Coupon found</response>
         /// <response code="404">Coupon not found</response>
         [HttpGet("{id}")]
-        [HasPermission(Permissions.EditCoupon)]
+        [HasPermission(Permissions.ViewCoupon)]
         [ProducesResponseType(typeof(ApiResponse<CouponDetailDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetCouponById(

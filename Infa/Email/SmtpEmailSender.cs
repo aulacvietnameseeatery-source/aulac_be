@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using MimeKit;
+using System.Diagnostics;
 using SmtpClient = MailKit.Net.Smtp.SmtpClient;
 
 namespace Infa.Email
@@ -27,8 +28,17 @@ namespace Infa.Email
 
         public async Task SendAsync(EmailMessage message, CancellationToken ct = default)
         {
+            var sw = Stopwatch.StartNew();
             var fromEmail = message.From ?? _opt.DefaultFrom;
             var fromName = message.FromName ?? _opt.DefaultFromName;
+
+            _logger.LogInformation(
+                "[EMAIL-SMTP] Start sending email | Host={Host}:{Port} | From={From} | To={To} | Subject={Subject}",
+                _opt.Host,
+                _opt.Port,
+                fromEmail,
+                message.To,
+                message.Subject);
 
             var mime = new MimeMessage();
             mime.From.Add(new MailboxAddress(fromName, fromEmail));
@@ -53,16 +63,36 @@ namespace Infa.Email
                     await client.AuthenticateAsync(_opt.Username, _opt.Password, ct);
 
                 await client.SendAsync(mime, ct);
+
+                _logger.LogInformation(
+                    "[EMAIL-SMTP] Send success | To={To} | Subject={Subject} | DurationMs={DurationMs}",
+                    message.To,
+                    message.Subject,
+                    sw.ElapsedMilliseconds);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "SMTP send failed to {To} (Subject: {Subject})", message.To, message.Subject);
+                _logger.LogError(
+                    ex,
+                    "[EMAIL-SMTP] Send failed | Host={Host}:{Port} | From={From} | To={To} | Subject={Subject} | DurationMs={DurationMs}",
+                    _opt.Host,
+                    _opt.Port,
+                    fromEmail,
+                    message.To,
+                    message.Subject,
+                    sw.ElapsedMilliseconds);
                 throw;
             }
             finally
             {
                 if (client.IsConnected)
                     await client.DisconnectAsync(true, ct);
+
+                _logger.LogInformation(
+                    "[EMAIL-SMTP] End send attempt | To={To} | Subject={Subject} | TotalDurationMs={DurationMs}",
+                    message.To,
+                    message.Subject,
+                    sw.ElapsedMilliseconds);
             }
         }
 

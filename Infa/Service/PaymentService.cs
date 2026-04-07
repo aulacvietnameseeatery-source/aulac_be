@@ -94,104 +94,147 @@ public class PaymentService : IPaymentService
             var tipAmount = dto.TipAmount ?? order.TipAmount ?? 0m;
             decimal totalDiscountAmount = 0m;
 
-            if (dto.CouponId.HasValue)
+            if (dto.CouponIds != null && dto.CouponIds.Any())
             {
-                var coupon = await _context.Coupons
-                    .Include(c => c.TypeLv)
-                    .FirstOrDefaultAsync(c => c.CouponId == dto.CouponId.Value, cancellationToken)
-                    ?? throw new InvalidOperationException("Coupon not found.");
-
-                if (coupon.CouponStatusLvId != activeCouponStatusId)
+                foreach (var couponId in dto.CouponIds.Distinct())
                 {
-                    throw new InvalidOperationException("Coupon is not active.");
-                }
+                    var coupon = await _context.Coupons
+                        .Include(c => c.TypeLv)
+                        .FirstOrDefaultAsync(c => c.CouponId == couponId, cancellationToken)
+                        ?? throw new InvalidOperationException($"Coupon {couponId} not found.");
 
-                if (now < coupon.StartTime || now > coupon.EndTime)
-                {
-                    throw new InvalidOperationException("Coupon is outside its valid period.");
-                }
-
-                if (coupon.MaxUsage.HasValue && (coupon.UsedCount ?? 0) >= coupon.MaxUsage.Value)
-                {
-                    throw new InvalidOperationException("Coupon usage limit has been reached.");
-                }
-
-                var existingOrderCoupon = order.OrderCoupons.FirstOrDefault(oc => oc.CouponId == coupon.CouponId);
-                if (existingOrderCoupon is null)
-                {
-                    var couponDiscountAmount = CalculateDiscountAmount(coupon.TypeLv.ValueCode, coupon.DiscountValue, subTotal);
-
-                    order.OrderCoupons.Add(new OrderCoupon
+                    if (coupon.CustomerId.HasValue && coupon.CustomerId.Value != order.CustomerId)
                     {
-                        CouponId = coupon.CouponId,
-                        DiscountAmount = couponDiscountAmount,
-                        AppliedAt = now
-                    });
+                        throw new InvalidOperationException($"Coupon {coupon.CouponCode} does not belong to this customer.");
+                    }
 
-                    coupon.UsedCount = (coupon.UsedCount ?? 0) + 1;
-                    totalDiscountAmount += couponDiscountAmount;
-                }
-                else
-                {
-                    totalDiscountAmount += existingOrderCoupon.DiscountAmount;
+                    if (coupon.CouponStatusLvId != activeCouponStatusId)
+                        throw new InvalidOperationException($"Coupon {coupon.CouponCode} is not active.");
+
+                    if (now < coupon.StartTime || now > coupon.EndTime)
+                        throw new InvalidOperationException($"Coupon {coupon.CouponCode} is outside its valid period.");
+
+                    if (coupon.MaxUsage.HasValue && (coupon.UsedCount ?? 0) >= coupon.MaxUsage.Value)
+                        throw new InvalidOperationException($"Coupon {coupon.CouponCode} usage limit has been reached.");
+
+                    var existingOrderCoupon = order.OrderCoupons.FirstOrDefault(oc => oc.CouponId == coupon.CouponId);
+                    if (existingOrderCoupon is null)
+                    {
+                        var couponDiscountAmount = CalculateDiscountAmount(coupon.TypeLv.ValueCode, coupon.DiscountValue, subTotal);
+                        order.OrderCoupons.Add(new OrderCoupon
+                        {
+                            CouponId = coupon.CouponId,
+                            DiscountAmount = couponDiscountAmount,
+                            AppliedAt = now
+                        });
+                        coupon.UsedCount = (coupon.UsedCount ?? 0) + 1;
+                        totalDiscountAmount += couponDiscountAmount;
+                    }
+                    else
+                    {
+                        totalDiscountAmount += existingOrderCoupon.DiscountAmount;
+                    }
                 }
             }
 
-            if (dto.PromotionId.HasValue)
+            // Handle Promotions (Automatic)
+            var allActivePromotions = await _context.Promotions
+                .Include(p => p.TypeLv)
+                .Include(p => p.PromotionRules)
+                .Include(p => p.PromotionTargets)
+                .Where(p => p.PromotionStatusLvId == activePromotionStatusId)
+                .Where(p => now >= p.StartTime && now <= p.EndTime)
+                .Where(p => !p.MaxUsage.HasValue || (p.UsedCount ?? 0) < p.MaxUsage.Value)
+                .ToListAsync(cancellationToken);
+
+            var promotionDiscounts = new Dictionary<long, decimal>();
+
+            // 1. Automatic Dish-Level Promotions
+            var autoPromos = allActivePromotions.Where(p => p.PromotionTargets.Any()).ToList();
+            var orderItems = order.OrderItems
+                .Where(oi => oi.ItemStatusLvId != rejectedItemStatusId && oi.ItemStatusLvId != cancelledItemStatusId)
+                .ToList();
+
+            foreach (var item in orderItems)
             {
-                var promotion = await _context.Promotions
-                    .Include(p => p.TypeLv)
-                    .FirstOrDefaultAsync(p => p.PromotionId == dto.PromotionId.Value, cancellationToken)
-                    ?? throw new InvalidOperationException("Promotion not found.");
-
-                if (promotion.PromotionStatusLvId != activePromotionStatusId)
+                foreach (var promo in autoPromos)
                 {
-                    throw new InvalidOperationException("Promotion is not active.");
-                }
-
-                if (now < promotion.StartTime || now > promotion.EndTime)
-                {
-                    throw new InvalidOperationException("Promotion is outside its valid period.");
-                }
-
-                if (promotion.MaxUsage.HasValue && (promotion.UsedCount ?? 0) >= promotion.MaxUsage.Value)
-                {
-                    throw new InvalidOperationException("Promotion usage limit has been reached.");
-                }
-
-                var existingOrderPromotion = order.OrderPromotions.FirstOrDefault(op => op.PromotionId == promotion.PromotionId);
-                if (existingOrderPromotion is null)
-                {
-                    var promotionDiscountAmount = CalculateDiscountAmount(promotion.TypeLv.ValueCode, promotion.DiscountValue, subTotal);
-
-                    order.OrderPromotions.Add(new OrderPromotion
+                    // Check if item matches any target
+                    if (promo.PromotionTargets.Any(t => (t.DishId.HasValue && t.DishId == item.DishId) || 
+                                                        (t.CategoryId.HasValue && t.CategoryId == item.Dish.CategoryId)))
                     {
-                        PromotionId = promotion.PromotionId,
-                        DiscountAmount = promotionDiscountAmount,
-                        AppliedAt = now
-                    });
+                        // Check rules
+                        var rule = promo.PromotionRules.FirstOrDefault();
+                        if (rule != null)
+                        {
+                            if (rule.MinOrderValue.HasValue && subTotal < rule.MinOrderValue.Value) continue;
+                            if (rule.RequiredDishId.HasValue && !orderItems.Any(oi => oi.DishId == rule.RequiredDishId.Value)) continue;
+                            if (rule.RequiredCategoryId.HasValue && !orderItems.Any(oi => oi.Dish.CategoryId == rule.RequiredCategoryId.Value)) continue;
+                        }
 
-                    promotion.UsedCount = (promotion.UsedCount ?? 0) + 1;
-                    totalDiscountAmount += promotionDiscountAmount;
+                        var discount = CalculateDiscountAmount(promo.TypeLv.ValueCode, promo.DiscountValue, item.Price * item.Quantity);
+                        
+                        if (promotionDiscounts.ContainsKey(promo.PromotionId))
+                            promotionDiscounts[promo.PromotionId] += discount;
+                        else
+                            promotionDiscounts[promo.PromotionId] = discount;
+                    }
                 }
-                else
+            }
+
+            // 2. Automatic General Promotions (no targets)
+            var generalPromos = allActivePromotions.Where(p => !p.PromotionTargets.Any()).ToList();
+            foreach (var promo in generalPromos)
+            {
+                // Check rules
+                var rule = promo.PromotionRules.FirstOrDefault();
+                if (rule != null)
                 {
-                    totalDiscountAmount += existingOrderPromotion.DiscountAmount;
+                    if (rule.MinOrderValue.HasValue && subTotal < rule.MinOrderValue.Value) continue;
+                    if (rule.RequiredDishId.HasValue && !orderItems.Any(oi => oi.DishId == rule.RequiredDishId.Value)) continue;
+                    if (rule.RequiredCategoryId.HasValue && !orderItems.Any(oi => oi.Dish.CategoryId == rule.RequiredCategoryId.Value)) continue;
                 }
+
+                var discount = CalculateDiscountAmount(promo.TypeLv.ValueCode, promo.DiscountValue, subTotal);
+                if (promotionDiscounts.ContainsKey(promo.PromotionId))
+                    promotionDiscounts[promo.PromotionId] += discount;
+                else
+                    promotionDiscounts[promo.PromotionId] = discount;
+            }
+
+            // 3. Apply all calculated promotions
+            foreach (var pd in promotionDiscounts)
+            {
+                var promotion = allActivePromotions.First(p => p.PromotionId == pd.Key);
+                
+                // Add OrderPromotion record
+                order.OrderPromotions.Add(new OrderPromotion
+                {
+                    PromotionId = promotion.PromotionId,
+                    DiscountAmount = pd.Value,
+                    AppliedAt = now
+                });
+
+                promotion.UsedCount = (promotion.UsedCount ?? 0) + 1;
+                totalDiscountAmount += pd.Value;
             }
 
             var finalAmount = Math.Max(0m, subTotal + order.TaxAmount + tipAmount - totalDiscountAmount);
-            if (dto.ReceivedAmount < finalAmount)
+            var finalAmountRounded = decimal.Round(finalAmount, 2, MidpointRounding.AwayFromZero);
+            var receivedAmountRounded = decimal.Round(dto.ReceivedAmount, 2, MidpointRounding.AwayFromZero);
+
+            if (receivedAmountRounded < finalAmountRounded)
             {
-                throw new InvalidOperationException("Received amount cannot be less than final amount.");
+                throw new InvalidOperationException(
+                    $"Received amount cannot be less than final amount. Received: {receivedAmountRounded:0.00}, Final: {finalAmountRounded:0.00}.");
             }
 
             // Create Payment record
             var payment = new Payment
             {
                 OrderId = dto.OrderId,
-                ReceivedAmount = dto.ReceivedAmount,
-                ChangeAmount = Math.Max(0m, dto.ReceivedAmount - finalAmount),
+                ReceivedAmount = receivedAmountRounded,
+                ChangeAmount = Math.Max(0m, receivedAmountRounded - finalAmountRounded),
                 PaidAt = DateTime.UtcNow,
                 MethodLvId = methodLvId
             };
@@ -200,7 +243,7 @@ public class PaymentService : IPaymentService
 
             // Update Order status to COMPLETED
             order.SubTotalAmount = subTotal;
-            order.TotalAmount = finalAmount;
+            order.TotalAmount = finalAmountRounded;
             order.OrderStatusLvId = completedStatusId;
             order.UpdatedAt = DateTime.UtcNow;
             order.TipAmount = tipAmount;
@@ -218,7 +261,7 @@ public class PaymentService : IPaymentService
 
             if (loyaltyEnabled && order.CustomerId != GuestCustomerId)
             {
-                var earnedPoints = CalculateLoyaltyPoints(finalAmount, loyaltyPointBaseAmount);
+                var earnedPoints = CalculateLoyaltyPoints(finalAmountRounded, loyaltyPointBaseAmount);
                 if (earnedPoints > 0)
                 {
                     order.Customer.LoyaltyPoints = (order.Customer.LoyaltyPoints ?? 0) + earnedPoints;
@@ -242,7 +285,7 @@ public class PaymentService : IPaymentService
                 Metadata = new Dictionary<string, object>
                 {
                     ["orderId"] = dto.OrderId.ToString(),
-                    ["amount"] = finalAmount.ToString("F2"),
+                    ["amount"] = finalAmountRounded.ToString(),
                     ["method"] = dto.PaymentMethod.ToString()
                 },
                 TargetPermissions = new List<string> { Permissions.ViewOrder }
@@ -281,7 +324,7 @@ public class PaymentService : IPaymentService
         if (string.Equals(discountType, CouponTypeCode.PERCENT.ToString(), StringComparison.OrdinalIgnoreCase)
             || string.Equals(discountType, PromotionTypeCode.PERCENT.ToString(), StringComparison.OrdinalIgnoreCase))
         {
-            var percentDiscount = Math.Round(baseAmount * (discountValue / 100m), 2);
+            var percentDiscount = baseAmount * (discountValue / 100m);
             return Math.Min(percentDiscount, baseAmount);
         }
 

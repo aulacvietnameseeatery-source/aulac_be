@@ -240,6 +240,10 @@ namespace Infa.Migrations
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
+                    b.Property<long?>("CustomerId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("customer_id");
+
                     b.Property<string>("Description")
                         .HasMaxLength(255)
                         .HasColumnType("varchar(255)")
@@ -274,6 +278,8 @@ namespace Infa.Migrations
 
                     b.HasKey("CouponId")
                         .HasName("PRIMARY");
+
+                    b.HasIndex(new[] { "CustomerId" }, "idx_coupon_customer_id");
 
                     b.HasIndex(new[] { "CouponStatusLvId" }, "idx_coupon_status_lv");
 
@@ -2946,6 +2952,12 @@ namespace Infa.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_coupon_status_lv");
 
+                    b.HasOne("Core.Entity.Customer", "Customer")
+                        .WithMany("Coupons")
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_coupon_customer");
+
                     b.HasOne("Core.Entity.LookupValue", "TypeLv")
                         .WithMany("CouponTypeLvs")
                         .HasForeignKey("TypeLvId")
@@ -2953,6 +2965,8 @@ namespace Infa.Migrations
                         .HasConstraintName("fk_coupon_type_lv");
 
                     b.Navigation("CouponStatusLv");
+
+                    b.Navigation("Customer");
 
                     b.Navigation("TypeLv");
                 });
@@ -3883,6 +3897,8 @@ namespace Infa.Migrations
 
             modelBuilder.Entity("Core.Entity.Customer", b =>
                 {
+                    b.Navigation("Coupons");
+
                     b.Navigation("Orders");
 
                     b.Navigation("Reservations");

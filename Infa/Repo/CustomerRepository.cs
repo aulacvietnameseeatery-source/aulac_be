@@ -1,7 +1,9 @@
 using Core.DTO.Customer;
 using Core.DTO.General;
+using Core.DTO.LookUpValue;
 using Core.Entity;
 using Core.Interface.Repo;
+using Core.Interface.Service.I18n;
 using Infa.Data;
 using Microsoft.EntityFrameworkCore;
 using System;
@@ -15,10 +17,12 @@ namespace Infa.Repo
     public class CustomerRepository : ICustomerRepository
     {
         private readonly RestaurantMgmtContext _context;
+        private readonly Ii18nService _i18nService;
 
-        public CustomerRepository(RestaurantMgmtContext context)
+        public CustomerRepository(RestaurantMgmtContext context, Ii18nService i18NService)
         {
             _context = context;
+            _i18nService = i18NService;
         }
 
         public async Task<PagedResultDTO<CustomerListDTO>> GetCustomersAsync(
@@ -271,61 +275,104 @@ namespace Infa.Repo
         }
 
         public async Task<CustomerOrderDetailDTO?> GetCustomerOrderDetailAsync(
-    long customerId,
-    long orderId,
-    CancellationToken ct = default)
+            long customerId,
+            long orderId,
+            CancellationToken ct = default)
         {
-            return await _context.Orders
+            var order = await _context.Orders
+                .AsNoTracking()
                 .Where(o => o.OrderId == orderId && o.CustomerId == customerId)
-                .Select(o => new CustomerOrderDetailDTO
-                {
-                    OrderId = o.OrderId,
-                    CreatedAt = o.CreatedAt,
-                    TotalAmount = o.TotalAmount,
-                    TipAmount = o.TipAmount,
 
-                    Status = o.OrderStatusLv.ValueCode,
-                    OrderType = o.SourceLv.ValueCode,
+                .Include(o => o.Table)
+                .Include(o => o.Staff)
+                .Include(o => o.OrderStatusLv)
+                .Include(o => o.SourceLv)
 
-                    TableCode = o.Table != null ? o.Table.TableCode : null,
+                .Include(o => o.OrderItems)
+                    .ThenInclude(i => i.ItemStatusLv)
 
-                    StaffName = o.Staff != null ? o.Staff.FullName : null,
+                .Include(o => o.OrderItems)
+                    .ThenInclude(i => i.Dish)
+                        .ThenInclude(d => d.DishNameText)
+                            .ThenInclude(t => t!.I18nTranslations)
 
-                    Items = o.OrderItems.Select(i => new CustomerOrderItemDTO
-                    {
-                        OrderItemId = i.OrderItemId,
-                        DishId = i.DishId,
-                        DishName = i.Dish.DishName,
-                        Quantity = i.Quantity,
-                        Price = i.Price,
-                        Status = i.ItemStatusLv.ValueCode,
-                        Note = i.Note
-                    }).ToList(),
+                .Include(o => o.OrderPromotions)
+                    .ThenInclude(p => p.Promotion)
 
-                    Promotions = o.OrderPromotions.Select(p => new CustomerOrderPromotionDTO
-                    {
-                        PromotionId = p.PromotionId,
-                        PromotionName = p.Promotion.PromoName,
-                        DiscountAmount = p.DiscountAmount
-                    }).ToList(),
+                .Include(o => o.OrderCoupons)
+                    .ThenInclude(c => c.Coupon)
 
-                    Coupons = o.OrderCoupons.Select(c => new CustomerOrderCouponDTO
-                    {
-                        CouponId = c.CouponId,
-                        CouponCode = c.Coupon.CouponCode,
-                        DiscountAmount = c.DiscountAmount
-                    }).ToList(),
+                .Include(o => o.Payments)
+                    .ThenInclude(p => p.MethodLv)
 
-                    Payments = o.Payments.Select(p => new CustomerOrderPaymentDTO
-                    {
-                        PaymentId = p.PaymentId,
-                        ReceivedAmount = p.ReceivedAmount,
-                        ChangeAmount = p.ChangeAmount,
-                        PaidAt = p.PaidAt,
-                        Method = p.MethodLv.ValueCode
-                    }).ToList()
-                })
                 .FirstOrDefaultAsync(ct);
+
+            if (order == null)
+                return null;
+
+            // Batch I18n
+            var dishNameMap = _i18nService.MapBatch(
+                order.OrderItems
+                    .Select(i => i.Dish.DishNameText)
+                    .Where(t => t != null)!
+                    .Distinct()
+            );
+
+            // Map DTO
+            var result = new CustomerOrderDetailDTO
+            {
+                OrderId = order.OrderId,
+                CreatedAt = order.CreatedAt,
+                TotalAmount = order.TotalAmount,
+                TipAmount = order.TipAmount,
+
+                Status = order.OrderStatusLv.ValueCode,
+                OrderType = order.SourceLv.ValueCode,
+
+                TableCode = order.Table?.TableCode,
+                StaffName = order.Staff?.FullName,
+
+                Items = order.OrderItems.Select(i => new CustomerOrderItemDTO
+                {
+                    OrderItemId = i.OrderItemId,
+                    DishId = i.DishId,
+
+                    DishNameI18n = dishNameMap.TryGetValue(
+                        i.Dish.DishNameTextId,
+                        out var name
+                    ) ? name : new LookupValueTranslationDto(),
+
+                    Quantity = i.Quantity,
+                    Price = i.Price,
+                    Status = i.ItemStatusLv.ValueCode,
+                    Note = i.Note
+                }).ToList(),
+
+                Promotions = order.OrderPromotions.Select(p => new CustomerOrderPromotionDTO
+                {
+                    PromotionId = p.PromotionId,
+                    PromotionName = p.Promotion.PromoName,
+                    DiscountAmount = p.DiscountAmount
+                }).ToList(),
+
+                Coupons = order.OrderCoupons.Select(c => new CustomerOrderCouponDTO
+                {
+                    CouponId = c.CouponId,
+                    CouponCode = c.Coupon.CouponCode,
+                    DiscountAmount = c.DiscountAmount
+                }).ToList(),
+
+                Payments = order.Payments.Select(p => new CustomerOrderPaymentDTO
+                {
+                    PaymentId = p.PaymentId,
+                    ReceivedAmount = p.ReceivedAmount,
+                    ChangeAmount = p.ChangeAmount,
+                    PaidAt = p.PaidAt,
+                    Method = p.MethodLv.ValueCode
+                }).ToList()
+            };
+
+            return result;
         }
 
         public async Task<Customer?> GetGuestCustomerAsync(CancellationToken ct)

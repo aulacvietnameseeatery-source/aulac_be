@@ -1,4 +1,5 @@
 ﻿using Core.DTO.Dish;
+using Core.DTO.LookUpValue;
 using Core.Entity;
 using Core.Interface.Repo;
 using Core.Interface.Service.I18n;
@@ -114,6 +115,41 @@ namespace Core.Service
                     existing.UpdatedAt = DateTime.UtcNow;
                 }
             }
+        }
+
+        public LookupValueTranslationDto Map(I18nText? text, string? fallback = null)
+        {
+            if (text == null)
+            {
+                return fallback != null
+                    ? new LookupValueTranslationDto
+                    {
+                        Vi = fallback,
+                        En = fallback,
+                        Fr = fallback
+                    }
+                    : new LookupValueTranslationDto();
+            }
+
+            var translations = text.I18nTranslations;
+
+            string fallbackText = text.SourceText ?? fallback ?? "";
+
+            return new LookupValueTranslationDto
+            {
+                Vi = translations.FirstOrDefault(x => x.LangCode == "vi")?.TranslatedText ?? fallbackText,
+                En = translations.FirstOrDefault(x => x.LangCode == "en")?.TranslatedText ?? fallbackText,
+                Fr = translations.FirstOrDefault(x => x.LangCode == "fr")?.TranslatedText ?? fallbackText
+            };
+        }
+
+        public Dictionary<long, LookupValueTranslationDto> MapBatch(
+            IEnumerable<I18nText> texts)
+        {
+            return texts.ToDictionary(
+                t => t.TextId,
+                t => Map(t)
+            );
         }
     }
 }

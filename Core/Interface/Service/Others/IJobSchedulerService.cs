@@ -15,5 +15,16 @@ namespace Core.Interface.Service.Others
         bool CancelJob(string jobId);
 
         string ScheduleTableLock(long reservationId, TimeSpan delay);
+
+        /// <summary>Enqueues a Hangfire fire-and-forget job to send the customer reservation confirmation email.</summary>
+        string EnqueueReservationCustomerEmail(long reservationId, string toEmail, string customerName, DateTime reservedTime, int partySize, string tableCodes);
+
+        /// <summary>Enqueues a Hangfire fire-and-forget job to send the admin reservation notification email (fetches store email internally).</summary>
+        string EnqueueReservationAdminEmail(long reservationId, string customerName, DateTime reservedTime, int partySize, string tableCodes);
+
+        /// <summary>
+        /// Enqueues one Hangfire job that sends customer + admin reservation emails concurrently.
+        /// </summary>
+        string EnqueueReservationEmails(long reservationId, string? customerEmail, string customerName, DateTime reservedTime, int partySize, string tableCodes);
     }
 }

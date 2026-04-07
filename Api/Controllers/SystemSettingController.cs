@@ -1,10 +1,11 @@
-using Core.Attribute;
+using API.Attributes;
 using Core.Data;
 using Core.DTO.SystemSetting;
 using Core.Interface.Service.Entity;
-using Core.Interface.Service.FileStorage;
 using Core.DTO.General;
+using Core.Extensions;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using API.Models;
 using Microsoft.AspNetCore.Authorization;
 
@@ -19,29 +20,17 @@ namespace Api.Controllers;
 public class SystemSettingController : ControllerBase
 {
     private readonly ISystemSettingService _systemSettingService;
-    private readonly IFileStorage _fileStorage;
     private readonly ILogger<SystemSettingController> _logger;
-
-    private static readonly HashSet<string> StoreMediaKeys = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "store.intro.hero.image",
-        "store.intro.virtualTour.videoUrl",
-        "store.intro.virtualTour.videoUrlLeft",
-        "store.intro.virtualTour.videoUrlRight",
-        "store.intro.collection.dish1.image",
-        "store.intro.collection.dish2.image",
-        "store.intro.collection.dish3.image",
-        "store.logoUrl"
-    };
+    private readonly RestaurantOptions _restaurantOptions;
 
     public SystemSettingController(
         ISystemSettingService systemSettingService,
-        IFileStorage fileStorage,
-        ILogger<SystemSettingController> logger)
+        ILogger<SystemSettingController> logger,
+        IOptions<RestaurantOptions> restaurantOptions)
     {
         _systemSettingService = systemSettingService;
-        _fileStorage = fileStorage;
         _logger = logger;
+        _restaurantOptions = restaurantOptions.Value;
     }
 
     /// <summary>
@@ -502,14 +491,8 @@ public class SystemSettingController : ControllerBase
                 });
             }
 
-            var uploadRequest = new FileUploadRequest
-            {
-                Stream = file.OpenReadStream(),
-                FileName = file.FileName,
-                ContentType = file.ContentType
-            };
-
-            var result = await _fileStorage.SaveAsync(uploadRequest, "store-logo", FileValidationOptions.ImageUpload, cancellationToken);
+            var result = await _systemSettingService.UploadStoreLogoAsync(
+                file.OpenReadStream(), file.FileName, file.ContentType, cancellationToken);
 
             _logger.LogInformation("Store logo uploaded: {PublicUrl}", result.PublicUrl);
 
@@ -564,25 +547,10 @@ public class SystemSettingController : ControllerBase
                 });
             }
 
-            var uploadRequest = new FileUploadRequest
-            {
-                Stream = file.OpenReadStream(),
-                FileName = file.FileName,
-                ContentType = file.ContentType
-            };
+            var result = await _systemSettingService.UploadStoreFileAsync(
+                file.OpenReadStream(), file.FileName, file.ContentType, cancellationToken);
 
-            var extension = Path.GetExtension(file.FileName);
-            var isVideo = file.ContentType.Equals("video/mp4", StringComparison.OrdinalIgnoreCase)
-                          || extension.Equals(".mp4", StringComparison.OrdinalIgnoreCase);
-
-            // Keep store folders and enforce store intro video policy (30s, 50MB, MP4).
-            var validation = isVideo ? FileValidationOptions.StoreIntroVideo : FileValidationOptions.ImageUpload;
-            var folder = isVideo ? "store-videos" : "store-media";
-
-            var result = await _fileStorage.SaveAsync(uploadRequest, folder, validation, cancellationToken);
-
-            _logger.LogInformation("Store {Type} uploaded to {Folder}: {PublicUrl}", 
-                isVideo ? "video" : "image", folder, result.PublicUrl);
+            _logger.LogInformation("Store file uploaded: {PublicUrl}", result.PublicUrl);
 
             return Ok(new ApiResponse<object>
             {
@@ -664,10 +632,6 @@ public class SystemSettingController : ControllerBase
         try
         {
             var settings = await _systemSettingService.GetGroupAsync(group, cancellationToken);
-            if (group.Equals("store", StringComparison.OrdinalIgnoreCase))
-            {
-                settings = settings.Select(AttachPublicUrlForStoreMedia).ToList();
-            }
 
             return Ok(new ApiResponse<object>
             {
@@ -707,10 +671,6 @@ public class SystemSettingController : ControllerBase
         try
         {
             var settings = await _systemSettingService.GetPublicGroupAsync(group, cancellationToken);
-            if (group.Equals("store", StringComparison.OrdinalIgnoreCase))
-            {
-                settings = settings.Select(AttachPublicUrlForStoreMedia).ToList();
-            }
 
             return Ok(new ApiResponse<object>
             {
@@ -737,6 +697,24 @@ public class SystemSettingController : ControllerBase
     }
 
     /// <summary>
+    /// Returns the configured restaurant timezone ID (e.g. "Europe/Zurich").
+    /// Public endpoint — used by FE to format dates in the restaurant's local time.
+    /// </summary>
+    [HttpGet("public/timezone")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    public IActionResult GetPublicTimezone()
+    {
+        return Ok(new ApiResponse<object>
+        {
+            Success = true,
+            Code = 200,
+            Data = new { timeZoneId = _restaurantOptions.TimeZoneId },
+            ServerTime = DateTimeOffset.UtcNow
+        });
+    }
+
+    /// <summary>
     /// Bulk-updates all settings in a group.
     /// Existing value types and sensitive flags are preserved.
     /// </summary>
@@ -755,11 +733,6 @@ public class SystemSettingController : ControllerBase
         {
             var userIdClaim = User.FindFirst("user_id");
             long? userId = userIdClaim != null && long.TryParse(userIdClaim.Value, out var id) ? id : null;
-
-            if (group.Equals("store", StringComparison.OrdinalIgnoreCase))
-            {
-                request = NormalizeStoreMediaValues(request);
-            }
 
             await _systemSettingService.BulkUpdateGroupAsync(
                 group, request.Items, userId, cancellationToken);
@@ -792,96 +765,4 @@ public class SystemSettingController : ControllerBase
         }
     }
 
-    private SystemSettingDetailDto AttachPublicUrlForStoreMedia(SystemSettingDetailDto setting)
-    {
-        if (!StoreMediaKeys.Contains(setting.SettingKey))
-            return setting;
-
-        if (setting.Value is not string value || string.IsNullOrWhiteSpace(value))
-            return setting;
-
-        var publicUrl = BuildPublicUrl(value);
-        return setting with { PublicUrl = publicUrl };
-    }
-
-    private string? BuildPublicUrl(string value)
-    {
-        var trimmed = value.Trim();
-        if (string.IsNullOrWhiteSpace(trimmed))
-            return null;
-
-        if (Uri.TryCreate(trimmed, UriKind.Absolute, out var absolute))
-            return absolute.ToString();
-
-        if (trimmed.StartsWith("/uploads/", StringComparison.OrdinalIgnoreCase))
-        {
-            var withoutPrefix = trimmed.Substring("/uploads/".Length);
-            return _fileStorage.GetPublicUrl(withoutPrefix);
-        }
-
-        if (trimmed.StartsWith("uploads/", StringComparison.OrdinalIgnoreCase))
-        {
-            var withoutPrefix = trimmed.Substring("uploads/".Length);
-            return _fileStorage.GetPublicUrl(withoutPrefix);
-        }
-
-        return _fileStorage.GetPublicUrl(trimmed.TrimStart('/'));
-    }
-
-    private static BulkUpdateGroupDto NormalizeStoreMediaValues(BulkUpdateGroupDto request)
-    {
-        var normalized = request.Items.Select(item =>
-        {
-            if (!StoreMediaKeys.Contains(item.Key))
-                return item;
-
-            var normalizedValue = NormalizeStoreMediaValue(item.Value);
-            return item with { Value = normalizedValue };
-        }).ToList();
-
-        return new BulkUpdateGroupDto { Items = normalized };
-    }
-
-    private static string NormalizeStoreMediaValue(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-            return string.Empty;
-
-        var trimmed = value.Trim();
-
-        if (Uri.TryCreate(trimmed, UriKind.Absolute, out var absolute))
-        {
-            var path = absolute.AbsolutePath;
-            if (path.StartsWith("/uploads/", StringComparison.OrdinalIgnoreCase))
-                return path.TrimStart('/');
-            return path.StartsWith("/") ? $"uploads{path}" : $"uploads/{path}";
-        }
-
-        if (trimmed.StartsWith("/uploads/", StringComparison.OrdinalIgnoreCase))
-            return trimmed.TrimStart('/');
-
-        if (trimmed.StartsWith("uploads/", StringComparison.OrdinalIgnoreCase))
-            return trimmed;
-
-        if (trimmed.StartsWith("/"))
-        {
-            if (trimmed.StartsWith("/store-media/", StringComparison.OrdinalIgnoreCase)
-                || trimmed.StartsWith("/store-videos/", StringComparison.OrdinalIgnoreCase)
-                || trimmed.StartsWith("/store-logo/", StringComparison.OrdinalIgnoreCase))
-            {
-                return "uploads" + trimmed;
-            }
-
-            return trimmed.TrimStart('/');
-        }
-
-        if (trimmed.StartsWith("store-media/", StringComparison.OrdinalIgnoreCase)
-            || trimmed.StartsWith("store-videos/", StringComparison.OrdinalIgnoreCase)
-            || trimmed.StartsWith("store-logo/", StringComparison.OrdinalIgnoreCase))
-        {
-            return "uploads/" + trimmed;
-        }
-
-        return trimmed;
-    }
 }
