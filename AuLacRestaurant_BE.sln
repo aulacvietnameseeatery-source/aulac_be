@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Infa", "Infa\Infa.csproj", 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Api", "Api\Api.csproj", "{E3279F93-269A-41AD-A664-1AAABCE84B23}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tests", "Tests\Tests.csproj", "{68501DCC-FCF9-48E1-9154-07145B531CF4}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,6 +29,10 @@ Global
 		{E3279F93-269A-41AD-A664-1AAABCE84B23}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E3279F93-269A-41AD-A664-1AAABCE84B23}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E3279F93-269A-41AD-A664-1AAABCE84B23}.Release|Any CPU.Build.0 = Release|Any CPU
+		{68501DCC-FCF9-48E1-9154-07145B531CF4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{68501DCC-FCF9-48E1-9154-07145B531CF4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{68501DCC-FCF9-48E1-9154-07145B531CF4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{68501DCC-FCF9-48E1-9154-07145B531CF4}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
