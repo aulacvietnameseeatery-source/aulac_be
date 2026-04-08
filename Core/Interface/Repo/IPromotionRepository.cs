@@ -24,5 +24,9 @@ namespace Core.Interface.Repo
         void RemoveTargets(IEnumerable<PromotionTarget> targets);
 
         Task<List<Promotion>> GetActivePromotionsAsync(DateTime now, CancellationToken ct);
+
+        Task<Promotion?> GetByIdWithRelationsAsync(long id, CancellationToken ct);
+
+        Task DeleteAsync(Promotion promotion, CancellationToken ct);
     }
 }

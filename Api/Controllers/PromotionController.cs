@@ -219,5 +219,23 @@ namespace Api.Controllers
                 ServerTime = DateTimeOffset.Now
             });
         }
+
+        [HttpDelete("{id:long}")]
+        [HasPermission(Permissions.DeletePromotion)]
+        public async Task<IActionResult> DeletePromotion(
+            long id,
+            CancellationToken ct)
+        {
+            await _promotionService.DeletePromotionAsync(id, ct);
+
+            return Ok(new ApiResponse<object>
+            {
+                Success = true,
+                Code = 200,
+                SubCode = 0,
+                UserMessage = "Delete promotion successfully",
+                ServerTime = DateTimeOffset.Now
+            });
+        }
     }
 }
