@@ -1,0 +1,94 @@
+@startuml
+autonumber
+title 2.10.2.2 Create Inventory Transaction
+
+actor Client
+participant "InventoryController" as Ctrl
+participant "InventoryService" as Svc
+participant "IInventoryRepository" as Repo
+participant "IFileStorage" as FS
+participant "IMediaRepository" as MR
+database "Database" as DB
+
+Client -> Ctrl : POST /api/inventory/transactions\n(CreateInventoryTransactionFormRequest: multipart/form-data)
+activate Ctrl
+Ctrl -> Ctrl : Deserialize RequestJson\n→ CreateInventoryTransactionRequest
+Ctrl -> Ctrl : GetCurrentUserId()
+Ctrl -> Ctrl : MapFiles(EvidenceFiles)
+Ctrl -> Svc : CreateTransactionAsync(request, userId, evidenceFiles, ct)
+activate Svc
+
+Svc -> Svc : Resolve DRAFT status ID via ILookupResolver
+Svc -> Svc : ResolveTypeCodeAsync(TypeLvId)\n→ "IN" | "OUT" | "ADJUST"
+
+Svc -> Repo : GetTodayTransactionCountByTypeAsync(typeCode, ct)
+activate Repo
+Repo -> DB : COUNT WHERE TypeCode AND CreatedAt >= today
+activate DB
+DB --> Repo : count
+deactivate DB
+Repo --> Svc : count
+deactivate Repo
+
+Svc -> Svc : GenerateTransactionCodeAsync\n→ {TYPE}-{YYYYMMDD}-{SEQ}
+
+note right of Svc : Build InventoryTransaction entity\n+ InventoryTransactionItem list from request
+
+Svc -> Repo : CreateTransactionAsync(transaction, items, ct)
+activate Repo
+Repo -> DB : INSERT InventoryTransaction
+activate DB
+DB --> Repo : transactionId
+deactivate DB
+Repo -> DB : INSERT InventoryTransactionItems (batch)
+activate DB
+DB --> Repo : ok
+deactivate DB
+Repo --> Svc : transactionId
+deactivate Repo
+
+opt Evidence files provided
+    Svc -> Svc : SaveEvidenceFilesAsync(transactionId, transaction, files, ct)
+    Svc -> Svc : Resolve IMAGE MediaType ID via ILookupResolver
+
+    Svc -> FS : SaveManyAsync(uploadRequests, "inventory-evidence", ImageUpload, ct)
+    activate FS
+    FS --> Svc : uploadResults (relativePaths)
+    deactivate FS
+
+    loop Each uploaded file
+        Svc -> MR : AddMediaAsync(MediaAsset, ct)
+        activate MR
+        MR --> Svc : MediaAsset (with MediaId)
+        deactivate MR
+        Svc -> Svc : Add InventoryTransactionMedium to entity
+    end
+
+    Svc -> Repo : UpdateTransactionAsync(transaction, ct)
+    activate Repo
+    Repo -> DB : UPDATE transaction + INSERT media links
+    activate DB
+    DB --> Repo : ok
+    deactivate DB
+    Repo --> Svc : ok
+    deactivate Repo
+end
+
+note right of Svc : GetTransactionDetailAsync\n→ reload entity + MapToDetailDto
+
+Svc -> Repo : GetTransactionByIdAsync(transactionId, ct)
+activate Repo
+Repo -> DB : SELECT with all Includes
+activate DB
+DB --> Repo : InventoryTransaction entity
+deactivate DB
+Repo --> Svc : InventoryTransaction entity
+deactivate Repo
+Svc -> Svc : MapToDetailDto(entity)
+
+Svc --> Ctrl : InventoryTransactionDetailDto
+deactivate Svc
+Ctrl --> Client : 200 ApiResponse<InventoryTransactionDetailDto>
+deactivate Ctrl
+
+@enduml

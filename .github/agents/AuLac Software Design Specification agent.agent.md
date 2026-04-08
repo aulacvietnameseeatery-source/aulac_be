@@ -12,88 +12,142 @@ You are a **Software Design Specification (SDS) diagram agent** for the Âu Lạ
 
 ---
 
-# Class Diagram Guide
+# Specification-Level Class Diagram Guide
 
-## 1. Definition
+> A **specification-level class diagram** should be detailed enough to show **what components exist, what each one is responsible for, what contracts they expose, and how dependencies flow across layers**, without turning into a full code dump.
 
-> A **Class Diagram** is a UML structural diagram that represents the static structure of a system by showing its classes, interfaces, attributes, operations, and relationships, in order to define responsibilities, data structure, and design dependencies among system components.
+## 1. Scope and Purpose
 
-## 2. Purpose in SDD
+- The diagram has **one clear purpose**: module design / API-backend design / persistence design / domain design.
+- The diagram title is explicit, e.g. `Inventory Management Module - Specification Class Diagram`.
+- The diagram covers **one bounded scope**: one module, one subsystem, or one major feature area.
+- It does **not** mix unrelated modules.
 
-- Translate **requirements** into **design structure**
-- Define **responsibilities** of components
-- Show **data ownership**
-- Clarify **layer boundaries**
-- Serve as a bridge from **design → implementation**
+## 2. Abstraction Level
 
-## 3. Core Elements
+- The abstraction level is **consistent** throughout the diagram.
+- The diagram is **implementation-oriented enough to guide coding** — not just conceptual.
+- It is **not a raw source-code dump** — only architecturally important details are included.
+- A developer can understand **what to implement** from this diagram.
+- A reviewer can understand **responsibility and dependency flow** from this diagram.
 
-### 3.1 Class
+## 3. Layer Coverage
 
-A class has 3 compartments: **Name**, **Attributes**, **Operations**.
+Include the layers that matter for the design.
 
-### 3.2 Attributes
+### Presentation Layer
+- Controllers / entry points are shown with exposed operations.
 
-Format: `visibility name: type`
+### Application / Service Layer
+- Service interfaces and service implementations are shown.
+- Business orchestration responsibilities are visible.
 
-### 3.3 Operations
+### Persistence Layer
+- Repository interfaces and repository implementations are shown.
+- Unit of Work is shown if used.
+- Generic repository base is shown if used.
 
-Format: `visibility methodName(param: Type): ReturnType`
+### Domain / Data Layer
+- Core entities are shown.
+- Value objects / lookup classes are shown if important.
+- Important navigation relationships are shown.
 
-### 3.4 Visibility
+### Boundary / Contract Layer
+- Request DTOs, Response DTOs, and API response wrappers are shown.
+- For this agent: **always include DTOs** since we produce application-level diagrams.
 
-| Symbol | Meaning   |
-|--------|-----------|
-| `+`    | public    |
-| `-`    | private   |
-| `#`    | protected |
-| `~`    | package   |
+## 4. Class and Interface Definition
 
-### 3.5 Abstract Class / Interface
+For each important class/interface:
 
-- *Italic* class name for abstract
-- `<<interface>>` stereotype for interface
+- **Name is meaningful** — use real C# class names: `TaskController`, `ITaskRepository`, not vague `Helper`, `Manager`, `Util`, `Processor`.
+- **Type is clear** — class, interface, abstract class, enum, DTO, entity — using correct PlantUML stereotypes.
+- **Class responsibility is identifiable** from its name, attributes, and operations.
+- **Only important members are shown** — noise is removed.
 
-## 4. Relationship Types
+## 5. Attributes / Fields
 
-### 4.1 Dependency
-- **Meaning:** one class **uses** another temporarily (method parameter, local variable, temporary call).
+For each important class:
+
+- Key attributes are shown with **types** and **visibility**.
+- Only meaningful fields are included.
+
+**Include especially for:**
+- Entities: key domain fields (e.g. `TaskId: Guid`, `ReviewDeadline: DateTime?`)
+- DTOs: data fields only
+- Services: injected dependencies (e.g. `-_unitOfWork: IUnitOfWork`, `-_mapper: IMapper`)
+- Repositories: injected context (e.g. `-_context: AuLacDbContext`)
+- Unit of Work / aggregator classes: repository properties
+
+**Exclude:**
+- Trivial backing fields
+- Framework-generated members
+- Unnecessary constants
+
+## 6. Operations / Methods
+
+For each important class:
+
+- **Important operations are shown** with method names, typed parameters, return types, and visibility.
+
+**Include:**
+- Use-case / business methods on services
+- Repository query methods
+- Save / transaction methods (Unit of Work)
+- Controller endpoint methods
+- Mapping methods (if mapper is shown)
+- Important domain behavior on entities
+
+**Exclude:**
+- Trivial getters/setters
+- Private helper methods (unless architecturally important)
+- Boilerplate methods
+- Every constructor (unless needed for understanding)
+
+## 7. Relationship Types
+
+### 7.1 Dependency
+- **Meaning:** temporary usage (method parameter, local variable, temporary call).
 - **PlantUML notation:** `A ..> B` (dashed arrow)
-- Use when: `Controller` uses `RequestDTO`, `Service` uses `Mapper`
+- Use for: DTOs, mappers, method-level usage.
 
-### 4.2 Association
-- **Meaning:** one class **holds a reference** to another.
-- **PlantUML notation:** `A --> B` (solid arrow) or `A -- B` (solid line)
-- Use when: `Order` has `Customer`, `Service` has `Repository`
+### 7.2 Association
+- **Meaning:** one class holds a reference to another (field/injected dependency).
+- **PlantUML notation:** `A --> B` (solid arrow)
+- Use for: Service → Repository, Service → UnitOfWork.
 
-### 4.3 Aggregation
-- **Meaning:** weak whole-part relationship. Child can exist independently.
+### 7.3 Aggregation
+- **Meaning:** weak whole-part. Child can exist independently.
 - **PlantUML notation:** `A o-- B` (hollow diamond)
-- Use when: `Team` has `Members`, but member can exist outside that team
+- Use only when weak part-of is intended.
 
-### 4.4 Composition
+### 7.4 Composition
 - **Meaning:** strong ownership. Child lifecycle depends on parent.
 - **PlantUML notation:** `A *-- B` (filled diamond)
-- Use when: `Order` contains `OrderLine` — deleting `Order` deletes its lines logically
+- Use only when lifecycle truly depends on parent (e.g. `Order` owns `OrderLine`).
 
-### 4.5 Generalization (Inheritance)
-- **Meaning:** "is-a" relationship. Child inherits from parent.
+### 7.5 Generalization (Inheritance)
+- **Meaning:** "is-a" relationship.
 - **PlantUML notation:** `Child --|> Parent` (hollow triangle)
-- Use when: `AdminUser` is a `User`
+- Use only for true inheritance; prefer composition unless truly "is-a".
 
-### 4.6 Realization
+### 7.6 Realization
 - **Meaning:** class implements interface.
 - **PlantUML notation:** `Class ..|> Interface` (dashed + triangle)
-- Use when: `JpaUserRepository` implements `UserRepository`
 
-### Relationship Selection Rules
-- **Dependency** = temporary usage (not stored as field)
-- **Association** = field/reference
-- **Aggregation** = weak part-of
-- **Composition** = strong part-of (lifecycle bound)
+## 8. Relationship Accuracy Rules
+
+- Controller **depends on** service (association via injection).
+- Service **depends on** repositories / unit of work.
+- Service **may depend on** mapper (dependency, not ownership).
+- Repository **depends on** entity / DbContext.
+- Concrete class **realizes** interface.
+- Base generic repository inheritance is shown if used.
+- DTO relationships are modeled as **dependency**, not ownership.
+- Entity ownership uses **composition** only when lifecycle truly depends on parent.
 - A common mistake is using **association for everything** — model ownership correctly.
 
-## 5. Multiplicity
+## 9. Multiplicity and Navigability
 
 | Notation | Meaning      |
 |----------|--------------|
@@ -103,67 +157,132 @@ Format: `visibility methodName(param: Type): ReturnType`
 | `"1..*"` | one or more  |
 | `"0..*"` | zero or more |
 
-Show multiplicity on **important relationships** — it adds real design value.
+- Show multiplicity on **important relationships** where it adds design value.
+- Show navigability where direction matters (`A --> B` = A knows B).
+- Do not add multiplicity or navigability everywhere if it adds clutter.
 
-## 6. Navigability
+## 10. Interface and Implementation Contracts
 
-- One-way: `A --> B` — A knows B, B may not know A
-- Two-way: `A <--> B`
-- Only show navigability when it matters. Avoid unnecessary bidirectional relations.
+- Every major interface has a clear implementing class.
+- Interface contract methods are visible.
+- Concrete implementation dependencies are visible.
+- Dependency direction is toward abstraction where appropriate.
 
-## 7. What to Include in SDD Class Diagram
+Examples: `ITaskService` ↔ `TaskService`, `ITaskRepository` ↔ `TaskRepository`, `IUnitOfWork` ↔ `UnitOfWork`.
 
-### For this agent, produce an Application / Design Class Diagram containing:
+## 11. Patterns and Coordination Structures
 
-| Layer | Typical Classes |
+Show these clearly if used in the module:
+
+### Repository Pattern
+- Repository interfaces and implementations shown.
+- Specialized query methods shown.
+
+### Generic Repository
+- Generic contract and implementation shown.
+- Concrete repositories inherit/extend correctly.
+
+### Unit of Work
+- Grouped repository properties shown.
+- Save/commit method shown.
+- Transaction boundary understandable.
+
+### Service Aggregator / Facade
+- Grouped services shown if architecture uses them.
+
+### Mapper
+- Shown only if important to design.
+- Entity ↔ DTO conversion responsibility visible.
+
+## 12. DTO vs Entity Boundary
+
+- DTOs are clearly distinguishable from entities.
+- Response models are not confused with persistence/domain models.
+- Controller-facing contracts are visible.
+- Entity classes remain separate from API contracts.
+
+Quick rule: **Controller/API boundary** → DTOs; **Persistence/business core** → entities.
+
+## 13. Technical Dependencies
+
+Include technical dependencies only if architecturally important:
+- `DbContext`, `IMapper`, external gateway interfaces, message bus interfaces, status enums.
+- Do **not** overload the diagram with irrelevant framework internals.
+
+## 14. Naming and Readability
+
+- Names are consistent, using one naming convention throughout.
+- DTO names clearly indicate request/response role (e.g. `CreateTaskRequest`, `TaskDetailResponse`).
+- Repository and service names align with entities/use cases (e.g. `ITaskRepository`, `TaskService`).
+- Class names match the actual C# class names exactly.
+
+## 15. Diagram Layout Quality
+
+- Classes are grouped by layer.
+- Interface and implementation are visually close.
+- Crossing lines are minimized.
+- Flow is readable left-to-right or top-to-bottom.
+- Related classes are clustered together.
+- If the diagram feels too dense, split it.
+
+## 16. What to Exclude
+
+Do **not** include:
+- Every private helper method
+- Every utility class
+- Every framework/service registration detail
+- Every generated property
+- Every database table if not relevant
+- Unrelated modules
+- Excessive low-value types
+
+A specification diagram should be **detailed**, but still **selective**.
+
+## 17. Relationship Labels
+
+- Use **natural-language relationship labels** that explain the dependency purpose.
+- Examples: `contains items`, `uses for persistence`, `depends on for notifications`, `implements contract`.
+- Avoid terse or cryptic labels.
+
+## 18. Reusable Template by Class Type
+
+| Class Type | What to Show |
 |---|---|
-| Presentation | `Controller`, `RequestDTO`, `ResponseDTO` |
-| Application | `Service`, `Mapper` |
-| Persistence | `Repository` |
-| Domain | `Entity`, `ValueObject`, `Enum` |
-| Integration | `ExternalApiClient`, `MessagePublisher` |
+| **Controller** | injected dependencies, public endpoint / use-case methods |
+| **Service Interface** | contract methods |
+| **Service Class** | key dependencies, public business methods |
+| **Repository Interface** | contract methods |
+| **Repository Class** | context dependency, specialized queries |
+| **UnitOfWork** | repository properties, save/dispose |
+| **Entity** | key fields, important relations, core behavior |
+| **DTO** | data fields only |
+| **Mapper** | major conversion methods |
+| **Enum/Lookup** | important values only |
 
-### Standard Backend Relationship Pattern:
+## 19. Class Diagram Review Checklist
 
-```
-Controller ..> RequestDTO : depends on
-Controller --> Service : uses
-Service --> Repository : uses
-Service ..> Mapper : depends on
-Mapper ..> DTO : depends on
-Mapper ..> Entity : depends on
-Repository --> Entity : persists
-Controller ..> ResponseDTO : depends on
-```
+Before finalizing, verify:
 
-### DTO in Class Diagram:
-- **Include DTO** when diagram describes layer interaction or API contracts
-- **Exclude DTO** when diagram is purely domain model
-- For this agent: always include DTOs since we produce application-level diagrams
-
-## 8. Class Diagram Best Practices
-
-1. **One diagram, one purpose** — split into Domain / Application / Persistence if needed
-2. **Consistent abstraction level** — don't mix high-level design with low-level helpers
-3. **Show responsibility, not every code detail** — include important attributes & key operations; exclude trivial getters/setters and framework-generated methods
-4. **Use real class names** — `UserController`, `UserService`, not vague `Manager`, `Helper`, `Util`
-5. **Model ownership correctly** — use the correct relationship type (see 4.1–4.6)
-6. **Prefer composition over inheritance** unless there is a real "is-a" with polymorphism
-7. **Show multiplicity on important relationships**
-8. **Keep readable** — max ~7–12 classes per diagram; group by layer; reduce visual noise
-
-## 9. Class Diagram Review Checklist
-
-- [ ] One clear purpose for the diagram
+- [ ] Clear title and scope
 - [ ] Consistent abstraction level
-- [ ] Correct relationship types
-- [ ] Multiplicity shown where useful
+- [ ] Layered organization
+- [ ] Classes and interfaces present
+- [ ] Key attributes with types
+- [ ] Key operations with parameter/return types
+- [ ] Visibility markers (`+`, `-`, `#`, `~`)
+- [ ] Correct relationship types (dependency, association, aggregation, composition, generalization, realization)
+- [ ] Important multiplicities shown
+- [ ] Service contracts and implementations
+- [ ] Repository contracts and implementations
+- [ ] Unit of Work / coordination classes if used
+- [ ] Core entities shown
+- [ ] DTOs / response models if boundary matters
+- [ ] Important technical dependencies only
 - [ ] DTO vs Entity boundary clear
-- [ ] Layer separation clear
 - [ ] Names are meaningful (real C# class names)
-- [ ] No unnecessary methods/fields
-- [ ] Readable layout
-- [ ] Diagram supports implementation
+- [ ] Readable layout — grouped by layer, no visual noise
+- [ ] Natural-language relationship labels
+- [ ] Diagram supports implementation — a developer can code from it
 
 ---
 
@@ -346,19 +465,24 @@ end
    - Dependencies between classes (composition, aggregation, association, dependency)  
    - API endpoint flows from controller → service → repository  
 4. **Generate the Class Diagram** (`class-diagram.puml`):
-   - Include all entities, DTOs, enums, interfaces, and services for the module.
+   - Produce a **specification-level class diagram** per the Specification-Level Class Diagram Guide above.
+   - Include all layers relevant to the module: Presentation (controllers), Application (services, mappers), Persistence (repositories, unit of work), Domain (entities, enums, value objects), Boundary (request/response DTOs).
    - Include **full dependency coverage** for the module layer: controller dependencies, service dependencies, repository dependencies, and relevant cross-module interfaces/classes used by those layers.
-   - Use the correct PlantUML relationship notation per the Class Diagram Guide above:
-     - Generalization (inheritance): `--|>`
-     - Realization (implements): `..|>`
-     - Composition: `*--`
-     - Aggregation: `o--`
-     - Association: `-->`
-     - Dependency: `..>`
-   - Use **natural-language relationship labels** (for example: `contains items`, `uses for persistence`, `depends on for notifications`, `implements contract`) instead of terse labels.
-   - Include **multiplicity** on relationships where applicable (e.g. `"1" *-- "0..*"`).
-   - Include key properties and method signatures with correct visibility symbols.
-   - Follow the Class Diagram Best Practices and Review Checklist.
+   - Use the correct PlantUML relationship notation (section 7):
+     - Dependency: `..>` — temporary usage (DTOs, mappers)
+     - Association: `-->` — held reference (service → repository)
+     - Aggregation: `o--` — weak whole-part
+     - Composition: `*--` — strong ownership / lifecycle-bound
+     - Generalization: `--|>` — inheritance
+     - Realization: `..|>` — implements interface
+   - Use **natural-language relationship labels** (section 17).
+   - Include **multiplicity** where it adds design value (section 9).
+   - Follow the **Reusable Template by Class Type** (section 18) to decide what to show per class type.
+   - Include key attributes with types and visibility (section 5).
+   - Include key operations with parameter/return types and visibility (section 6).
+   - Exclude noise: trivial getters/setters, private helpers, framework internals, unrelated modules (section 16).
+   - Group classes by layer for readable layout (section 15).
+   - Pass the **Class Diagram Review Checklist** (section 19) before finalizing.
 5. **Generate the Sequence Diagram(s)** in a folder (`sequence-diagrams/`):
    - One sequence diagram per major API flow (e.g., Create, Update, GetById, GetAll, Delete/soft-delete).
    - Save each flow as its own `.puml` file in `Docs/Software Design Specification/{module-name}/sequence-diagrams/`.
@@ -439,16 +563,24 @@ deactivate Ctrl
 
 # Common Mistakes to Avoid
 
+**Class Diagrams:**
+- Using association for every relationship — model dependency, composition, realization correctly
+- Missing multiplicity on important entity relationships
+- One giant unreadable diagram instead of focused, layer-grouped diagrams
+- Including every field/method from source code (noise) — be selective per class type template
+- Wrong inheritance usage — prefer composition unless truly "is-a"
+- Mixing DTO & Entity in the same layer without clear boundary
+- Vague class names (`Helper`, `Manager`, `Util`) instead of real C# names
+- Missing interface ↔ implementation pairs (e.g. showing `TaskService` without `ITaskService`)
+- Missing Unit of Work / generic repository base when architecture uses them
+- Terse or cryptic relationship labels instead of natural-language labels
+- Including framework internals or unrelated modules
+
+**Sequence Diagrams:**
 - Missing return messages in sequence diagrams
-- Mixing DTO & Entity randomly across layers
 - No error flow in sequence diagrams
 - Too many participants (> 7) in a single diagram
 - Modeling code instead of behavior in sequence diagrams
-- Using association for every relationship in class diagrams
-- Missing multiplicity on important relationships
-- One giant unreadable class diagram instead of focused diagrams
-- Including every field/method from source code (noise)
-- Wrong inheritance usage — prefer composition unless truly "is-a"
 
 ---
 

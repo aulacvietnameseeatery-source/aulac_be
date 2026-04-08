@@ -1,0 +1,58 @@
+@startuml
+autonumber
+title 2.10.2.5 View Transactions List & Detail
+
+actor Client
+participant "InventoryController" as Ctrl
+participant "InventoryService" as Svc
+participant "IInventoryRepository" as Repo
+database "Database" as DB
+
+== GET /api/inventory/transactions ==
+
+Client -> Ctrl : GET /api/inventory/transactions\n(GetTransactionsFilterRequest)
+activate Ctrl
+Ctrl -> Svc : GetTransactionsAsync(filter, ct)
+activate Svc
+Svc -> Repo : GetTransactionsPagedAsync(filter, ct)
+activate Repo
+Repo -> DB : SELECT InventoryTransactions\nJOIN TypeLv, StatusLv, ExportReasonLv,\nSupplier, CreatedBy, ApprovedBy, Items\nWITH filters ORDER BY CreatedAt DESC
+activate DB
+DB --> Repo : result rows
+deactivate DB
+note right of Repo : Map to InventoryTransactionListDto\nwith ItemCount and TotalValue
+Repo --> Svc : PagedResultDTO<InventoryTransactionListDto>
+deactivate Repo
+Svc --> Ctrl : PagedResultDTO<InventoryTransactionListDto>
+deactivate Svc
+Ctrl --> Client : 200 ApiResponse<PagedResultDTO<InventoryTransactionListDto>>
+deactivate Ctrl
+
+== GET /api/inventory/transactions/{id} ==
+
+Client -> Ctrl : GET /api/inventory/transactions/{id}
+activate Ctrl
+Ctrl -> Svc : GetTransactionDetailAsync(id, ct)
+activate Svc
+
+Svc -> Repo : GetTransactionByIdAsync(id, ct)
+activate Repo
+Repo -> DB : SELECT InventoryTransaction\nwith Includes (TypeLv, StatusLv, ExportReasonLv,\nSupplier, CreatedBy, ApprovedBy,\nItems→Ingredient→Image, Items→CategoryLv,\nItems→UnitLv, Items→VarianceReasonLv,\nMedia→MediaAsset)
+activate DB
+DB --> Repo : InventoryTransaction entity
+deactivate DB
+Repo --> Svc : entity
+deactivate Repo
+
+alt Transaction not found
+    Svc --> Ctrl : throw KeyNotFoundException
+    Ctrl --> Client : 404 ApiResponse (Transaction not found)
+end
+
+Svc -> Svc : MapToDetailDto(entity)
+Svc --> Ctrl : InventoryTransactionDetailDto
+deactivate Svc
+Ctrl --> Client : 200 ApiResponse<InventoryTransactionDetailDto>
+deactivate Ctrl
+
+@enduml
