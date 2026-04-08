@@ -149,5 +149,23 @@ namespace Infa.Repo
                     p.PromotionStatusLv.ValueCode != PromotionStatusCode.DISABLED.ToString())
                 .ToListAsync(ct);
         }
+
+        public async Task<Promotion?> GetByIdWithRelationsAsync(
+            long id,
+            CancellationToken ct)
+        {
+            return await _context.Promotions
+                .Include(x => x.PromotionRules)
+                .Include(x => x.PromotionTargets)
+                .Include(x => x.OrderPromotions) 
+                .Include(x => x.PromotionStatusLv)
+                .FirstOrDefaultAsync(x => x.PromotionId == id, ct);
+        }
+
+        public Task DeleteAsync(Promotion promotion, CancellationToken ct)
+        {
+            _context.Promotions.Remove(promotion);
+            return Task.CompletedTask;
+        }
     }
 }

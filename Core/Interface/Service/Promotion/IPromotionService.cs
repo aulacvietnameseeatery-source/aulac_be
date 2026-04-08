@@ -20,5 +20,6 @@ namespace Core.Interface.Service.Promotion
         Task DisablePromotionAsync(long promotionId, CancellationToken ct);
         Task ActivatePromotionAsync(long promotionId, CancellationToken ct);
         Task<List<PromotionAvailableDTO>> GetAvailablePromotionsAsync(long orderId, CancellationToken ct);
+        Task DeletePromotionAsync(long promotionId, CancellationToken ct);
     }
 }
