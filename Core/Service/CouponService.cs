@@ -1,6 +1,7 @@
 using Core.DTO.Coupon;
 using Core.DTO.General;
 using Core.Entity;
+using Core.Enum;
 using Core.Interface.Repo;
 using Core.Interface.Service.Coupon;
 using Core.Interface.Service.Entity;
@@ -101,12 +102,14 @@ namespace Core.Service
 
             // Get lookup value IDs (throws KeyNotFoundException if not found)
             var typeLvId = await _lookupResolver.GetIdAsync(
-                (ushort)LookupTypeEnum.CouponType, 
-                request.Type, 
+                (ushort)LookupTypeEnum.CouponType,
+                request.Type,
                 ct);
+
+            var status = CalculateStatus(request.StartTime, request.EndTime);
             var statusLvId = await _lookupResolver.GetIdAsync(
-                (ushort)LookupTypeEnum.CouponStatus, 
-                request.CouponStatus, 
+                (ushort)LookupTypeEnum.CouponStatus,
+                status,
                 ct);
 
             var coupon = new Coupon
@@ -168,15 +171,11 @@ namespace Core.Service
 
             // Get lookup value IDs (throws KeyNotFoundException if not found)
             var typeLvId = await _lookupResolver.GetIdAsync(
-                (ushort)LookupTypeEnum.CouponType, 
-                request.Type, 
-                ct);
-            var statusLvId = await _lookupResolver.GetIdAsync(
-                (ushort)LookupTypeEnum.CouponStatus, 
-                request.CouponStatus, 
+                (ushort)LookupTypeEnum.CouponType,
+                request.Type,
                 ct);
 
-            // Update coupon
+            // Update coupon — status is not changed on update (use disable/activate endpoints)
             coupon.CouponCode = request.CouponCode;
             coupon.CouponName = request.CouponName.Trim();
             coupon.Description = request.Description?.Trim();
@@ -185,7 +184,6 @@ namespace Core.Service
             coupon.DiscountValue = request.DiscountValue;
             coupon.MaxUsage = request.MaxUsage;
             coupon.TypeLvId = typeLvId;
-            coupon.CouponStatusLvId = statusLvId;
 
             var updatedCoupon = await _couponRepository.UpdateAsync(coupon, ct);
 
@@ -217,6 +215,50 @@ namespace Core.Service
             var deleted = await _couponRepository.DeleteAsync(id, ct);
             if (!deleted)
                 throw new KeyNotFoundException($"Failed to delete coupon with ID {id}.");
+        }
+
+        public async Task DisableCouponAsync(long id, CancellationToken ct)
+        {
+            var coupon = await _couponRepository.GetByIdAsync(id, ct);
+            if (coupon == null)
+                throw new KeyNotFoundException($"Coupon with ID {id} not found.");
+
+            var disableStatusId = await _lookupResolver.GetIdAsync(
+                (ushort)LookupTypeEnum.CouponStatus,
+                CouponStatusCode.DISABLED,
+                ct);
+
+            coupon.CouponStatusLvId = disableStatusId;
+            await _couponRepository.UpdateAsync(coupon, ct);
+        }
+
+        public async Task ActivateCouponAsync(long id, CancellationToken ct)
+        {
+            var coupon = await _couponRepository.GetByIdAsync(id, ct);
+            if (coupon == null)
+                throw new KeyNotFoundException($"Coupon with ID {id} not found.");
+
+            var status = CalculateStatus(coupon.StartTime, coupon.EndTime);
+            var statusId = await _lookupResolver.GetIdAsync(
+                (ushort)LookupTypeEnum.CouponStatus,
+                status,
+                ct);
+
+            coupon.CouponStatusLvId = statusId;
+            await _couponRepository.UpdateAsync(coupon, ct);
+        }
+
+        private CouponStatusCode CalculateStatus(DateTime start, DateTime end)
+        {
+            var now = DateTime.UtcNow;
+
+            if (now < start)
+                return CouponStatusCode.SCHEDULED;
+
+            if (now >= start && now <= end)
+                return CouponStatusCode.ACTIVE;
+
+            return CouponStatusCode.EXPIRED;
         }
     }
 }

@@ -34,8 +34,4 @@ public class UpdateCouponRequest
     [Required(ErrorMessage = "Type is required")]
     [RegularExpression("^(FIXED_AMOUNT|PERCENT)$", ErrorMessage = "Type must be either FIXED_AMOUNT or PERCENT")]
     public string Type { get; set; } = string.Empty;
-
-    [Required(ErrorMessage = "Status is required")]
-    [RegularExpression("^(ACTIVE|DISABLED|SCHEDULED|EXPIRED)$", ErrorMessage = "Invalid coupon status")]
-    public string CouponStatus { get; set; } = string.Empty;
 }
