@@ -1,0 +1,49 @@
+@startuml
+autonumber
+title 2.10.2.1 View Inventory List & Stock Card
+
+actor C as "Client"
+participant "InventoryController" as Ctrl
+participant "InventoryService" as Svc
+participant "InventoryRepository" as Repo
+database "Database" as DB
+
+== GET /api/inventory/items ==
+
+C -> Ctrl : GET /api/inventory/items (GetInventoryItemsFilterRequest)
+activate Ctrl
+Ctrl -> Svc : GetItemsAsync(filter, ct)
+activate Svc
+Svc -> Repo : GetItemsPagedAsync(filter, ct)
+activate Repo
+Repo -> DB : SELECT Ingredients JOIN TypeLv, UnitLv, CategoryLv, Image, CurrentStock
+activate DB
+DB --> Repo : Rows
+deactivate DB
+Repo --> Svc : PagedResultDTO of InventoryItemDto
+deactivate Repo
+Svc --> Ctrl : PagedResultDTO of InventoryItemDto
+deactivate Svc
+Ctrl --> C : 200 ApiResponse with PagedResultDTO of InventoryItemDto
+deactivate Ctrl
+
+== GET /api/inventory/items/{ingredientId}/stock-card ==
+
+C -> Ctrl : GET /api/inventory/items/{ingredientId}/stock-card
+activate Ctrl
+Ctrl -> Svc : GetStockCardAsync(ingredientId, pageIndex, pageSize, ct)
+activate Svc
+Svc -> Repo : GetStockCardAsync(ingredientId, pageIndex, pageSize, ct)
+activate Repo
+Repo -> DB : SELECT InventoryTransactionItems JOIN Transaction,\nTypeLv, StatusLv, ExportReasonLv, CreatedByNavigation\nWHERE IngredientId = ingredientId ORDER BY CreatedAt DESC
+activate DB
+DB --> Repo : Rows
+deactivate DB
+Repo --> Svc : PagedResultDTO of StockCardDto
+deactivate Repo
+Svc --> Ctrl : PagedResultDTO of StockCardDto
+deactivate Svc
+Ctrl --> C : 200 ApiResponse with PagedResultDTO of StockCardDto
+deactivate Ctrl
+
+@enduml
