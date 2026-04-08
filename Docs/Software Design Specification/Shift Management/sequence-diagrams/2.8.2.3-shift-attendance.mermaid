@@ -1,0 +1,165 @@
+sequenceDiagram
+    autonumber
+    title 2.8.2.3 Shift Attendance
+
+    actor Client
+    participant Ctrl as ShiftController
+    participant Svc as AttendanceService
+    participant ARepo as IAttendanceRepository
+    participant SARepo as IShiftAssignmentRepository
+    participant Settings as IShiftSettingsProvider
+    participant Lookup as ILookupResolver
+    participant Notif as INotificationService
+    participant RT as IShiftLiveRealtimePublisher
+    participant UoW as IUnitOfWork
+    participant DB as Database
+
+    %% -- POST /api/shifts/assignments/{id}/check-in --
+    rect rgba(0,0,0,0)
+    note over Client,DB: Staff Check-In
+    Client->>+Ctrl: POST /api/shifts/assignments/{id}/check-in
+    Ctrl->>+Svc: CheckInAsync(assignmentId, staffId)
+    Svc->>+SARepo: GetByIdWithDetailsAsync(assignmentId)
+    SARepo->>+DB: SELECT ... with Includes
+    DB-->>-SARepo: ShiftAssignment?
+    SARepo-->>-Svc: ShiftAssignment?
+    alt Not found
+        Svc-->>Ctrl: throw NotFoundException
+        Ctrl-->>Client: 404
+    end
+    alt Not own shift
+        Svc-->>Ctrl: throw ForbiddenException
+        Ctrl-->>Client: 403
+    end
+    alt Cancelled assignment
+        Svc-->>Ctrl: throw ValidationException
+        Ctrl-->>Client: 400
+    end
+    Svc->>+ARepo: GetByAssignmentIdAsync(assignmentId)
+    ARepo-->>-Svc: AttendanceRecord?
+    alt Already checked in
+        Svc-->>Ctrl: throw ConflictException
+        Ctrl-->>Client: 409
+    end
+    Svc->>+Settings: GetAllowedEarlyCheckInMinutesAsync()
+    Settings-->>-Svc: int minutes
+    alt Too early to check in
+        Svc-->>Ctrl: throw ValidationException
+        Ctrl-->>Client: 400
+    end
+    alt Shift already ended
+        Svc-->>Ctrl: throw ValidationException
+        Ctrl-->>Client: 400
+    end
+    Svc->>+Settings: GetLateGraceMinutesAsync()
+    Settings-->>-Svc: int graceMinutes
+    Note right of Svc: Calculate isLate, lateMinutes
+    Svc->>+Lookup: ToAttendanceStatusIdAsync(ACTIVE or LATE)
+    Lookup-->>-Svc: uint statusLvId
+    alt Existing record (SCHEDULED status)
+        Note right of Svc: Update existing record
+    else No record yet
+        Svc->>ARepo: Add(new AttendanceRecord)
+    end
+    Svc->>+UoW: SaveChangesAsync()
+    UoW->>+DB: INSERT/UPDATE attendance_record
+    DB-->>-UoW: OK
+    UoW-->>-Svc: OK
+    opt Staff is late
+        Svc->>+Notif: PublishAsync(ATTENDANCE_ALERT - Late Check-in)
+        Notif-->>-Svc: OK
+    end
+    Svc->>+RT: PublishBoardChangedAsync(attendance_checked_in)
+    RT-->>-Svc: OK
+    Svc-->>-Ctrl: AttendanceRecordDto
+    Ctrl-->>-Client: 200 OK ApiResponse
+    end
+
+    %% -- POST /api/shifts/assignments/{id}/check-out --
+    rect rgba(0,0,0,0)
+    note over Client,DB: Staff Check-Out
+    Client->>+Ctrl: POST /api/shifts/assignments/{id}/check-out
+    Ctrl->>+Svc: CheckOutAsync(assignmentId, staffId)
+    Svc->>+ARepo: GetByAssignmentIdAsync(assignmentId)
+    ARepo-->>-Svc: AttendanceRecord?
+    alt No record
+        Svc-->>Ctrl: throw NotFoundException
+        Ctrl-->>Client: 404
+    end
+    alt Not checked in yet
+        Svc-->>Ctrl: throw ValidationException
+        Ctrl-->>Client: 400
+    end
+    alt Already checked out
+        Svc-->>Ctrl: throw ConflictException
+        Ctrl-->>Client: 409
+    end
+    Svc->>+SARepo: GetByIdAsync(assignmentId)
+    SARepo-->>-Svc: ShiftAssignment
+    alt Not own shift
+        Svc-->>Ctrl: throw ForbiddenException
+        Ctrl-->>Client: 403
+    end
+    Svc->>+Settings: GetEarlyLeaveBufferMinutesAsync()
+    Settings-->>-Svc: int buffer
+    Note right of Svc: Calculate isEarlyLeave, workedMinutes
+    Svc->>+Lookup: ToAttendanceStatusIdAsync(COMPLETED or EARLY_LEAVE)
+    Lookup-->>-Svc: uint statusLvId
+    Note right of Svc: Update record with checkout data
+    Svc->>+UoW: SaveChangesAsync()
+    UoW->>+DB: UPDATE attendance_record
+    DB-->>-UoW: OK
+    UoW-->>-Svc: OK
+    opt Early leave detected
+        Svc->>+Notif: PublishAsync(ATTENDANCE_ALERT - Early Leave)
+        Notif-->>-Svc: OK
+    end
+    Svc->>+RT: PublishBoardChangedAsync(attendance_checked_out)
+    RT-->>-Svc: OK
+    Svc-->>-Ctrl: AttendanceRecordDto
+    Ctrl-->>-Client: 200 OK ApiResponse
+    end
+
+    %% -- PATCH /api/shifts/attendance/{id} --
+    rect rgba(0,0,0,0)
+    note over Client,DB: Manager Adjust Attendance
+    Client->>+Ctrl: PATCH /api/shifts/attendance/{id} (AdjustAttendanceRequest)
+    Ctrl->>+Svc: AdjustAttendanceAsync(attendanceId, request, reviewerStaffId)
+    Svc->>+ARepo: GetByIdWithDetailsAsync(attendanceId)
+    ARepo->>+DB: SELECT ... with ShiftAssignment include
+    DB-->>-ARepo: AttendanceRecord?
+    ARepo-->>-Svc: AttendanceRecord?
+    alt Not found
+        Svc-->>Ctrl: throw NotFoundException
+        Ctrl-->>Client: 404
+    end
+    alt Missing adjustment reason
+        Svc-->>Ctrl: throw ValidationException
+        Ctrl-->>Client: 400
+    end
+    opt Adjusting check-in time
+        Svc->>+Settings: GetLateGraceMinutesAsync()
+        Settings-->>-Svc: int
+        Note right of Svc: Recalculate LateMinutes
+    end
+    opt Adjusting check-out time
+        alt Check-out before check-in
+            Svc-->>Ctrl: throw ValidationException
+            Ctrl-->>Client: 400
+        end
+        Svc->>+Settings: GetEarlyLeaveBufferMinutesAsync()
+        Settings-->>-Svc: int
+        Note right of Svc: Recalculate EarlyLeaveMinutes, WorkedMinutes
+        Svc->>+Lookup: ToAttendanceStatusIdAsync(final status)
+        Lookup-->>-Svc: uint
+    end
+    Note right of Svc: Set IsManualAdjustment=true, ReviewedBy, ReviewedAt
+    Svc->>+UoW: SaveChangesAsync()
+    UoW->>+DB: UPDATE attendance_record
+    DB-->>-UoW: OK
+    UoW-->>-Svc: OK
+    Svc->>+RT: PublishBoardChangedAsync(attendance_adjusted)
+    RT-->>-Svc: OK
+    Svc-->>-Ctrl: AttendanceRecordDto
+    Ctrl-->>-Client: 200 OK ApiResponse
+    end

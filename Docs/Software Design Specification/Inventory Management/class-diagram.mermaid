@@ -1,0 +1,467 @@
+classDiagram
+    direction TB
+
+    %% ENUMS
+    class InventoryTxTypeCode {
+        <<enumeration>>
+        IN
+        OUT
+        ADJUST
+    }
+
+    class InventoryTxStatusCode {
+        <<enumeration>>
+        DRAFT
+        PENDING_APPROVAL
+        COMPLETED
+        CANCELLED
+    }
+
+    class InventoryCategoryCode {
+        <<enumeration>>
+        FOOD_INGREDIENT
+        KITCHEN_TOOL
+        CONSUMABLE_SUPPLY
+        EQUIPMENT
+    }
+
+    class ExportReasonCode {
+        <<enumeration>>
+        COOKING
+        SPOILED
+        EXPIRED
+        BROKEN
+        LOST
+        DISPOSED
+        WORN_OUT
+    }
+
+    class VarianceReasonCode {
+        <<enumeration>>
+        BREAKAGE
+        NATURAL_LOSS
+        COUNTING_ERROR
+    }
+
+    class IngredientUnitCode {
+        <<enumeration>>
+        KG
+        GRAM
+        LITER
+        ML
+        PCS
+    }
+
+    %% ENTITIES
+    class InventoryTransaction {
+        +long TransactionId
+        +string TransactionCode
+        +long CreatedBy
+        +DateTime CreatedAt
+        +DateTime SubmittedAt
+        +long ApprovedBy
+        +DateTime ApprovedAt
+        +string Note
+        +uint TypeLvId
+        +uint StatusLvId
+        +long SupplierId
+        +uint ExportReasonLvId
+        +string StockCheckAreaNote
+    }
+
+    class InventoryTransactionItem {
+        +long TransactionItemId
+        +long TransactionId
+        +long IngredientId
+        +decimal Quantity
+        +uint UnitLvId
+        +decimal UnitPrice
+        +decimal SystemQuantity
+        +decimal ActualQuantity
+        +uint VarianceReasonLvId
+        +string Note
+    }
+
+    class InventoryTransactionMedium {
+        +long TransactionId
+        +long MediaId
+        +bool IsPrimary
+    }
+
+    class Ingredient {
+        +long IngredientId
+        +string IngredientName
+        +uint UnitLvId
+        +uint TypeLvId
+        +uint CategoryLvId
+        +long ImageId
+    }
+
+    class CurrentStock {
+        +long IngredientId
+        +decimal QuantityOnHand
+        +decimal MinStockLevel
+        +DateTime LastUpdatedAt
+    }
+
+    class Supplier {
+        +long SupplierId
+        +string SupplierName
+        +string Phone
+        +string Email
+        +string Address
+        +string TaxCode
+    }
+
+    class LookupValue {
+        <<cross-module>>
+        +uint LookupValueId
+        +string ValueCode
+        +string ValueName
+    }
+
+    class StaffAccount {
+        <<cross-module>>
+        +long AccountId
+        +string FullName
+    }
+
+    class MediaAsset {
+        <<cross-module>>
+        +long MediaId
+        +string Url
+        +string MimeType
+    }
+
+    InventoryTransaction "1" *-- "0..*" InventoryTransactionItem : Items
+    InventoryTransaction "1" *-- "0..*" InventoryTransactionMedium : Media
+    InventoryTransaction --> LookupValue : TypeLv
+    InventoryTransaction --> LookupValue : StatusLv
+    InventoryTransaction --> LookupValue : ExportReasonLv
+    InventoryTransaction --> Supplier : Supplier
+    InventoryTransaction --> StaffAccount : CreatedByNavigation
+    InventoryTransaction --> StaffAccount : ApprovedByNavigation
+    InventoryTransactionItem --> Ingredient : Ingredient
+    InventoryTransactionItem --> LookupValue : UnitLv
+    InventoryTransactionItem --> LookupValue : VarianceReasonLv
+    InventoryTransactionMedium --> MediaAsset : Media
+    Ingredient "1" o-- "0..1" CurrentStock : CurrentStock
+    Ingredient --> LookupValue : UnitLv
+    Ingredient --> LookupValue : TypeLv
+    Ingredient --> LookupValue : CategoryLv
+    Ingredient --> MediaAsset : Image
+    Supplier "1" o-- "0..*" InventoryTransaction : Transactions
+
+    %% DTOs - Requests
+    class GetInventoryItemsFilterRequest {
+        +int PageIndex
+        +int PageSize
+        +string Search
+        +uint CategoryLvId
+        +uint TypeLvId
+        +bool IsLowStock
+    }
+
+    class GetTransactionsFilterRequest {
+        +int PageIndex
+        +int PageSize
+        +string Search
+        +uint TypeLvId
+        +uint StatusLvId
+        +uint ExportReasonLvId
+        +long SupplierId
+        +DateTime FromDate
+        +DateTime ToDate
+    }
+
+    class CreateInventoryTransactionRequest {
+        +uint TypeLvId
+        +uint ExportReasonLvId
+        +long SupplierId
+        +string StockCheckAreaNote
+        +string Note
+        +List~TransactionItemRequest~ Items
+    }
+
+    class TransactionItemRequest {
+        +long IngredientId
+        +decimal Quantity
+        +uint UnitLvId
+        +decimal UnitPrice
+        +string Note
+    }
+
+    class SubmitTransactionRequest {
+        +List~long~ MediaIds
+    }
+
+    class ApproveTransactionRequest {
+        +bool IsApproved
+        +string Note
+    }
+
+    class CreateInventoryTransactionFormRequest {
+        +string RequestJson
+        +List~IFormFile~ EvidenceFiles
+    }
+
+    CreateInventoryTransactionRequest *-- TransactionItemRequest : Items
+
+    %% DTOs - Responses
+    class InventoryItemDto {
+        +long IngredientId
+        +string IngredientName
+        +uint UnitLvId
+        +string UnitName
+        +uint TypeLvId
+        +string TypeName
+        +uint CategoryLvId
+        +string CategoryCode
+        +string CategoryName
+        +long ImageId
+        +string ImageUrl
+        +decimal QuantityOnHand
+        +decimal MinStockLevel
+        +DateTime LastUpdatedAt
+        +bool IsLowStock
+    }
+
+    class InventoryTransactionListDto {
+        +long TransactionId
+        +string TransactionCode
+        +uint TypeLvId
+        +string TypeCode
+        +string TypeName
+        +uint StatusLvId
+        +string StatusCode
+        +string StatusName
+        +uint ExportReasonLvId
+        +string ExportReasonName
+        +long SupplierId
+        +string SupplierName
+        +long CreatedBy
+        +string CreatedByName
+        +DateTime CreatedAt
+        +DateTime SubmittedAt
+        +long ApprovedBy
+        +string ApprovedByName
+        +DateTime ApprovedAt
+        +string Note
+        +int ItemCount
+        +decimal TotalValue
+    }
+
+    class InventoryTransactionDetailDto {
+        +long TransactionId
+        +string TransactionCode
+        +uint TypeLvId
+        +string TypeCode
+        +string TypeName
+        +uint StatusLvId
+        +string StatusCode
+        +string StatusName
+        +uint ExportReasonLvId
+        +string ExportReasonCode
+        +string ExportReasonName
+        +long SupplierId
+        +string SupplierName
+        +long CreatedBy
+        +string CreatedByName
+        +DateTime CreatedAt
+        +DateTime SubmittedAt
+        +long ApprovedBy
+        +string ApprovedByName
+        +DateTime ApprovedAt
+        +string Note
+        +string StockCheckAreaNote
+        +List~TransactionItemDto~ Items
+        +List~TransactionMediaDto~ Media
+    }
+
+    class TransactionItemDto {
+        +long TransactionItemId
+        +long IngredientId
+        +string IngredientName
+        +string IngredientImageUrl
+        +uint CategoryLvId
+        +string CategoryCode
+        +string CategoryName
+        +decimal Quantity
+        +uint UnitLvId
+        +string UnitName
+        +decimal UnitPrice
+        +decimal SystemQuantity
+        +decimal ActualQuantity
+        +uint VarianceReasonLvId
+        +string VarianceReasonName
+        +string Note
+    }
+
+    class TransactionMediaDto {
+        +long MediaId
+        +string Url
+        +string MediaType
+    }
+
+    class StockCardDto {
+        +long TransactionItemId
+        +long TransactionId
+        +string TransactionCode
+        +string TypeCode
+        +string TypeName
+        +string StatusCode
+        +decimal QuantityChanged
+        +string UnitName
+        +decimal UnitPrice
+        +string ExportReasonName
+        +string Note
+        +string CreatedByName
+        +DateTime CreatedAt
+    }
+
+    class InventoryDashboardDto {
+        +int TotalItems
+        +int LowStockItems
+        +int OutOfStockItems
+        +int PendingTransactions
+        +List~LowStockItemDto~ LowStockList
+        +List~RecentTransactionDto~ RecentTransactions
+    }
+
+    class LowStockItemDto {
+        +long IngredientId
+        +string IngredientName
+        +string CategoryName
+        +decimal QuantityOnHand
+        +decimal MinStockLevel
+        +string UnitName
+    }
+
+    class RecentTransactionDto {
+        +long TransactionId
+        +string TransactionCode
+        +string TypeName
+        +string StatusName
+        +string CreatedByName
+        +DateTime CreatedAt
+        +int ItemCount
+    }
+
+    InventoryTransactionDetailDto *-- TransactionItemDto : Items
+    InventoryTransactionDetailDto *-- TransactionMediaDto : Media
+    InventoryDashboardDto *-- LowStockItemDto : LowStockList
+    InventoryDashboardDto *-- RecentTransactionDto : RecentTransactions
+
+    %% INTERFACES
+    class IInventoryService {
+        <<interface>>
+        +GetItemsAsync(filter, ct) PagedResultDTO~InventoryItemDto~
+        +CreateTransactionAsync(request, userId, files, ct) InventoryTransactionDetailDto
+        +GetTransactionDetailAsync(transactionId, ct) InventoryTransactionDetailDto
+        +GetTransactionsAsync(filter, ct) PagedResultDTO~InventoryTransactionListDto~
+        +SubmitTransactionAsync(transactionId, request, userId, ct) InventoryTransactionDetailDto
+        +ApproveTransactionAsync(transactionId, request, userId, ct) InventoryTransactionDetailDto
+        +GetStockCardAsync(ingredientId, pageIndex, pageSize, ct) PagedResultDTO~StockCardDto~
+        +GetDashboardAsync(ct) InventoryDashboardDto
+    }
+
+    class IInventoryRepository {
+        <<interface>>
+        +GetItemsPagedAsync(filter, ct) PagedResultDTO~InventoryItemDto~
+        +CreateTransactionAsync(transaction, items, ct) long
+        +GetTransactionByIdAsync(transactionId, ct) InventoryTransaction
+        +GetTransactionsPagedAsync(filter, ct) PagedResultDTO~InventoryTransactionListDto~
+        +UpdateTransactionAsync(transaction, ct) void
+        +GetCurrentStockAsync(ingredientId, ct) CurrentStock
+        +UpdateStockAsync(ingredientId, quantityChange, ct) void
+        +GetStockCardAsync(ingredientId, pageIndex, pageSize, ct) PagedResultDTO~StockCardDto~
+        +GetDashboardAsync(ct) InventoryDashboardDto
+        +GetTodayTransactionCountByTypeAsync(typeCode, ct) int
+    }
+
+    %% SERVICE & REPOSITORY IMPLEMENTATIONS
+    class InventoryService {
+        -IInventoryRepository _repo
+        -IUnitOfWork _unitOfWork
+        -ILookupResolver _lookupResolver
+        -INotificationService _notificationService
+        -IFileStorage _fileStorage
+        -IMediaRepository _mediaRepository
+        +GetItemsAsync(filter, ct)
+        +CreateTransactionAsync(request, userId, files, ct)
+        +GetTransactionDetailAsync(transactionId, ct)
+        +GetTransactionsAsync(filter, ct)
+        +SubmitTransactionAsync(transactionId, request, userId, ct)
+        +ApproveTransactionAsync(transactionId, request, userId, ct)
+        +GetStockCardAsync(ingredientId, pageIndex, pageSize, ct)
+        +GetDashboardAsync(ct)
+        -ResolveTypeCodeAsync(typeLvId, ct)
+        -GenerateTransactionCodeAsync(typeCode, ct)
+        -ValidateExportReasonScopingAsync(entity, ct)
+        -ApplyStockChangesAsync(entity, ct)
+        -CheckLowStockAlertsAsync(entity, ct)
+        -NotifyTransactionStatusAsync(entity, action, ct)
+        -SaveEvidenceFilesAsync(transactionId, transaction, files, ct)
+        -MapToDetailDto(entity)$
+    }
+
+    class InventoryRepository {
+        -RestaurantMgmtContext _context
+        +GetItemsPagedAsync(filter, ct)
+        +CreateTransactionAsync(transaction, items, ct)
+        +GetTransactionByIdAsync(transactionId, ct)
+        +GetTransactionsPagedAsync(filter, ct)
+        +UpdateTransactionAsync(transaction, ct)
+        +GetCurrentStockAsync(ingredientId, ct)
+        +UpdateStockAsync(ingredientId, quantityChange, ct)
+        +GetStockCardAsync(ingredientId, pageIndex, pageSize, ct)
+        +GetDashboardAsync(ct)
+        +GetTodayTransactionCountByTypeAsync(typeCode, ct)
+    }
+
+    %% CONTROLLER
+    class InventoryController {
+        -IInventoryService _inventoryService
+        -ILogger _logger
+        +GetItems(filter, ct) IActionResult
+        +GetTransactions(filter, ct) IActionResult
+        +GetTransactionDetail(id, ct) IActionResult
+        +CreateTransaction(formRequest, ct) IActionResult
+        +SubmitTransaction(id, request, ct) IActionResult
+        +ApproveTransaction(id, request, ct) IActionResult
+        +GetStockCard(ingredientId, pageIndex, pageSize, ct) IActionResult
+        +GetDashboard(ct) IActionResult
+        -MapFiles(files)$ List~MediaFileInput~
+        -GetCurrentUserId() long
+    }
+
+    InventoryService ..|> IInventoryService : implements
+    InventoryRepository ..|> IInventoryRepository : implements
+    InventoryController --> IInventoryService : uses
+    InventoryService --> IInventoryRepository : uses
+    InventoryService --> IUnitOfWork : uses
+    InventoryService --> INotificationService : uses
+    InventoryService --> IFileStorage : uses
+    InventoryService --> IMediaRepository : uses
+    InventoryService --> ILookupResolver : uses
+
+    class IUnitOfWork {
+        <<interface>>
+        <<cross-module>>
+    }
+    class INotificationService {
+        <<interface>>
+        <<cross-module>>
+    }
+    class IFileStorage {
+        <<interface>>
+        <<cross-module>>
+    }
+    class IMediaRepository {
+        <<interface>>
+        <<cross-module>>
+    }
+    class ILookupResolver {
+        <<interface>>
+        <<cross-module>>
+    }

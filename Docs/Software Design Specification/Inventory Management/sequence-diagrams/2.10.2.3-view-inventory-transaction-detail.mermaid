@@ -1,0 +1,39 @@
+sequenceDiagram
+    autonumber
+    participant C as Client
+    participant Ctrl as InventoryController
+    participant Svc as InventoryService
+    participant Repo as InventoryRepository
+    participant DB as Database
+
+    Note over C,DB: GET /api/inventory/transactions?PageIndex=1&PageSize=20&...
+
+    C->>+Ctrl: GET /transactions (GetTransactionsFilterRequest)
+    Ctrl->>+Svc: GetTransactionsAsync(filter, ct)
+    Svc->>+Repo: GetTransactionsPagedAsync(filter, ct)
+
+    Repo->>+DB: SELECT InventoryTransactions JOIN TypeLv, StatusLv, ExportReasonLv, Supplier, CreatedBy, ApprovedBy, Items with filters (Search, TypeLvId, StatusLvId, ExportReasonLvId, SupplierId, FromDate, ToDate) ORDER BY CreatedAt DESC
+    DB-->>-Repo: Rows
+    Note right of Repo: Map to InventoryTransactionListDto with ItemCount and TotalValue
+    Repo-->>-Svc: PagedResultDTO of InventoryTransactionListDto
+    Svc-->>-Ctrl: PagedResultDTO of InventoryTransactionListDto
+    Ctrl-->>-C: 200 ApiResponse with PagedResultDTO of InventoryTransactionListDto
+
+    Note over C,DB: GET /api/inventory/transactions/{id}
+
+    C->>+Ctrl: GET /transactions/{id}
+    Ctrl->>+Svc: GetTransactionDetailAsync(id, ct)
+    Svc->>+Repo: GetTransactionByIdAsync(id, ct)
+
+    Repo->>+DB: SELECT InventoryTransaction with Includes (TypeLv, StatusLv, ExportReasonLv, Supplier, CreatedBy, ApprovedBy, Items->Ingredient->Image, Items->Ingredient->CategoryLv, Items->UnitLv, Items->VarianceReasonLv, Media->MediaAsset)
+    DB-->>-Repo: InventoryTransaction entity
+
+    alt entity is null
+        Repo-->>Svc: null
+        Svc-->>C: KeyNotFoundException
+    end
+
+    Repo-->>-Svc: InventoryTransaction entity
+    Svc->>Svc: MapToDetailDto(entity)
+    Svc-->>-Ctrl: InventoryTransactionDetailDto
+    Ctrl-->>-C: 200 ApiResponse with InventoryTransactionDetailDto
