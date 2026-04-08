@@ -1,0 +1,187 @@
+@startuml
+autonumber
+title 2.8.2.1 Shift Template Management
+
+actor Client
+participant "ShiftController" as Ctrl
+participant "ShiftTemplateService" as Svc
+participant "IShiftTemplateRepository" as Repo
+participant "IUnitOfWork" as UoW
+database "Database" as DB
+
+== Get All Templates ==
+
+Client -> Ctrl : GET /api/shifts/templates?isActive={bool}
+activate Ctrl
+Ctrl -> Svc : GetAllAsync(isActive)
+activate Svc
+Svc -> Repo : GetAllActiveAsync() / GetAllAsync()
+activate Repo
+Repo -> DB : SELECT * FROM shift_template
+activate DB
+DB --> Repo : List of ShiftTemplate
+deactivate DB
+Repo --> Svc : List of ShiftTemplate
+deactivate Repo
+Svc --> Ctrl : List of ShiftTemplateListDto
+deactivate Svc
+Ctrl --> Client : 200 OK ApiResponse
+deactivate Ctrl
+
+== Get Template By Id ==
+
+Client -> Ctrl : GET /api/shifts/templates/{id}
+activate Ctrl
+Ctrl -> Svc : GetByIdAsync(id)
+activate Svc
+Svc -> Repo : GetByIdAsync(id)
+activate Repo
+Repo -> DB : SELECT ... WHERE ShiftTemplateId = id
+activate DB
+DB --> Repo : ShiftTemplate or null
+deactivate DB
+Repo --> Svc : ShiftTemplate?
+deactivate Repo
+alt Template not found
+    Svc --> Ctrl : throw NotFoundException
+    Ctrl --> Client : 404 Not Found
+else Template found
+    Svc --> Ctrl : ShiftTemplateDetailDto
+    deactivate Svc
+    Ctrl --> Client : 200 OK ApiResponse
+    deactivate Ctrl
+end
+
+== Create Template ==
+
+Client -> Ctrl : POST /api/shifts/templates (CreateShiftTemplateRequest)
+activate Ctrl
+Ctrl -> Svc : CreateAsync(request, staffId)
+activate Svc
+alt StartTime >= EndTime
+    Svc --> Ctrl : throw ValidationException
+    Ctrl --> Client : 400 Bad Request
+end
+Svc -> Repo : ExistsByNameAsync(name)
+activate Repo
+Repo -> DB : SELECT COUNT(*) WHERE TemplateName = name
+activate DB
+DB --> Repo : bool
+deactivate DB
+Repo --> Svc : bool
+deactivate Repo
+alt Name already exists
+    Svc --> Ctrl : throw ConflictException
+    Ctrl --> Client : 409 Conflict
+end
+Svc -> Repo : Add(ShiftTemplate)
+Svc -> UoW : SaveChangesAsync()
+activate UoW
+UoW -> DB : INSERT INTO shift_template
+activate DB
+DB --> UoW : OK
+deactivate DB
+UoW --> Svc : OK
+deactivate UoW
+Svc -> Repo : GetByIdAsync(newId)
+activate Repo
+Repo -> DB : SELECT ... WHERE ShiftTemplateId = newId
+activate DB
+DB --> Repo : ShiftTemplate
+deactivate DB
+Repo --> Svc : ShiftTemplate
+deactivate Repo
+Svc --> Ctrl : ShiftTemplateDetailDto
+deactivate Svc
+Ctrl --> Client : 201 Created ApiResponse
+deactivate Ctrl
+
+== Update Template ==
+
+Client -> Ctrl : PUT /api/shifts/templates/{id} (UpdateShiftTemplateRequest)
+activate Ctrl
+Ctrl -> Svc : UpdateAsync(id, request, staffId)
+activate Svc
+Svc -> Repo : GetByIdAsync(id)
+activate Repo
+Repo -> DB : SELECT ... WHERE ShiftTemplateId = id
+activate DB
+DB --> Repo : ShiftTemplate?
+deactivate DB
+Repo --> Svc : ShiftTemplate?
+deactivate Repo
+alt Not found
+    Svc --> Ctrl : throw NotFoundException
+    Ctrl --> Client : 404 Not Found
+end
+opt Name is being changed
+    Svc -> Repo : ExistsByNameAsync(newName, excludeId)
+    activate Repo
+    Repo -> DB : SELECT COUNT(*)
+    activate DB
+    DB --> Repo : bool
+    deactivate DB
+    Repo --> Svc : bool
+    deactivate Repo
+    alt Name conflict
+        Svc --> Ctrl : throw ConflictException
+        Ctrl --> Client : 409 Conflict
+    end
+end
+Svc -> UoW : SaveChangesAsync()
+activate UoW
+UoW -> DB : UPDATE shift_template SET ...
+activate DB
+DB --> UoW : OK
+deactivate DB
+UoW --> Svc : OK
+deactivate UoW
+Svc --> Ctrl : ShiftTemplateDetailDto
+deactivate Svc
+Ctrl --> Client : 200 OK ApiResponse
+deactivate Ctrl
+
+== Deactivate Template ==
+
+Client -> Ctrl : DELETE /api/shifts/templates/{id}
+activate Ctrl
+Ctrl -> Svc : DeactivateAsync(id)
+activate Svc
+Svc -> Repo : GetByIdAsync(id)
+activate Repo
+Repo -> DB : SELECT ...
+activate DB
+DB --> Repo : ShiftTemplate?
+deactivate DB
+Repo --> Svc : ShiftTemplate?
+deactivate Repo
+alt Not found
+    Svc --> Ctrl : throw NotFoundException
+    Ctrl --> Client : 404 Not Found
+end
+Svc -> Repo : HasActiveAssignmentsAsync(id)
+activate Repo
+Repo -> DB : SELECT COUNT(*) FROM shift_assignment WHERE IsActive=1
+activate DB
+DB --> Repo : bool
+deactivate DB
+Repo --> Svc : bool
+deactivate Repo
+alt Active assignments exist
+    Svc --> Ctrl : throw ConflictException
+    Ctrl --> Client : 409 Conflict
+end
+Svc -> UoW : SaveChangesAsync()
+activate UoW
+UoW -> DB : UPDATE shift_template SET IsActive=0
+activate DB
+DB --> UoW : OK
+deactivate DB
+UoW --> Svc : OK
+deactivate UoW
+Svc --> Ctrl : void
+deactivate Svc
+Ctrl --> Client : 204 No Content
+deactivate Ctrl
+
+@enduml

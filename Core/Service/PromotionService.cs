@@ -378,6 +378,31 @@ namespace Core.Service
             return result;
         }
 
+        public async Task DeletePromotionAsync(
+            long promotionId,
+            CancellationToken ct)
+        {
+            var promotion = await _promotionRepository
+                .GetByIdWithRelationsAsync(promotionId, ct);
+
+            if (promotion == null)
+                throw new KeyNotFoundException("Promotion not found");
+
+            if (promotion.OrderPromotions.Any())
+                throw new InvalidOperationException(
+                    "Cannot delete promotion that has already been used in orders");
+
+            if (promotion.PromotionRules.Any())
+                _promotionRepository.RemoveRules(promotion.PromotionRules);
+
+            if (promotion.PromotionTargets.Any())
+                _promotionRepository.RemoveTargets(promotion.PromotionTargets);
+
+            await _promotionRepository.DeleteAsync(promotion, ct);
+
+            await _promotionRepository.SaveChangesAsync(ct);
+        }
+
         private PromotionStatusCode CalculateStatus(
             DateTime start,
             DateTime end)

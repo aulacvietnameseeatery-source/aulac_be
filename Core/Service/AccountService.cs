@@ -30,6 +30,7 @@ public class AccountService : IAccountService
     private readonly ILookupResolver _lookupResolver;
     private readonly IEmailQueue _emailQueue;
     private readonly IEmailTemplateService _emailTemplateService;
+    private readonly IAuthSessionRepository _sessionRepository;
     private readonly ILogger<AccountService> _logger;
 
     private const string TemplateCodeAccountCreated = "ACCOUNT_CREATED";
@@ -45,6 +46,7 @@ public class AccountService : IAccountService
         ILookupResolver lookupResolver,
         IEmailQueue emailQueue,
         IEmailTemplateService emailTemplateService,
+        IAuthSessionRepository sessionRepository,
         ILogger<AccountService> logger)
     {
         _accountRepository = accountRepository;
@@ -56,6 +58,7 @@ public class AccountService : IAccountService
         _lookupResolver = lookupResolver;
         _emailQueue = emailQueue;
         _emailTemplateService = emailTemplateService;
+        _sessionRepository = sessionRepository;
         _logger = logger;
     }
 
@@ -266,6 +269,12 @@ public class AccountService : IAccountService
         else if (newStatusCode == AccountStatusCode.ACTIVE)
         {
             account.IsLocked = false;
+        }
+        else if (newStatusCode == AccountStatusCode.INACTIVE)
+        {
+            // Revoke all active sessions when deactivating an account
+            var revokedCount = await _sessionRepository.RevokeAllUserSessionsAsync(accountId, cancellationToken: cancellationToken);
+            _logger.LogInformation("Deactivated account {AccountId}: revoked {Count} active session(s).", accountId, revokedCount);
         }
 
         await _accountRepository.UpdateAccountAsync(account, cancellationToken);

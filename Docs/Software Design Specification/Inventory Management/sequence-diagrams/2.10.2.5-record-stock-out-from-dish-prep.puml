@@ -1,0 +1,119 @@
+@startuml
+autonumber
+title 2.10.2.5 Record Stock Out from Dish Prep
+
+actor C as "Client"
+participant "InventoryController" as Ctrl
+participant "InventoryService" as Svc
+participant "InventoryRepository" as Repo
+participant "IFileStorage" as FS
+participant "IMediaRepository" as MR
+database "Database" as DB
+
+== Stock Out from Dish Prep: POST /api/inventory/transactions (TypeLvId=OUT, ExportReasonLvId=COOKING) ==
+
+C -> Ctrl : POST /transactions (CreateInventoryTransactionFormRequest)
+activate Ctrl
+note right of Ctrl : RequestJson contains TypeLvId=OUT,\nExportReasonLvId=COOKING, Items=[ingredients used]
+Ctrl -> Ctrl : Deserialize RequestJson
+Ctrl -> Ctrl : GetCurrentUserId()
+Ctrl -> Ctrl : MapFiles(EvidenceFiles)
+Ctrl -> Svc : CreateTransactionAsync(request, userId, evidenceFiles, ct)
+activate Svc
+
+Svc -> Svc : Resolve DRAFT status via LookupResolver
+Svc -> Svc : ResolveTypeCodeAsync(TypeLvId) returns OUT
+Svc -> Repo : GetTodayTransactionCountByTypeAsync(OUT, ct)
+activate Repo
+Repo -> DB : COUNT WHERE TypeCode=OUT AND today
+activate DB
+DB --> Repo : count
+deactivate DB
+Repo --> Svc : count
+deactivate Repo
+Svc -> Svc : GenerateTransactionCodeAsync -> OUT-YYYYMMDD-SEQ
+
+Svc -> Repo : CreateTransactionAsync(transaction, items, ct)
+activate Repo
+Repo -> DB : INSERT InventoryTransaction (type=OUT, status=DRAFT, exportReason=COOKING)
+activate DB
+DB --> Repo : TransactionId
+deactivate DB
+Repo -> DB : INSERT InventoryTransactionItems (ingredients with quantities)
+activate DB
+DB --> Repo : ok
+deactivate DB
+Repo --> Svc : transactionId
+deactivate Repo
+
+opt Evidence files provided
+    Svc -> FS : SaveManyAsync(uploadRequests, inventory-evidence, ImageUpload, ct)
+    activate FS
+    FS --> Svc : uploadResults
+    deactivate FS
+    loop Each uploaded file
+        Svc -> MR : AddMediaAsync(MediaAsset, ct)
+        activate MR
+        MR --> Svc : MediaAsset
+        deactivate MR
+    end
+    Svc -> Repo : UpdateTransactionAsync(transaction, ct)
+    activate Repo
+    Repo -> DB : UPDATE (attach media)
+    activate DB
+    DB --> Repo : ok
+    deactivate DB
+    Repo --> Svc : ok
+    deactivate Repo
+end
+
+Svc -> Repo : GetTransactionByIdAsync(transactionId, ct)
+activate Repo
+Repo -> DB : SELECT with Includes
+activate DB
+DB --> Repo : entity
+deactivate DB
+Repo --> Svc : entity
+deactivate Repo
+Svc -> Svc : MapToDetailDto(entity)
+Svc --> Ctrl : InventoryTransactionDetailDto (status=DRAFT)
+deactivate Svc
+Ctrl --> C : 200 ApiResponse with InventoryTransactionDetailDto
+deactivate Ctrl
+
+== Submit DRAFT for approval ==
+
+C -> Ctrl : POST /transactions/{id}/submit (SubmitTransactionRequest)
+activate Ctrl
+Ctrl -> Svc : SubmitTransactionAsync(id, request, userId, ct)
+activate Svc
+Svc -> Repo : GetTransactionByIdAsync(id, ct)
+activate Repo
+Repo --> Svc : entity (DRAFT)
+deactivate Repo
+
+Svc -> Svc : ValidateExportReasonScopingAsync\n- verify COOKING is valid for FOOD_INGREDIENT items
+
+alt Item category not in allowed set for COOKING
+    Svc --> C : InvalidOperationException
+end
+
+Svc -> Svc : Set status = PENDING_APPROVAL, SubmittedAt = now
+Svc -> Repo : UpdateTransactionAsync(entity, ct)
+activate Repo
+Repo -> DB : UPDATE
+activate DB
+DB --> Repo : ok
+deactivate DB
+Repo --> Svc : ok
+deactivate Repo
+
+Svc -> Svc : NotificationService.PublishAsync(INVENTORY_TX_SUBMITTED)
+
+Svc -> Svc : Return updated detail DTO
+Svc --> Ctrl : InventoryTransactionDetailDto
+deactivate Svc
+Ctrl --> C : 200 ApiResponse
+deactivate Ctrl
+
+@enduml

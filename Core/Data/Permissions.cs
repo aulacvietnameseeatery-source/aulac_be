@@ -79,6 +79,7 @@ namespace Core.Data
         public const string ViewPromotion = "PROMOTION:READ";
         public const string CreatePromotion = "PROMOTION:CREATE";
         public const string UpdatePromotion = "PROMOTION:UPDATE";
+        public const string DeletePromotion = "PROMOTION:DELETE";
 
         // Shift
         public const string ViewShift = "SHIFT:READ";

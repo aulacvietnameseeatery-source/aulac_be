@@ -1,0 +1,160 @@
+@startuml
+autonumber
+title 2.8.2.4 Shift Live Board and Reports
+
+actor Client
+participant "ShiftController" as Ctrl
+participant "ShiftAssignmentService" as ASvc
+participant "AttendanceService" as AtSvc
+participant "IShiftAssignmentRepository" as ARepo
+participant "IOrderRepository" as ORepo
+participant "IShiftLiveRealtimePublisher" as RT
+database "Database" as DB
+
+== Get Live Board ==
+
+Client -> Ctrl : GET /api/shifts/live-board?fromDate&toDate&filters
+activate Ctrl
+Ctrl -> ASvc : GetLiveBoardAsync(request)
+activate ASvc
+ASvc -> ARepo : GetAssignmentsAsync(liveRequest)
+activate ARepo
+ARepo -> DB : SELECT shift_assignment with includes (paged)
+activate DB
+DB --> ARepo : (List ShiftAssignment, int)
+deactivate DB
+ARepo --> ASvc : (Items, TotalCount)
+deactivate ARepo
+alt No items
+    ASvc --> Ctrl : empty list
+    Ctrl --> Client : 200 OK []
+end
+note right of ASvc : Collect distinct staffIds, date range
+ASvc -> ORepo : GetShiftLiveOrderSnapshotsAsync(start, end, staffIds)
+activate ORepo
+ORepo -> DB : SELECT orders with revenue, items
+activate DB
+DB --> ORepo : List ShiftLiveOrderSnapshotDto
+deactivate DB
+ORepo --> ASvc : orderSnapshots
+deactivate ORepo
+ASvc -> ORepo : GetShiftLiveIssueSnapshotsAsync(start, end, staffIds)
+activate ORepo
+ORepo -> DB : SELECT service_events WHERE type=issue
+activate DB
+DB --> ORepo : List ShiftLiveIssueSnapshotDto
+deactivate DB
+ORepo --> ASvc : issueSnapshots
+deactivate ORepo
+note right of ASvc : Group orders and issues by staffId
+loop For each ShiftAssignment
+    note right of ASvc : MapToLiveBoardDto - compute LiveStatus, HasAlert, KPIs
+end
+ASvc --> Ctrl : List ShiftLiveBoardItemDto
+deactivate ASvc
+Ctrl --> Client : 200 OK ApiResponse
+deactivate Ctrl
+
+== Real-time Live Board Updates (SignalR) ==
+
+note right of RT : On assignment or attendance change
+RT -> Client : ShiftLiveRealtimeEventDto via SignalR
+note left of Client : FE invalidates live board query cache
+
+== Report KPI Snapshot ==
+
+Client -> Ctrl : GET /api/shifts/reports/snapshot?fromDate&toDate
+activate Ctrl
+Ctrl -> AtSvc : GetReportSnapshotAsync(fromDate, toDate)
+activate AtSvc
+AtSvc -> ARepo : GetAttendanceReportAsync(request with PageSize=1)
+activate ARepo
+ARepo -> DB : COUNT total attendance rows
+activate DB
+DB --> ARepo : (items, attendanceCount)
+deactivate DB
+ARepo --> AtSvc : (_, attendanceCount)
+deactivate ARepo
+AtSvc -> ARepo : GetWorkedHoursDataAsync(from, to, null)
+activate ARepo
+ARepo -> DB : SELECT assignments with attendance
+activate DB
+DB --> ARepo : List ShiftAssignment
+deactivate DB
+ARepo --> AtSvc : workedData
+deactivate ARepo
+note right of AtSvc : Count distinct staffIds
+AtSvc -> ARepo : GetExceptionDataAsync(from, to, null)
+activate ARepo
+ARepo -> DB : SELECT exception assignments
+activate DB
+DB --> ARepo : List ShiftAssignment
+deactivate DB
+ARepo --> AtSvc : exceptions
+deactivate ARepo
+AtSvc --> Ctrl : ShiftReportSnapshotDto
+deactivate AtSvc
+Ctrl --> Client : 200 OK ApiResponse
+deactivate Ctrl
+
+== Attendance Report (paged) ==
+
+Client -> Ctrl : GET /api/shifts/reports/attendance?filters
+activate Ctrl
+Ctrl -> AtSvc : GetAttendanceReportAsync(request)
+activate AtSvc
+AtSvc -> ARepo : GetAttendanceReportAsync(request)
+activate ARepo
+ARepo -> DB : SELECT with filters, paging, includes
+activate DB
+DB --> ARepo : (List ShiftAssignment, int TotalCount)
+deactivate DB
+ARepo --> AtSvc : (Items, TotalCount)
+deactivate ARepo
+note right of AtSvc : Map to AttendanceReportRowDto
+AtSvc --> Ctrl : (List AttendanceReportRowDto, TotalCount)
+deactivate AtSvc
+Ctrl --> Client : 200 OK PagedResult
+deactivate Ctrl
+
+== Worked Hours Report ==
+
+Client -> Ctrl : GET /api/shifts/reports/worked-hours?fromDate&toDate&staffId
+activate Ctrl
+Ctrl -> AtSvc : GetWorkedHoursReportAsync(from, to, staffId?)
+activate AtSvc
+AtSvc -> ARepo : GetWorkedHoursDataAsync(from, to, staffId)
+activate ARepo
+ARepo -> DB : SELECT assignments with attendance
+activate DB
+DB --> ARepo : List ShiftAssignment
+deactivate DB
+ARepo --> AtSvc : data
+deactivate ARepo
+note right of AtSvc : Group by StaffId, sum Scheduled vs Worked
+AtSvc --> Ctrl : List WorkedHoursReportRowDto
+deactivate AtSvc
+Ctrl --> Client : 200 OK ApiResponse
+deactivate Ctrl
+
+== Exceptions Report ==
+
+Client -> Ctrl : GET /api/shifts/reports/exceptions?fromDate&toDate&staffId
+activate Ctrl
+Ctrl -> AtSvc : GetExceptionsReportAsync(from, to, staffId?)
+activate AtSvc
+AtSvc -> ARepo : GetExceptionDataAsync(from, to, staffId)
+activate ARepo
+ARepo -> DB : SELECT assignments WHERE status in (LATE, ABSENT, EARLY_LEAVE, manual)
+activate DB
+DB --> ARepo : List ShiftAssignment
+deactivate DB
+ARepo --> AtSvc : data
+deactivate ARepo
+note right of AtSvc : Map to AttendanceExceptionReportRowDto with ExceptionType
+AtSvc --> Ctrl : List AttendanceExceptionReportRowDto
+deactivate AtSvc
+Ctrl --> Client : 200 OK ApiResponse
+deactivate Ctrl
+
+@enduml
