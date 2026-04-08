@@ -218,12 +218,108 @@ Include technical dependencies only if architecturally important:
 
 ## 15. Diagram Layout Quality
 
-- Classes are grouped by layer.
-- Interface and implementation are visually close.
-- Crossing lines are minimized.
-- Flow is readable left-to-right or top-to-bottom.
-- Related classes are clustered together.
-- If the diagram feels too dense, split it.
+### 15.1 Choose One Primary Reading Direction
+
+Choose **one** direction and apply it consistently throughout the diagram — do not mix both:
+
+- **Left → Right**: Use for backend layered architecture and dependency flow diagrams (recommended for SDS/specification-level). Flow: `Controller → Service → Repository → Entity/DB`.
+- **Top → Bottom**: Use for formal documentation with many classes per layer (stacked layer presentation).
+
+### 15.2 Group Classes by Layer Using Packages
+
+Place classes inside named `package` blocks matching their architectural layer:
+
+- **`package "Presentation Layer"`** — Controller, Request DTOs, Response DTOs
+- **`package "Application Layer"`** — Service interface, Service implementation
+- **`package "Persistence Layer"`** — Repository interface, Repository implementation, Unit of Work
+- **`package "Domain Layer"`** — Entities, Enums, Value Objects, cross-module entities
+
+### 15.3 Arrange Dependencies in One Direction
+
+If the system flows `Controller → Service → Repository`, arrange packages in the same direction. The caller (less stable) appears before the callee (more stable). Never mix — do not place Controller below Repository if the reading direction is top-to-bottom.
+
+### 15.4 Interface and Implementation Side by Side
+
+Place interface and implementation in the same package. Interface above or to the left of implementation. Never scatter them across distant packages.
+
+### 15.5 DTOs at the Boundary, Entities at the Core
+
+- **Request/Response DTOs** belong in the Presentation layer (API boundary).
+- **Entities** belong in the Domain layer (persistence core).
+- Never mix DTOs among entity definitions.
+
+### 15.6 Minimize Crossing Lines
+
+- Move related classes close together so arrows are short.
+- Avoid drawing a dependency arrow across the entire diagram width.
+- If crossing lines are excessive (more than ~30% of arrows cross), split the diagram into focused views.
+
+### 15.7 Central / Hub Classes Go in the Middle of Their Cluster
+
+High-dependency classes (`TaskService`, `UnitOfWork`, `OrderService`) should sit in the center of their layer group — not at the edges — to keep arrows short and readable.
+
+### 15.8 Group Frequently Related Classes Together
+
+- `TaskService` near `ITaskService`
+- `TaskRepository` near `ITaskRepository`
+- Parent entity near its child entities (e.g. `Order` near `OrderItem`)
+- Request DTOs near their Controller
+
+### 15.9 Diagram Size Limit
+
+- 7–12 classes: ideal
+- 12–20 classes: acceptable if well grouped
+- > 20 classes: split into Domain / Application / Persistence view
+
+### 15.10 Use Whitespace Intentionally
+
+Leave space between layer packages to make visual boundaries clear. Dense packing makes groups indistinguishable.
+
+### 15.11 Composition/Aggregation Close, Dependencies Farther
+
+- Structural (`*--`, `o--`) relationships: keep source and target in the same or adjacent package.
+- Dependency (`..>`) arrows: acceptable to span further (they are visually lighter).
+
+### 15.12 Recommended Specification-Level Layout Template
+
+```
+[Presentation Layer]    [Application Layer]    [Persistence Layer]    [Domain Layer]
+  Controller         →    IService             →  IRepository         →  Entity
+  Request DTOs            ServiceImpl             RepositoryImpl          Enum/VO
+  Response DTOs           Cross-module ref        UnitOfWork
+```
+
+Or vertically stacked (top to bottom):
+```
+Presentation Layer   ← entry point
+Application Layer    ← business logic
+Persistence Layer    ← data access
+Domain Layer         ← core entities / enums
+```
+
+### 15.13 Five-Second Readability Rule
+
+A good class diagram must let a viewer identify **in 5 seconds**:
+- Where is the entry point (Controller)?
+- Where is the business logic (Service)?
+- Where is the data access (Repository)?
+- Where are the entities?
+- Which direction do dependencies flow?
+
+If these are not apparent in 5 seconds, the layout needs improvement.
+
+### 15.14 Layout Mini-Checklist
+
+- [ ] One primary reading direction chosen (left→right or top→bottom)
+- [ ] Classes grouped into named `package` blocks by layer
+- [ ] Interface placed adjacent to its implementation (same package)
+- [ ] DTOs in the Presentation layer (API boundary)
+- [ ] Entities in the Domain layer (persistence core)
+- [ ] Main dependency arrows follow the chosen direction
+- [ ] Hub/central classes positioned in the middle of their cluster
+- [ ] No more than ~20 classes per diagram view
+- [ ] Whitespace between layer packages is visible
+- [ ] A viewer can identify all five landmarks within 5 seconds
 
 ## 16. What to Exclude
 
@@ -280,9 +376,74 @@ Before finalizing, verify:
 - [ ] Important technical dependencies only
 - [ ] DTO vs Entity boundary clear
 - [ ] Names are meaningful (real C# class names)
-- [ ] Readable layout — grouped by layer, no visual noise
+- [ ] Readable layout — classes in named `package` blocks by layer, one primary reading direction (left→right or top→bottom), interface adjacent to implementation, DTOs in Presentation package, entities in Domain package, 5-second readability satisfied
 - [ ] Natural-language relationship labels
 - [ ] Diagram supports implementation — a developer can code from it
+
+---
+
+## 20. Compact Overview Diagram
+
+When the full specification-level diagram becomes too cluttered, or when the goal is a quick overview (SDS overview section, BA/tech-lead review, presenter-friendly slide), produce a **compact overview diagram** instead.
+
+> A compact overview diagram shows only the **backbone structure**: the main entry point, the main business component, the main persistence component, the core domain classes, and the single most important boundary contract. Everything else is dropped.
+
+### 20.1 When to Use
+
+- Diagram has > 20 classes and is hard to read
+- Goal is to communicate **module shape**, not full contract
+- Presenting to reviewers, BAs, or tech leads
+- SDS overview or onboarding documentation
+- The current diagram is described as "rối" (cluttered/messy)
+
+### 20.2 When NOT to Use
+
+- Full contract documentation is required
+- Every DTO and request must be shown
+- Integration or cross-module dependencies must be traced
+- Diagram will be used by developers as a near-code implementation reference
+
+### 20.3 What to Keep
+
+| Element | Rule |
+|---|---|
+| **Main entry point** | One controller / handler / facade |
+| **Main service** | One service interface + its implementation |
+| **Main repository** | One repository interface + its implementation |
+| **Core entities** | The 1–3 central domain entities the module manages |
+| **Key boundary contracts** | At most 1 main request DTO + 1 main response DTO per service |
+| **Unit of Work** | Keep if it is the central coordination mechanism |
+
+### 20.4 What to Drop by Default
+
+- All enums
+- All cross-module classes and external technical interfaces
+- Minor / nested / report DTOs
+- Action-specific small request classes (e.g. `AdjustAttendanceRequest`, `PublishAssignmentsRequest`)
+- Helper, utility, and mapper classes
+- Framework details (`DbContext`, `IMapper`, etc.) unless architecturally load-bearing
+- Redundant dependency lines that repeat the same relationship type to many targets
+- Any method or field that is not needed to understand the class's core responsibility
+
+### 20.5 Structural Pattern
+
+```
+Entry Point  →  Service  →  Repository  →  Core Entity
+   ↑ Request DTO              ↑ Entity
+   ↓ Response DTO
+```
+
+### 20.6 Compact Diagram Checklist
+
+- [ ] ≤ 12 classes total
+- [ ] Entry point visible
+- [ ] Service (interface + impl) visible
+- [ ] Repository (interface + impl) visible
+- [ ] Core entities visible
+- [ ] At most 1–2 representative DTOs per service
+- [ ] No enums, no cross-module noise
+- [ ] All 5 landmarks identifiable in 5 seconds
+- [ ] Line count is noticeably lower than the full diagram
 
 ---
 
@@ -465,7 +626,8 @@ end
    - Dependencies between classes (composition, aggregation, association, dependency)  
    - API endpoint flows from controller → service → repository  
 4. **Generate the Class Diagram** (`class-diagram.puml`):
-   - Produce a **specification-level class diagram** per the Specification-Level Class Diagram Guide above.
+   - By default, produce a **specification-level class diagram** per the Specification-Level Class Diagram Guide above.
+   - If the user requests a compact or overview diagram, or if the full diagram would exceed ~20 classes, apply **§20 Compact Overview Diagram** rules instead: keep only the backbone (entry point, main service, main repository, core entities, 1–2 boundary contracts) and drop enums, minor DTOs, cross-module noise, and redundant dependency lines.
    - Include all layers relevant to the module: Presentation (controllers), Application (services, mappers), Persistence (repositories, unit of work), Domain (entities, enums, value objects), Boundary (request/response DTOs).
    - Include **full dependency coverage** for the module layer: controller dependencies, service dependencies, repository dependencies, and relevant cross-module interfaces/classes used by those layers.
    - Use the correct PlantUML relationship notation (section 7):
@@ -564,8 +726,14 @@ deactivate Ctrl
 # Common Mistakes to Avoid
 
 **Class Diagrams:**
+- Diagram has > 20 classes with no compact alternative — apply §20 Compact Overview Diagram when full detail is not needed
+- Keeping enums, minor DTOs, and cross-module noise when a compact overview was requested
 - Using association for every relationship — model dependency, composition, realization correctly
 - Missing multiplicity on important entity relationships
+- No `package` blocks — flat class list with no visual layer grouping
+- Mixing reading directions (part left→right, part top→bottom) in one diagram
+- DTOs mixed among entity definitions instead of in Presentation layer
+- Interface and implementation scattered far apart instead of in the same package
 - One giant unreadable diagram instead of focused, layer-grouped diagrams
 - Including every field/method from source code (noise) — be selective per class type template
 - Wrong inheritance usage — prefer composition unless truly "is-a"

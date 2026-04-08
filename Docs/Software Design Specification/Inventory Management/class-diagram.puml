@@ -36,20 +36,6 @@ enum ExportReasonCode {
     WORN_OUT
 }
 
-enum VarianceReasonCode {
-    BREAKAGE
-    NATURAL_LOSS
-    COUNTING_ERROR
-}
-
-enum IngredientUnitCode {
-    KG
-    GRAM
-    LITER
-    ML
-    PCS
-}
-
 ' ═══════════════════════════════════════════════════
 ' DOMAIN LAYER — Entities
 ' ═══════════════════════════════════════════════════
@@ -482,8 +468,16 @@ InventoryRepository ..|> IInventoryRepository : implements
 
 ' Controller layer dependencies
 InventoryController --> IInventoryService : uses for inventory operations
+InventoryController ..> GetInventoryItemsFilterRequest : receives item filter request
+InventoryController ..> GetTransactionsFilterRequest : receives transaction filter request
 InventoryController ..> CreateInventoryTransactionFormRequest : receives multipart form data
+InventoryController ..> SubmitTransactionRequest : receives submission request
+InventoryController ..> ApproveTransactionRequest : receives approval request
+InventoryController ..> InventoryItemDto : returns item list payload
+InventoryController ..> InventoryTransactionListDto : returns transaction list payload
 InventoryController ..> InventoryTransactionDetailDto : returns as response
+InventoryController ..> StockCardDto : returns stock card payload
+InventoryController ..> InventoryDashboardDto : returns dashboard payload
 
 ' Service layer associations (held as fields)
 InventoryService --> IInventoryRepository : uses for data persistence
@@ -494,10 +488,38 @@ InventoryService --> IFileStorage : uses for evidence file uploads
 InventoryService --> IMediaRepository : uses for media asset persistence
 
 ' Service layer dependencies (temporary usage)
+InventoryService ..> InventoryTxTypeCode : uses transaction type codes
+InventoryService ..> InventoryTxStatusCode : uses transaction status codes
+InventoryService ..> InventoryCategoryCode : validates category scopes
+InventoryService ..> ExportReasonCode : validates export reason scopes
+InventoryService ..> CreateInventoryTransactionRequest : consumes create transaction request
+InventoryService ..> SubmitTransactionRequest : consumes submission request
+InventoryService ..> ApproveTransactionRequest : consumes approval request
 InventoryService ..> InventoryTransaction : creates and manages entity
+InventoryService ..> InventoryItemDto : returns item query results
+InventoryService ..> InventoryTransactionListDto : returns transaction query results
 InventoryService ..> InventoryTransactionDetailDto : maps entity to response DTO
+InventoryService ..> StockCardDto : returns stock movement results
+InventoryService ..> InventoryDashboardDto : returns dashboard summary
 
 ' Repository layer dependency
 InventoryRepository --> InventoryTransaction : persists entity
+IInventoryService ..> GetInventoryItemsFilterRequest : defines item query contract
+IInventoryService ..> GetTransactionsFilterRequest : defines transaction query contract
+IInventoryService ..> CreateInventoryTransactionRequest : defines create transaction contract
+IInventoryService ..> SubmitTransactionRequest : defines submit transaction contract
+IInventoryService ..> ApproveTransactionRequest : defines approval contract
+IInventoryService ..> InventoryItemDto : exposes item response contract
+IInventoryService ..> InventoryTransactionListDto : exposes transaction list contract
+IInventoryService ..> InventoryTransactionDetailDto : exposes transaction detail contract
+IInventoryService ..> StockCardDto : exposes stock card contract
+IInventoryService ..> InventoryDashboardDto : exposes dashboard contract
+IInventoryRepository ..> GetInventoryItemsFilterRequest : accepts item filter criteria
+IInventoryRepository ..> GetTransactionsFilterRequest : accepts transaction filter criteria
+IInventoryRepository ..> InventoryItemDto : projects item query results
+IInventoryRepository ..> InventoryTransactionListDto : projects transaction list results
+IInventoryRepository ..> StockCardDto : projects stock card results
+IInventoryRepository ..> InventoryDashboardDto : projects dashboard results
+CreateInventoryTransactionFormRequest ..> CreateInventoryTransactionRequest : carries serialized transaction payload
 
 @enduml
