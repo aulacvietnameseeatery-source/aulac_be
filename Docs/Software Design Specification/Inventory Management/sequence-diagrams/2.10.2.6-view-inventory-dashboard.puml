@@ -1,0 +1,42 @@
+@startuml
+autonumber
+title 2.10.2.6 View Inventory Dashboard
+
+actor Client
+participant "InventoryController" as Ctrl
+participant "InventoryService" as Svc
+participant "IInventoryRepository" as Repo
+database "Database" as DB
+
+Client -> Ctrl : GET /api/inventory/dashboard
+activate Ctrl
+Ctrl -> Svc : GetDashboardAsync(ct)
+activate Svc
+
+Svc -> Repo : GetDashboardAsync(ct)
+activate Repo
+
+Repo -> DB : SELECT aggregated stats:\n- COUNT total ingredients\n- COUNT low stock (QuantityOnHand <= MinStockLevel)\n- COUNT out of stock (QuantityOnHand = 0)\n- COUNT pending transactions
+activate DB
+DB --> Repo : summary counts
+deactivate DB
+
+Repo -> DB : SELECT TOP low stock items\nJOIN Ingredient, CurrentStock, CategoryLv, UnitLv
+activate DB
+DB --> Repo : LowStockItemDto list
+deactivate DB
+
+Repo -> DB : SELECT TOP recent transactions\nJOIN TypeLv, StatusLv, CreatedBy, Items
+activate DB
+DB --> Repo : RecentTransactionDto list
+deactivate DB
+
+Repo --> Svc : InventoryDashboardDto
+deactivate Repo
+
+Svc --> Ctrl : InventoryDashboardDto
+deactivate Svc
+Ctrl --> Client : 200 ApiResponse<InventoryDashboardDto>
+deactivate Ctrl
+
+@enduml

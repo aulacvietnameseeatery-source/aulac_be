@@ -1,0 +1,151 @@
+@startuml
+autonumber
+title 2.10.2.2 Inventory Transaction Submission
+
+actor C as "Client"
+participant "InventoryController" as Ctrl
+participant "InventoryService" as Svc
+participant "InventoryRepository" as Repo
+participant "IFileStorage" as FS
+participant "IMediaRepository" as MR
+database "Database" as DB
+
+== POST /api/inventory/transactions (multipart/form-data) ==
+
+C -> Ctrl : POST /transactions (CreateInventoryTransactionFormRequest)
+activate Ctrl
+note right of Ctrl : Deserialize RequestJson to CreateInventoryTransactionRequest
+Ctrl -> Ctrl : GetCurrentUserId()
+Ctrl -> Ctrl : MapFiles(EvidenceFiles)
+Ctrl -> Svc : CreateTransactionAsync(request, userId, evidenceFiles, ct)
+activate Svc
+
+Svc -> Svc : Resolve DRAFT status via LookupResolver
+Svc -> Svc : ResolveTypeCodeAsync(TypeLvId)
+Svc -> Repo : GetTodayTransactionCountByTypeAsync(typeCode, ct)
+activate Repo
+Repo -> DB : COUNT InventoryTransactions WHERE TypeCode AND CreatedAt >= today
+activate DB
+DB --> Repo : count
+deactivate DB
+Repo --> Svc : count
+deactivate Repo
+Svc -> Svc : GenerateTransactionCodeAsync (TYPE-YYYYMMDD-SEQ)
+
+note right of Svc : Build InventoryTransaction + InventoryTransactionItem entities
+
+Svc -> Repo : CreateTransactionAsync(transaction, items, ct)
+activate Repo
+Repo -> DB : INSERT InventoryTransactions
+activate DB
+DB --> Repo : TransactionId
+deactivate DB
+Repo -> DB : INSERT InventoryTransactionItems
+activate DB
+DB --> Repo : ok
+deactivate DB
+Repo --> Svc : transactionId
+deactivate Repo
+
+opt Evidence files provided
+    Svc -> Svc : SaveEvidenceFilesAsync(transactionId, transaction, files, ct)
+    Svc -> FS : SaveManyAsync(uploadRequests, folder, validationOptions, ct)
+    activate FS
+    FS --> Svc : uploadResults
+    deactivate FS
+    loop Each uploaded file
+        Svc -> MR : AddMediaAsync(MediaAsset, ct)
+        activate MR
+        MR --> Svc : MediaAsset
+        deactivate MR
+        Svc -> Svc : Add InventoryTransactionMedium to transaction
+    end
+    Svc -> Repo : UpdateTransactionAsync(transaction, ct)
+    activate Repo
+    Repo -> DB : UPDATE InventoryTransactions (media links)
+    activate DB
+    DB --> Repo : ok
+    deactivate DB
+    Repo --> Svc : ok
+    deactivate Repo
+end
+
+Svc -> Repo : GetTransactionByIdAsync(transactionId, ct)
+activate Repo
+Repo -> DB : SELECT with all Includes
+activate DB
+DB --> Repo : InventoryTransaction entity
+deactivate DB
+Repo --> Svc : InventoryTransaction entity
+deactivate Repo
+Svc -> Svc : MapToDetailDto(entity)
+Svc --> Ctrl : InventoryTransactionDetailDto
+deactivate Svc
+Ctrl --> C : 200 ApiResponse with InventoryTransactionDetailDto
+deactivate Ctrl
+
+== POST /api/inventory/transactions/{id}/submit ==
+
+C -> Ctrl : POST /transactions/{id}/submit (SubmitTransactionRequest)
+activate Ctrl
+Ctrl -> Ctrl : GetCurrentUserId()
+Ctrl -> Svc : SubmitTransactionAsync(id, request, userId, ct)
+activate Svc
+
+Svc -> Repo : GetTransactionByIdAsync(id, ct)
+activate Repo
+Repo -> DB : SELECT InventoryTransaction
+activate DB
+DB --> Repo : entity
+deactivate DB
+Repo --> Svc : entity
+deactivate Repo
+
+alt Status is not DRAFT
+    Svc --> C : InvalidOperationException
+end
+
+opt TypeLvId == OUT
+    Svc -> Svc : ValidateExportReasonScopingAsync(entity, ct)
+    alt Export reason not allowed for item category
+        Svc --> C : InvalidOperationException
+    end
+end
+
+Svc -> Svc : Set StatusLvId = PENDING_APPROVAL, SubmittedAt = now
+
+Svc -> Svc : BeginTransaction via IUnitOfWork
+
+opt MediaIds provided in request
+    loop Each MediaId
+        Svc -> Svc : Add InventoryTransactionMedium (avoid duplicates)
+    end
+end
+
+Svc -> Repo : UpdateTransactionAsync(entity, ct)
+activate Repo
+Repo -> DB : UPDATE InventoryTransactions
+activate DB
+DB --> Repo : ok
+deactivate DB
+Repo --> Svc : ok
+deactivate Repo
+Svc -> Svc : CommitTransaction via IUnitOfWork
+
+Svc -> Svc : NotificationService.PublishAsync (INVENTORY_TX_SUBMITTED to approvers)
+
+Svc -> Repo : GetTransactionByIdAsync(id, ct)
+activate Repo
+Repo -> DB : SELECT
+activate DB
+DB --> Repo : entity
+deactivate DB
+Repo --> Svc : entity
+deactivate Repo
+Svc -> Svc : MapToDetailDto(entity)
+Svc --> Ctrl : InventoryTransactionDetailDto
+deactivate Svc
+Ctrl --> C : 200 ApiResponse with InventoryTransactionDetailDto
+deactivate Ctrl
+
+@enduml
