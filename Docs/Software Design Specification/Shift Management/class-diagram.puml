@@ -1,4 +1,5 @@
 @startuml
+title Shift Management Module - Specification Class Diagram
 skinparam classAttributeIconSize 0
 
 enum ShiftTypeCode {
@@ -87,27 +88,27 @@ class TimeLog {
     +CreatedAt: DateTime
 }
 
-class StaffAccount {
+class StaffAccount <<cross-module>> {
     +AccountId: long
     +FullName: string
 }
 
-class LookupValue {
+class LookupValue <<cross-module>> {
     +LookupValueId: uint
     +ValueCode: string
     +ValueName: string
 }
 
-ShiftTemplate "1" --> "0..*" ShiftAssignment : ShiftAssignments
-ShiftAssignment "1" --> "0..1" AttendanceRecord : AttendanceRecord
-AttendanceRecord "1" --> "0..*" TimeLog : TimeLogs
-ShiftAssignment --> "1" StaffAccount : Staff
-ShiftAssignment --> "1" StaffAccount : AssignedByStaff
-ShiftAssignment --> "1" LookupValue : AssignmentStatusLv
-AttendanceRecord --> "1" LookupValue : AttendanceStatusLv
-AttendanceRecord --> "0..1" StaffAccount : ReviewedByStaff
-ShiftTemplate --> "1" StaffAccount : CreatedByStaff
-ShiftTemplate --> "0..1" StaffAccount : UpdatedByStaff
+ShiftTemplate "1" --> "0..*" ShiftAssignment : defines shift assignments
+ShiftAssignment "1" *-- "0..1" AttendanceRecord : contains attendance record
+AttendanceRecord "1" *-- "0..*" TimeLog : contains time logs
+ShiftAssignment --> "1" StaffAccount : assigned to staff
+ShiftAssignment --> "1" StaffAccount : assigned by staff
+ShiftAssignment --> "1" LookupValue : assignment status
+AttendanceRecord --> "1" LookupValue : attendance status
+AttendanceRecord --> "0..1" StaffAccount : reviewed by staff
+ShiftTemplate --> "1" StaffAccount : created by staff
+ShiftTemplate --> "0..1" StaffAccount : updated by staff
 
 ' === DTOs ===
 
@@ -430,6 +431,10 @@ interface IShiftAssignmentRepository {
     +GetByIdsWithDetailsAsync(ids: IEnumerable<long>): List<ShiftAssignment>
     +GetWeekAssignmentsAsync(weekStart: DateOnly): List<ShiftAssignment>
     +GetTeamScheduleAsync(from: DateOnly, to: DateOnly, templateId: long?): List<ShiftAssignment>
+    +GetWeeklyScheduledMinutesAsync(staffId: long, weekStart: DateOnly, ct): int
+    +GetWorkedHoursDataAsync(fromDate: DateOnly, toDate: DateOnly, staffId: long?, ct): List<ShiftAssignment>
+    +GetExceptionDataAsync(fromDate: DateOnly, toDate: DateOnly, staffId: long?, ct): List<ShiftAssignment>
+    +GetAttendanceReportAsync(request: AttendanceReportRequest, ct): Tuple
     +GetNoShowCandidatesAsync(threshold: DateTime): List<ShiftAssignment>
 }
 
@@ -447,6 +452,10 @@ interface IShiftSettingsProvider {
     +GetEarlyLeaveBufferMinutesAsync(): int
     +GetNoShowThresholdMinutesAsync(): int
     +GetMaxWeeklyHoursAsync(): double
+    +GetGeofenceBaseLatitudeAsync(): double?
+    +GetGeofenceBaseLongitudeAsync(): double?
+    +GetGeofenceMaxRadiusMetersAsync(): int
+    +GetAutoLogoutAfterCheckoutMinutesAsync(): int
 }
 
 interface IShiftLiveRealtimePublisher {
@@ -458,6 +467,11 @@ interface IShiftLiveRealtimePublisher {
 class ShiftTemplateService {
     -_templateRepo: IShiftTemplateRepository
     -_unitOfWork: IUnitOfWork
+    +GetAllAsync(isActive, ct): List<ShiftTemplateListDto>
+    +GetByIdAsync(id, ct): ShiftTemplateDetailDto
+    +CreateAsync(request, staffId, ct): ShiftTemplateDetailDto
+    +UpdateAsync(id, request, staffId, ct): ShiftTemplateDetailDto
+    +DeactivateAsync(id, ct): void
 }
 
 class ShiftAssignmentService {
@@ -469,6 +483,19 @@ class ShiftAssignmentService {
     -_notificationService: INotificationService
     -_lookupResolver: ILookupResolver
     -_shiftLiveRealtimePublisher: IShiftLiveRealtimePublisher
+    +GetAssignmentsAsync(request, ct): Tuple
+    +GetLiveBoardAsync(request, ct): List<ShiftLiveBoardItemDto>
+    +GetByIdAsync(id, ct): ShiftAssignmentDetailDto
+    +CreateAssignmentAsync(request, staffId, ct): ShiftAssignmentDetailDto
+    +BulkCreateAssignmentsAsync(request, staffId, ct): List<ShiftAssignmentDetailDto>
+    +UpdateAssignmentAsync(id, request, staffId, ct): ShiftAssignmentDetailDto
+    +CancelAssignmentAsync(id, ct): void
+    +GetMyShiftsAsync(staffId, request, ct): Tuple
+    +PublishAssignmentsAsync(request, staffId, ct): List<ShiftAssignmentListDto>
+    +CopyWeekAsync(request, staffId, ct): List<ShiftAssignmentListDto>
+    +ReassignAsync(id, request, staffId, ct): ShiftAssignmentDetailDto
+    +ConfirmAssignmentAsync(id, staffId, ct): ShiftAssignmentDetailDto
+    +GetTeamScheduleAsync(request, ct): List<ShiftAssignmentListDto>
 }
 
 class AttendanceService {
@@ -479,6 +506,13 @@ class AttendanceService {
     -_shiftSettings: IShiftSettingsProvider
     -_notificationService: INotificationService
     -_shiftLiveRealtimePublisher: IShiftLiveRealtimePublisher
+    +CheckInAsync(assignmentId, staffId, ct): AttendanceRecordDto
+    +CheckOutAsync(assignmentId, staffId, ct): AttendanceRecordDto
+    +AdjustAttendanceAsync(attendanceId, request, staffId, ct): AttendanceRecordDto
+    +GetAttendanceReportAsync(request, ct): Tuple
+    +GetExceptionsReportAsync(from, to, staffId, ct): List<AttendanceExceptionReportRowDto>
+    +GetWorkedHoursReportAsync(from, to, staffId, ct): List<WorkedHoursReportRowDto>
+    +GetReportSnapshotAsync(from, to, ct): ShiftReportSnapshotDto
 }
 
 ' === Controller ===
@@ -514,6 +548,27 @@ class ShiftController {
     +GetExceptionsReport(from: DateOnly, to: DateOnly, staffId: long?): IActionResult
 }
 
+' === Cross-module Interfaces (dependencies from other modules) ===
+
+interface IUnitOfWork <<cross-module>> {
+    +BeginTransactionAsync(ct): Task
+    +CommitAsync(ct): Task
+    +RollbackAsync(ct): Task
+    +SaveChangesAsync(ct): Task
+}
+
+interface INotificationService <<cross-module>> {
+    +PublishAsync(request: PublishNotificationRequest, ct): Task
+}
+
+interface ILookupResolver <<cross-module>> {
+    +GetIdAsync(typeId: ushort, valueCode: string, ct): uint
+}
+
+interface IAccountRepository <<cross-module>>
+
+interface IOrderRepository <<cross-module>>
+
 ' === Realization (implements) ===
 
 ShiftTemplateService ..|> IShiftTemplateService : implements
@@ -529,11 +584,20 @@ ShiftController --> IAttendanceService : uses for attendance operations
 ' === Service dependencies ===
 
 ShiftTemplateService --> IShiftTemplateRepository : uses for persistence
+ShiftTemplateService --> IUnitOfWork : uses for transaction management
 ShiftAssignmentService --> IShiftAssignmentRepository : uses for persistence
 ShiftAssignmentService --> IShiftTemplateRepository : uses for template validation
+ShiftAssignmentService --> IAccountRepository : uses for staff account lookup
+ShiftAssignmentService --> IOrderRepository : uses for live board order data
+ShiftAssignmentService --> IUnitOfWork : uses for transaction management
+ShiftAssignmentService --> INotificationService : uses for staff notifications
+ShiftAssignmentService --> ILookupResolver : uses for status code resolution
 ShiftAssignmentService --> IShiftLiveRealtimePublisher : uses for real-time events
 AttendanceService --> IAttendanceRepository : uses for persistence
 AttendanceService --> IShiftAssignmentRepository : uses for assignment lookup
+AttendanceService --> IUnitOfWork : uses for transaction management
+AttendanceService --> ILookupResolver : uses for status code resolution
+AttendanceService --> INotificationService : uses for attendance notifications
 AttendanceService --> IShiftSettingsProvider : uses for attendance rules
 AttendanceService --> IShiftLiveRealtimePublisher : uses for real-time events
 
