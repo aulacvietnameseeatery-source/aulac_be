@@ -10,6 +10,7 @@ using Core.Interface.Repo;
 using Core.Interface.Service.Entity;
 using Core.Interface.Service.Notification;
 using Core.Interface.Service.Shift;
+using Core.Interface.Service.Others;
 using Infa.Data;
 using Microsoft.EntityFrameworkCore;
 using Core.DTO.General;
@@ -31,6 +32,7 @@ public class PaymentService : IPaymentService
     private readonly INotificationService _notificationService;
     private readonly IShiftLiveRealtimePublisher _shiftLiveRealtimePublisher;
     private readonly IPaymentRepository _paymentRepository;
+    private readonly IOrderRealtimeService _orderRealtime;
 
     public PaymentService(
         RestaurantMgmtContext context,
@@ -39,7 +41,8 @@ public class PaymentService : IPaymentService
         ISystemSettingService systemSettingService,
         INotificationService notificationService,
         IShiftLiveRealtimePublisher shiftLiveRealtimePublisher,
-        IPaymentRepository paymentRepository)
+        IPaymentRepository paymentRepository,
+        IOrderRealtimeService orderRealtime)
     {
         _context = context;
         _lookupResolver = lookupResolver;
@@ -48,6 +51,7 @@ public class PaymentService : IPaymentService
         _notificationService = notificationService;
         _shiftLiveRealtimePublisher = shiftLiveRealtimePublisher;
         _paymentRepository = paymentRepository;
+        _orderRealtime = orderRealtime;
     }
 
     public async Task ProcessPaymentAsync(CreatePaymentDTO dto, CancellationToken cancellationToken = default)
@@ -299,6 +303,9 @@ public class PaymentService : IPaymentService
                 StaffId = order.StaffId,
                 OccurredAt = DateTime.UtcNow,
             }, cancellationToken);
+
+            // Notify customer screen to close (push to order-{id} SignalR group)
+            await _orderRealtime.OrderPaidAsync(dto.OrderId);
         }
         catch (Exception)
         {

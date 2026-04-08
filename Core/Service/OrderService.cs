@@ -621,6 +621,13 @@ public class OrderService : IOrderService
 
     public async Task AddItemsToOrderAsync(long orderId, AddOrderItemsRequestDTO request, CancellationToken cancellationToken = default)
     {
+        // Pre-check: block if order already has a payment
+        var existingOrder = await _orderRepository.GetByIdForUpdateAsync(orderId, cancellationToken)
+            ?? throw new KeyNotFoundException($"Order {orderId} not found.");
+
+        if (existingOrder.Payments.Any())
+            throw new InvalidOperationException("This order has already been paid. Please ask staff to create a new order for your table.");
+
         var createdItemLvId = await OrderItemStatusCode.CREATED.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
         var completedOrderStatusId = await OrderStatusCode.COMPLETED.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
         var cancelledOrderStatusId = await OrderStatusCode.CANCELLED.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
@@ -647,7 +654,6 @@ public class OrderService : IOrderService
             .Where(n => n != null));
 
         var tableCode = "";
-        var existingOrder = await _orderRepository.GetByIdForUpdateAsync(orderId, cancellationToken);
         if (existingOrder?.TableId != null)
         {
             var table = await _tableRepository.GetByIdAsync(existingOrder.TableId.Value, cancellationToken);

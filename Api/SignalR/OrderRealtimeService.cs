@@ -35,5 +35,11 @@ namespace Api.SignalR
             await _hub.Clients.Group($"order-{data.OrderId}")
                 .SendAsync("OrderItemUpdated", data);
         }
+
+        public async Task OrderPaidAsync(long orderId)
+        {
+            await _hub.Clients.Group($"order-{orderId}")
+                .SendAsync("OrderPaid", new { orderId });
+        }
     }
 }
