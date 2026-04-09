@@ -1,0 +1,94 @@
+@startuml
+title Shift Management - Domain Layer Class Diagram
+
+
+package "Domain Layer" {
+
+    class ShiftTemplate <<Entity>> {
+        +ShiftTemplateId: long
+        +TemplateName: string
+        +DefaultStartTime: TimeOnly
+        +DefaultEndTime: TimeOnly
+        +Description: string?
+        +BufferBeforeMinutes: int?
+        +BufferAfterMinutes: int?
+        +IsActive: bool
+        +CreatedBy: long
+        +CreatedAt: DateTime
+        +UpdatedBy: long?
+        +UpdatedAt: DateTime
+    }
+
+    class ShiftAssignment <<Entity>> {
+        +ShiftAssignmentId: long
+        +ShiftTemplateId: long
+        +StaffId: long
+        +WorkDate: DateOnly
+        +PlannedStartAt: DateTime
+        +PlannedEndAt: DateTime
+        +AssignmentStatusLvId: uint
+        +IsActive: bool
+        +Tags: string?
+        +Notes: string?
+        +AssignedBy: long
+        +AssignedAt: DateTime
+        +CreatedAt: DateTime
+        +UpdatedAt: DateTime
+    }
+
+    class AttendanceRecord <<Entity>> {
+        +AttendanceId: long
+        +ShiftAssignmentId: long
+        +AttendanceStatusLvId: uint
+        +ActualCheckInAt: DateTime?
+        +ActualCheckOutAt: DateTime?
+        +LateMinutes: int
+        +EarlyLeaveMinutes: int
+        +WorkedMinutes: int
+        +IsManualAdjustment: bool
+        +AdjustmentReason: string?
+        +ReviewedBy: long?
+        +ReviewedAt: DateTime?
+        +CreatedAt: DateTime
+        +UpdatedAt: DateTime
+    }
+
+    class TimeLog <<Entity>> {
+        +TimeLogId: long
+        +AttendanceRecordId: long
+        +PunchInTime: DateTime
+        +PunchOutTime: DateTime?
+        +GpsLocationIn: string?
+        +GpsLocationOut: string?
+        +DeviceIdIn: string?
+        +DeviceIdOut: string?
+        +ValidationStatus: string
+        +PunchDurationMinutes: int
+        +CreatedAt: DateTime
+    }
+
+    class StaffAccount <<Entity>> {
+        +AccountId: long
+        +FullName: string
+        +RoleId: long
+        +RegisteredDeviceId: string?
+    }
+
+    class LookupValue <<Entity>> {
+        +ValueId: uint
+        +TypeId: ushort
+        +ValueCode: string
+        +ValueName: string
+    }
+}
+
+' ── Domain Relationships ──
+
+ShiftTemplate "1" *-- "0..*" ShiftAssignment : contains assignments
+ShiftAssignment "1" *-- "0..1" AttendanceRecord : tracks attendance
+AttendanceRecord "1" *-- "0..*" TimeLog : records punch cycles
+ShiftAssignment "0..*" --> "1" StaffAccount : assigned to
+ShiftAssignment "0..*" --> "1" LookupValue : assignment status
+AttendanceRecord "0..*" --> "1" LookupValue : attendance status
+ShiftTemplate "0..*" --> "1" StaffAccount : created by
+@enduml

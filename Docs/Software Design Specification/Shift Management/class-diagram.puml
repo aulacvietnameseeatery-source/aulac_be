@@ -1,5 +1,4 @@
 @startuml
-skinparam linetype ortho
 title Shift Management Module - Specification Class Diagram
 left to right direction
 
@@ -9,7 +8,7 @@ left to right direction
 
 package "Presentation Layer" {
 
-    class ShiftController {
+    class ShiftController <<Controller>> {
         -_templateService: IShiftTemplateService
         -_assignmentService: IShiftAssignmentService
         -_attendanceService: IAttendanceService
@@ -278,7 +277,7 @@ package "Presentation Layer" {
 
 package "Application Layer" {
 
-    interface IShiftTemplateService {
+    interface IShiftTemplateService <<interface>> {
         +GetAllAsync(isActive: bool?): Task<List<ShiftTemplateListDto>>
         +GetByIdAsync(id: long): Task<ShiftTemplateDetailDto>
         +CreateAsync(request: CreateShiftTemplateRequest, staffId: long): Task<ShiftTemplateDetailDto>
@@ -286,7 +285,7 @@ package "Application Layer" {
         +DeactivateAsync(id: long): Task
     }
 
-    class ShiftTemplateService {
+    class ShiftTemplateService <<Service>> {
         -_templateRepo: IShiftTemplateRepository
         -_unitOfWork: IUnitOfWork
         +GetAllAsync(isActive: bool?): Task<List<ShiftTemplateListDto>>
@@ -296,7 +295,7 @@ package "Application Layer" {
         +DeactivateAsync(id: long): Task
     }
 
-    interface IShiftAssignmentService {
+    interface IShiftAssignmentService <<interface>> {
         +GetAssignmentsAsync(request: GetShiftAssignmentRequest): Task<(List<ShiftAssignmentListDto>, int)>
         +GetByIdAsync(id: long): Task<ShiftAssignmentDetailDto>
         +GetLiveBoardAsync(request: GetShiftAssignmentRequest): Task<List<ShiftLiveBoardItemDto>>
@@ -312,7 +311,7 @@ package "Application Layer" {
         +GetTeamScheduleAsync(request: TeamScheduleRequest): Task<List<ShiftAssignmentListDto>>
     }
 
-    class ShiftAssignmentService {
+    class ShiftAssignmentService <<Service>> {
         -_assignmentRepo: IShiftAssignmentRepository
         -_templateRepo: IShiftTemplateRepository
         -_accountRepo: IAccountRepository
@@ -336,7 +335,7 @@ package "Application Layer" {
         +GetTeamScheduleAsync(request: TeamScheduleRequest): Task<List<ShiftAssignmentListDto>>
     }
 
-    interface IAttendanceService {
+    interface IAttendanceService <<interface>> {
         +CheckInAsync(assignmentId: long, staffId: long): Task<AttendanceRecordDto>
         +CheckOutAsync(assignmentId: long, staffId: long): Task<AttendanceRecordDto>
         +AdjustAttendanceAsync(id: long, request: AdjustAttendanceRequest, reviewerId: long): Task<AttendanceRecordDto>
@@ -346,7 +345,7 @@ package "Application Layer" {
         +GetReportSnapshotAsync(from: DateOnly, to: DateOnly): Task<ShiftReportSnapshotDto>
     }
 
-    class AttendanceService {
+    class AttendanceService <<Service>> {
         -_attendanceRepo: IAttendanceRepository
         -_assignmentRepo: IShiftAssignmentRepository
         -_unitOfWork: IUnitOfWork
@@ -363,7 +362,7 @@ package "Application Layer" {
         +GetReportSnapshotAsync(from: DateOnly, to: DateOnly): Task<ShiftReportSnapshotDto>
     }
 
-    interface IShiftSettingsProvider {
+    interface IShiftSettingsProvider <<interface>> {
         +GetAllowedEarlyCheckInMinutesAsync(): Task<int>
         +GetLateGraceMinutesAsync(): Task<int>
         +GetAbsenceThresholdMinutesAsync(): Task<int>
@@ -372,7 +371,7 @@ package "Application Layer" {
         +GetMaxWeeklyHoursAsync(): Task<double>
     }
 
-    class ShiftSettingsProvider {
+    class ShiftSettingsProvider <<Service>> {
         -_systemSettingRepo: ISystemSettingRepository
         +GetAllowedEarlyCheckInMinutesAsync(): Task<int>
         +GetLateGraceMinutesAsync(): Task<int>
@@ -382,7 +381,7 @@ package "Application Layer" {
         +GetMaxWeeklyHoursAsync(): Task<double>
     }
 
-    interface IShiftLiveRealtimePublisher {
+    interface IShiftLiveRealtimePublisher <<interface>> {
         +PublishBoardChangedAsync(payload: ShiftLiveRealtimeEventDto): Task
     }
 
@@ -398,7 +397,7 @@ package "Application Layer" {
 
 package "Persistence Layer" {
 
-    interface IShiftTemplateRepository {
+    interface IShiftTemplateRepository <<interface>> {
         +Add(entity: ShiftTemplate): void
         +GetByIdAsync(id: long): Task<ShiftTemplate?>
         +GetAllActiveAsync(): Task<List<ShiftTemplate>>
@@ -407,11 +406,11 @@ package "Persistence Layer" {
         +HasActiveAssignmentsAsync(templateId: long): Task<bool>
     }
 
-    class ShiftTemplateRepository {
+    class ShiftTemplateRepository <<Repository>> {
         -_context: AuLacDbContext
     }
 
-    interface IShiftAssignmentRepository {
+    interface IShiftAssignmentRepository <<interface>> {
         +Add(entity: ShiftAssignment): void
         +AddRange(entities: IEnumerable<ShiftAssignment>): void
         +GetByIdAsync(id: long): Task<ShiftAssignment?>
@@ -429,22 +428,22 @@ package "Persistence Layer" {
         +GetAttendanceReportAsync(request: AttendanceReportRequest): Task<(List<ShiftAssignment>, int)>
     }
 
-    class ShiftAssignmentRepository {
+    class ShiftAssignmentRepository <<Repository>> {
         -_context: AuLacDbContext
     }
 
-    interface IAttendanceRepository {
+    interface IAttendanceRepository <<interface>> {
         +Add(entity: AttendanceRecord): void
         +GetByAssignmentIdAsync(assignmentId: long): Task<AttendanceRecord?>
         +GetByIdAsync(id: long): Task<AttendanceRecord?>
         +GetByIdWithDetailsAsync(id: long): Task<AttendanceRecord?>
     }
 
-    class AttendanceRepository {
+    class AttendanceRepository <<Repository>> {
         -_context: AuLacDbContext
     }
 
-    interface IUnitOfWork {
+    interface IUnitOfWork <<interface>> {
         +BeginTransactionAsync(): Task
         +CommitAsync(): Task
         +RollbackAsync(): Task

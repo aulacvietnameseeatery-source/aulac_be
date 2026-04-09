@@ -1,0 +1,82 @@
+@startuml
+title Shift Management - Persistence Layer Class Diagram
+
+
+package "Persistence Layer" {
+
+    interface IShiftTemplateRepository <<interface>> {
+        +Add(entity: ShiftTemplate): void
+        +GetByIdAsync(id: long): Task<ShiftTemplate?>
+        +GetAllActiveAsync(): Task<List<ShiftTemplate>>
+        +GetAllAsync(): Task<List<ShiftTemplate>>
+        +ExistsByNameAsync(name: string, excludeId: long?): Task<bool>
+        +HasActiveAssignmentsAsync(templateId: long): Task<bool>
+    }
+
+    class ShiftTemplateRepository <<Repository>> {
+        -_context: AuLacDbContext
+    }
+
+    interface IShiftAssignmentRepository <<interface>> {
+        +Add(entity: ShiftAssignment): void
+        +AddRange(entities: IEnumerable<ShiftAssignment>): void
+        +GetByIdAsync(id: long): Task<ShiftAssignment?>
+        +GetByIdWithDetailsAsync(id: long): Task<ShiftAssignment?>
+        +GetAssignmentsAsync(request: GetShiftAssignmentRequest): Task<(List<ShiftAssignment>, int)>
+        +HasOverlappingAssignmentAsync(staffId: long, workDate: DateOnly, start: DateTime, end: DateTime, excludeId: long?): Task<bool>
+        +GetAlreadyAssignedStaffIdsAsync(templateId: long, workDate: DateOnly, staffIds: IEnumerable<long>): Task<List<long>>
+        +GetDraftAssignmentsAsync(from: DateOnly, to: DateOnly): Task<List<ShiftAssignment>>
+        +GetByIdsWithDetailsAsync(ids: IEnumerable<long>): Task<List<ShiftAssignment>>
+        +GetWeekAssignmentsAsync(weekStart: DateOnly): Task<List<ShiftAssignment>>
+        +GetTeamScheduleAsync(weekStart: DateOnly, weekEnd: DateOnly, templateId: long?): Task<List<ShiftAssignment>>
+        +GetNoShowCandidatesAsync(thresholdUtc: DateTime): Task<List<ShiftAssignment>>
+        +GetWorkedHoursDataAsync(from: DateOnly, to: DateOnly, staffId: long?): Task<List<ShiftAssignment>>
+        +GetExceptionDataAsync(from: DateOnly, to: DateOnly, staffId: long?): Task<List<ShiftAssignment>>
+        +GetAttendanceReportAsync(request: AttendanceReportRequest): Task<(List<ShiftAssignment>, int)>
+    }
+
+    class ShiftAssignmentRepository <<Repository>> {
+        -_context: AuLacDbContext
+    }
+
+    interface IAttendanceRepository <<interface>> {
+        +Add(entity: AttendanceRecord): void
+        +GetByAssignmentIdAsync(assignmentId: long): Task<AttendanceRecord?>
+        +GetByIdAsync(id: long): Task<AttendanceRecord?>
+        +GetByIdWithDetailsAsync(id: long): Task<AttendanceRecord?>
+    }
+
+    class AttendanceRepository <<Repository>> {
+        -_context: AuLacDbContext
+    }
+
+    interface IUnitOfWork <<interface>> {
+        +BeginTransactionAsync(): Task
+        +CommitAsync(): Task
+        +RollbackAsync(): Task
+        +SaveChangesAsync(): Task
+    }
+
+    ShiftTemplateRepository ..|> IShiftTemplateRepository : implements
+    ShiftAssignmentRepository ..|> IShiftAssignmentRepository : implements
+    AttendanceRepository ..|> IAttendanceRepository : implements
+}
+
+' External type stubs
+class ShiftTemplate <<Entity>>
+class ShiftAssignment <<Entity>>
+class AttendanceRecord <<Entity>>
+class AuLacDbContext <<Repository>>
+class GetShiftAssignmentRequest <<DTO>>
+class AttendanceReportRequest <<DTO>>
+
+ShiftTemplateRepository --> AuLacDbContext : uses EF Core context
+ShiftAssignmentRepository --> AuLacDbContext : uses EF Core context
+AttendanceRepository --> AuLacDbContext : uses EF Core context
+
+IShiftTemplateRepository ..> ShiftTemplate : persists
+IShiftAssignmentRepository ..> ShiftAssignment : persists
+IShiftAssignmentRepository ..> GetShiftAssignmentRequest : filters with
+IShiftAssignmentRepository ..> AttendanceReportRequest : filters with
+IAttendanceRepository ..> AttendanceRecord : persists
+@enduml

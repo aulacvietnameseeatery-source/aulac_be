@@ -1,0 +1,89 @@
+@startuml
+title Inventory Management - Application Layer Class Diagram
+
+package "Application Layer" {
+
+    interface IInventoryService <<interface>> {
+        +GetItemsAsync(filter: GetInventoryItemsFilterRequest): Task<PagedResultDTO<InventoryItemDto>>
+        +CreateTransactionAsync(request: CreateInventoryTransactionRequest, userId: long, files: IReadOnlyList<MediaFileInput>?): Task<InventoryTransactionDetailDto>
+        +GetTransactionDetailAsync(id: long): Task<InventoryTransactionDetailDto>
+        +GetTransactionsAsync(filter: GetTransactionsFilterRequest): Task<PagedResultDTO<InventoryTransactionListDto>>
+        +SubmitTransactionAsync(id: long, request: SubmitTransactionRequest?, userId: long): Task<InventoryTransactionDetailDto>
+        +ApproveTransactionAsync(id: long, request: ApproveTransactionRequest, userId: long): Task<InventoryTransactionDetailDto>
+        +GetStockCardAsync(ingredientId: long, pageIndex: int, pageSize: int): Task<PagedResultDTO<StockCardDto>>
+        +GetDashboardAsync(): Task<InventoryDashboardDto>
+    }
+
+    class InventoryService <<Service>> {
+        -_repo: IInventoryRepository
+        -_unitOfWork: IUnitOfWork
+        -_lookupResolver: ILookupResolver
+        -_notificationService: INotificationService
+        -_fileStorage: IFileStorage
+        -_mediaRepository: IMediaRepository
+        +GetItemsAsync(filter: GetInventoryItemsFilterRequest): Task<PagedResultDTO<InventoryItemDto>>
+        +CreateTransactionAsync(request: CreateInventoryTransactionRequest, userId: long, files: IReadOnlyList<MediaFileInput>?): Task<InventoryTransactionDetailDto>
+        +GetTransactionDetailAsync(id: long): Task<InventoryTransactionDetailDto>
+        +GetTransactionsAsync(filter: GetTransactionsFilterRequest): Task<PagedResultDTO<InventoryTransactionListDto>>
+        +SubmitTransactionAsync(id: long, request: SubmitTransactionRequest?, userId: long): Task<InventoryTransactionDetailDto>
+        +ApproveTransactionAsync(id: long, request: ApproveTransactionRequest, userId: long): Task<InventoryTransactionDetailDto>
+        +GetStockCardAsync(ingredientId: long, pageIndex: int, pageSize: int): Task<PagedResultDTO<StockCardDto>>
+        +GetDashboardAsync(): Task<InventoryDashboardDto>
+        -SaveEvidenceFilesAsync(txId: long, tx: InventoryTransaction, files: IReadOnlyList<MediaFileInput>): Task
+        -GenerateTransactionCodeAsync(typeCode: string): Task<string>
+        -ValidateExportReasonScopingAsync(entity: InventoryTransaction): Task
+    }
+
+    InventoryService ..|> IInventoryService : implements
+}
+
+' ── Group: Request DTOs (horizontal) ──
+together {
+    class GetInventoryItemsFilterRequest <<DTO>>
+    class CreateInventoryTransactionRequest <<DTO>>
+    class SubmitTransactionRequest <<DTO>>
+    class ApproveTransactionRequest <<DTO>>
+    class GetTransactionsFilterRequest <<DTO>>
+}
+
+' ── Group: Response DTOs (horizontal) ──
+together {
+    
+    class InventoryItemDto <<DTO>>
+    class InventoryTransactionListDto <<DTO>>
+    class InventoryTransactionDetailDto <<DTO>>
+    class StockCardDto <<DTO>>
+    class InventoryDashboardDto <<DTO>>
+}
+
+' ── Group: Dependencies (horizontal) ──
+together {
+    interface IInventoryRepository <<interface>>
+    interface IUnitOfWork <<interface>>
+    interface IMediaRepository <<interface>>
+    interface ILookupResolver <<interface>>
+    interface INotificationService <<interface>>
+    interface IFileStorage <<interface>>
+}
+
+class InventoryTransaction <<Entity>>
+
+IInventoryService ..> GetInventoryItemsFilterRequest : consumes
+IInventoryService ..> CreateInventoryTransactionRequest : consumes
+IInventoryService ..> SubmitTransactionRequest : consumes
+IInventoryService ..> ApproveTransactionRequest : consumes
+IInventoryService ..> GetTransactionsFilterRequest : consumes
+IInventoryService ..> InventoryItemDto : returns
+IInventoryService ..> InventoryTransactionListDto : returns
+IInventoryService ..> InventoryTransactionDetailDto : returns
+IInventoryService ..> StockCardDto : returns
+IInventoryService ..> InventoryDashboardDto : returns
+
+InventoryService --> IInventoryRepository : uses for persistence
+InventoryService --> IUnitOfWork : uses for transaction boundary
+InventoryService --> IMediaRepository : saves evidence media
+InventoryService ..> ILookupResolver : resolves lookup values
+InventoryService ..> INotificationService : sends notifications
+InventoryService ..> IFileStorage : stores files
+InventoryService ..> InventoryTransaction : validates transaction rules
+@enduml

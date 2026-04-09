@@ -1,0 +1,181 @@
+@startuml
+title Shift Management - Main Cross-Layer Interactions
+
+
+package "Presentation Layer" {
+    class ShiftController <<Controller>> {
+        -_templateService: IShiftTemplateService
+        -_assignmentService: IShiftAssignmentService
+        -_attendanceService: IAttendanceService
+        +GetTemplates(isActive: bool?): IActionResult
+        +CreateAssignment(request): IActionResult
+        +BulkCreateAssignment(request): IActionResult
+        +PublishAssignments(request): IActionResult
+        +CheckIn(id: long): IActionResult
+        +CheckOut(id: long): IActionResult
+        +GetLiveBoard(request): IActionResult
+        +GetAttendanceReport(request): IActionResult
+    }
+}
+
+package "Application Layer" {
+    interface IShiftTemplateService <<interface>> {
+        +GetAllAsync(isActive: bool?): Task<List<ShiftTemplateListDto>>
+        +CreateAsync(request, staffId: long): Task<ShiftTemplateDetailDto>
+        +UpdateAsync(id: long, request, staffId: long): Task<ShiftTemplateDetailDto>
+        +DeactivateAsync(id: long): Task
+    }
+
+    class ShiftTemplateService <<Service>> {
+        -_templateRepo: IShiftTemplateRepository
+        -_unitOfWork: IUnitOfWork
+    }
+
+    interface IShiftAssignmentService <<interface>> {
+        +GetAssignmentsAsync(request): Task<(List<ShiftAssignmentListDto>, int)>
+        +CreateAssignmentAsync(request, staffId: long): Task<ShiftAssignmentDetailDto>
+        +BulkCreateAssignmentsAsync(request, staffId: long): Task<List<ShiftAssignmentDetailDto>>
+        +PublishAssignmentsAsync(request, staffId: long): Task<List<ShiftAssignmentListDto>>
+        +CopyWeekAsync(request, staffId: long): Task<List<ShiftAssignmentListDto>>
+        +GetLiveBoardAsync(request): Task<List<ShiftLiveBoardItemDto>>
+    }
+
+    class ShiftAssignmentService <<Service>> {
+        -_assignmentRepo: IShiftAssignmentRepository
+        -_templateRepo: IShiftTemplateRepository
+        -_unitOfWork: IUnitOfWork
+        -_notificationService: INotificationService
+        -_shiftLiveRealtimePublisher: IShiftLiveRealtimePublisher
+    }
+
+    interface IAttendanceService <<interface>> {
+        +CheckInAsync(assignmentId: long, staffId: long): Task<AttendanceRecordDto>
+        +CheckOutAsync(assignmentId: long, staffId: long): Task<AttendanceRecordDto>
+        +AdjustAttendanceAsync(id: long, request, reviewerId: long): Task<AttendanceRecordDto>
+        +GetAttendanceReportAsync(request): Task<(List<AttendanceReportRowDto>, int)>
+        +GetReportSnapshotAsync(from: DateOnly, to: DateOnly): Task<ShiftReportSnapshotDto>
+    }
+
+    class AttendanceService <<Service>> {
+        -_attendanceRepo: IAttendanceRepository
+        -_assignmentRepo: IShiftAssignmentRepository
+        -_unitOfWork: IUnitOfWork
+        -_shiftSettings: IShiftSettingsProvider
+        -_shiftLiveRealtimePublisher: IShiftLiveRealtimePublisher
+    }
+
+    interface IShiftSettingsProvider <<interface>> {
+        +GetAllowedEarlyCheckInMinutesAsync(): Task<int>
+        +GetLateGraceMinutesAsync(): Task<int>
+        +GetNoShowThresholdMinutesAsync(): Task<int>
+    }
+
+    class ShiftSettingsProvider <<Service>> {
+        -_systemSettingRepo: ISystemSettingRepository
+    }
+
+    interface IShiftLiveRealtimePublisher <<interface>> {
+        +PublishBoardChangedAsync(payload): Task
+    }
+
+    ShiftTemplateService ..|> IShiftTemplateService : implements
+    ShiftAssignmentService ..|> IShiftAssignmentService : implements
+    AttendanceService ..|> IAttendanceService : implements
+    ShiftSettingsProvider ..|> IShiftSettingsProvider : implements
+}
+
+package "Persistence Layer" {
+    interface IShiftTemplateRepository <<interface>> {
+        +GetByIdAsync(id: long): Task<ShiftTemplate?>
+        +GetAllActiveAsync(): Task<List<ShiftTemplate>>
+        +ExistsByNameAsync(name: string, excludeId: long?): Task<bool>
+    }
+
+    class ShiftTemplateRepository <<Repository>> {
+        -_context: AuLacDbContext
+    }
+
+    interface IShiftAssignmentRepository <<interface>> {
+        +GetByIdWithDetailsAsync(id: long): Task<ShiftAssignment?>
+        +GetAssignmentsAsync(request): Task<(List<ShiftAssignment>, int)>
+        +HasOverlappingAssignmentAsync(staffId: long, workDate: DateOnly, start: DateTime, end: DateTime, excludeId: long?): Task<bool>
+        +GetNoShowCandidatesAsync(thresholdUtc: DateTime): Task<List<ShiftAssignment>>
+    }
+
+    class ShiftAssignmentRepository <<Repository>> {
+        -_context: AuLacDbContext
+    }
+
+    interface IAttendanceRepository <<interface>> {
+        +GetByAssignmentIdAsync(assignmentId: long): Task<AttendanceRecord?>
+        +GetByIdWithDetailsAsync(id: long): Task<AttendanceRecord?>
+    }
+
+    class AttendanceRepository <<Repository>> {
+        -_context: AuLacDbContext
+    }
+
+    interface IUnitOfWork <<interface>> {
+        +BeginTransactionAsync(): Task
+        +CommitAsync(): Task
+        +SaveChangesAsync(): Task
+    }
+
+    ShiftTemplateRepository ..|> IShiftTemplateRepository : implements
+    ShiftAssignmentRepository ..|> IShiftAssignmentRepository : implements
+    AttendanceRepository ..|> IAttendanceRepository : implements
+}
+
+package "Domain Layer" {
+    class ShiftTemplate <<Entity>> {
+        +ShiftTemplateId: long
+        +TemplateName: string
+        +IsActive: bool
+    }
+
+    class ShiftAssignment <<Entity>> {
+        +ShiftAssignmentId: long
+        +WorkDate: DateOnly
+        +AssignmentStatusLvId: uint
+    }
+
+    class AttendanceRecord <<Entity>> {
+        +AttendanceId: long
+        +AttendanceStatusLvId: uint
+        +WorkedMinutes: int
+    }
+
+    class TimeLog <<Entity>> {
+        +TimeLogId: long
+        +PunchInTime: DateTime
+        +PunchOutTime: DateTime?
+    }
+
+    ShiftTemplate "1" *-- "0..*" ShiftAssignment : contains assignments
+    ShiftAssignment "1" *-- "0..1" AttendanceRecord : tracks attendance
+    AttendanceRecord "1" *-- "0..*" TimeLog : records punch cycles
+}
+
+' Cross-layer relationships
+ShiftController --> IShiftTemplateService : uses for template operations
+ShiftController --> IShiftAssignmentService : uses for assignment operations
+ShiftController --> IAttendanceService : uses for attendance operations
+
+ShiftTemplateService --> IShiftTemplateRepository : uses for persistence
+ShiftTemplateService --> IUnitOfWork : uses for transactions
+
+ShiftAssignmentService --> IShiftAssignmentRepository : uses for persistence
+ShiftAssignmentService --> IShiftTemplateRepository : validates templates
+ShiftAssignmentService --> IUnitOfWork : uses for transactions
+ShiftAssignmentService --> IShiftLiveRealtimePublisher : publishes live updates
+
+AttendanceService --> IAttendanceRepository : uses for persistence
+AttendanceService --> IShiftAssignmentRepository : validates assignments
+AttendanceService --> IUnitOfWork : uses for transactions
+AttendanceService --> IShiftSettingsProvider : reads attendance config
+AttendanceService --> IShiftLiveRealtimePublisher : publishes live updates
+
+ShiftTemplateRepository ..> ShiftTemplate : persists
+ShiftAssignmentRepository ..> ShiftAssignment : persists
+AttendanceRepository ..> AttendanceRecord : persists
+@enduml

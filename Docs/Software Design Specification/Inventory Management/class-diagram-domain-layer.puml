@@ -1,0 +1,112 @@
+@startuml
+title Inventory Management - Domain Layer Class Diagram
+left to right direction
+skinparam linetype ortho
+
+package "Domain Layer" {
+
+    class InventoryTransaction <<Entity>> {
+        +TransactionId: long
+        +TransactionCode: string?
+        +CreatedBy: long?
+        +CreatedAt: DateTime?
+        +SubmittedAt: DateTime?
+        +ApprovedBy: long?
+        +ApprovedAt: DateTime?
+        +Note: string?
+        +TypeLvId: uint
+        +StatusLvId: uint
+        +SupplierId: long?
+        +ExportReasonLvId: uint?
+        +StockCheckAreaNote: string?
+    }
+
+    class InventoryTransactionItem <<Entity>> {
+        +TransactionItemId: long
+        +TransactionId: long
+        +IngredientId: long
+        +Quantity: decimal
+        +UnitLvId: uint
+        +UnitPrice: decimal?
+        +SystemQuantity: decimal?
+        +ActualQuantity: decimal?
+        +VarianceReasonLvId: uint?
+        +Note: string?
+    }
+
+    class InventoryTransactionMedium <<Entity>> {
+        +TransactionId: long
+        +MediaId: long
+        +IsPrimary: bool?
+    }
+
+    class Ingredient <<Entity>> {
+        +IngredientId: long
+        +IngredientName: string
+        +UnitLvId: uint
+        +TypeLvId: uint?
+        +CategoryLvId: uint?
+        +IngredientNameTextId: long?
+        +ImageId: long?
+    }
+
+    class CurrentStock <<Entity>> {
+        +IngredientId: long
+        +QuantityOnHand: decimal
+        +MinStockLevel: decimal
+        +LastUpdatedAt: DateTime?
+    }
+
+    class Supplier <<Entity>> {
+        +SupplierId: long
+        +SupplierName: string
+        +Phone: string?
+        +Email: string?
+        +Address: string?
+        +TaxCode: string?
+    }
+
+    class LookupValue <<Entity>> {
+        +ValueId: uint
+        +TypeId: ushort
+        +ValueCode: string
+        +ValueName: string
+    }
+
+    class MediaAsset <<Entity>> {
+        +MediaId: long
+        +Url: string
+        +MimeType: string
+        +MediaTypeLvId: uint
+        +CreatedAt: DateTime
+    }
+
+    class StaffAccount <<Entity>> {
+        +AccountId: long
+        +FullName: string
+        +RoleId: long
+    }
+
+    InventoryTransaction -right-> InventoryTransactionItem
+    InventoryTransactionItem -right-> InventoryTransactionMedium
+    InventoryTransactionMedium -right-> MediaAsset
+
+    Ingredient -right-> CurrentStock
+    Supplier -right-> LookupValue
+    LookupValue -right-> StaffAccount
+
+    InventoryTransaction -right-> Ingredient
+    InventoryTransactionMedium -right-> LookupValue
+}
+
+InventoryTransaction "1" *--- "1..*" InventoryTransactionItem : contains line items
+InventoryTransaction "1" *--- "0..*" InventoryTransactionMedium : has evidence media
+InventoryTransactionItem "0..*" --> "1" Ingredient : references ingredient
+InventoryTransactionMedium "0..*" --> "1" MediaAsset : references media
+Ingredient "1" *--- "0..1" CurrentStock : tracks current stock
+InventoryTransaction "0..*" -down-> "0..1" Supplier : supplied by
+InventoryTransaction "0..*" -down-> "0..1" LookupValue : references transaction lookups
+InventoryTransactionItem "0..*" -down-> "1" LookupValue : uses unit lookup
+Ingredient "0..*" -right-> "0..1" LookupValue : references type/category lookups
+InventoryTransaction "0..*" -right-> "0..1" StaffAccount : created/approved by
+@enduml

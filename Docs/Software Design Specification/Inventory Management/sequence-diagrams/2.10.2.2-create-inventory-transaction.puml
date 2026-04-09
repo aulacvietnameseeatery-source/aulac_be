@@ -1,9 +1,11 @@
 @startuml
-skinparam linetype ortho
 autonumber
 title 2.10.2.2 Create Inventory Transaction
 
-actor Client
+actor User as U
+participant "FE Layer" as Client
+note over U, Client : User interacts through FE before backend calls
+U -> Client : uses web app UI
 participant "InventoryController" as Ctrl
 participant "InventoryService" as Svc
 participant "IInventoryRepository" as Repo

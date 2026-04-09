@@ -62,6 +62,7 @@ For each important class/interface:
 
 - **Name is meaningful** — use real C# class names: `TaskController`, `ITaskRepository`, not vague `Helper`, `Manager`, `Util`, `Processor`.
 - **Type is clear** — class, interface, abstract class, enum, DTO, entity — using correct PlantUML stereotypes.
+- **Always annotate stereotypes explicitly** for non-DTO/entity types as well, e.g. `<<Controller>>`, `<<Service>>`, `<<Repository>>`, and `<<interface>>`.
 - **Class responsibility is identifiable** from its name, attributes, and operations.
 - **Only important members are shown** — noise is removed.
 
@@ -447,6 +448,61 @@ Entry Point  →  Service  →  Repository  →  Core Entity
 
 ---
 
+## 21. Multi-File Class Diagram Convention
+
+When a module has more than ~12 classes (which is typical), split the class diagram into **separate per-layer files** plus one **main cross-layer interaction diagram**.
+
+### 21.1 File Structure
+
+| File | Contents |
+|---|---|
+| `class-diagram-presentation-layer.puml` | Controller + all Request/Response DTOs with full fields |
+| `class-diagram-application-layer.puml` | Service interfaces + Service implementations + external dependency stubs |
+| `class-diagram-persistence-layer.puml` | Repository interfaces + Repository implementations + UnitOfWork + external type stubs |
+| `class-diagram-domain-layer.puml` | All domain entities with full fields and entity relationships |
+| `class-diagram-main-cross-layer-interactions.puml` | Backbone classes only — **NO DTOs**. Shows cross-layer dependency flow |
+
+### 21.2 Main Cross-Layer Interaction Diagram Rules
+
+- **NO DTOs** — only include Controller, Service interfaces/implementations, Repository interfaces/implementations, UnitOfWork, and core Entities.
+- Keep layer packages stacked in a clear order: Presentation → Application → Persistence → Domain.
+- Show only key methods on Controller and Service interface (representative subset, not full listing).
+- Show only injected dependencies as fields on Service and Repository implementations.
+- Core entities shown with only key identity fields (e.g. `+EntityId: long`, `+Name: string`).
+- Relationship labels must be natural-language.
+- Cross-layer relationship arrows placed after all package blocks.
+
+### 21.3 Per-Layer Diagram Rules
+
+Each per-layer file shows the **full detail** for that layer:
+
+- All classes in that layer with full attributes and operations per the Reusable Template by Class Type (§18).
+- External type stubs (from other layers) shown as simple class boxes **outside** the package — just the name and stereotype, no fields/methods.
+- Hidden alignment links (`-[hidden]right->`, `-[hidden]down->`) may be used to improve square layout.
+
+### 21.4 Standard Skinparams
+
+All class diagram `.puml` files use the same minimal base header:
+
+```plantuml
+@startuml
+```
+
+Do **not** add strict spacing overrides (`nodesep`, `ranksep`, `classFontSize`, `classAttributeFontSize`, `classMethodFontSize`, padding params, etc.). Let PlantUML auto-layout handle spacing, and avoid forcing `skinparam linetype ortho` or `top to bottom direction` unless explicitly requested.
+
+### 21.5 Multi-File Checklist
+
+- [ ] One file per layer (presentation, application, persistence, domain)
+- [ ] One main cross-layer interaction diagram
+- [ ] Main diagram has NO DTOs
+- [ ] Main diagram has vertical layer flow (top to bottom)
+- [ ] Per-layer files have full detail for their own classes
+- [ ] Per-layer files use external stubs for cross-layer types
+- [ ] No strict spacing skinparams in any file
+- [ ] No class diagram file forces `skinparam linetype ortho` or `top to bottom direction` unless explicitly requested
+
+---
+
 # Sequence Diagram Guide
 
 ## 1. Definition
@@ -625,11 +681,11 @@ end
    - Interface contracts  
    - Dependencies between classes (composition, aggregation, association, dependency)  
    - API endpoint flows from controller → service → repository  
-4. **Generate the Class Diagram** (`class-diagram.puml`):
-   - By default, produce a **specification-level class diagram** per the Specification-Level Class Diagram Guide above.
-   - If the user requests a compact or overview diagram, or if the full diagram would exceed ~20 classes, apply **§20 Compact Overview Diagram** rules instead: keep only the backbone (entry point, main service, main repository, core entities, 1–2 boundary contracts) and drop enums, minor DTOs, cross-module noise, and redundant dependency lines.
-   - Include all layers relevant to the module: Presentation (controllers), Application (services, mappers), Persistence (repositories, unit of work), Domain (entities, enums, value objects), Boundary (request/response DTOs).
-   - Include **full dependency coverage** for the module layer: controller dependencies, service dependencies, repository dependencies, and relevant cross-module interfaces/classes used by those layers.
+4. **Generate the Class Diagrams** (multi-file per **§21 Multi-File Class Diagram Convention**):
+   - By default, produce **separate per-layer files** plus one **main cross-layer interaction diagram** per §21.
+   - If the user requests a compact or overview diagram, apply **§20 Compact Overview Diagram** rules instead.
+   - Per-layer files include full detail per the Specification-Level Class Diagram Guide (§1–§19).
+    - The main cross-layer interaction diagram includes **NO DTOs** — only backbone classes (Controller, Services, Repositories, UnitOfWork, core Entities).
    - Use the correct PlantUML relationship notation (section 7):
      - Dependency: `..>` — temporary usage (DTOs, mappers)
      - Association: `-->` — held reference (service → repository)
@@ -640,11 +696,8 @@ end
    - Use **natural-language relationship labels** (section 17).
    - Include **multiplicity** where it adds design value (section 9).
    - Follow the **Reusable Template by Class Type** (section 18) to decide what to show per class type.
-   - Include key attributes with types and visibility (section 5).
-   - Include key operations with parameter/return types and visibility (section 6).
-   - Exclude noise: trivial getters/setters, private helpers, framework internals, unrelated modules (section 16).
-   - Group classes by layer for readable layout (section 15).
-   - Pass the **Class Diagram Review Checklist** (section 19) before finalizing.
+    - Do NOT add strict spacing skinparams, and do not force `skinparam linetype ortho` or `top to bottom direction` unless explicitly requested.
+   - Pass the **Class Diagram Review Checklist** (section 19) and **Multi-File Checklist** (§21.5) before finalizing.
 5. **Generate the Sequence Diagram(s)** in a folder (`sequence-diagrams/`):
    - One sequence diagram per major API flow (e.g., Create, Update, GetById, GetAll, Delete/soft-delete).
    - Save each flow as its own `.puml` file in `Docs/Software Design Specification/{module-name}/sequence-diagrams/`.
@@ -660,7 +713,11 @@ end
    - Use `autonumber` for message numbering.
    - Follow the Sequence Diagram Best Practices and Review Checklist.
 6. **Save outputs** to `Docs/Software Design Specification/{module-name}/`:
-    - `class-diagram.puml` — PlantUML class diagram source.
+    - `class-diagram-presentation-layer.puml` — Presentation layer (Controller + DTOs).
+    - `class-diagram-application-layer.puml` — Application layer (Service interfaces + implementations).
+    - `class-diagram-persistence-layer.puml` — Persistence layer (Repository interfaces + implementations + UoW).
+    - `class-diagram-domain-layer.puml` — Domain layer (Entities + relationships).
+    - `class-diagram-main-cross-layer-interactions.puml` — Main cross-layer interaction overview (NO DTOs).
     - `sequence-diagrams/*.puml` — one PlantUML source file per sequence diagram flow.
 
 ---
@@ -669,32 +726,74 @@ end
 
 Each output file must contain **only raw PlantUML syntax** with `@startuml` / `@enduml` markers and no Markdown wrapper and no prose.
 
-Immediately after `@startuml`, always add:
+Keep output headers minimal unless the user explicitly requests extra layout directives.
 
-```plantuml
-skinparam linetype ortho
-```
-
-### Class Diagram Example
+### Class Diagram Example (Main Cross-Layer Interaction)
 
 ```plantuml
 @startuml
-skinparam linetype ortho
-interface IShiftTemplateService {
-    +GetAllAsync(isActive: bool?): List<ShiftTemplateListDto>
-    +CreateAsync(request: CreateShiftTemplateRequest, staffId: long): ShiftTemplateDetailDto
+title Shift Management - Main Cross-Layer Interactions
+
+package "Presentation Layer" {
+    class ShiftController <<Controller>> {
+        -_templateService: IShiftTemplateService
+        -_assignmentService: IShiftAssignmentService
+        +GetTemplates(isActive: bool?): IActionResult
+        +CreateAssignment(request: CreateShiftAssignmentRequest): IActionResult
+        +CheckIn(id: long): IActionResult
+    }
 }
 
-class ShiftTemplateService {
-    -_templateRepo: IShiftTemplateRepository
-    -_unitOfWork: IUnitOfWork
-    +GetAllAsync(isActive: bool?): List<ShiftTemplateListDto>
-    +CreateAsync(request: CreateShiftTemplateRequest, staffId: long): ShiftTemplateDetailDto
+package "Application Layer" {
+    interface IShiftTemplateService <<interface>> {
+        +GetAllAsync(isActive: bool?): Task<List<ShiftTemplateListDto>>
+        +CreateAsync(request: CreateShiftTemplateRequest, staffId: long): Task<ShiftTemplateDetailDto>
+    }
+
+    class ShiftTemplateService <<Service>> {
+        -_templateRepo: IShiftTemplateRepository
+        -_unitOfWork: IUnitOfWork
+    }
+
+    ShiftTemplateService ..|> IShiftTemplateService : implements
 }
 
-ShiftTemplateService ..|> IShiftTemplateService : implements
+package "Persistence Layer" {
+    interface IShiftTemplateRepository <<interface>> {
+        +GetAllActiveAsync(): Task<List<ShiftTemplate>>
+        +GetByIdAsync(id: long): Task<ShiftTemplate?>
+    }
+
+    class ShiftTemplateRepository <<Repository>> {
+        -_context: AuLacDbContext
+    }
+
+    interface IUnitOfWork <<interface>> {
+        +SaveChangesAsync(): Task
+        +CommitAsync(): Task
+    }
+
+    ShiftTemplateRepository ..|> IShiftTemplateRepository : implements
+}
+
+package "Domain Layer" {
+    class ShiftTemplate <<Entity>> {
+        +ShiftTemplateId: long
+        +TemplateName: string
+    }
+
+    class ShiftAssignment <<Entity>> {
+        +ShiftAssignmentId: long
+        +WorkDate: DateOnly
+    }
+
+    ShiftTemplate "1" *-- "0..*" ShiftAssignment : contains assignments
+}
+
+ShiftController --> IShiftTemplateService : uses for template operations
 ShiftTemplateService --> IShiftTemplateRepository : uses for persistence
-ShiftTemplate "1" *-- "0..*" ShiftAssignment : contains assignments
+ShiftTemplateService --> IUnitOfWork : coordinates transactions
+ShiftTemplateRepository ..> ShiftTemplate : persists
 @enduml
 ```
 
@@ -702,7 +801,6 @@ ShiftTemplate "1" *-- "0..*" ShiftAssignment : contains assignments
 
 ```plantuml
 @startuml
-skinparam linetype ortho
 autonumber
 actor Client
 participant "ShiftController" as Ctrl
@@ -734,6 +832,9 @@ deactivate Ctrl
 # Common Mistakes to Avoid
 
 **Class Diagrams:**
+- Producing a single monolith `.puml` file instead of per-layer split files + main interaction diagram (§21)
+- Including DTOs in the main cross-layer interaction diagram — main diagram must have NO DTOs
+- Adding strict spacing skinparams (`nodesep`, `ranksep`, `classFontSize`, etc.) or forcing `skinparam linetype ortho` / `top to bottom direction` when not requested
 - Diagram has > 20 classes with no compact alternative — apply §20 Compact Overview Diagram when full detail is not needed
 - Keeping enums, minor DTOs, and cross-module noise when a compact overview was requested
 - Using association for every relationship — model dependency, composition, realization correctly
