@@ -87,6 +87,10 @@ namespace Core.Service
             // Normalize coupon code: remove all whitespace and convert to uppercase
             request.CouponCode = string.Concat(request.CouponCode.Split()).ToUpper();
 
+            // Validate coupon code minimum length
+            if (request.CouponCode.Length < 3)
+                throw new InvalidOperationException("Coupon code must be at least 3 characters.");
+
             // Validate coupon code uniqueness
             var existingCoupon = await _couponRepository.GetByCodeAsync(request.CouponCode, ct);
             if (existingCoupon != null)
@@ -150,40 +154,64 @@ namespace Core.Service
             if (coupon == null)
                 throw new KeyNotFoundException($"Coupon with ID {id} not found.");
 
-            // Normalize coupon code: remove all whitespace and convert to uppercase
-            request.CouponCode = string.Concat(request.CouponCode.Split()).ToUpper();
+            // If coupon is expired, do not allow any updates
+            if (coupon.EndTime < DateTime.UtcNow)
+                throw new InvalidOperationException("Cannot update an expired coupon.");
 
-            // Validate coupon code uniqueness (if changed)
-            if (coupon.CouponCode.ToLower() != request.CouponCode.ToLower())
+            var isUsed = coupon.UsedCount > 0;
+
+            if (isUsed)
             {
-                var existingCoupon = await _couponRepository.GetByCodeAsync(request.CouponCode, ct);
-                if (existingCoupon != null)
-                    throw new InvalidOperationException($"Coupon with code '{request.CouponCode}' already exists.");
+                // Used coupon: only allow updating Description, EndTime, MaxUsage
+                if (request.EndTime <= coupon.StartTime)
+                    throw new InvalidOperationException("End time must be after start time.");
+
+                coupon.Description = request.Description?.Trim();
+                coupon.EndTime = request.EndTime;
+                coupon.MaxUsage = request.MaxUsage;
             }
+            else
+            {
+                // Unused coupon: allow full update
+                // Normalize coupon code: remove all whitespace and convert to uppercase
+                request.CouponCode = string.Concat(request.CouponCode.Split()).ToUpper();
 
-            // Validate date range
-            if (request.EndTime <= request.StartTime)
-                throw new InvalidOperationException("End time must be after start time.");
+                // Validate coupon code minimum length
+                if (request.CouponCode.Length < 3)
+                    throw new InvalidOperationException("Coupon code must be at least 3 characters.");
 
-            // Validate discount value for percent type
-            if (request.Type == "PERCENT" && (request.DiscountValue < 0 || request.DiscountValue > 100))
-                throw new InvalidOperationException("Discount percentage must be between 0 and 100%.");
+                // Validate coupon code uniqueness (if changed)
+                if (coupon.CouponCode.ToLower() != request.CouponCode.ToLower())
+                {
+                    var existingCoupon = await _couponRepository.GetByCodeAsync(request.CouponCode, ct);
+                    if (existingCoupon != null)
+                        throw new InvalidOperationException($"Coupon with code '{request.CouponCode}' already exists.");
+                }
 
-            // Get lookup value IDs (throws KeyNotFoundException if not found)
-            var typeLvId = await _lookupResolver.GetIdAsync(
-                (ushort)LookupTypeEnum.CouponType,
-                request.Type,
-                ct);
+                // Validate date range
+                if (request.EndTime <= request.StartTime)
+                    throw new InvalidOperationException("End time must be after start time.");
 
-            // Update coupon — status is not changed on update (use disable/activate endpoints)
-            coupon.CouponCode = request.CouponCode;
-            coupon.CouponName = request.CouponName.Trim();
-            coupon.Description = request.Description?.Trim();
-            coupon.StartTime = request.StartTime;
-            coupon.EndTime = request.EndTime;
-            coupon.DiscountValue = request.DiscountValue;
-            coupon.MaxUsage = request.MaxUsage;
-            coupon.TypeLvId = typeLvId;
+                // Validate discount value for percent type
+                if (request.Type == "PERCENT" && (request.DiscountValue < 0 || request.DiscountValue > 100))
+                    throw new InvalidOperationException("Discount percentage must be between 0 and 100%.");
+
+                // Get lookup value IDs (throws KeyNotFoundException if not found)
+                var typeLvId = await _lookupResolver.GetIdAsync(
+                    (ushort)LookupTypeEnum.CouponType,
+                    request.Type,
+                    ct);
+
+                // Update coupon — status is not changed on update (use disable/activate endpoints)
+                coupon.CouponCode = request.CouponCode;
+                coupon.CouponName = request.CouponName.Trim();
+                coupon.Description = request.Description?.Trim();
+                coupon.StartTime = request.StartTime;
+                coupon.EndTime = request.EndTime;
+                coupon.DiscountValue = request.DiscountValue;
+                coupon.MaxUsage = request.MaxUsage;
+                coupon.TypeLvId = typeLvId;
+            }
 
             var updatedCoupon = await _couponRepository.UpdateAsync(coupon, ct);
 

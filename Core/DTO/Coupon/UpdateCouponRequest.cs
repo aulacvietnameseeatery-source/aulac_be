@@ -8,6 +8,7 @@ namespace Core.DTO.Coupon;
 public class UpdateCouponRequest
 {
     [Required(ErrorMessage = "Coupon code is required")]
+    [MinLength(3, ErrorMessage = "Coupon code must be at least 3 characters")]
     [MaxLength(50, ErrorMessage = "Coupon code cannot exceed 50 characters")]
     public string CouponCode { get; set; } = string.Empty;
 
