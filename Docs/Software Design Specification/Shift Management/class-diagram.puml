@@ -2,12 +2,6 @@
 title Shift Management Module - Specification Class Diagram
 skinparam classAttributeIconSize 0
 
-enum ShiftTypeCode {
-    MORNING
-    LUNCH
-    EVENING
-}
-
 enum ShiftAssignmentStatusCode {
     DRAFT
     ASSIGNED
@@ -580,6 +574,18 @@ AttendanceService ..|> IAttendanceService : implements
 ShiftController --> IShiftTemplateService : uses for template operations
 ShiftController --> IShiftAssignmentService : uses for assignment operations
 ShiftController --> IAttendanceService : uses for attendance operations
+ShiftController ..> CreateShiftTemplateRequest : receives template creation request
+ShiftController ..> UpdateShiftTemplateRequest : receives template update request
+ShiftController ..> GetShiftAssignmentRequest : receives assignment query request
+ShiftController ..> CreateShiftAssignmentRequest : receives assignment creation request
+ShiftController ..> UpdateShiftAssignmentRequest : receives assignment update request
+ShiftController ..> BulkCreateAssignmentRequest : receives bulk assignment request
+ShiftController ..> PublishAssignmentsRequest : receives publish request
+ShiftController ..> CopyWeekRequest : receives copy-week request
+ShiftController ..> ReassignRequest : receives reassignment request
+ShiftController ..> AdjustAttendanceRequest : receives attendance adjustment request
+ShiftController ..> AttendanceReportRequest : receives attendance report request
+ShiftController ..> TeamScheduleRequest : receives team schedule request
 
 ' === Service dependencies ===
 
@@ -593,6 +599,7 @@ ShiftAssignmentService --> IUnitOfWork : uses for transaction management
 ShiftAssignmentService --> INotificationService : uses for staff notifications
 ShiftAssignmentService --> ILookupResolver : uses for status code resolution
 ShiftAssignmentService --> IShiftLiveRealtimePublisher : uses for real-time events
+ShiftAssignmentService ..> ShiftAssignmentStatusCode : uses assignment status codes
 AttendanceService --> IAttendanceRepository : uses for persistence
 AttendanceService --> IShiftAssignmentRepository : uses for assignment lookup
 AttendanceService --> IUnitOfWork : uses for transaction management
@@ -600,5 +607,31 @@ AttendanceService --> ILookupResolver : uses for status code resolution
 AttendanceService --> INotificationService : uses for attendance notifications
 AttendanceService --> IShiftSettingsProvider : uses for attendance rules
 AttendanceService --> IShiftLiveRealtimePublisher : uses for real-time events
+AttendanceService ..> AttendanceStatusCode : uses attendance status codes
+IShiftTemplateService ..> ShiftTemplateListDto : exposes template list contract
+IShiftTemplateService ..> ShiftTemplateDetailDto : exposes template detail contract
+IShiftTemplateService ..> CreateShiftTemplateRequest : defines template creation contract
+IShiftTemplateService ..> UpdateShiftTemplateRequest : defines template update contract
+IShiftAssignmentService ..> GetShiftAssignmentRequest : defines assignment query contract
+IShiftAssignmentService ..> CreateShiftAssignmentRequest : defines assignment creation contract
+IShiftAssignmentService ..> BulkCreateAssignmentRequest : defines bulk assignment contract
+IShiftAssignmentService ..> UpdateShiftAssignmentRequest : defines assignment update contract
+IShiftAssignmentService ..> PublishAssignmentsRequest : defines publish contract
+IShiftAssignmentService ..> CopyWeekRequest : defines copy-week contract
+IShiftAssignmentService ..> ReassignRequest : defines reassignment contract
+IShiftAssignmentService ..> TeamScheduleRequest : defines team schedule contract
+IShiftAssignmentService ..> ShiftAssignmentListDto : exposes assignment list contract
+IShiftAssignmentService ..> ShiftAssignmentDetailDto : exposes assignment detail contract
+IShiftAssignmentService ..> ShiftLiveBoardItemDto : exposes live board contract
+IAttendanceService ..> AdjustAttendanceRequest : defines attendance adjustment contract
+IAttendanceService ..> AttendanceReportRequest : defines attendance report contract
+IAttendanceService ..> AttendanceRecordDto : exposes attendance detail contract
+IAttendanceService ..> AttendanceReportRowDto : exposes attendance report contract
+IAttendanceService ..> WorkedHoursReportRowDto : exposes worked-hours report contract
+IAttendanceService ..> AttendanceExceptionReportRowDto : exposes exception report contract
+IAttendanceService ..> ShiftReportSnapshotDto : exposes report snapshot contract
+IShiftAssignmentRepository ..> GetShiftAssignmentRequest : accepts assignment filter criteria
+IShiftAssignmentRepository ..> AttendanceReportRequest : accepts attendance report criteria
+IShiftLiveRealtimePublisher ..> ShiftLiveRealtimeEventDto : publishes live board events
 
 @enduml

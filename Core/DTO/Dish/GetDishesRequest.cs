@@ -23,5 +23,7 @@ namespace Core.DTO.Dish
 
         // view context
         public bool IsCustomerView { get; set; } = false;
+
+        public string? Locale { get; set; }
     }
 }

@@ -44,19 +44,37 @@ public class DishRepository : IDishRepository
             .AsNoTracking()
             .AsQueryable();
 
-        // Logic Searching 
+        // 1. Logic Searching 
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
-            var searchTerm = request.Search.Trim().ToLower();
+            var searchTerm = $"%{request.Search.Trim()}%";
+
+            var currentLocale = !string.IsNullOrWhiteSpace(request.Locale) ? request.Locale.ToLower() : "en";
+
             query = query.Where(d =>
-                d.DishName.ToLower().Contains(searchTerm) ||
-                (d.Description != null && d.Description.ToLower().Contains(searchTerm)) ||
-                (d.Category != null && d.Category.CategoryName.ToLower().Contains(searchTerm))
+                (currentLocale == "en" && (
+                    EF.Functions.Like(d.DishName, searchTerm) ||
+                    (d.Category != null && EF.Functions.Like(d.Category.CategoryName, searchTerm))
+                ))
+                ||
+                (currentLocale != "en" && (
+                    (d.DishNameText != null && d.DishNameText.I18nTranslations.Any(t =>
+                        t.LangCode == currentLocale && EF.Functions.Like(t.TranslatedText, searchTerm)))
+                    ||
+                    (d.Category != null && d.Category.CategoryNameText != null && d.Category.CategoryNameText.I18nTranslations.Any(t =>
+                        t.LangCode == currentLocale && EF.Functions.Like(t.TranslatedText, searchTerm)))
+                ))
             );
         }
 
+        // 2. Logic Filtering Category 
+        if (!string.IsNullOrWhiteSpace(request.Category) && request.Category != "All")
+        {
+            var targetCategory = request.Category.Trim().ToLower();
+            query = query.Where(d => d.Category != null && d.Category.CategoryName.ToLower() == targetCategory);
+        }
 
-        //  Filter Customer
+        // 3. Logic Filtering Status (Customer / Admin)
         if (request.IsCustomerView)
         {
             var availableCode = DishStatusCode.AVAILABLE.ToString();
@@ -82,7 +100,7 @@ public class DishRepository : IDishRepository
             }
         }
 
-        // Logic Sorting
+        // 4. Logic Sorting
         if (string.IsNullOrWhiteSpace(request.SortBy))
         {
             query = query.OrderByDescending(d => d.DishId);
@@ -107,8 +125,7 @@ public class DishRepository : IDishRepository
             }
         }
 
-        // Pagination 
-
+        // 5. Pagination 
         var totalCount = await query.CountAsync(cancellationToken);
 
         var pageIndex = request.PageIndex < 1 ? 1 : request.PageIndex;

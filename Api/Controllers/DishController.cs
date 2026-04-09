@@ -113,6 +113,13 @@ public class DishController : ControllerBase
         [FromQuery] GetDishesRequest request,
         CancellationToken cancellationToken)
     {
+        var rawLocale = Request.Headers["x-locale"].FirstOrDefault()
+                     ?? Request.Headers["Accept-Language"].FirstOrDefault()
+                     ?? "en";
+
+        request.Locale = rawLocale.Split('-')[0].ToLower();
+
+
         var (items, totalCount) = await _dishService.GetDishesForAdminAsync(request, cancellationToken);
 
         var pagedResult = new PagedResult<DishManagementDto>
@@ -136,7 +143,7 @@ public class DishController : ControllerBase
         });
     }
 
-    // --- 2. CUSTOMER ENDPOINT (Menu hiển thị) ---
+    // --- 2. CUSTOMER ENDPOINT ---
     [HttpGet("menu")]
     [AllowAnonymous] 
     [ProducesResponseType(typeof(ApiResponse<PagedResult<DishDisplayDto>>), StatusCodes.Status200OK)]
