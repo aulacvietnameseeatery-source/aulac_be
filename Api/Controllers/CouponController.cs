@@ -26,7 +26,12 @@ namespace Api.Controllers
         /// <summary>
         /// Get active coupons (for public use)
         /// </summary>
+        /// <param name="customerId">Optional customer ID to filter applicable coupons</param>
+        /// <param name="ct">Cancellation token</param>
+        /// <returns>List of active coupons</returns>
+        /// <response code="200">Coupons retrieved successfully</response>
         [HttpGet]
+        [ProducesResponseType(typeof(ApiResponse<List<CouponDTO>>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetCoupons([FromQuery] long? customerId, CancellationToken ct)
         {
             var result = await _couponService.GetCouponsAsync(customerId, ct);
@@ -38,13 +43,17 @@ namespace Api.Controllers
                 SubCode = 0,
                 UserMessage = "Get coupons successfully",
                 Data = result,
-                ServerTime = DateTimeOffset.Now
+                ServerTime = DateTimeOffset.UtcNow
             });
         }
 
         /// <summary>
         /// Get paginated coupons list with filtering and search
         /// </summary>
+        /// <param name="query">Filter and pagination parameters</param>
+        /// <param name="ct">Cancellation token</param>
+        /// <returns>Paginated list of coupons</returns>
+        /// <response code="200">Coupons list retrieved successfully</response>
         [HttpGet("list")]
         [HasPermission(Permissions.ViewCoupon)]
         [ProducesResponseType(typeof(ApiResponse<PagedResultDTO<CouponDTO>>), StatusCodes.Status200OK)]
@@ -61,7 +70,7 @@ namespace Api.Controllers
                 SubCode = 0,
                 UserMessage = "Get coupons list successfully",
                 Data = result,
-                ServerTime = DateTimeOffset.Now
+                ServerTime = DateTimeOffset.UtcNow
             });
         }
 
@@ -114,11 +123,13 @@ namespace Api.Controllers
         /// <param name="ct">Cancellation token</param>
         /// <returns>Created coupon</returns>
         /// <response code="201">Coupon created successfully</response>
-        /// <response code="400">Invalid request or coupon code already exists</response>
+        /// <response code="400">Invalid request</response>
+        /// <response code="409">Coupon code already exists</response>
         [HttpPost]
         [HasPermission(Permissions.CreateCoupon)]
         [ProducesResponseType(typeof(ApiResponse<CouponDTO>), StatusCodes.Status201Created)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
         public async Task<IActionResult> CreateCoupon(
             [FromBody] CreateCouponRequest request,
             CancellationToken ct)
@@ -138,6 +149,18 @@ namespace Api.Controllers
                         Data = coupon,
                         ServerTime = DateTimeOffset.UtcNow
                     });
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("already exists"))
+            {
+                _logger.LogWarning(ex, "Failed to create coupon");
+                return Conflict(new ApiResponse<object>
+                {
+                    Success = false,
+                    Code = 409,
+                    UserMessage = ex.Message,
+                    Data = default!,
+                    ServerTime = DateTimeOffset.UtcNow
+                });
             }
             catch (InvalidOperationException ex)
             {
@@ -161,13 +184,15 @@ namespace Api.Controllers
         /// <param name="ct">Cancellation token</param>
         /// <returns>Updated coupon</returns>
         /// <response code="200">Coupon updated successfully</response>
-        /// <response code="400">Invalid request or coupon code already exists</response>
+        /// <response code="400">Invalid request</response>
         /// <response code="404">Coupon not found</response>
+        /// <response code="409">Coupon code already exists</response>
         [HttpPut("{id}")]
         [HasPermission(Permissions.EditCoupon)]
         [ProducesResponseType(typeof(ApiResponse<CouponDTO>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
         public async Task<IActionResult> UpdateCoupon(
             long id,
             [FromBody] UpdateCouponRequest request,
@@ -193,6 +218,18 @@ namespace Api.Controllers
                 {
                     Success = false,
                     Code = 404,
+                    UserMessage = ex.Message,
+                    Data = default!,
+                    ServerTime = DateTimeOffset.UtcNow
+                });
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("already exists"))
+            {
+                _logger.LogWarning(ex, "Failed to update coupon");
+                return Conflict(new ApiResponse<object>
+                {
+                    Success = false,
+                    Code = 409,
                     UserMessage = ex.Message,
                     Data = default!,
                     ServerTime = DateTimeOffset.UtcNow
@@ -254,6 +291,82 @@ namespace Api.Controllers
                 {
                     Success = false,
                     Code = 400,
+                    UserMessage = ex.Message,
+                    Data = default!,
+                    ServerTime = DateTimeOffset.UtcNow
+                });
+            }
+        }
+
+        /// <summary>
+        /// Disable a coupon
+        /// </summary>
+        /// <param name="id">Coupon ID</param>
+        /// <param name="ct">Cancellation token</param>
+        /// <returns>Success status</returns>
+        /// <response code="200">Coupon disabled successfully</response>
+        /// <response code="404">Coupon not found</response>
+        [HttpPut("{id}/disable")]
+        [HasPermission(Permissions.EditCoupon)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> DisableCoupon(long id, CancellationToken ct)
+        {
+            try
+            {
+                await _couponService.DisableCouponAsync(id, ct);
+                return Ok(new ApiResponse<object>
+                {
+                    Success = true,
+                    Code = 200,
+                    UserMessage = "Coupon disabled successfully.",
+                    ServerTime = DateTimeOffset.UtcNow
+                });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new ApiResponse<object>
+                {
+                    Success = false,
+                    Code = 404,
+                    UserMessage = ex.Message,
+                    Data = default!,
+                    ServerTime = DateTimeOffset.UtcNow
+                });
+            }
+        }
+
+        /// <summary>
+        /// Activate a coupon
+        /// </summary>
+        /// <param name="id">Coupon ID</param>
+        /// <param name="ct">Cancellation token</param>
+        /// <returns>Success status</returns>
+        /// <response code="200">Coupon activated successfully</response>
+        /// <response code="404">Coupon not found</response>
+        [HttpPut("{id}/activate")]
+        [HasPermission(Permissions.EditCoupon)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> ActivateCoupon(long id, CancellationToken ct)
+        {
+            try
+            {
+                await _couponService.ActivateCouponAsync(id, ct);
+                return Ok(new ApiResponse<object>
+                {
+                    Success = true,
+                    Code = 200,
+                    UserMessage = "Coupon activated successfully.",
+                    ServerTime = DateTimeOffset.UtcNow
+                });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new ApiResponse<object>
+                {
+                    Success = false,
+                    Code = 404,
                     UserMessage = ex.Message,
                     Data = default!,
                     ServerTime = DateTimeOffset.UtcNow

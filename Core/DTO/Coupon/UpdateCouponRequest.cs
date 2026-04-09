@@ -8,6 +8,7 @@ namespace Core.DTO.Coupon;
 public class UpdateCouponRequest
 {
     [Required(ErrorMessage = "Coupon code is required")]
+    [MinLength(3, ErrorMessage = "Coupon code must be at least 3 characters")]
     [MaxLength(50, ErrorMessage = "Coupon code cannot exceed 50 characters")]
     public string CouponCode { get; set; } = string.Empty;
 
@@ -34,8 +35,4 @@ public class UpdateCouponRequest
     [Required(ErrorMessage = "Type is required")]
     [RegularExpression("^(FIXED_AMOUNT|PERCENT)$", ErrorMessage = "Type must be either FIXED_AMOUNT or PERCENT")]
     public string Type { get; set; } = string.Empty;
-
-    [Required(ErrorMessage = "Status is required")]
-    [RegularExpression("^(ACTIVE|DISABLED|SCHEDULED|EXPIRED)$", ErrorMessage = "Invalid coupon status")]
-    public string CouponStatus { get; set; } = string.Empty;
 }

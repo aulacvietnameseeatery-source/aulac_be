@@ -1,6 +1,7 @@
 using Core.DTO.Coupon;
 using Core.DTO.General;
 using Core.Entity;
+using Core.Enum;
 using Core.Interface.Repo;
 using Core.Interface.Service.Coupon;
 using Core.Interface.Service.Entity;
@@ -86,6 +87,10 @@ namespace Core.Service
             // Normalize coupon code: remove all whitespace and convert to uppercase
             request.CouponCode = string.Concat(request.CouponCode.Split()).ToUpper();
 
+            // Validate coupon code minimum length
+            if (request.CouponCode.Length < 3)
+                throw new InvalidOperationException("Coupon code must be at least 3 characters.");
+
             // Validate coupon code uniqueness
             var existingCoupon = await _couponRepository.GetByCodeAsync(request.CouponCode, ct);
             if (existingCoupon != null)
@@ -101,12 +106,14 @@ namespace Core.Service
 
             // Get lookup value IDs (throws KeyNotFoundException if not found)
             var typeLvId = await _lookupResolver.GetIdAsync(
-                (ushort)LookupTypeEnum.CouponType, 
-                request.Type, 
+                (ushort)LookupTypeEnum.CouponType,
+                request.Type,
                 ct);
+
+            var status = CalculateStatus(request.StartTime, request.EndTime);
             var statusLvId = await _lookupResolver.GetIdAsync(
-                (ushort)LookupTypeEnum.CouponStatus, 
-                request.CouponStatus, 
+                (ushort)LookupTypeEnum.CouponStatus,
+                status,
                 ct);
 
             var coupon = new Coupon
@@ -147,45 +154,64 @@ namespace Core.Service
             if (coupon == null)
                 throw new KeyNotFoundException($"Coupon with ID {id} not found.");
 
-            // Normalize coupon code: remove all whitespace and convert to uppercase
-            request.CouponCode = string.Concat(request.CouponCode.Split()).ToUpper();
+            // If coupon is expired, do not allow any updates
+            if (coupon.EndTime < DateTime.UtcNow)
+                throw new InvalidOperationException("Cannot update an expired coupon.");
 
-            // Validate coupon code uniqueness (if changed)
-            if (coupon.CouponCode.ToLower() != request.CouponCode.ToLower())
+            var isUsed = coupon.UsedCount > 0;
+
+            if (isUsed)
             {
-                var existingCoupon = await _couponRepository.GetByCodeAsync(request.CouponCode, ct);
-                if (existingCoupon != null)
-                    throw new InvalidOperationException($"Coupon with code '{request.CouponCode}' already exists.");
+                // Used coupon: only allow updating Description, EndTime, MaxUsage
+                if (request.EndTime <= coupon.StartTime)
+                    throw new InvalidOperationException("End time must be after start time.");
+
+                coupon.Description = request.Description?.Trim();
+                coupon.EndTime = request.EndTime;
+                coupon.MaxUsage = request.MaxUsage;
             }
+            else
+            {
+                // Unused coupon: allow full update
+                // Normalize coupon code: remove all whitespace and convert to uppercase
+                request.CouponCode = string.Concat(request.CouponCode.Split()).ToUpper();
 
-            // Validate date range
-            if (request.EndTime <= request.StartTime)
-                throw new InvalidOperationException("End time must be after start time.");
+                // Validate coupon code minimum length
+                if (request.CouponCode.Length < 3)
+                    throw new InvalidOperationException("Coupon code must be at least 3 characters.");
 
-            // Validate discount value for percent type
-            if (request.Type == "PERCENT" && (request.DiscountValue < 0 || request.DiscountValue > 100))
-                throw new InvalidOperationException("Discount percentage must be between 0 and 100%.");
+                // Validate coupon code uniqueness (if changed)
+                if (coupon.CouponCode.ToLower() != request.CouponCode.ToLower())
+                {
+                    var existingCoupon = await _couponRepository.GetByCodeAsync(request.CouponCode, ct);
+                    if (existingCoupon != null)
+                        throw new InvalidOperationException($"Coupon with code '{request.CouponCode}' already exists.");
+                }
 
-            // Get lookup value IDs (throws KeyNotFoundException if not found)
-            var typeLvId = await _lookupResolver.GetIdAsync(
-                (ushort)LookupTypeEnum.CouponType, 
-                request.Type, 
-                ct);
-            var statusLvId = await _lookupResolver.GetIdAsync(
-                (ushort)LookupTypeEnum.CouponStatus, 
-                request.CouponStatus, 
-                ct);
+                // Validate date range
+                if (request.EndTime <= request.StartTime)
+                    throw new InvalidOperationException("End time must be after start time.");
 
-            // Update coupon
-            coupon.CouponCode = request.CouponCode;
-            coupon.CouponName = request.CouponName.Trim();
-            coupon.Description = request.Description?.Trim();
-            coupon.StartTime = request.StartTime;
-            coupon.EndTime = request.EndTime;
-            coupon.DiscountValue = request.DiscountValue;
-            coupon.MaxUsage = request.MaxUsage;
-            coupon.TypeLvId = typeLvId;
-            coupon.CouponStatusLvId = statusLvId;
+                // Validate discount value for percent type
+                if (request.Type == "PERCENT" && (request.DiscountValue < 0 || request.DiscountValue > 100))
+                    throw new InvalidOperationException("Discount percentage must be between 0 and 100%.");
+
+                // Get lookup value IDs (throws KeyNotFoundException if not found)
+                var typeLvId = await _lookupResolver.GetIdAsync(
+                    (ushort)LookupTypeEnum.CouponType,
+                    request.Type,
+                    ct);
+
+                // Update coupon — status is not changed on update (use disable/activate endpoints)
+                coupon.CouponCode = request.CouponCode;
+                coupon.CouponName = request.CouponName.Trim();
+                coupon.Description = request.Description?.Trim();
+                coupon.StartTime = request.StartTime;
+                coupon.EndTime = request.EndTime;
+                coupon.DiscountValue = request.DiscountValue;
+                coupon.MaxUsage = request.MaxUsage;
+                coupon.TypeLvId = typeLvId;
+            }
 
             var updatedCoupon = await _couponRepository.UpdateAsync(coupon, ct);
 
@@ -217,6 +243,50 @@ namespace Core.Service
             var deleted = await _couponRepository.DeleteAsync(id, ct);
             if (!deleted)
                 throw new KeyNotFoundException($"Failed to delete coupon with ID {id}.");
+        }
+
+        public async Task DisableCouponAsync(long id, CancellationToken ct)
+        {
+            var coupon = await _couponRepository.GetByIdAsync(id, ct);
+            if (coupon == null)
+                throw new KeyNotFoundException($"Coupon with ID {id} not found.");
+
+            var disableStatusId = await _lookupResolver.GetIdAsync(
+                (ushort)LookupTypeEnum.CouponStatus,
+                CouponStatusCode.DISABLED,
+                ct);
+
+            coupon.CouponStatusLvId = disableStatusId;
+            await _couponRepository.UpdateAsync(coupon, ct);
+        }
+
+        public async Task ActivateCouponAsync(long id, CancellationToken ct)
+        {
+            var coupon = await _couponRepository.GetByIdAsync(id, ct);
+            if (coupon == null)
+                throw new KeyNotFoundException($"Coupon with ID {id} not found.");
+
+            var status = CalculateStatus(coupon.StartTime, coupon.EndTime);
+            var statusId = await _lookupResolver.GetIdAsync(
+                (ushort)LookupTypeEnum.CouponStatus,
+                status,
+                ct);
+
+            coupon.CouponStatusLvId = statusId;
+            await _couponRepository.UpdateAsync(coupon, ct);
+        }
+
+        private CouponStatusCode CalculateStatus(DateTime start, DateTime end)
+        {
+            var now = DateTime.UtcNow;
+
+            if (now < start)
+                return CouponStatusCode.SCHEDULED;
+
+            if (now >= start && now <= end)
+                return CouponStatusCode.ACTIVE;
+
+            return CouponStatusCode.EXPIRED;
         }
     }
 }

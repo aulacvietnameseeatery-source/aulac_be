@@ -11,5 +11,7 @@ namespace Core.Interface.Service.Coupon
         Task<CouponDTO> CreateCouponAsync(CreateCouponRequest request, CancellationToken ct);
         Task<CouponDTO> UpdateCouponAsync(long id, UpdateCouponRequest request, CancellationToken ct);
         Task DeleteCouponAsync(long id, CancellationToken ct);
+        Task DisableCouponAsync(long id, CancellationToken ct);
+        Task ActivateCouponAsync(long id, CancellationToken ct);
     }
 }
