@@ -74,23 +74,20 @@ public class ReservationRepository : IReservationRepository
     }
 
     public async Task<(List<ReservationManagementDto> Items, int TotalCount)> GetReservationsAsync(
-        GetReservationsRequest request,
-        CancellationToken cancellationToken = default)
+    GetReservationsRequest request,
+    CancellationToken cancellationToken = default)
     {
         // 1. Khởi tạo Query
         var query = _context.Reservations
-            .Include(r => r.ReservationStatusLv) 
+            .Include(r => r.ReservationStatusLv)
             .Include(r => r.Tables)
             .AsNoTracking()
             .AsQueryable();
 
         // 2. Filter theo Ngày (Date)
-        // Mặc định nếu không truyền Date thì có thể lấy tất cả hoặc logic tùy chọn. 
-        // Ở đây ta check HasValue như yêu cầu.
         if (request.Date.HasValue)
         {
             var filterDate = request.Date.Value.Date;
-            // So sánh phần ngày: ReservedTime >= 00:00 và < 23:59 của ngày đó
             query = query.Where(r => r.ReservedTime.Date == filterDate);
         }
 
@@ -111,10 +108,37 @@ public class ReservationRepository : IReservationRepository
             );
         }
 
-        // 5. Sorting (Mặc định sắp xếp theo ngày tạo mới nhất)
-        query = query
-            .OrderByDescending(r => r.CreatedAt ?? DateTime.MinValue)
-            .ThenByDescending(r => r.ReservationId);
+        if (request.TableId.HasValue)
+        {
+            query = query.Where(r => r.Tables.Any(t => t.TableId == request.TableId.Value));
+        }
+
+        // ----------------------------------------------------
+        // 4.2 Filter  (CreatorId / StaffId)
+        // ----------------------------------------------------
+        if (request.CreatorId.HasValue)
+        {
+            
+            // query = query.Where(r => r.CreatedBy == request.CreatorId.Value); 
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.SortBy))
+        {
+            if (request.SortBy.Equals("reservedDate", StringComparison.OrdinalIgnoreCase))
+            {
+                query = query.OrderByDescending(r => r.ReservedTime);
+            }
+            else
+            {
+                query = query.OrderByDescending(r => r.CreatedAt ?? DateTime.MinValue);
+            }
+        }
+        else
+        {
+            query = query.OrderByDescending(r => r.CreatedAt ?? DateTime.MinValue);
+        }
+
+        query = ((IOrderedQueryable<Reservation>)query).ThenByDescending(r => r.ReservationId);
 
         // 6. Pagination
         var totalCount = await query.CountAsync(cancellationToken);
@@ -130,15 +154,10 @@ public class ReservationRepository : IReservationRepository
                 Phone = r.Phone,
                 Email = r.Email,
                 Pax = r.PartySize,
-
-                // Map Status
                 StatusId = r.ReservationStatusLvId,
                 StatusName = r.ReservationStatusLv.ValueName,
                 TableName = string.Join(", ", r.Tables.Select(t => t.TableCode)),
-
-                // Pre-order: Tạm thời để null vì chưa có liên kết DB
                 PreOrderSummary = null,
-
                 CreatedAt = r.CreatedAt
             })
             .ToListAsync(cancellationToken);
