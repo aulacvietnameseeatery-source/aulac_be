@@ -317,6 +317,17 @@ namespace Api.Controllers
 				ServerTime = DateTimeOffset.Now
 			});
 		}
+		catch (InvalidOperationException ex)
+		{
+			return BadRequest(new ApiResponse<object>
+			{
+				Success = false,
+				Code = 400,
+				SubCode = 2,
+				UserMessage = ex.Message,
+				ServerTime = DateTimeOffset.Now
+			});
+		}
 	}
 
 	/// <summary>

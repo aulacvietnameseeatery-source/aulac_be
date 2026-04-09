@@ -12,5 +12,6 @@ namespace Core.Interface.Service.Others
         Task OrderCreatedAsync(OrderRealtimeDTO data);
         Task OrderUpdatedAsync(OrderRealtimeDTO data);
         Task OrderItemUpdatedAsync(OrderItemRealtimeDTO data);
+        Task OrderPaidAsync(long orderId);
     }
 }
