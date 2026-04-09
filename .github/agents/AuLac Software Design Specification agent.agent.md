@@ -669,10 +669,17 @@ end
 
 Each output file must contain **only raw PlantUML syntax** with `@startuml` / `@enduml` markers and no Markdown wrapper and no prose.
 
+Immediately after `@startuml`, always add:
+
+```plantuml
+skinparam linetype ortho
+```
+
 ### Class Diagram Example
 
 ```plantuml
 @startuml
+skinparam linetype ortho
 interface IShiftTemplateService {
     +GetAllAsync(isActive: bool?): List<ShiftTemplateListDto>
     +CreateAsync(request: CreateShiftTemplateRequest, staffId: long): ShiftTemplateDetailDto
@@ -695,6 +702,7 @@ ShiftTemplate "1" *-- "0..*" ShiftAssignment : contains assignments
 
 ```plantuml
 @startuml
+skinparam linetype ortho
 autonumber
 actor Client
 participant "ShiftController" as Ctrl

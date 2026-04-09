@@ -1,637 +1,590 @@
 @startuml
+skinparam linetype ortho
 title Shift Management Module - Specification Class Diagram
-skinparam classAttributeIconSize 0
+left to right direction
 
-enum ShiftAssignmentStatusCode {
-    DRAFT
-    ASSIGNED
-    CONFIRMED
-    CANCELLED
+' ══════════════════════════════════════════════════════════════
+'  PRESENTATION LAYER
+' ══════════════════════════════════════════════════════════════
+
+package "Presentation Layer" {
+
+    class ShiftController {
+        -_templateService: IShiftTemplateService
+        -_assignmentService: IShiftAssignmentService
+        -_attendanceService: IAttendanceService
+        -GetStaffId(): long
+        +GetTemplates(isActive: bool?): IActionResult
+        +GetTemplate(id: long): IActionResult
+        +CreateTemplate(request: CreateShiftTemplateRequest): IActionResult
+        +UpdateTemplate(id: long, request: UpdateShiftTemplateRequest): IActionResult
+        +DeactivateTemplate(id: long): IActionResult
+        +GetAssignments(request: GetShiftAssignmentRequest): IActionResult
+        +GetAssignment(id: long): IActionResult
+        +CreateAssignment(request: CreateShiftAssignmentRequest): IActionResult
+        +UpdateAssignment(id: long, request: UpdateShiftAssignmentRequest): IActionResult
+        +CancelAssignment(id: long): IActionResult
+        +BulkCreateAssignment(request: BulkCreateAssignmentRequest): IActionResult
+        +PublishAssignments(request: PublishAssignmentsRequest): IActionResult
+        +CopyWeek(request: CopyWeekRequest): IActionResult
+        +ReassignAssignment(id: long, request: ReassignRequest): IActionResult
+        +ConfirmAssignment(id: long): IActionResult
+        +GetTeamSchedule(request: TeamScheduleRequest): IActionResult
+        +GetMyShifts(request: GetShiftAssignmentRequest): IActionResult
+        +GetLiveBoard(request: GetShiftAssignmentRequest): IActionResult
+        +CheckIn(id: long): IActionResult
+        +CheckOut(id: long): IActionResult
+        +AdjustAttendance(id: long, request: AdjustAttendanceRequest): IActionResult
+        +GetReportSnapshot(fromDate: DateOnly, toDate: DateOnly): IActionResult
+        +GetAttendanceReport(request: AttendanceReportRequest): IActionResult
+        +GetWorkedHoursReport(fromDate: DateOnly, toDate: DateOnly, staffId: long?): IActionResult
+        +GetExceptionsReport(fromDate: DateOnly, toDate: DateOnly, staffId: long?): IActionResult
+    }
+
+    ' ── Template Request/Response DTOs ──
+
+    class CreateShiftTemplateRequest <<DTO>> {
+        +TemplateName: string
+        +DefaultStartTime: TimeOnly
+        +DefaultEndTime: TimeOnly
+        +Description: string?
+        +BufferBeforeMinutes: int?
+        +BufferAfterMinutes: int?
+    }
+
+    class UpdateShiftTemplateRequest <<DTO>> {
+        +TemplateName: string?
+        +DefaultStartTime: TimeOnly?
+        +DefaultEndTime: TimeOnly?
+        +Description: string?
+        +IsActive: bool?
+        +BufferBeforeMinutes: int?
+        +BufferAfterMinutes: int?
+    }
+
+    class GetShiftTemplateRequest <<DTO>> {
+        +IsActive: bool?
+        +PageIndex: int
+        +PageSize: int
+    }
+
+    class ShiftTemplateListDto <<DTO>> {
+        +ShiftTemplateId: long
+        +TemplateName: string
+        +DefaultStartTime: TimeOnly
+        +DefaultEndTime: TimeOnly
+        +Description: string?
+        +BufferBeforeMinutes: int?
+        +BufferAfterMinutes: int?
+        +IsActive: bool
+        +CreatedAt: DateTime
+    }
+
+    class ShiftTemplateDetailDto <<DTO>> {
+        +CreatedByName: string
+        +UpdatedByName: string?
+        +UpdatedAt: DateTime
+    }
+
+    ' ── Assignment Request/Response DTOs ──
+
+    class GetShiftAssignmentRequest <<DTO>> {
+        +StaffId: long?
+        +ShiftTemplateId: long?
+        +FromDate: DateOnly?
+        +ToDate: DateOnly?
+        +IsActive: bool?
+        +AssignmentStatusCode: string?
+        +PageIndex: int
+        +PageSize: int
+    }
+
+    class CreateShiftAssignmentRequest <<DTO>> {
+        +ShiftTemplateId: long
+        +StaffId: long
+        +WorkDate: DateOnly
+        +PlannedStartAt: DateTime?
+        +PlannedEndAt: DateTime?
+        +Notes: string?
+        +Tags: string?
+        +IsDraft: bool
+    }
+
+    class BulkCreateAssignmentRequest <<DTO>> {
+        +ShiftTemplateId: long
+        +StaffIds: List<long>
+        +WorkDate: DateOnly
+        +WorkDates: List<DateOnly>?
+        +PlannedStartAt: DateTime?
+        +PlannedEndAt: DateTime?
+        +Notes: string?
+        +Tags: string?
+        +IsDraft: bool
+        +GetEffectiveDates(): IReadOnlyList<DateOnly>
+    }
+
+    class PublishAssignmentsRequest <<DTO>> {
+        +AssignmentIds: List<long>?
+        +FromDate: DateOnly?
+        +ToDate: DateOnly?
+    }
+
+    class CopyWeekRequest <<DTO>> {
+        +SourceWeekStart: DateOnly
+        +TargetWeekStart: DateOnly
+        +AsDraft: bool
+    }
+
+    class ReassignRequest <<DTO>> {
+        +NewStaffId: long
+        +NewWorkDate: DateOnly?
+        +Reason: string?
+    }
+
+    class UpdateShiftAssignmentRequest <<DTO>> {
+        +PlannedStartAt: DateTime?
+        +PlannedEndAt: DateTime?
+        +Notes: string?
+        +Tags: string?
+    }
+
+    class TeamScheduleRequest <<DTO>> {
+        +WeekStart: DateOnly
+        +WeekEnd: DateOnly?
+        +ShiftTemplateId: long?
+    }
+
+    class ShiftAssignmentListDto <<DTO>> {
+        +ShiftAssignmentId: long
+        +ShiftTemplateId: long
+        +TemplateName: string
+        +StaffId: long
+        +StaffName: string
+        +WorkDate: DateOnly
+        +PlannedStartAt: DateTime
+        +PlannedEndAt: DateTime
+        +AssignmentStatusCode: string
+        +AssignmentStatusName: string
+        +IsActive: bool
+        +Tags: string?
+        +Notes: string?
+        +AssignedAt: DateTime
+        +AssignedByName: string
+    }
+
+    class ShiftAssignmentDetailDto <<DTO>> {
+        +Attendance: AttendanceRecordDto?
+    }
+
+    ' ── Attendance DTOs ──
+
+    class AdjustAttendanceRequest <<DTO>> {
+        +ActualCheckInAt: DateTime?
+        +ActualCheckOutAt: DateTime?
+        +AdjustmentReason: string
+    }
+
+    class AttendanceRecordDto <<DTO>> {
+        +AttendanceId: long
+        +ShiftAssignmentId: long
+        +AttendanceStatusCode: string
+        +AttendanceStatusName: string
+        +ActualCheckInAt: DateTime?
+        +ActualCheckOutAt: DateTime?
+        +LateMinutes: int
+        +EarlyLeaveMinutes: int
+        +WorkedMinutes: int
+        +IsManualAdjustment: bool
+        +AdjustmentReason: string?
+        +ReviewedByName: string?
+        +ReviewedAt: DateTime?
+        +TimeLogs: List<TimeLogDto>
+    }
+
+    class TimeLogDto <<DTO>> {
+        +TimeLogId: long
+        +PunchInTime: DateTime
+        +PunchOutTime: DateTime?
+        +ValidationStatus: string
+        +PunchDurationMinutes: int
+    }
+
+    ' ── Live Board DTOs ──
+
+    class ShiftLiveBoardItemDto <<DTO>> {
+        +ShiftAssignmentId: long
+        +StaffId: long
+        +StaffName: string
+        +LiveStatusCode: string
+        +LiveStatusName: string
+        +HasAlert: bool
+        +OrdersHandledCount: int?
+        +PaidBillsCount: int?
+        +CurrentRevenue: decimal?
+        +IssueCount: int
+    }
+
+    ' ── Report DTOs ──
+
+    class AttendanceReportRequest <<DTO>> {
+        +FromDate: DateOnly?
+        +ToDate: DateOnly?
+        +StaffId: long?
+        +ShiftTemplateId: long?
+        +AttendanceStatusCode: string?
+        +PageIndex: int
+        +PageSize: int
+    }
+
+    class AttendanceReportRowDto <<DTO>> {
+        +ShiftAssignmentId: long
+        +StaffId: long
+        +StaffName: string
+        +WorkDate: DateOnly
+        +AttendanceStatusCode: string
+        +LateMinutes: int
+        +WorkedMinutes: int
+    }
+
+    class WorkedHoursReportRowDto <<DTO>> {
+        +StaffId: long
+        +StaffName: string
+        +ScheduledMinutes: int
+        +WorkedMinutes: int
+        +VarianceMinutes: int
+    }
+
+    class AttendanceExceptionReportRowDto <<DTO>> {
+        +StaffId: long
+        +StaffName: string
+        +ExceptionType: string
+        +MinutesAffected: int
+        +IsManualAdjustment: bool
+    }
+
+    class ShiftReportSnapshotDto <<DTO>> {
+        +AttendanceCount: int
+        +WorkedStaffCount: int
+        +ExceptionCount: int
+    }
+
+    ShiftTemplateDetailDto --|> ShiftTemplateListDto
+    ShiftAssignmentDetailDto --|> ShiftAssignmentListDto
 }
 
-enum AttendanceStatusCode {
-    SCHEDULED
-    ACTIVE
-    COMPLETED
-    LATE
-    ABSENT
-    EARLY_LEAVE
-    EXCUSED
+' ══════════════════════════════════════════════════════════════
+'  APPLICATION LAYER
+' ══════════════════════════════════════════════════════════════
+
+package "Application Layer" {
+
+    interface IShiftTemplateService {
+        +GetAllAsync(isActive: bool?): Task<List<ShiftTemplateListDto>>
+        +GetByIdAsync(id: long): Task<ShiftTemplateDetailDto>
+        +CreateAsync(request: CreateShiftTemplateRequest, staffId: long): Task<ShiftTemplateDetailDto>
+        +UpdateAsync(id: long, request: UpdateShiftTemplateRequest, staffId: long): Task<ShiftTemplateDetailDto>
+        +DeactivateAsync(id: long): Task
+    }
+
+    class ShiftTemplateService {
+        -_templateRepo: IShiftTemplateRepository
+        -_unitOfWork: IUnitOfWork
+        +GetAllAsync(isActive: bool?): Task<List<ShiftTemplateListDto>>
+        +GetByIdAsync(id: long): Task<ShiftTemplateDetailDto>
+        +CreateAsync(request: CreateShiftTemplateRequest, staffId: long): Task<ShiftTemplateDetailDto>
+        +UpdateAsync(id: long, request: UpdateShiftTemplateRequest, staffId: long): Task<ShiftTemplateDetailDto>
+        +DeactivateAsync(id: long): Task
+    }
+
+    interface IShiftAssignmentService {
+        +GetAssignmentsAsync(request: GetShiftAssignmentRequest): Task<(List<ShiftAssignmentListDto>, int)>
+        +GetByIdAsync(id: long): Task<ShiftAssignmentDetailDto>
+        +GetLiveBoardAsync(request: GetShiftAssignmentRequest): Task<List<ShiftLiveBoardItemDto>>
+        +CreateAssignmentAsync(request: CreateShiftAssignmentRequest, staffId: long): Task<ShiftAssignmentDetailDto>
+        +BulkCreateAssignmentsAsync(request: BulkCreateAssignmentRequest, staffId: long): Task<List<ShiftAssignmentDetailDto>>
+        +UpdateAssignmentAsync(id: long, request: UpdateShiftAssignmentRequest, staffId: long): Task<ShiftAssignmentDetailDto>
+        +CancelAssignmentAsync(id: long): Task
+        +GetMyShiftsAsync(staffId: long, request: GetShiftAssignmentRequest): Task<(List<ShiftAssignmentDetailDto>, int)>
+        +PublishAssignmentsAsync(request: PublishAssignmentsRequest, staffId: long): Task<List<ShiftAssignmentListDto>>
+        +CopyWeekAsync(request: CopyWeekRequest, staffId: long): Task<List<ShiftAssignmentListDto>>
+        +ReassignAsync(id: long, request: ReassignRequest, staffId: long): Task<ShiftAssignmentDetailDto>
+        +ConfirmAssignmentAsync(id: long, staffId: long): Task<ShiftAssignmentDetailDto>
+        +GetTeamScheduleAsync(request: TeamScheduleRequest): Task<List<ShiftAssignmentListDto>>
+    }
+
+    class ShiftAssignmentService {
+        -_assignmentRepo: IShiftAssignmentRepository
+        -_templateRepo: IShiftTemplateRepository
+        -_accountRepo: IAccountRepository
+        -_orderRepository: IOrderRepository
+        -_unitOfWork: IUnitOfWork
+        -_notificationService: INotificationService
+        -_lookupResolver: ILookupResolver
+        -_options: AttendanceOptions
+        -_shiftLiveRealtimePublisher: IShiftLiveRealtimePublisher
+        +GetAssignmentsAsync(request: GetShiftAssignmentRequest): Task<(List<ShiftAssignmentListDto>, int)>
+        +GetByIdAsync(id: long): Task<ShiftAssignmentDetailDto>
+        +GetLiveBoardAsync(request: GetShiftAssignmentRequest): Task<List<ShiftLiveBoardItemDto>>
+        +CreateAssignmentAsync(request: CreateShiftAssignmentRequest, staffId: long): Task<ShiftAssignmentDetailDto>
+        +BulkCreateAssignmentsAsync(request: BulkCreateAssignmentRequest, staffId: long): Task<List<ShiftAssignmentDetailDto>>
+        +UpdateAssignmentAsync(id: long, request: UpdateShiftAssignmentRequest, staffId: long): Task<ShiftAssignmentDetailDto>
+        +CancelAssignmentAsync(id: long): Task
+        +PublishAssignmentsAsync(request: PublishAssignmentsRequest, staffId: long): Task<List<ShiftAssignmentListDto>>
+        +CopyWeekAsync(request: CopyWeekRequest, staffId: long): Task<List<ShiftAssignmentListDto>>
+        +ReassignAsync(id: long, request: ReassignRequest, staffId: long): Task<ShiftAssignmentDetailDto>
+        +ConfirmAssignmentAsync(id: long, staffId: long): Task<ShiftAssignmentDetailDto>
+        +GetTeamScheduleAsync(request: TeamScheduleRequest): Task<List<ShiftAssignmentListDto>>
+    }
+
+    interface IAttendanceService {
+        +CheckInAsync(assignmentId: long, staffId: long): Task<AttendanceRecordDto>
+        +CheckOutAsync(assignmentId: long, staffId: long): Task<AttendanceRecordDto>
+        +AdjustAttendanceAsync(id: long, request: AdjustAttendanceRequest, reviewerId: long): Task<AttendanceRecordDto>
+        +GetAttendanceReportAsync(request: AttendanceReportRequest): Task<(List<AttendanceReportRowDto>, int)>
+        +GetExceptionsReportAsync(from: DateOnly, to: DateOnly, staffId: long?): Task<List<AttendanceExceptionReportRowDto>>
+        +GetWorkedHoursReportAsync(from: DateOnly, to: DateOnly, staffId: long?): Task<List<WorkedHoursReportRowDto>>
+        +GetReportSnapshotAsync(from: DateOnly, to: DateOnly): Task<ShiftReportSnapshotDto>
+    }
+
+    class AttendanceService {
+        -_attendanceRepo: IAttendanceRepository
+        -_assignmentRepo: IShiftAssignmentRepository
+        -_unitOfWork: IUnitOfWork
+        -_lookupResolver: ILookupResolver
+        -_shiftSettings: IShiftSettingsProvider
+        -_notificationService: INotificationService
+        -_shiftLiveRealtimePublisher: IShiftLiveRealtimePublisher
+        +CheckInAsync(assignmentId: long, staffId: long): Task<AttendanceRecordDto>
+        +CheckOutAsync(assignmentId: long, staffId: long): Task<AttendanceRecordDto>
+        +AdjustAttendanceAsync(id: long, request: AdjustAttendanceRequest, reviewerId: long): Task<AttendanceRecordDto>
+        +GetAttendanceReportAsync(request: AttendanceReportRequest): Task<(List<AttendanceReportRowDto>, int)>
+        +GetExceptionsReportAsync(from: DateOnly, to: DateOnly, staffId: long?): Task<List<AttendanceExceptionReportRowDto>>
+        +GetWorkedHoursReportAsync(from: DateOnly, to: DateOnly, staffId: long?): Task<List<WorkedHoursReportRowDto>>
+        +GetReportSnapshotAsync(from: DateOnly, to: DateOnly): Task<ShiftReportSnapshotDto>
+    }
+
+    interface IShiftSettingsProvider {
+        +GetAllowedEarlyCheckInMinutesAsync(): Task<int>
+        +GetLateGraceMinutesAsync(): Task<int>
+        +GetAbsenceThresholdMinutesAsync(): Task<int>
+        +GetEarlyLeaveBufferMinutesAsync(): Task<int>
+        +GetNoShowThresholdMinutesAsync(): Task<int>
+        +GetMaxWeeklyHoursAsync(): Task<double>
+    }
+
+    class ShiftSettingsProvider {
+        -_systemSettingRepo: ISystemSettingRepository
+        +GetAllowedEarlyCheckInMinutesAsync(): Task<int>
+        +GetLateGraceMinutesAsync(): Task<int>
+        +GetAbsenceThresholdMinutesAsync(): Task<int>
+        +GetEarlyLeaveBufferMinutesAsync(): Task<int>
+        +GetNoShowThresholdMinutesAsync(): Task<int>
+        +GetMaxWeeklyHoursAsync(): Task<double>
+    }
+
+    interface IShiftLiveRealtimePublisher {
+        +PublishBoardChangedAsync(payload: ShiftLiveRealtimeEventDto): Task
+    }
+
+    ShiftTemplateService ..|> IShiftTemplateService : implements
+    ShiftAssignmentService ..|> IShiftAssignmentService : implements
+    AttendanceService ..|> IAttendanceService : implements
+    ShiftSettingsProvider ..|> IShiftSettingsProvider : implements
 }
 
-class ShiftTemplate {
-    +ShiftTemplateId: long
-    +TemplateName: string
-    +DefaultStartTime: TimeOnly
-    +DefaultEndTime: TimeOnly
-    +Description: string?
-    +BufferBeforeMinutes: int?
-    +BufferAfterMinutes: int?
-    +IsActive: bool
-    +CreatedBy: long
-    +CreatedAt: DateTime
-    +UpdatedBy: long?
-    +UpdatedAt: DateTime
+' ══════════════════════════════════════════════════════════════
+'  PERSISTENCE LAYER
+' ══════════════════════════════════════════════════════════════
+
+package "Persistence Layer" {
+
+    interface IShiftTemplateRepository {
+        +Add(entity: ShiftTemplate): void
+        +GetByIdAsync(id: long): Task<ShiftTemplate?>
+        +GetAllActiveAsync(): Task<List<ShiftTemplate>>
+        +GetAllAsync(): Task<List<ShiftTemplate>>
+        +ExistsByNameAsync(name: string, excludeId: long?): Task<bool>
+        +HasActiveAssignmentsAsync(templateId: long): Task<bool>
+    }
+
+    class ShiftTemplateRepository {
+        -_context: AuLacDbContext
+    }
+
+    interface IShiftAssignmentRepository {
+        +Add(entity: ShiftAssignment): void
+        +AddRange(entities: IEnumerable<ShiftAssignment>): void
+        +GetByIdAsync(id: long): Task<ShiftAssignment?>
+        +GetByIdWithDetailsAsync(id: long): Task<ShiftAssignment?>
+        +GetAssignmentsAsync(request: GetShiftAssignmentRequest): Task<(List<ShiftAssignment>, int)>
+        +HasOverlappingAssignmentAsync(staffId: long, workDate: DateOnly, start: DateTime, end: DateTime, excludeId: long?): Task<bool>
+        +GetAlreadyAssignedStaffIdsAsync(templateId: long, workDate: DateOnly, staffIds: IEnumerable<long>): Task<List<long>>
+        +GetDraftAssignmentsAsync(from: DateOnly, to: DateOnly): Task<List<ShiftAssignment>>
+        +GetByIdsWithDetailsAsync(ids: IEnumerable<long>): Task<List<ShiftAssignment>>
+        +GetWeekAssignmentsAsync(weekStart: DateOnly): Task<List<ShiftAssignment>>
+        +GetTeamScheduleAsync(weekStart: DateOnly, weekEnd: DateOnly, templateId: long?): Task<List<ShiftAssignment>>
+        +GetNoShowCandidatesAsync(thresholdUtc: DateTime): Task<List<ShiftAssignment>>
+        +GetWorkedHoursDataAsync(from: DateOnly, to: DateOnly, staffId: long?): Task<List<ShiftAssignment>>
+        +GetExceptionDataAsync(from: DateOnly, to: DateOnly, staffId: long?): Task<List<ShiftAssignment>>
+        +GetAttendanceReportAsync(request: AttendanceReportRequest): Task<(List<ShiftAssignment>, int)>
+    }
+
+    class ShiftAssignmentRepository {
+        -_context: AuLacDbContext
+    }
+
+    interface IAttendanceRepository {
+        +Add(entity: AttendanceRecord): void
+        +GetByAssignmentIdAsync(assignmentId: long): Task<AttendanceRecord?>
+        +GetByIdAsync(id: long): Task<AttendanceRecord?>
+        +GetByIdWithDetailsAsync(id: long): Task<AttendanceRecord?>
+    }
+
+    class AttendanceRepository {
+        -_context: AuLacDbContext
+    }
+
+    interface IUnitOfWork {
+        +BeginTransactionAsync(): Task
+        +CommitAsync(): Task
+        +RollbackAsync(): Task
+        +SaveChangesAsync(): Task
+    }
+
+    ShiftTemplateRepository ..|> IShiftTemplateRepository : implements
+    ShiftAssignmentRepository ..|> IShiftAssignmentRepository : implements
+    AttendanceRepository ..|> IAttendanceRepository : implements
 }
 
-class ShiftAssignment {
-    +ShiftAssignmentId: long
-    +ShiftTemplateId: long
-    +StaffId: long
-    +WorkDate: DateOnly
-    +PlannedStartAt: DateTime
-    +PlannedEndAt: DateTime
-    +AssignmentStatusLvId: uint
-    +IsActive: bool
-    +Tags: string?
-    +Notes: string?
-    +AssignedBy: long
-    +AssignedAt: DateTime
-    +CreatedAt: DateTime
-    +UpdatedAt: DateTime
+' ══════════════════════════════════════════════════════════════
+'  DOMAIN LAYER
+' ══════════════════════════════════════════════════════════════
+
+package "Domain Layer" {
+
+    class ShiftTemplate <<Entity>> {
+        +ShiftTemplateId: long
+        +TemplateName: string
+        +DefaultStartTime: TimeOnly
+        +DefaultEndTime: TimeOnly
+        +Description: string?
+        +BufferBeforeMinutes: int?
+        +BufferAfterMinutes: int?
+        +IsActive: bool
+        +CreatedBy: long
+        +CreatedAt: DateTime
+        +UpdatedBy: long?
+        +UpdatedAt: DateTime
+    }
+
+    class ShiftAssignment <<Entity>> {
+        +ShiftAssignmentId: long
+        +ShiftTemplateId: long
+        +StaffId: long
+        +WorkDate: DateOnly
+        +PlannedStartAt: DateTime
+        +PlannedEndAt: DateTime
+        +AssignmentStatusLvId: uint
+        +IsActive: bool
+        +Tags: string?
+        +Notes: string?
+        +AssignedBy: long
+        +AssignedAt: DateTime
+        +CreatedAt: DateTime
+        +UpdatedAt: DateTime
+    }
+
+    class AttendanceRecord <<Entity>> {
+        +AttendanceId: long
+        +ShiftAssignmentId: long
+        +AttendanceStatusLvId: uint
+        +ActualCheckInAt: DateTime?
+        +ActualCheckOutAt: DateTime?
+        +LateMinutes: int
+        +EarlyLeaveMinutes: int
+        +WorkedMinutes: int
+        +IsManualAdjustment: bool
+        +AdjustmentReason: string?
+        +ReviewedBy: long?
+        +ReviewedAt: DateTime?
+        +CreatedAt: DateTime
+        +UpdatedAt: DateTime
+    }
+
+    class TimeLog <<Entity>> {
+        +TimeLogId: long
+        +AttendanceRecordId: long
+        +PunchInTime: DateTime
+        +PunchOutTime: DateTime?
+        +GpsLocationIn: string?
+        +GpsLocationOut: string?
+        +DeviceIdIn: string?
+        +DeviceIdOut: string?
+        +ValidationStatus: string
+        +PunchDurationMinutes: int
+        +CreatedAt: DateTime
+    }
+
+    class StaffAccount <<Entity>> {
+        +AccountId: long
+        +FullName: string
+        +RoleId: long
+        +RegisteredDeviceId: string?
+    }
+
+    class LookupValue <<Entity>> {
+        +ValueId: uint
+        +TypeId: ushort
+        +ValueCode: string
+        +ValueName: string
+    }
+
+    ' ── Domain Relationships ──
+
+    ShiftTemplate "1" *-- "0..*" ShiftAssignment : contains assignments
+    ShiftAssignment "1" *-- "0..1" AttendanceRecord : tracks attendance
+    AttendanceRecord "1" *-- "0..*" TimeLog : records punch cycles
+    ShiftAssignment "0..*" --> "1" StaffAccount : assigned to
+    ShiftAssignment "0..*" --> "1" LookupValue : assignment status
+    AttendanceRecord "0..*" --> "1" LookupValue : attendance status
+    ShiftTemplate "0..*" --> "1" StaffAccount : created by
 }
 
-class AttendanceRecord {
-    +AttendanceId: long
-    +ShiftAssignmentId: long
-    +AttendanceStatusLvId: uint
-    +ActualCheckInAt: DateTime?
-    +ActualCheckOutAt: DateTime?
-    +LateMinutes: int
-    +EarlyLeaveMinutes: int
-    +WorkedMinutes: int
-    +IsManualAdjustment: bool
-    +AdjustmentReason: string?
-    +ReviewedBy: long?
-    +ReviewedAt: DateTime?
-    +CreatedAt: DateTime
-    +UpdatedAt: DateTime
-}
+' ══════════════════════════════════════════════════════════════
+'  CROSS-LAYER RELATIONSHIPS
+' ══════════════════════════════════════════════════════════════
 
-class TimeLog {
-    +TimeLogId: long
-    +AttendanceRecordId: long
-    +PunchInTime: DateTime
-    +PunchOutTime: DateTime?
-    +GpsLocationIn: string?
-    +GpsLocationOut: string?
-    +DeviceIdIn: string?
-    +DeviceIdOut: string?
-    +ValidationStatus: string
-    +PunchDurationMinutes: int
-    +CreatedAt: DateTime
-}
-
-class StaffAccount <<cross-module>> {
-    +AccountId: long
-    +FullName: string
-}
-
-class LookupValue <<cross-module>> {
-    +LookupValueId: uint
-    +ValueCode: string
-    +ValueName: string
-}
-
-ShiftTemplate "1" --> "0..*" ShiftAssignment : defines shift assignments
-ShiftAssignment "1" *-- "0..1" AttendanceRecord : contains attendance record
-AttendanceRecord "1" *-- "0..*" TimeLog : contains time logs
-ShiftAssignment --> "1" StaffAccount : assigned to staff
-ShiftAssignment --> "1" StaffAccount : assigned by staff
-ShiftAssignment --> "1" LookupValue : assignment status
-AttendanceRecord --> "1" LookupValue : attendance status
-AttendanceRecord --> "0..1" StaffAccount : reviewed by staff
-ShiftTemplate --> "1" StaffAccount : created by staff
-ShiftTemplate --> "0..1" StaffAccount : updated by staff
-
-' === DTOs ===
-
-class ShiftTemplateListDto {
-    +ShiftTemplateId: long
-    +TemplateName: string
-    +DefaultStartTime: TimeOnly
-    +DefaultEndTime: TimeOnly
-    +Description: string?
-    +BufferBeforeMinutes: int?
-    +BufferAfterMinutes: int?
-    +IsActive: bool
-    +CreatedAt: DateTime
-}
-
-class ShiftTemplateDetailDto {
-    +CreatedByName: string
-    +UpdatedByName: string?
-    +UpdatedAt: DateTime
-}
-
-ShiftTemplateDetailDto --|> ShiftTemplateListDto
-
-class ShiftAssignmentListDto {
-    +ShiftAssignmentId: long
-    +ShiftTemplateId: long
-    +TemplateName: string
-    +StaffId: long
-    +StaffName: string
-    +WorkDate: DateOnly
-    +PlannedStartAt: DateTime
-    +PlannedEndAt: DateTime
-    +AssignmentStatusCode: string
-    +AssignmentStatusName: string
-    +IsActive: bool
-    +Tags: string?
-    +Notes: string?
-    +AssignedAt: DateTime
-    +AssignedByName: string
-}
-
-class ShiftAssignmentDetailDto {
-    +Attendance: AttendanceRecordDto?
-}
-
-ShiftAssignmentDetailDto --|> ShiftAssignmentListDto
-
-class AttendanceRecordDto {
-    +AttendanceId: long
-    +ShiftAssignmentId: long
-    +AttendanceStatusCode: string
-    +AttendanceStatusName: string
-    +ActualCheckInAt: DateTime?
-    +ActualCheckOutAt: DateTime?
-    +LateMinutes: int
-    +EarlyLeaveMinutes: int
-    +WorkedMinutes: int
-    +IsManualAdjustment: bool
-    +AdjustmentReason: string?
-    +ReviewedByName: string?
-    +ReviewedAt: DateTime?
-    +TimeLogs: List<TimeLogDto>
-}
-
-class TimeLogDto {
-    +TimeLogId: long
-    +PunchInTime: DateTime
-    +PunchOutTime: DateTime?
-    +ValidationStatus: string
-    +PunchDurationMinutes: int
-    +CreatedAt: DateTime
-}
-
-ShiftAssignmentDetailDto --> AttendanceRecordDto
-AttendanceRecordDto --> "0..*" TimeLogDto
-
-class ShiftLiveBoardItemDto {
-    +ShiftAssignmentId: long
-    +ShiftTemplateId: long
-    +TemplateName: string
-    +StaffId: long
-    +StaffName: string
-    +StaffRoleCode: string
-    +StaffRoleName: string
-    +AttendanceStatusCode: string?
-    +LiveStatusCode: string
-    +LiveStatusName: string
-    +HasAlert: bool
-    +OrdersHandledCount: int?
-    +PaidBillsCount: int?
-    +CurrentRevenue: decimal?
-    +IssueCount: int
-    +LatestIssueText: string?
-}
-
-class ShiftLiveOrderSnapshotDto {
-    +OrderId: long
-    +StaffId: long
-    +TableCode: string?
-    +PaidRevenue: decimal
-    +CompletedItemsCount: int
-    +PendingItemsCount: int
-}
-
-class ShiftLiveIssueSnapshotDto {
-    +StaffId: long
-    +Description: string
-    +IsResolved: bool
-    +CreatedAt: DateTime?
-    +TableCode: string?
-}
-
-class ShiftLiveRealtimeEventDto {
-    +EventType: string
-    +WorkDate: DateOnly?
-    +ShiftAssignmentId: long?
-    +StaffId: long?
-    +OrderId: long?
-    +OccurredAt: DateTime
-}
-
-ShiftLiveBoardItemDto ..> ShiftLiveOrderSnapshotDto : enriched by
-ShiftLiveBoardItemDto ..> ShiftLiveIssueSnapshotDto : enriched by
-
-class AttendanceReportRowDto {
-    +ShiftAssignmentId: long
-    +StaffId: long
-    +StaffName: string
-    +WorkDate: DateOnly
-    +TemplateName: string
-    +AttendanceStatusCode: string
-    +LateMinutes: int
-    +EarlyLeaveMinutes: int
-    +WorkedMinutes: int
-    +IsManualAdjustment: bool
-}
-
-class WorkedHoursReportRowDto {
-    +StaffId: long
-    +StaffName: string
-    +ScheduledMinutes: int
-    +WorkedMinutes: int
-    +VarianceMinutes: int
-    +IncompleteRecords: int
-}
-
-class AttendanceExceptionReportRowDto {
-    +StaffId: long
-    +StaffName: string
-    +WorkDate: DateOnly
-    +TemplateName: string
-    +ExceptionType: string
-    +MinutesAffected: int
-    +IsManualAdjustment: bool
-    +ReviewerName: string?
-}
-
-class ShiftReportSnapshotDto {
-    +AttendanceCount: int
-    +WorkedStaffCount: int
-    +ExceptionCount: int
-}
-
-' === Request DTOs ===
-
-class CreateShiftTemplateRequest {
-    +TemplateName: string
-    +DefaultStartTime: TimeOnly
-    +DefaultEndTime: TimeOnly
-    +Description: string?
-    +BufferBeforeMinutes: int?
-    +BufferAfterMinutes: int?
-}
-
-class UpdateShiftTemplateRequest {
-    +TemplateName: string?
-    +DefaultStartTime: TimeOnly?
-    +DefaultEndTime: TimeOnly?
-    +Description: string?
-    +IsActive: bool?
-    +BufferBeforeMinutes: int?
-    +BufferAfterMinutes: int?
-}
-
-class GetShiftAssignmentRequest {
-    +StaffId: long?
-    +ShiftTemplateId: long?
-    +FromDate: DateOnly?
-    +ToDate: DateOnly?
-    +IsActive: bool?
-    +AssignmentStatusCode: string?
-    +PageIndex: int
-    +PageSize: int
-}
-
-class CreateShiftAssignmentRequest {
-    +ShiftTemplateId: long
-    +StaffId: long
-    +WorkDate: DateOnly
-    +PlannedStartAt: DateTime?
-    +PlannedEndAt: DateTime?
-    +Notes: string?
-    +Tags: string?
-    +IsDraft: bool
-}
-
-class BulkCreateAssignmentRequest {
-    +ShiftTemplateId: long
-    +StaffIds: List<long>
-    +WorkDate: DateOnly
-    +WorkDates: List<DateOnly>?
-    +PlannedStartAt: DateTime?
-    +PlannedEndAt: DateTime?
-    +Notes: string?
-    +Tags: string?
-    +IsDraft: bool
-}
-
-class PublishAssignmentsRequest {
-    +AssignmentIds: List<long>?
-    +FromDate: DateOnly?
-    +ToDate: DateOnly?
-}
-
-class CopyWeekRequest {
-    +SourceWeekStart: DateOnly
-    +TargetWeekStart: DateOnly
-    +AsDraft: bool
-}
-
-class ReassignRequest {
-    +NewStaffId: long
-    +NewWorkDate: DateOnly?
-    +Reason: string?
-}
-
-class UpdateShiftAssignmentRequest {
-    +PlannedStartAt: DateTime?
-    +PlannedEndAt: DateTime?
-    +Notes: string?
-    +Tags: string?
-}
-
-class AdjustAttendanceRequest {
-    +ActualCheckInAt: DateTime?
-    +ActualCheckOutAt: DateTime?
-    +AdjustmentReason: string
-}
-
-class AttendanceReportRequest {
-    +FromDate: DateOnly?
-    +ToDate: DateOnly?
-    +StaffId: long?
-    +ShiftTemplateId: long?
-    +AttendanceStatusCode: string?
-    +PageIndex: int
-    +PageSize: int
-}
-
-class TeamScheduleRequest {
-    +WeekStart: DateOnly
-    +WeekEnd: DateOnly?
-    +ShiftTemplateId: long?
-}
-
-' === Interfaces ===
-
-interface IShiftTemplateService {
-    +GetAllAsync(isActive: bool?): List<ShiftTemplateListDto>
-    +GetByIdAsync(id: long): ShiftTemplateDetailDto
-    +CreateAsync(request: CreateShiftTemplateRequest, staffId: long): ShiftTemplateDetailDto
-    +UpdateAsync(id: long, request: UpdateShiftTemplateRequest, staffId: long): ShiftTemplateDetailDto
-    +DeactivateAsync(id: long): void
-}
-
-interface IShiftAssignmentService {
-    +GetAssignmentsAsync(request: GetShiftAssignmentRequest): Tuple
-    +GetLiveBoardAsync(request: GetShiftAssignmentRequest): List<ShiftLiveBoardItemDto>
-    +GetByIdAsync(id: long): ShiftAssignmentDetailDto
-    +CreateAssignmentAsync(request: CreateShiftAssignmentRequest, staffId: long): ShiftAssignmentDetailDto
-    +BulkCreateAssignmentsAsync(request: BulkCreateAssignmentRequest, staffId: long): List<ShiftAssignmentDetailDto>
-    +UpdateAssignmentAsync(id: long, request: UpdateShiftAssignmentRequest, staffId: long): ShiftAssignmentDetailDto
-    +CancelAssignmentAsync(id: long): void
-    +GetMyShiftsAsync(staffId: long, request: GetShiftAssignmentRequest): Tuple
-    +PublishAssignmentsAsync(request: PublishAssignmentsRequest, staffId: long): List<ShiftAssignmentListDto>
-    +CopyWeekAsync(request: CopyWeekRequest, staffId: long): List<ShiftAssignmentListDto>
-    +ReassignAsync(id: long, request: ReassignRequest, staffId: long): ShiftAssignmentDetailDto
-    +ConfirmAssignmentAsync(id: long, staffId: long): ShiftAssignmentDetailDto
-    +GetTeamScheduleAsync(request: TeamScheduleRequest): List<ShiftAssignmentListDto>
-}
-
-interface IAttendanceService {
-    +CheckInAsync(assignmentId: long, staffId: long): AttendanceRecordDto
-    +CheckOutAsync(assignmentId: long, staffId: long): AttendanceRecordDto
-    +AdjustAttendanceAsync(attendanceId: long, request: AdjustAttendanceRequest, staffId: long): AttendanceRecordDto
-    +GetAttendanceReportAsync(request: AttendanceReportRequest): Tuple
-    +GetExceptionsReportAsync(from: DateOnly, to: DateOnly, staffId: long?): List<AttendanceExceptionReportRowDto>
-    +GetWorkedHoursReportAsync(from: DateOnly, to: DateOnly, staffId: long?): List<WorkedHoursReportRowDto>
-    +GetReportSnapshotAsync(from: DateOnly, to: DateOnly): ShiftReportSnapshotDto
-}
-
-interface IShiftTemplateRepository {
-    +Add(template: ShiftTemplate): void
-    +GetByIdAsync(id: long): ShiftTemplate?
-    +GetAllActiveAsync(): List<ShiftTemplate>
-    +GetAllAsync(): List<ShiftTemplate>
-    +ExistsByNameAsync(name: string, excludeId: long?): bool
-    +HasActiveAssignmentsAsync(id: long): bool
-}
-
-interface IShiftAssignmentRepository {
-    +Add(assignment: ShiftAssignment): void
-    +AddRange(assignments: IEnumerable<ShiftAssignment>): void
-    +GetByIdAsync(id: long): ShiftAssignment?
-    +GetByIdWithDetailsAsync(id: long): ShiftAssignment?
-    +GetAssignmentsAsync(request: GetShiftAssignmentRequest): Tuple
-    +HasOverlappingAssignmentAsync(staffId: long, workDate: DateOnly, start: DateTime, end: DateTime, excludeId: long?): bool
-    +GetAlreadyAssignedStaffIdsAsync(templateId: long, workDate: DateOnly, staffIds: IEnumerable<long>): List<long>
-    +GetDraftAssignmentsAsync(from: DateOnly, to: DateOnly): List<ShiftAssignment>
-    +GetByIdsWithDetailsAsync(ids: IEnumerable<long>): List<ShiftAssignment>
-    +GetWeekAssignmentsAsync(weekStart: DateOnly): List<ShiftAssignment>
-    +GetTeamScheduleAsync(from: DateOnly, to: DateOnly, templateId: long?): List<ShiftAssignment>
-    +GetWeeklyScheduledMinutesAsync(staffId: long, weekStart: DateOnly, ct): int
-    +GetWorkedHoursDataAsync(fromDate: DateOnly, toDate: DateOnly, staffId: long?, ct): List<ShiftAssignment>
-    +GetExceptionDataAsync(fromDate: DateOnly, toDate: DateOnly, staffId: long?, ct): List<ShiftAssignment>
-    +GetAttendanceReportAsync(request: AttendanceReportRequest, ct): Tuple
-    +GetNoShowCandidatesAsync(threshold: DateTime): List<ShiftAssignment>
-}
-
-interface IAttendanceRepository {
-    +Add(record: AttendanceRecord): void
-    +GetByAssignmentIdAsync(assignmentId: long): AttendanceRecord?
-    +GetByIdAsync(id: long): AttendanceRecord?
-    +GetByIdWithDetailsAsync(id: long): AttendanceRecord?
-}
-
-interface IShiftSettingsProvider {
-    +GetAllowedEarlyCheckInMinutesAsync(): int
-    +GetLateGraceMinutesAsync(): int
-    +GetAbsenceThresholdMinutesAsync(): int
-    +GetEarlyLeaveBufferMinutesAsync(): int
-    +GetNoShowThresholdMinutesAsync(): int
-    +GetMaxWeeklyHoursAsync(): double
-    +GetGeofenceBaseLatitudeAsync(): double?
-    +GetGeofenceBaseLongitudeAsync(): double?
-    +GetGeofenceMaxRadiusMetersAsync(): int
-    +GetAutoLogoutAfterCheckoutMinutesAsync(): int
-}
-
-interface IShiftLiveRealtimePublisher {
-    +PublishBoardChangedAsync(event: ShiftLiveRealtimeEventDto): void
-}
-
-' === Service Implementations ===
-
-class ShiftTemplateService {
-    -_templateRepo: IShiftTemplateRepository
-    -_unitOfWork: IUnitOfWork
-    +GetAllAsync(isActive, ct): List<ShiftTemplateListDto>
-    +GetByIdAsync(id, ct): ShiftTemplateDetailDto
-    +CreateAsync(request, staffId, ct): ShiftTemplateDetailDto
-    +UpdateAsync(id, request, staffId, ct): ShiftTemplateDetailDto
-    +DeactivateAsync(id, ct): void
-}
-
-class ShiftAssignmentService {
-    -_assignmentRepo: IShiftAssignmentRepository
-    -_templateRepo: IShiftTemplateRepository
-    -_accountRepo: IAccountRepository
-    -_orderRepository: IOrderRepository
-    -_unitOfWork: IUnitOfWork
-    -_notificationService: INotificationService
-    -_lookupResolver: ILookupResolver
-    -_shiftLiveRealtimePublisher: IShiftLiveRealtimePublisher
-    +GetAssignmentsAsync(request, ct): Tuple
-    +GetLiveBoardAsync(request, ct): List<ShiftLiveBoardItemDto>
-    +GetByIdAsync(id, ct): ShiftAssignmentDetailDto
-    +CreateAssignmentAsync(request, staffId, ct): ShiftAssignmentDetailDto
-    +BulkCreateAssignmentsAsync(request, staffId, ct): List<ShiftAssignmentDetailDto>
-    +UpdateAssignmentAsync(id, request, staffId, ct): ShiftAssignmentDetailDto
-    +CancelAssignmentAsync(id, ct): void
-    +GetMyShiftsAsync(staffId, request, ct): Tuple
-    +PublishAssignmentsAsync(request, staffId, ct): List<ShiftAssignmentListDto>
-    +CopyWeekAsync(request, staffId, ct): List<ShiftAssignmentListDto>
-    +ReassignAsync(id, request, staffId, ct): ShiftAssignmentDetailDto
-    +ConfirmAssignmentAsync(id, staffId, ct): ShiftAssignmentDetailDto
-    +GetTeamScheduleAsync(request, ct): List<ShiftAssignmentListDto>
-}
-
-class AttendanceService {
-    -_attendanceRepo: IAttendanceRepository
-    -_assignmentRepo: IShiftAssignmentRepository
-    -_unitOfWork: IUnitOfWork
-    -_lookupResolver: ILookupResolver
-    -_shiftSettings: IShiftSettingsProvider
-    -_notificationService: INotificationService
-    -_shiftLiveRealtimePublisher: IShiftLiveRealtimePublisher
-    +CheckInAsync(assignmentId, staffId, ct): AttendanceRecordDto
-    +CheckOutAsync(assignmentId, staffId, ct): AttendanceRecordDto
-    +AdjustAttendanceAsync(attendanceId, request, staffId, ct): AttendanceRecordDto
-    +GetAttendanceReportAsync(request, ct): Tuple
-    +GetExceptionsReportAsync(from, to, staffId, ct): List<AttendanceExceptionReportRowDto>
-    +GetWorkedHoursReportAsync(from, to, staffId, ct): List<WorkedHoursReportRowDto>
-    +GetReportSnapshotAsync(from, to, ct): ShiftReportSnapshotDto
-}
-
-' === Controller ===
-
-class ShiftController {
-    -_templateService: IShiftTemplateService
-    -_assignmentService: IShiftAssignmentService
-    -_attendanceService: IAttendanceService
-    +GetTemplates(isActive: bool?): IActionResult
-    +GetTemplate(id: long): IActionResult
-    +CreateTemplate(request: CreateShiftTemplateRequest): IActionResult
-    +UpdateTemplate(id: long, request: UpdateShiftTemplateRequest): IActionResult
-    +DeactivateTemplate(id: long): IActionResult
-    +GetAssignments(request: GetShiftAssignmentRequest): IActionResult
-    +GetLiveBoard(request: GetShiftAssignmentRequest): IActionResult
-    +GetAssignment(id: long): IActionResult
-    +CreateAssignment(request: CreateShiftAssignmentRequest): IActionResult
-    +UpdateAssignment(id: long, request: UpdateShiftAssignmentRequest): IActionResult
-    +CancelAssignment(id: long): IActionResult
-    +BulkCreateAssignment(request: BulkCreateAssignmentRequest): IActionResult
-    +PublishAssignments(request: PublishAssignmentsRequest): IActionResult
-    +CopyWeek(request: CopyWeekRequest): IActionResult
-    +ReassignAssignment(id: long, request: ReassignRequest): IActionResult
-    +ConfirmAssignment(id: long): IActionResult
-    +GetTeamSchedule(request: TeamScheduleRequest): IActionResult
-    +GetMyShifts(request: GetShiftAssignmentRequest): IActionResult
-    +CheckIn(id: long): IActionResult
-    +CheckOut(id: long): IActionResult
-    +AdjustAttendance(id: long, request: AdjustAttendanceRequest): IActionResult
-    +GetReportSnapshot(from: DateOnly, to: DateOnly): IActionResult
-    +GetAttendanceReport(request: AttendanceReportRequest): IActionResult
-    +GetWorkedHoursReport(from: DateOnly, to: DateOnly, staffId: long?): IActionResult
-    +GetExceptionsReport(from: DateOnly, to: DateOnly, staffId: long?): IActionResult
-}
-
-' === Cross-module Interfaces (dependencies from other modules) ===
-
-interface IUnitOfWork <<cross-module>> {
-    +BeginTransactionAsync(ct): Task
-    +CommitAsync(ct): Task
-    +RollbackAsync(ct): Task
-    +SaveChangesAsync(ct): Task
-}
-
-interface INotificationService <<cross-module>> {
-    +PublishAsync(request: PublishNotificationRequest, ct): Task
-}
-
-interface ILookupResolver <<cross-module>> {
-    +GetIdAsync(typeId: ushort, valueCode: string, ct): uint
-}
-
-interface IAccountRepository <<cross-module>>
-
-interface IOrderRepository <<cross-module>>
-
-' === Realization (implements) ===
-
-ShiftTemplateService ..|> IShiftTemplateService : implements
-ShiftAssignmentService ..|> IShiftAssignmentService : implements
-AttendanceService ..|> IAttendanceService : implements
-
-' === Controller dependencies ===
-
+' Presentation → Application
 ShiftController --> IShiftTemplateService : uses for template operations
 ShiftController --> IShiftAssignmentService : uses for assignment operations
 ShiftController --> IAttendanceService : uses for attendance operations
-ShiftController ..> CreateShiftTemplateRequest : receives template creation request
-ShiftController ..> UpdateShiftTemplateRequest : receives template update request
-ShiftController ..> GetShiftAssignmentRequest : receives assignment query request
-ShiftController ..> CreateShiftAssignmentRequest : receives assignment creation request
-ShiftController ..> UpdateShiftAssignmentRequest : receives assignment update request
-ShiftController ..> BulkCreateAssignmentRequest : receives bulk assignment request
-ShiftController ..> PublishAssignmentsRequest : receives publish request
-ShiftController ..> CopyWeekRequest : receives copy-week request
-ShiftController ..> ReassignRequest : receives reassignment request
-ShiftController ..> AdjustAttendanceRequest : receives attendance adjustment request
-ShiftController ..> AttendanceReportRequest : receives attendance report request
-ShiftController ..> TeamScheduleRequest : receives team schedule request
+ShiftController ..> CreateShiftTemplateRequest : receives
+ShiftController ..> CreateShiftAssignmentRequest : receives
+ShiftController ..> BulkCreateAssignmentRequest : receives
+ShiftController ..> AdjustAttendanceRequest : receives
+ShiftController ..> ShiftTemplateDetailDto : returns
+ShiftController ..> ShiftAssignmentDetailDto : returns
+ShiftController ..> AttendanceRecordDto : returns
+ShiftController ..> ShiftLiveBoardItemDto : returns
 
-' === Service dependencies ===
-
+' Application → Persistence
 ShiftTemplateService --> IShiftTemplateRepository : uses for persistence
-ShiftTemplateService --> IUnitOfWork : uses for transaction management
+ShiftTemplateService --> IUnitOfWork : uses for transactions
+
 ShiftAssignmentService --> IShiftAssignmentRepository : uses for persistence
-ShiftAssignmentService --> IShiftTemplateRepository : uses for template validation
-ShiftAssignmentService --> IAccountRepository : uses for staff account lookup
-ShiftAssignmentService --> IOrderRepository : uses for live board order data
-ShiftAssignmentService --> IUnitOfWork : uses for transaction management
-ShiftAssignmentService --> INotificationService : uses for staff notifications
-ShiftAssignmentService --> ILookupResolver : uses for status code resolution
-ShiftAssignmentService --> IShiftLiveRealtimePublisher : uses for real-time events
-ShiftAssignmentService ..> ShiftAssignmentStatusCode : uses assignment status codes
+ShiftAssignmentService --> IShiftTemplateRepository : validates templates
+ShiftAssignmentService --> IUnitOfWork : uses for transactions
+ShiftAssignmentService --> IShiftLiveRealtimePublisher : publishes live updates
+
 AttendanceService --> IAttendanceRepository : uses for persistence
-AttendanceService --> IShiftAssignmentRepository : uses for assignment lookup
-AttendanceService --> IUnitOfWork : uses for transaction management
-AttendanceService --> ILookupResolver : uses for status code resolution
-AttendanceService --> INotificationService : uses for attendance notifications
-AttendanceService --> IShiftSettingsProvider : uses for attendance rules
-AttendanceService --> IShiftLiveRealtimePublisher : uses for real-time events
-AttendanceService ..> AttendanceStatusCode : uses attendance status codes
-IShiftTemplateService ..> ShiftTemplateListDto : exposes template list contract
-IShiftTemplateService ..> ShiftTemplateDetailDto : exposes template detail contract
-IShiftTemplateService ..> CreateShiftTemplateRequest : defines template creation contract
-IShiftTemplateService ..> UpdateShiftTemplateRequest : defines template update contract
-IShiftAssignmentService ..> GetShiftAssignmentRequest : defines assignment query contract
-IShiftAssignmentService ..> CreateShiftAssignmentRequest : defines assignment creation contract
-IShiftAssignmentService ..> BulkCreateAssignmentRequest : defines bulk assignment contract
-IShiftAssignmentService ..> UpdateShiftAssignmentRequest : defines assignment update contract
-IShiftAssignmentService ..> PublishAssignmentsRequest : defines publish contract
-IShiftAssignmentService ..> CopyWeekRequest : defines copy-week contract
-IShiftAssignmentService ..> ReassignRequest : defines reassignment contract
-IShiftAssignmentService ..> TeamScheduleRequest : defines team schedule contract
-IShiftAssignmentService ..> ShiftAssignmentListDto : exposes assignment list contract
-IShiftAssignmentService ..> ShiftAssignmentDetailDto : exposes assignment detail contract
-IShiftAssignmentService ..> ShiftLiveBoardItemDto : exposes live board contract
-IAttendanceService ..> AdjustAttendanceRequest : defines attendance adjustment contract
-IAttendanceService ..> AttendanceReportRequest : defines attendance report contract
-IAttendanceService ..> AttendanceRecordDto : exposes attendance detail contract
-IAttendanceService ..> AttendanceReportRowDto : exposes attendance report contract
-IAttendanceService ..> WorkedHoursReportRowDto : exposes worked-hours report contract
-IAttendanceService ..> AttendanceExceptionReportRowDto : exposes exception report contract
-IAttendanceService ..> ShiftReportSnapshotDto : exposes report snapshot contract
-IShiftAssignmentRepository ..> GetShiftAssignmentRequest : accepts assignment filter criteria
-IShiftAssignmentRepository ..> AttendanceReportRequest : accepts attendance report criteria
-IShiftLiveRealtimePublisher ..> ShiftLiveRealtimeEventDto : publishes live board events
+AttendanceService --> IShiftAssignmentRepository : validates assignments
+AttendanceService --> IUnitOfWork : uses for transactions
+AttendanceService --> IShiftSettingsProvider : reads attendance config
+AttendanceService --> IShiftLiveRealtimePublisher : publishes live updates
+
+' Persistence → Domain
+ShiftTemplateRepository ..> ShiftTemplate : persists
+ShiftAssignmentRepository ..> ShiftAssignment : persists
+AttendanceRepository ..> AttendanceRecord : persists
 
 @enduml

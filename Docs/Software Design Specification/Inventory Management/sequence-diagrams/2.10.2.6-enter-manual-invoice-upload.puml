@@ -1,4 +1,5 @@
 @startuml
+skinparam linetype ortho
 autonumber
 title 2.10.2.6 Enter Manual Invoice Upload
 

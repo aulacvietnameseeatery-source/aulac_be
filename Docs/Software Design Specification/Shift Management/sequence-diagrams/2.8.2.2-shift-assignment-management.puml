@@ -1,4 +1,5 @@
 @startuml
+skinparam linetype ortho
 autonumber
 title 2.8.2.2 Shift Assignment Management
 
@@ -24,13 +25,14 @@ Svc -> ARepo : GetAssignmentsAsync(request)
 activate ARepo
 ARepo -> DB : SELECT ... with filters and paging
 activate DB
-DB --> ARepo : (List ShiftAssignment, int TotalCount)
+DB --> ARepo : (List<ShiftAssignment>, TotalCount)
 deactivate DB
 ARepo --> Svc : (Items, TotalCount)
 deactivate ARepo
-Svc --> Ctrl : (List ShiftAssignmentListDto, TotalCount)
+note right of Svc : Map each entity to ShiftAssignmentListDto
+Svc --> Ctrl : (List<ShiftAssignmentListDto>, TotalCount)
 deactivate Svc
-Ctrl --> Client : 200 OK PagedResult
+Ctrl --> Client : 200 OK PagedResult<ShiftAssignmentListDto>
 deactivate Ctrl
 
 == Get Assignment Detail ==
@@ -41,7 +43,7 @@ Ctrl -> Svc : GetByIdAsync(id)
 activate Svc
 Svc -> ARepo : GetByIdWithDetailsAsync(id)
 activate ARepo
-ARepo -> DB : SELECT ... with Includes
+ARepo -> DB : SELECT ... with Includes\n(Template, Staff, Status, Attendance)
 activate DB
 DB --> ARepo : ShiftAssignment?
 deactivate DB
@@ -51,54 +53,77 @@ alt Not found
     Svc --> Ctrl : throw NotFoundException
     Ctrl --> Client : 404 Not Found
 else Found
+    note right of Svc : Map to ShiftAssignmentDetailDto\n(includes AttendanceRecordDto if present)
     Svc --> Ctrl : ShiftAssignmentDetailDto
     deactivate Svc
-    Ctrl --> Client : 200 OK ApiResponse
+    Ctrl --> Client : 200 OK ApiResponse<ShiftAssignmentDetailDto>
     deactivate Ctrl
 end
 
 == Create Single Assignment ==
 
-Client -> Ctrl : POST /api/shifts/assignments (CreateShiftAssignmentRequest)
+Client -> Ctrl : POST /api/shifts/assignments\n(CreateShiftAssignmentRequest)
 activate Ctrl
 Ctrl -> Svc : CreateAssignmentAsync(request, staffId)
 activate Svc
+
 Svc -> TRepo : GetByIdAsync(templateId)
 activate TRepo
+TRepo -> DB : SELECT ... WHERE ShiftTemplateId = @id
+activate DB
+DB --> TRepo : ShiftTemplate?
+deactivate DB
 TRepo --> Svc : ShiftTemplate?
 deactivate TRepo
 alt Template not found or inactive
     Svc --> Ctrl : throw NotFoundException / ValidationException
     Ctrl --> Client : 404 / 400
 end
+
 Svc -> AccRepo : FindByIdWithRoleAsync(staffId)
 activate AccRepo
+AccRepo -> DB : SELECT ... WHERE AccountId = @id
+activate DB
+DB --> AccRepo : StaffAccount?
+deactivate DB
 AccRepo --> Svc : StaffAccount?
 deactivate AccRepo
 alt Staff not found
     Svc --> Ctrl : throw NotFoundException
     Ctrl --> Client : 404
 end
-Svc -> ARepo : GetAlreadyAssignedStaffIdsAsync(templateId, workDate, staffIds)
+
+note right of Svc : Auto-populate PlannedStart/End\nfrom template defaults if not provided
+
+alt PlannedStart >= PlannedEnd
+    Svc --> Ctrl : throw ValidationException
+    Ctrl --> Client : 400
+end
+
+Svc -> ARepo : GetAlreadyAssignedStaffIdsAsync(templateId, workDate, [staffId])
 activate ARepo
-ARepo --> Svc : List of long
+ARepo --> Svc : List<long>
 deactivate ARepo
-alt Already assigned
+alt Staff already assigned to this template on this date
     Svc --> Ctrl : throw ConflictException
     Ctrl --> Client : 409 Conflict
 end
+
 Svc -> ARepo : HasOverlappingAssignmentAsync(staffId, workDate, start, end)
 activate ARepo
 ARepo --> Svc : bool
 deactivate ARepo
-alt Overlap found
+alt Overlapping shift found
     Svc --> Ctrl : throw ConflictException
     Ctrl --> Client : 409 Conflict
 end
+
 Svc -> Lookup : ToShiftAssignmentStatusIdAsync(DRAFT or ASSIGNED)
 activate Lookup
 Lookup --> Svc : uint statusLvId
 deactivate Lookup
+
+note right of Svc : Build ShiftAssignment entity
 Svc -> ARepo : Add(ShiftAssignment)
 Svc -> UoW : SaveChangesAsync()
 activate UoW
@@ -108,105 +133,174 @@ DB --> UoW : OK
 deactivate DB
 UoW --> Svc : OK
 deactivate UoW
-opt Not Draft
+
+opt IsDraft == false (published immediately)
     Svc -> Notif : PublishAsync(SHIFT_ASSIGNED notification)
     activate Notif
     Notif --> Svc : OK
     deactivate Notif
 end
+
+Svc -> ARepo : GetByIdWithDetailsAsync(newId)
+activate ARepo
+ARepo --> Svc : ShiftAssignment
+deactivate ARepo
+
 Svc -> RT : PublishBoardChangedAsync(assignment_created)
 activate RT
 RT --> Svc : OK
 deactivate RT
+
 Svc --> Ctrl : ShiftAssignmentDetailDto
 deactivate Svc
-Ctrl --> Client : 201 Created ApiResponse
+Ctrl --> Client : 201 Created ApiResponse<ShiftAssignmentDetailDto>
 deactivate Ctrl
 
 == Bulk Create Assignments ==
 
-Client -> Ctrl : POST /api/shifts/assignments/bulk (BulkCreateAssignmentRequest)
+Client -> Ctrl : POST /api/shifts/assignments/bulk\n(BulkCreateAssignmentRequest)
 activate Ctrl
 Ctrl -> Svc : BulkCreateAssignmentsAsync(request, staffId)
 activate Svc
+
 Svc -> TRepo : GetByIdAsync(templateId)
 activate TRepo
 TRepo --> Svc : ShiftTemplate
 deactivate TRepo
+alt Template not found or inactive
+    Svc --> Ctrl : throw NotFoundException / ValidationException
+    Ctrl --> Client : 404 / 400
+end
+
 loop For each staffId in StaffIds
     Svc -> AccRepo : FindByIdWithRoleAsync(staffId)
     activate AccRepo
     AccRepo --> Svc : StaffAccount
     deactivate AccRepo
+    alt Staff not found
+        Svc --> Ctrl : throw NotFoundException
+        Ctrl --> Client : 404
+    end
 end
-loop For each workDate in effectiveDates
-    Svc -> ARepo : GetAlreadyAssignedStaffIdsAsync(...)
+
+Svc -> Lookup : ToShiftAssignmentStatusIdAsync(DRAFT or ASSIGNED)
+activate Lookup
+Lookup --> Svc : uint statusLvId
+deactivate Lookup
+
+loop For each workDate in GetEffectiveDates()
+    note right of Svc : Auto-populate PlannedStart/End from template
+    Svc -> ARepo : GetAlreadyAssignedStaffIdsAsync(templateId, workDate, staffIds)
     activate ARepo
-    ARepo --> Svc : alreadyAssigned
+    ARepo --> Svc : alreadyAssigned (skipped)
     deactivate ARepo
-    loop For each valid staffId
-        Svc -> ARepo : HasOverlappingAssignmentAsync(...)
+    loop For each valid (not yet assigned) staffId
+        Svc -> ARepo : HasOverlappingAssignmentAsync(staffId, workDate, start, end)
         activate ARepo
         ARepo --> Svc : bool (skip if true)
         deactivate ARepo
     end
 end
-Svc -> ARepo : AddRange(entities)
+
+alt No assignments could be created
+    Svc --> Ctrl : throw ConflictException
+    Ctrl --> Client : 409
+end
+
+Svc -> ARepo : AddRange(List<ShiftAssignment>)
 Svc -> UoW : SaveChangesAsync()
 activate UoW
-UoW -> DB : INSERT multiple rows
+UoW -> DB : INSERT multiple rows into shift_assignment
 activate DB
 DB --> UoW : OK
 deactivate DB
 UoW --> Svc : OK
 deactivate UoW
-opt Not Draft
-    loop For each entity
+
+opt IsDraft == false
+    loop For each created assignment
         Svc -> Notif : PublishAsync(SHIFT_ASSIGNED)
     end
 end
+
+Svc -> ARepo : GetByIdsWithDetailsAsync(createdIds)
+activate ARepo
+ARepo --> Svc : List<ShiftAssignment>
+deactivate ARepo
+
 Svc -> RT : PublishBoardChangedAsync(assignments_bulk_created)
-Svc --> Ctrl : List ShiftAssignmentDetailDto
+activate RT
+RT --> Svc : OK
+deactivate RT
+
+Svc --> Ctrl : List<ShiftAssignmentDetailDto>
 deactivate Svc
 Ctrl --> Client : 201 Created ApiResponse
 deactivate Ctrl
 
 == Update Assignment ==
 
-Client -> Ctrl : PUT /api/shifts/assignments/{id} (UpdateShiftAssignmentRequest)
+Client -> Ctrl : PUT /api/shifts/assignments/{id}\n(UpdateShiftAssignmentRequest)
 activate Ctrl
 Ctrl -> Svc : UpdateAssignmentAsync(id, request, staffId)
 activate Svc
+
 Svc -> ARepo : GetByIdAsync(id)
 activate ARepo
 ARepo --> Svc : ShiftAssignment?
 deactivate ARepo
-alt Not found or cancelled or already checked in
-    Svc --> Ctrl : throw Exception
-    Ctrl --> Client : 404 / 400 / 409
+alt Not found
+    Svc --> Ctrl : throw NotFoundException
+    Ctrl --> Client : 404
 end
+alt Cancelled assignment
+    Svc --> Ctrl : throw ValidationException
+    Ctrl --> Client : 400
+end
+alt Already checked in
+    Svc --> Ctrl : throw ConflictException
+    Ctrl --> Client : 409
+end
+
+alt PlannedStart >= PlannedEnd
+    Svc --> Ctrl : throw ValidationException
+    Ctrl --> Client : 400
+end
+
 opt Time changed
-    Svc -> ARepo : HasOverlappingAssignmentAsync(...)
+    Svc -> ARepo : HasOverlappingAssignmentAsync(staffId, workDate, start, end, excludeId)
     activate ARepo
     ARepo --> Svc : bool
     deactivate ARepo
-    alt Overlap
+    alt Overlap found
         Svc --> Ctrl : throw ConflictException
         Ctrl --> Client : 409
     end
 end
+
+note right of Svc : Apply partial updates (times, notes, tags)
 Svc -> UoW : SaveChangesAsync()
 activate UoW
-UoW -> DB : UPDATE shift_assignment
+UoW -> DB : UPDATE shift_assignment SET ...
 activate DB
 DB --> UoW : OK
 deactivate DB
 UoW --> Svc : OK
 deactivate UoW
+
+Svc -> ARepo : GetByIdWithDetailsAsync(id)
+activate ARepo
+ARepo --> Svc : ShiftAssignment
+deactivate ARepo
+
 Svc -> RT : PublishBoardChangedAsync(assignment_updated)
+activate RT
+RT --> Svc : OK
+deactivate RT
+
 Svc --> Ctrl : ShiftAssignmentDetailDto
 deactivate Svc
-Ctrl --> Client : 200 OK ApiResponse
+Ctrl --> Client : 200 OK ApiResponse<ShiftAssignmentDetailDto>
 deactivate Ctrl
 
 == Cancel Assignment ==
@@ -215,31 +309,40 @@ Client -> Ctrl : DELETE /api/shifts/assignments/{id}
 activate Ctrl
 Ctrl -> Svc : CancelAssignmentAsync(id)
 activate Svc
+
 Svc -> ARepo : GetByIdAsync(id)
 activate ARepo
 ARepo --> Svc : ShiftAssignment?
 deactivate ARepo
 alt Not found or already cancelled
-    Svc --> Ctrl : throw Exception
+    Svc --> Ctrl : throw NotFoundException / ValidationException
     Ctrl --> Client : 404 / 400
 end
 alt Already checked in
     Svc --> Ctrl : throw ConflictException
     Ctrl --> Client : 409
 end
+
 Svc -> Lookup : ToShiftAssignmentStatusIdAsync(CANCELLED)
 activate Lookup
 Lookup --> Svc : uint statusLvId
 deactivate Lookup
+
+note right of Svc : Set IsActive = false, StatusLvId = CANCELLED
 Svc -> UoW : SaveChangesAsync()
 activate UoW
-UoW -> DB : UPDATE ... SET IsActive=0, StatusLvId=CANCELLED
+UoW -> DB : UPDATE shift_assignment\nSET IsActive = 0, StatusLvId = @cancelled
 activate DB
 DB --> UoW : OK
 deactivate DB
 UoW --> Svc : OK
 deactivate UoW
+
 Svc -> RT : PublishBoardChangedAsync(assignment_cancelled)
+activate RT
+RT --> Svc : OK
+deactivate RT
+
 Svc --> Ctrl : void
 deactivate Svc
 Ctrl --> Client : 204 No Content
@@ -247,43 +350,325 @@ deactivate Ctrl
 
 == Publish Draft Assignments ==
 
-Client -> Ctrl : POST /api/shifts/assignments/publish (PublishAssignmentsRequest)
+Client -> Ctrl : POST /api/shifts/assignments/publish\n(PublishAssignmentsRequest)
 activate Ctrl
 Ctrl -> Svc : PublishAssignmentsAsync(request, staffId)
 activate Svc
-alt By IDs
+
+alt By specific AssignmentIds
     Svc -> ARepo : GetByIdsWithDetailsAsync(ids)
     activate ARepo
-    ARepo --> Svc : List ShiftAssignment (filter DRAFTs)
+    ARepo --> Svc : List<ShiftAssignment>
     deactivate ARepo
-else By date range
-    Svc -> ARepo : GetDraftAssignmentsAsync(from, to)
+    note right of Svc : Filter to keep only DRAFT + IsActive
+else By date range (FromDate, ToDate)
+    Svc -> ARepo : GetDraftAssignmentsAsync(fromDate, toDate)
     activate ARepo
-    ARepo --> Svc : List ShiftAssignment
+    ARepo --> Svc : List<ShiftAssignment>
     deactivate ARepo
+else Neither provided
+    Svc --> Ctrl : throw ValidationException
+    Ctrl --> Client : 400
 end
+
+alt No drafts found
+    Svc --> Ctrl : empty list
+    Ctrl --> Client : 200 OK []
+end
+
 Svc -> Lookup : ToShiftAssignmentStatusIdAsync(ASSIGNED)
 activate Lookup
-Lookup --> Svc : uint
+Lookup --> Svc : uint assignedStatusId
 deactivate Lookup
-loop For each draft
-    note right of Svc : Set status DRAFT to ASSIGNED
+
+loop For each draft assignment
+    note right of Svc : Set StatusLvId = ASSIGNED
 end
+
 Svc -> UoW : SaveChangesAsync()
 activate UoW
-UoW -> DB : UPDATE shift_assignment SET status=ASSIGNED
+UoW -> DB : UPDATE shift_assignment SET StatusLvId = @assigned
 activate DB
 DB --> UoW : OK
 deactivate DB
 UoW --> Svc : OK
 deactivate UoW
+
 loop For each published assignment
     Svc -> Notif : PublishAsync(SHIFT_ASSIGNED)
+    activate Notif
+    Notif --> Svc : OK
+    deactivate Notif
 end
+
 Svc -> RT : PublishBoardChangedAsync(assignments_published)
-Svc --> Ctrl : List ShiftAssignmentListDto
+activate RT
+RT --> Svc : OK
+deactivate RT
+
+Svc --> Ctrl : List<ShiftAssignmentListDto>
 deactivate Svc
 Ctrl --> Client : 200 OK ApiResponse
+deactivate Ctrl
+
+== Copy Week ==
+
+Client -> Ctrl : POST /api/shifts/assignments/copy-week\n(CopyWeekRequest)
+activate Ctrl
+Ctrl -> Svc : CopyWeekAsync(request, staffId)
+activate Svc
+
+alt SourceWeekStart or TargetWeekStart is not Monday
+    Svc --> Ctrl : throw ValidationException
+    Ctrl --> Client : 400
+end
+
+Svc -> ARepo : GetWeekAssignmentsAsync(sourceWeekStart)
+activate ARepo
+ARepo -> DB : SELECT ... WHERE WorkDate BETWEEN @start AND @start+6 AND IsActive = 1
+activate DB
+DB --> ARepo : List<ShiftAssignment>
+deactivate DB
+ARepo --> Svc : sourceAssignments
+deactivate ARepo
+
+alt No source assignments found
+    Svc --> Ctrl : throw NotFoundException
+    Ctrl --> Client : 404
+end
+
+Svc -> Lookup : ToShiftAssignmentStatusIdAsync(DRAFT or ASSIGNED)
+activate Lookup
+Lookup --> Svc : uint statusLvId
+deactivate Lookup
+
+note right of Svc : Calculate dayOffset = target - source
+
+loop For each source assignment
+    note right of Svc : Calculate targetDate, newStart, newEnd
+    Svc -> ARepo : GetAlreadyAssignedStaffIdsAsync(templateId, targetDate, [staffId])
+    activate ARepo
+    ARepo --> Svc : already assigned (skip if found)
+    deactivate ARepo
+    Svc -> ARepo : HasOverlappingAssignmentAsync(staffId, targetDate, newStart, newEnd)
+    activate ARepo
+    ARepo --> Svc : bool (skip if true)
+    deactivate ARepo
+end
+
+alt No assignments could be copied
+    Svc --> Ctrl : throw ConflictException
+    Ctrl --> Client : 409
+end
+
+Svc -> ARepo : AddRange(newEntities)
+Svc -> UoW : SaveChangesAsync()
+activate UoW
+UoW -> DB : INSERT copied assignments
+activate DB
+DB --> UoW : OK
+deactivate DB
+UoW --> Svc : OK
+deactivate UoW
+
+Svc -> ARepo : GetByIdsWithDetailsAsync(newIds)
+activate ARepo
+ARepo --> Svc : List<ShiftAssignment>
+deactivate ARepo
+
+Svc -> RT : PublishBoardChangedAsync(assignments_copied)
+activate RT
+RT --> Svc : OK
+deactivate RT
+
+Svc --> Ctrl : List<ShiftAssignmentListDto>
+deactivate Svc
+Ctrl --> Client : 201 Created ApiResponse
+deactivate Ctrl
+
+== Reassign Shift ==
+
+Client -> Ctrl : PUT /api/shifts/assignments/{id}/reassign\n(ReassignRequest)
+activate Ctrl
+Ctrl -> Svc : ReassignAsync(id, request, staffId)
+activate Svc
+
+Svc -> ARepo : GetByIdWithDetailsAsync(id)
+activate ARepo
+ARepo --> Svc : ShiftAssignment?
+deactivate ARepo
+alt Not found
+    Svc --> Ctrl : throw NotFoundException
+    Ctrl --> Client : 404
+end
+alt Cancelled assignment
+    Svc --> Ctrl : throw ValidationException
+    Ctrl --> Client : 400
+end
+alt Already checked in
+    Svc --> Ctrl : throw ConflictException
+    Ctrl --> Client : 409
+end
+
+Svc -> AccRepo : FindByIdWithRoleAsync(newStaffId)
+activate AccRepo
+AccRepo --> Svc : StaffAccount?
+deactivate AccRepo
+alt New staff not found
+    Svc --> Ctrl : throw NotFoundException
+    Ctrl --> Client : 404
+end
+alt Same staff and same date
+    Svc --> Ctrl : throw ValidationException
+    Ctrl --> Client : 400
+end
+
+Svc -> ARepo : HasOverlappingAssignmentAsync(newStaffId, targetDate, start, end, excludeId)
+activate ARepo
+ARepo --> Svc : bool
+deactivate ARepo
+alt Overlap found
+    Svc --> Ctrl : throw ConflictException
+    Ctrl --> Client : 409
+end
+
+note right of Svc : Update StaffId, WorkDate,\nPlannedStart/End, append reason to Notes
+Svc -> UoW : SaveChangesAsync()
+activate UoW
+UoW -> DB : UPDATE shift_assignment
+activate DB
+DB --> UoW : OK
+deactivate DB
+UoW --> Svc : OK
+deactivate UoW
+
+Svc -> Notif : PublishAsync(SHIFT_ASSIGNED to new staff)
+activate Notif
+Notif --> Svc : OK
+deactivate Notif
+
+Svc -> ARepo : GetByIdWithDetailsAsync(id)
+activate ARepo
+ARepo --> Svc : ShiftAssignment
+deactivate ARepo
+
+Svc -> RT : PublishBoardChangedAsync(assignment_reassigned)
+activate RT
+RT --> Svc : OK
+deactivate RT
+
+Svc --> Ctrl : ShiftAssignmentDetailDto
+deactivate Svc
+Ctrl --> Client : 200 OK ApiResponse<ShiftAssignmentDetailDto>
+deactivate Ctrl
+
+== Confirm Assignment (Staff Self-service) ==
+
+Client -> Ctrl : POST /api/shifts/assignments/{id}/confirm
+activate Ctrl
+Ctrl -> Svc : ConfirmAssignmentAsync(id, staffId)
+activate Svc
+
+Svc -> ARepo : GetByIdWithDetailsAsync(id)
+activate ARepo
+ARepo --> Svc : ShiftAssignment?
+deactivate ARepo
+alt Not found
+    Svc --> Ctrl : throw NotFoundException
+    Ctrl --> Client : 404
+end
+alt Not own shift
+    Svc --> Ctrl : throw ForbiddenException
+    Ctrl --> Client : 403
+end
+
+Svc -> Lookup : ToShiftAssignmentStatusIdAsync(ASSIGNED)
+activate Lookup
+Lookup --> Svc : uint assignedStatusId
+deactivate Lookup
+alt Current status is not ASSIGNED
+    Svc --> Ctrl : throw ValidationException
+    Ctrl --> Client : 400
+end
+
+Svc -> Lookup : ToShiftAssignmentStatusIdAsync(CONFIRMED)
+activate Lookup
+Lookup --> Svc : uint confirmedStatusId
+deactivate Lookup
+
+note right of Svc : Set StatusLvId = CONFIRMED
+Svc -> UoW : SaveChangesAsync()
+activate UoW
+UoW -> DB : UPDATE shift_assignment SET StatusLvId = @confirmed
+activate DB
+DB --> UoW : OK
+deactivate DB
+UoW --> Svc : OK
+deactivate UoW
+
+Svc -> ARepo : GetByIdWithDetailsAsync(id)
+activate ARepo
+ARepo --> Svc : ShiftAssignment
+deactivate ARepo
+
+Svc -> RT : PublishBoardChangedAsync(assignment_confirmed)
+activate RT
+RT --> Svc : OK
+deactivate RT
+
+Svc --> Ctrl : ShiftAssignmentDetailDto
+deactivate Svc
+Ctrl --> Client : 200 OK ApiResponse<ShiftAssignmentDetailDto>
+deactivate Ctrl
+
+== Get My Shifts (Staff Self-service) ==
+
+Client -> Ctrl : GET /api/shifts/my-shifts?filters
+activate Ctrl
+note right of Ctrl : Extract staffId from JWT token
+Ctrl -> Svc : GetMyShiftsAsync(staffId, request)
+activate Svc
+note right of Svc : Force request.StaffId = authenticated staffId
+Svc -> ARepo : GetAssignmentsAsync(request)
+activate ARepo
+ARepo -> DB : SELECT ... WHERE StaffId = @staffId with filters
+activate DB
+DB --> ARepo : (List<ShiftAssignment>, TotalCount)
+deactivate DB
+ARepo --> Svc : (Items, TotalCount)
+deactivate ARepo
+note right of Svc : Map to ShiftAssignmentDetailDto (with attendance)
+Svc --> Ctrl : (List<ShiftAssignmentDetailDto>, TotalCount)
+deactivate Svc
+Ctrl --> Client : 200 OK PagedResult<ShiftAssignmentDetailDto>
+deactivate Ctrl
+
+== Get Team Schedule ==
+
+Client -> Ctrl : GET /api/shifts/team-schedule?weekStart&weekEnd&templateId
+activate Ctrl
+Ctrl -> Svc : GetTeamScheduleAsync(request)
+activate Svc
+
+alt WeekEnd < WeekStart
+    Svc --> Ctrl : throw ValidationException
+    Ctrl --> Client : 400
+end
+
+note right of Svc : Default weekEnd = weekStart + 6 days
+Svc -> ARepo : GetTeamScheduleAsync(weekStart, weekEnd, templateId?)
+activate ARepo
+ARepo -> DB : SELECT ... WHERE WorkDate BETWEEN @start AND @end\nAND IsActive = 1
+activate DB
+DB --> ARepo : List<ShiftAssignment>
+deactivate DB
+ARepo --> Svc : List<ShiftAssignment>
+deactivate ARepo
+
+note right of Svc : Map to ShiftAssignmentListDto
+Svc --> Ctrl : List<ShiftAssignmentListDto>
+deactivate Svc
+Ctrl --> Client : 200 OK ApiResponse<List<ShiftAssignmentListDto>>
 deactivate Ctrl
 
 @enduml
