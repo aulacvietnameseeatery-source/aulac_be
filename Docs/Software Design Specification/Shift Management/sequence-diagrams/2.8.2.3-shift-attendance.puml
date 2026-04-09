@@ -1,9 +1,11 @@
 @startuml
-skinparam linetype ortho
 autonumber
 title 2.8.2.3 Shift Attendance (Check-in / Check-out / Adjust)
 
-actor Client
+actor User as U
+participant "FE Layer" as Client
+note over U, Client : User interacts through FE before backend calls
+U -> Client : uses web app UI
 participant "ShiftController" as Ctrl
 participant "AttendanceService" as Svc
 participant "IAttendanceRepository" as ARepo

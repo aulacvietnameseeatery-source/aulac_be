@@ -1,0 +1,81 @@
+@startuml
+title Inventory Management - Persistence Layer Class Diagram
+
+
+package "Persistence Layer" {
+
+    interface IInventoryRepository <<interface>> {
+        +GetItemsPagedAsync(filter: GetInventoryItemsFilterRequest): Task<PagedResultDTO<InventoryItemDto>>
+        +CreateTransactionAsync(tx: InventoryTransaction, items: List<InventoryTransactionItem>): Task<long>
+        +GetTransactionByIdAsync(id: long): Task<InventoryTransaction?>
+        +GetTransactionsPagedAsync(filter: GetTransactionsFilterRequest): Task<PagedResultDTO<InventoryTransactionListDto>>
+        +UpdateTransactionAsync(tx: InventoryTransaction): Task
+        +GetCurrentStockAsync(ingredientId: long): Task<CurrentStock?>
+        +UpdateStockAsync(ingredientId: long, quantityChange: decimal): Task
+        +GetStockCardAsync(ingredientId: long, pageIndex: int, pageSize: int): Task<PagedResultDTO<StockCardDto>>
+        +GetDashboardAsync(): Task<InventoryDashboardDto>
+        +GetTodayTransactionCountByTypeAsync(typeCode: string): Task<int>
+    }
+
+    class InventoryRepository <<Repository>> {
+        -_context: AuLacDbContext
+    }
+
+    interface IMediaRepository <<interface>> {
+        +AddMediaAsync(asset: MediaAsset): Task<MediaAsset>
+    }
+
+    interface IUnitOfWork <<interface>> {
+        +BeginTransactionAsync(): Task
+        +CommitAsync(): Task
+        +RollbackAsync(): Task
+        +SaveChangesAsync(): Task
+    }
+
+    InventoryRepository ..|> IInventoryRepository : implements
+}
+
+class GetInventoryItemsFilterRequest <<DTO>>
+class GetTransactionsFilterRequest <<DTO>>
+class InventoryItemDto <<DTO>>
+class InventoryTransactionListDto <<DTO>>
+class StockCardDto <<DTO>>
+class InventoryDashboardDto <<DTO>>
+class InventoryTransaction <<Entity>>
+class InventoryTransactionItem <<Entity>>
+class CurrentStock <<Entity>>
+class Ingredient <<Entity>>
+class MediaAsset <<Entity>>
+class AuLacDbContext <<Repository>>
+
+IInventoryRepository -[hidden]right-> IUnitOfWork
+IUnitOfWork -[hidden]right-> IMediaRepository
+IInventoryRepository -[hidden]down-> InventoryRepository
+
+GetInventoryItemsFilterRequest -[hidden]right-> GetTransactionsFilterRequest
+InventoryItemDto -[hidden]right-> InventoryTransactionListDto
+InventoryTransactionListDto -[hidden]right-> StockCardDto
+StockCardDto -[hidden]right-> InventoryDashboardDto
+
+InventoryTransaction -[hidden]right-> InventoryTransactionItem
+InventoryTransactionItem -[hidden]right-> CurrentStock
+CurrentStock -[hidden]right-> Ingredient
+Ingredient -[hidden]right-> MediaAsset
+
+GetTransactionsFilterRequest -[hidden]down-> InventoryTransactionListDto
+InventoryDashboardDto -[hidden]down-> InventoryTransaction
+
+IInventoryRepository ..> GetInventoryItemsFilterRequest : filters with
+IInventoryRepository ..> GetTransactionsFilterRequest : filters with
+IInventoryRepository ..> InventoryItemDto : returns paged items
+IInventoryRepository ..> InventoryTransactionListDto : returns paged transactions
+IInventoryRepository ..> StockCardDto : returns stock movements
+IInventoryRepository ..> InventoryDashboardDto : returns dashboard summary
+IInventoryRepository ..> InventoryTransaction : loads transactions
+IInventoryRepository ..> InventoryTransactionItem : persists line items
+IInventoryRepository ..> CurrentStock : reads and updates
+IInventoryRepository ..> Ingredient : reads ingredient data
+
+InventoryRepository --> AuLacDbContext : uses EF Core context
+IMediaRepository ..> MediaAsset : persists media assets
+@enduml

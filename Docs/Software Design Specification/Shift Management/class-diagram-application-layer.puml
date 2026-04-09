@@ -1,0 +1,153 @@
+@startuml
+title Shift Management - Application Layer Class Diagram
+
+
+package "Application Layer" {
+
+    interface IShiftTemplateService <<interface>> {
+        +GetAllAsync(isActive: bool?): Task<List<ShiftTemplateListDto>>
+        +GetByIdAsync(id: long): Task<ShiftTemplateDetailDto>
+        +CreateAsync(request: CreateShiftTemplateRequest, staffId: long): Task<ShiftTemplateDetailDto>
+        +UpdateAsync(id: long, request: UpdateShiftTemplateRequest, staffId: long): Task<ShiftTemplateDetailDto>
+        +DeactivateAsync(id: long): Task
+    }
+
+    class ShiftTemplateService <<Service>> {
+        -_templateRepo: IShiftTemplateRepository
+        -_unitOfWork: IUnitOfWork
+        +GetAllAsync(isActive: bool?): Task<List<ShiftTemplateListDto>>
+        +GetByIdAsync(id: long): Task<ShiftTemplateDetailDto>
+        +CreateAsync(request: CreateShiftTemplateRequest, staffId: long): Task<ShiftTemplateDetailDto>
+        +UpdateAsync(id: long, request: UpdateShiftTemplateRequest, staffId: long): Task<ShiftTemplateDetailDto>
+        +DeactivateAsync(id: long): Task
+    }
+
+    interface IShiftAssignmentService <<interface>> {
+        +GetAssignmentsAsync(request: GetShiftAssignmentRequest): Task<(List<ShiftAssignmentListDto>, int)>
+        +GetByIdAsync(id: long): Task<ShiftAssignmentDetailDto>
+        +GetLiveBoardAsync(request: GetShiftAssignmentRequest): Task<List<ShiftLiveBoardItemDto>>
+        +CreateAssignmentAsync(request: CreateShiftAssignmentRequest, staffId: long): Task<ShiftAssignmentDetailDto>
+        +BulkCreateAssignmentsAsync(request: BulkCreateAssignmentRequest, staffId: long): Task<List<ShiftAssignmentDetailDto>>
+        +UpdateAssignmentAsync(id: long, request: UpdateShiftAssignmentRequest, staffId: long): Task<ShiftAssignmentDetailDto>
+        +CancelAssignmentAsync(id: long): Task
+        +GetMyShiftsAsync(staffId: long, request: GetShiftAssignmentRequest): Task<(List<ShiftAssignmentDetailDto>, int)>
+        +PublishAssignmentsAsync(request: PublishAssignmentsRequest, staffId: long): Task<List<ShiftAssignmentListDto>>
+        +CopyWeekAsync(request: CopyWeekRequest, staffId: long): Task<List<ShiftAssignmentListDto>>
+        +ReassignAsync(id: long, request: ReassignRequest, staffId: long): Task<ShiftAssignmentDetailDto>
+        +ConfirmAssignmentAsync(id: long, staffId: long): Task<ShiftAssignmentDetailDto>
+        +GetTeamScheduleAsync(request: TeamScheduleRequest): Task<List<ShiftAssignmentListDto>>
+    }
+
+    class ShiftAssignmentService <<Service>> {
+        -_assignmentRepo: IShiftAssignmentRepository
+        -_templateRepo: IShiftTemplateRepository
+        -_accountRepo: IAccountRepository
+        -_orderRepository: IOrderRepository
+        -_unitOfWork: IUnitOfWork
+        -_notificationService: INotificationService
+        -_lookupResolver: ILookupResolver
+        -_options: AttendanceOptions
+        -_shiftLiveRealtimePublisher: IShiftLiveRealtimePublisher
+        +GetAssignmentsAsync(request: GetShiftAssignmentRequest): Task<(List<ShiftAssignmentListDto>, int)>
+        +GetByIdAsync(id: long): Task<ShiftAssignmentDetailDto>
+        +GetLiveBoardAsync(request: GetShiftAssignmentRequest): Task<List<ShiftLiveBoardItemDto>>
+        +CreateAssignmentAsync(request: CreateShiftAssignmentRequest, staffId: long): Task<ShiftAssignmentDetailDto>
+        +BulkCreateAssignmentsAsync(request: BulkCreateAssignmentRequest, staffId: long): Task<List<ShiftAssignmentDetailDto>>
+        +UpdateAssignmentAsync(id: long, request: UpdateShiftAssignmentRequest, staffId: long): Task<ShiftAssignmentDetailDto>
+        +CancelAssignmentAsync(id: long): Task
+        +PublishAssignmentsAsync(request: PublishAssignmentsRequest, staffId: long): Task<List<ShiftAssignmentListDto>>
+        +CopyWeekAsync(request: CopyWeekRequest, staffId: long): Task<List<ShiftAssignmentListDto>>
+        +ReassignAsync(id: long, request: ReassignRequest, staffId: long): Task<ShiftAssignmentDetailDto>
+        +ConfirmAssignmentAsync(id: long, staffId: long): Task<ShiftAssignmentDetailDto>
+        +GetTeamScheduleAsync(request: TeamScheduleRequest): Task<List<ShiftAssignmentListDto>>
+    }
+
+    interface IAttendanceService <<interface>> {
+        +CheckInAsync(assignmentId: long, staffId: long): Task<AttendanceRecordDto>
+        +CheckOutAsync(assignmentId: long, staffId: long): Task<AttendanceRecordDto>
+        +AdjustAttendanceAsync(id: long, request: AdjustAttendanceRequest, reviewerId: long): Task<AttendanceRecordDto>
+        +GetAttendanceReportAsync(request: AttendanceReportRequest): Task<(List<AttendanceReportRowDto>, int)>
+        +GetExceptionsReportAsync(from: DateOnly, to: DateOnly, staffId: long?): Task<List<AttendanceExceptionReportRowDto>>
+        +GetWorkedHoursReportAsync(from: DateOnly, to: DateOnly, staffId: long?): Task<List<WorkedHoursReportRowDto>>
+        +GetReportSnapshotAsync(from: DateOnly, to: DateOnly): Task<ShiftReportSnapshotDto>
+    }
+
+    class AttendanceService <<Service>> {
+        -_attendanceRepo: IAttendanceRepository
+        -_assignmentRepo: IShiftAssignmentRepository
+        -_unitOfWork: IUnitOfWork
+        -_lookupResolver: ILookupResolver
+        -_shiftSettings: IShiftSettingsProvider
+        -_notificationService: INotificationService
+        -_shiftLiveRealtimePublisher: IShiftLiveRealtimePublisher
+        +CheckInAsync(assignmentId: long, staffId: long): Task<AttendanceRecordDto>
+        +CheckOutAsync(assignmentId: long, staffId: long): Task<AttendanceRecordDto>
+        +AdjustAttendanceAsync(id: long, request: AdjustAttendanceRequest, reviewerId: long): Task<AttendanceRecordDto>
+        +GetAttendanceReportAsync(request: AttendanceReportRequest): Task<(List<AttendanceReportRowDto>, int)>
+        +GetExceptionsReportAsync(from: DateOnly, to: DateOnly, staffId: long?): Task<List<AttendanceExceptionReportRowDto>>
+        +GetWorkedHoursReportAsync(from: DateOnly, to: DateOnly, staffId: long?): Task<List<WorkedHoursReportRowDto>>
+        +GetReportSnapshotAsync(from: DateOnly, to: DateOnly): Task<ShiftReportSnapshotDto>
+    }
+
+    interface IShiftSettingsProvider <<interface>> {
+        +GetAllowedEarlyCheckInMinutesAsync(): Task<int>
+        +GetLateGraceMinutesAsync(): Task<int>
+        +GetAbsenceThresholdMinutesAsync(): Task<int>
+        +GetEarlyLeaveBufferMinutesAsync(): Task<int>
+        +GetNoShowThresholdMinutesAsync(): Task<int>
+        +GetMaxWeeklyHoursAsync(): Task<double>
+    }
+
+    class ShiftSettingsProvider <<Service>> {
+        -_systemSettingRepo: ISystemSettingRepository
+        +GetAllowedEarlyCheckInMinutesAsync(): Task<int>
+        +GetLateGraceMinutesAsync(): Task<int>
+        +GetAbsenceThresholdMinutesAsync(): Task<int>
+        +GetEarlyLeaveBufferMinutesAsync(): Task<int>
+        +GetNoShowThresholdMinutesAsync(): Task<int>
+        +GetMaxWeeklyHoursAsync(): Task<double>
+    }
+
+    interface IShiftLiveRealtimePublisher <<interface>> {
+        +PublishBoardChangedAsync(payload: ShiftLiveRealtimeEventDto): Task
+    }
+
+    ShiftTemplateService ..|> IShiftTemplateService : implements
+    ShiftAssignmentService ..|> IShiftAssignmentService : implements
+    AttendanceService ..|> IAttendanceService : implements
+    ShiftSettingsProvider ..|> IShiftSettingsProvider : implements
+}
+
+' External dependency stubs
+interface IShiftTemplateRepository <<interface>>
+interface IShiftAssignmentRepository <<interface>>
+interface IAttendanceRepository <<interface>>
+interface IUnitOfWork <<interface>>
+interface IAccountRepository <<interface>>
+interface IOrderRepository <<interface>>
+interface INotificationService <<interface>>
+interface ILookupResolver <<interface>>
+interface ISystemSettingRepository <<interface>>
+
+ShiftTemplateService --> IShiftTemplateRepository : uses for persistence
+ShiftTemplateService --> IUnitOfWork : uses for transactions
+
+ShiftAssignmentService --> IShiftAssignmentRepository : uses for persistence
+ShiftAssignmentService --> IShiftTemplateRepository : validates templates
+ShiftAssignmentService --> IAccountRepository : validates staff accounts
+ShiftAssignmentService --> IOrderRepository : reads order data for live board
+ShiftAssignmentService --> IUnitOfWork : uses for transactions
+ShiftAssignmentService --> INotificationService : sends notifications
+ShiftAssignmentService ..> ILookupResolver : resolves lookup values
+ShiftAssignmentService --> IShiftLiveRealtimePublisher : publishes live updates
+
+AttendanceService --> IAttendanceRepository : uses for persistence
+AttendanceService --> IShiftAssignmentRepository : validates assignments
+AttendanceService --> IUnitOfWork : uses for transactions
+AttendanceService --> IShiftSettingsProvider : reads attendance config
+AttendanceService --> INotificationService : sends notifications
+AttendanceService ..> ILookupResolver : resolves lookup values
+AttendanceService --> IShiftLiveRealtimePublisher : publishes live updates
+
+ShiftSettingsProvider --> ISystemSettingRepository : reads system settings
+@enduml

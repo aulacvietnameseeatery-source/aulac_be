@@ -1,0 +1,113 @@
+@startuml
+title Inventory Management - Main Cross-Layer Interactions
+
+
+package "Presentation Layer" {
+    class InventoryController <<Controller>> {
+        -_inventoryService: IInventoryService
+        +GetItems(filter): IActionResult
+        +GetTransactions(filter): IActionResult
+        +GetTransactionDetail(id: long): IActionResult
+        +CreateTransaction(formRequest): IActionResult
+        +SubmitTransaction(id: long, request): IActionResult
+        +ApproveTransaction(id: long, request): IActionResult
+        +GetStockCard(ingredientId: long): IActionResult
+        +GetDashboard(): IActionResult
+    }
+}
+
+package "Application Layer" {
+    interface IInventoryService <<interface>> {
+        +GetItemsAsync(filter): Task<PagedResultDTO<InventoryItemDto>>
+        +CreateTransactionAsync(request, userId: long, files): Task<InventoryTransactionDetailDto>
+        +GetTransactionsAsync(filter): Task<PagedResultDTO<InventoryTransactionListDto>>
+        +SubmitTransactionAsync(id: long, request, userId: long): Task<InventoryTransactionDetailDto>
+        +ApproveTransactionAsync(id: long, request, userId: long): Task<InventoryTransactionDetailDto>
+        +GetStockCardAsync(ingredientId: long): Task<PagedResultDTO<StockCardDto>>
+        +GetDashboardAsync(): Task<InventoryDashboardDto>
+    }
+
+    class InventoryService <<Service>> {
+        -_repo: IInventoryRepository
+        -_unitOfWork: IUnitOfWork
+        -_mediaRepository: IMediaRepository
+    }
+
+    InventoryService ..|> IInventoryService : implements
+}
+
+package "Persistence Layer" {
+    interface IInventoryRepository <<interface>> {
+        +GetItemsPagedAsync(filter): Task<PagedResultDTO<InventoryItemDto>>
+        +CreateTransactionAsync(tx, items): Task<long>
+        +GetTransactionByIdAsync(id: long): Task<InventoryTransaction?>
+        +UpdateTransactionAsync(tx): Task
+        +GetCurrentStockAsync(ingredientId: long): Task<CurrentStock?>
+        +UpdateStockAsync(ingredientId: long, quantityChange: decimal): Task
+        +GetDashboardAsync(): Task<InventoryDashboardDto>
+    }
+
+    class InventoryRepository <<Repository>> {
+        -_context: AuLacDbContext
+    }
+
+    interface IUnitOfWork <<interface>> {
+        +BeginTransactionAsync(): Task
+        +CommitAsync(): Task
+        +RollbackAsync(): Task
+        +SaveChangesAsync(): Task
+    }
+
+    interface IMediaRepository <<interface>> {
+        +AddMediaAsync(asset: MediaAsset): Task<MediaAsset>
+    }
+
+    InventoryRepository ..|> IInventoryRepository : implements
+}
+
+package "Domain Layer" {
+    class InventoryTransaction <<Entity>> {
+        +TransactionId: long
+        +TransactionCode: string?
+        +TypeLvId: uint
+        +StatusLvId: uint
+    }
+
+    class InventoryTransactionItem <<Entity>> {
+        +TransactionItemId: long
+        +IngredientId: long
+        +Quantity: decimal
+    }
+
+    class Ingredient <<Entity>> {
+        +IngredientId: long
+        +IngredientName: string
+    }
+
+    class CurrentStock <<Entity>> {
+        +IngredientId: long
+        +QuantityOnHand: decimal
+    }
+
+    class MediaAsset <<Entity>> {
+        +MediaId: long
+        +Url: string
+    }
+
+    InventoryTransaction "1" *-- "1..*" InventoryTransactionItem : contains line items
+    Ingredient "1" *-- "0..1" CurrentStock : tracks current stock
+    InventoryTransactionItem "0..*" --> "1" Ingredient : references ingredient
+}
+
+' Cross-layer relationships
+InventoryController --> IInventoryService : invokes inventory use cases
+
+InventoryService --> IInventoryRepository : uses for persistence
+InventoryService --> IUnitOfWork : coordinates transaction boundary
+InventoryService --> IMediaRepository : persists evidence files
+
+InventoryRepository ..> InventoryTransaction : persists aggregate root
+InventoryRepository ..> InventoryTransactionItem : persists line items
+InventoryRepository ..> CurrentStock : reads and updates stock
+IMediaRepository ..> MediaAsset : persists media entity
+@enduml

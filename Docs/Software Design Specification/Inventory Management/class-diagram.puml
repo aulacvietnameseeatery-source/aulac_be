@@ -1,7 +1,15 @@
 @startuml
-skinparam linetype ortho
+skinparam nodesep 2
+skinparam ranksep 10
+skinparam padding 2
+skinparam ClassPadding 2
+skinparam packagePadding 4
+skinparam BoxPadding 2
+skinparam classFontSize 10
+skinparam classAttributeFontSize 10
+skinparam classMethodFontSize 10
 title Inventory Management Module - Specification Class Diagram
-left to right direction
+
 
 ' ══════════════════════════════════════════════════════════════
 '  PRESENTATION LAYER
@@ -9,7 +17,7 @@ left to right direction
 
 package "Presentation Layer" {
 
-    class InventoryController {
+    class InventoryController <<Controller>> {
         -_inventoryService: IInventoryService
         -_logger: ILogger<InventoryController>
         -GetCurrentUserId(): long
@@ -231,7 +239,7 @@ package "Presentation Layer" {
 
 package "Application Layer" {
 
-    interface IInventoryService {
+    interface IInventoryService <<interface>> {
         +GetItemsAsync(filter: GetInventoryItemsFilterRequest): Task<PagedResultDTO<InventoryItemDto>>
         +CreateTransactionAsync(request: CreateInventoryTransactionRequest, userId: long, files: IReadOnlyList<MediaFileInput>?): Task<InventoryTransactionDetailDto>
         +GetTransactionDetailAsync(id: long): Task<InventoryTransactionDetailDto>
@@ -242,7 +250,7 @@ package "Application Layer" {
         +GetDashboardAsync(): Task<InventoryDashboardDto>
     }
 
-    class InventoryService {
+    class InventoryService <<Service>> {
         -_repo: IInventoryRepository
         -_unitOfWork: IUnitOfWork
         -_lookupResolver: ILookupResolver
@@ -271,7 +279,7 @@ package "Application Layer" {
 
 package "Persistence Layer" {
 
-    interface IInventoryRepository {
+    interface IInventoryRepository <<interface>> {
         +GetItemsPagedAsync(filter: GetInventoryItemsFilterRequest): Task<PagedResultDTO<InventoryItemDto>>
         +CreateTransactionAsync(tx: InventoryTransaction, items: List<InventoryTransactionItem>): Task<long>
         +GetTransactionByIdAsync(id: long): Task<InventoryTransaction?>
@@ -284,15 +292,15 @@ package "Persistence Layer" {
         +GetTodayTransactionCountByTypeAsync(typeCode: string): Task<int>
     }
 
-    class InventoryRepository {
+    class InventoryRepository <<Repository>> {
         -_context: AuLacDbContext
     }
 
-    interface IMediaRepository {
+    interface IMediaRepository <<interface>> {
         +AddMediaAsync(asset: MediaAsset): Task<MediaAsset>
     }
 
-    interface IUnitOfWork {
+    interface IUnitOfWork <<interface>> {
         +BeginTransactionAsync(): Task
         +CommitAsync(): Task
         +RollbackAsync(): Task
