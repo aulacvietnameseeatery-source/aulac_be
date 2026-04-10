@@ -84,6 +84,7 @@ public class AuthController : ControllerBase
                 Success = false,
                 Code = 401,
                 UserMessage = result.ErrorMessage,
+                SystemMessage = result.ErrorCode,
                 Data = new AuthErrorDto
                 {
                     ErrorCode = result.ErrorCode ?? "AUTH_ERROR",
