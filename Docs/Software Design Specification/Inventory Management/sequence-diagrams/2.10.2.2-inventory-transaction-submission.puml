@@ -2,7 +2,10 @@
 autonumber
 title 2.10.2.2 Inventory Transaction Submission
 
-actor C as "Client"
+actor User as U
+participant "FE Layer" as C
+note over U, C : User interacts through FE before backend calls
+U -> C : uses web app UI
 participant "InventoryController" as Ctrl
 participant "InventoryService" as Svc
 participant "InventoryRepository" as Repo

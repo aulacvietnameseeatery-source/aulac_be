@@ -16,5 +16,8 @@ namespace Core.DTO.Reservation
         public DateTime? Date { get; set; } // Lọc theo ngày cụ thể (Today, Tomorrow...)
 
         public long? StatusId { get; set; } // Lọc theo Tab (Pending, Confirmed...)
+        public string? SortBy { get; set; }
+        public long? CreatorId { get; set; }
+        public long? TableId { get; set; }
     }
 }

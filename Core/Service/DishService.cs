@@ -219,12 +219,12 @@ public class DishService : IDishService
     /// Lấy danh sách cho Customer (Đã hỗ trợ Đa ngôn ngữ trọn gói)
     /// </summary>
     public async Task<(List<DishDisplayDto> Items, int TotalCount)> GetDishesForCustomerAsync(
-        GetDishesRequest request,
-   CancellationToken cancellationToken = default)
+    GetDishesRequest request,
+    CancellationToken cancellationToken = default)
     {
         request.IsCustomerView = true;
         var (entities, totalCount) = await _dishRepository.GetDishesAsync(request, cancellationToken);
-        
+
         var showImages = await ShouldShowMedia("landing_page.show_dish_image", cancellationToken);
 
         var dtos = entities.Select(d => new DishDisplayDto
@@ -232,11 +232,13 @@ public class DishService : IDishService
             DishId = d.DishId,
             DishName = MapTranslations(d.DishNameText, d.DishName),
             Price = d.Price,
+
+            CategoryId = d.CategoryId,
+
             CategoryName = d.Category != null
-            ? MapTranslations(d.Category.CategoryNameText, d.Category.CategoryName) : new I18nTextDto(),
+                ? MapTranslations(d.Category.CategoryNameText, d.Category.CategoryName) : new I18nTextDto(),
             Description = MapTranslations(d.DescriptionText, string.Empty),
-            // Url stores RelativePath — resolve to public URL at read time
-            ImageUrl = showImages 
+            ImageUrl = showImages
                 ? (d.DishMedia.FirstOrDefault(dm => dm.IsPrimary == true)?.Media?.Url is { } primaryUrl
                     ? _fileStorage.GetPublicUrl(primaryUrl)
                     : d.DishMedia.FirstOrDefault()?.Media?.Url is { } firstUrl ? _fileStorage.GetPublicUrl(firstUrl) : null)

@@ -11,7 +11,7 @@ namespace Core.DTO.Dish
         public long DishId { get; set; }
 
         public I18nTextDto DishName { get; set; } = new I18nTextDto();
-
+        public long CategoryId { get; set; }
         public decimal Price { get; set; }
         public I18nTextDto CategoryName { get; set; } = new I18nTextDto();
 

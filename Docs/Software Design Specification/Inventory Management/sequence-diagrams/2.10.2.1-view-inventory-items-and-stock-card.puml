@@ -2,7 +2,10 @@
 autonumber
 title 2.10.2.1 View Inventory Items & Stock Card
 
-actor Client
+actor User as U
+participant "FE Layer" as Client
+note over U, Client : User interacts through FE before backend calls
+U -> Client : uses web app UI
 participant "InventoryController" as Ctrl
 participant "InventoryService" as Svc
 participant "IInventoryRepository" as Repo

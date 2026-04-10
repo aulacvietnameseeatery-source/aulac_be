@@ -1,525 +1,458 @@
 @startuml
+skinparam nodesep 2
+skinparam ranksep 10
+skinparam padding 2
+skinparam ClassPadding 2
+skinparam packagePadding 4
+skinparam BoxPadding 2
+skinparam classFontSize 10
+skinparam classAttributeFontSize 10
+skinparam classMethodFontSize 10
 title Inventory Management Module - Specification Class Diagram
-skinparam classAttributeIconSize 0
 
-' ═══════════════════════════════════════════════════
-' ENUMS
-' ═══════════════════════════════════════════════════
 
-enum InventoryTxTypeCode {
-    IN
-    OUT
-    ADJUST
+' ══════════════════════════════════════════════════════════════
+'  PRESENTATION LAYER
+' ══════════════════════════════════════════════════════════════
+
+package "Presentation Layer" {
+
+    class InventoryController <<Controller>> {
+        -_inventoryService: IInventoryService
+        -_logger: ILogger<InventoryController>
+        -GetCurrentUserId(): long
+        +GetItems(filter: GetInventoryItemsFilterRequest): IActionResult
+        +GetTransactions(filter: GetTransactionsFilterRequest): IActionResult
+        +GetTransactionDetail(id: long): IActionResult
+        +CreateTransaction(formRequest: CreateInventoryTransactionFormRequest): IActionResult
+        +SubmitTransaction(id: long, request: SubmitTransactionRequest?): IActionResult
+        +ApproveTransaction(id: long, request: ApproveTransactionRequest): IActionResult
+        +GetStockCard(ingredientId: long, pageIndex: int, pageSize: int): IActionResult
+        +GetDashboard(): IActionResult
+    }
+
+    ' ── Item DTOs ──
+
+    class GetInventoryItemsFilterRequest <<DTO>> {
+        +PageIndex: int
+        +PageSize: int
+        +Search: string?
+        +CategoryLvId: uint?
+        +TypeLvId: uint?
+        +IsLowStock: bool?
+    }
+
+    class InventoryItemDto <<DTO>> {
+        +IngredientId: long
+        +IngredientName: string
+        +UnitLvId: uint
+        +UnitName: string?
+        +TypeLvId: uint?
+        +TypeName: string?
+        +CategoryLvId: uint?
+        +CategoryCode: string?
+        +CategoryName: string?
+        +ImageId: long?
+        +ImageUrl: string?
+        +QuantityOnHand: decimal
+        +MinStockLevel: decimal
+        +LastUpdatedAt: DateTime?
+        +IsLowStock: bool
+    }
+
+    ' ── Transaction Request DTOs ──
+
+    class CreateInventoryTransactionFormRequest <<DTO>> {
+        +RequestJson: string
+        +EvidenceFiles: List<IFormFile>?
+    }
+
+    class CreateInventoryTransactionRequest <<DTO>> {
+        +TypeLvId: uint
+        +ExportReasonLvId: uint?
+        +SupplierId: long?
+        +StockCheckAreaNote: string?
+        +Note: string?
+        +Items: List<TransactionItemRequest>
+    }
+
+    class TransactionItemRequest <<DTO>> {
+        +IngredientId: long
+        +Quantity: decimal
+        +UnitLvId: uint
+        +UnitPrice: decimal?
+        +Note: string?
+    }
+
+    class SubmitTransactionRequest <<DTO>> {
+        +MediaIds: List<long>?
+    }
+
+    class ApproveTransactionRequest <<DTO>> {
+        +IsApproved: bool
+        +Note: string?
+    }
+
+    class GetTransactionsFilterRequest <<DTO>> {
+        +PageIndex: int
+        +PageSize: int
+        +Search: string?
+        +TypeLvId: uint?
+        +StatusLvId: uint?
+        +ExportReasonLvId: uint?
+        +SupplierId: long?
+        +FromDate: DateTime?
+        +ToDate: DateTime?
+    }
+
+    ' ── Transaction Response DTOs ──
+
+    class InventoryTransactionListDto <<DTO>> {
+        +TransactionId: long
+        +TransactionCode: string?
+        +TypeLvId: uint
+        +TypeCode: string?
+        +TypeName: string?
+        +StatusLvId: uint
+        +StatusCode: string?
+        +StatusName: string?
+        +ExportReasonLvId: uint?
+        +ExportReasonName: string?
+        +SupplierId: long?
+        +SupplierName: string?
+        +CreatedBy: long?
+        +CreatedByName: string?
+        +CreatedAt: DateTime?
+        +SubmittedAt: DateTime?
+        +ApprovedBy: long?
+        +ApprovedByName: string?
+        +ApprovedAt: DateTime?
+        +Note: string?
+        +ItemCount: int
+        +TotalValue: decimal?
+    }
+
+    class InventoryTransactionDetailDto <<DTO>> {
+        +TransactionId: long
+        +TransactionCode: string?
+        +TypeLvId: uint
+        +TypeCode: string?
+        +TypeName: string?
+        +StatusLvId: uint
+        +StatusCode: string?
+        +StatusName: string?
+        +ExportReasonLvId: uint?
+        +ExportReasonCode: string?
+        +ExportReasonName: string?
+        +SupplierId: long?
+        +SupplierName: string?
+        +CreatedBy: long?
+        +CreatedByName: string?
+        +CreatedAt: DateTime?
+        +SubmittedAt: DateTime?
+        +ApprovedBy: long?
+        +ApprovedByName: string?
+        +ApprovedAt: DateTime?
+        +Note: string?
+        +StockCheckAreaNote: string?
+        +Items: List<TransactionItemDto>
+        +Media: List<TransactionMediaDto>
+    }
+
+    class TransactionItemDto <<DTO>> {
+        +TransactionItemId: long
+        +IngredientId: long
+        +IngredientName: string?
+        +IngredientImageUrl: string?
+        +CategoryLvId: uint?
+        +CategoryCode: string?
+        +CategoryName: string?
+        +Quantity: decimal
+        +UnitLvId: uint
+        +UnitName: string?
+        +UnitPrice: decimal?
+        +SystemQuantity: decimal?
+        +ActualQuantity: decimal?
+        +VarianceReasonLvId: uint?
+        +VarianceReasonName: string?
+        +Note: string?
+    }
+
+    class TransactionMediaDto <<DTO>> {
+        +MediaId: long
+        +Url: string?
+        +MediaType: string?
+    }
+
+    ' ── Stock Card DTO ──
+
+    class StockCardDto <<DTO>> {
+        +TransactionItemId: long
+        +TransactionId: long
+        +TransactionCode: string?
+        +TypeCode: string?
+        +TypeName: string?
+        +StatusCode: string?
+        +QuantityChanged: decimal
+        +UnitName: string?
+        +UnitPrice: decimal?
+        +ExportReasonName: string?
+        +Note: string?
+        +CreatedByName: string?
+        +CreatedAt: DateTime?
+    }
+
+    ' ── Dashboard DTOs ──
+
+    class InventoryDashboardDto <<DTO>> {
+        +TotalItems: int
+        +LowStockItems: int
+        +OutOfStockItems: int
+        +PendingTransactions: int
+        +LowStockList: List<LowStockItemDto>
+        +RecentTransactions: List<RecentTransactionDto>
+    }
+
+    class LowStockItemDto <<DTO>> {
+        +IngredientId: long
+        +IngredientName: string?
+        +CategoryName: string?
+        +QuantityOnHand: decimal
+        +MinStockLevel: decimal
+        +UnitName: string?
+    }
+
+    class RecentTransactionDto <<DTO>> {
+        +TransactionId: long
+        +TransactionCode: string?
+        +TypeName: string?
+        +StatusName: string?
+        +CreatedByName: string?
+        +CreatedAt: DateTime?
+        +ItemCount: int
+    }
 }
 
-enum InventoryTxStatusCode {
-    DRAFT
-    PENDING_APPROVAL
-    COMPLETED
-    CANCELLED
+' ══════════════════════════════════════════════════════════════
+'  APPLICATION LAYER
+' ══════════════════════════════════════════════════════════════
+
+package "Application Layer" {
+
+    interface IInventoryService <<interface>> {
+        +GetItemsAsync(filter: GetInventoryItemsFilterRequest): Task<PagedResultDTO<InventoryItemDto>>
+        +CreateTransactionAsync(request: CreateInventoryTransactionRequest, userId: long, files: IReadOnlyList<MediaFileInput>?): Task<InventoryTransactionDetailDto>
+        +GetTransactionDetailAsync(id: long): Task<InventoryTransactionDetailDto>
+        +GetTransactionsAsync(filter: GetTransactionsFilterRequest): Task<PagedResultDTO<InventoryTransactionListDto>>
+        +SubmitTransactionAsync(id: long, request: SubmitTransactionRequest?, userId: long): Task<InventoryTransactionDetailDto>
+        +ApproveTransactionAsync(id: long, request: ApproveTransactionRequest, userId: long): Task<InventoryTransactionDetailDto>
+        +GetStockCardAsync(ingredientId: long, pageIndex: int, pageSize: int): Task<PagedResultDTO<StockCardDto>>
+        +GetDashboardAsync(): Task<InventoryDashboardDto>
+    }
+
+    class InventoryService <<Service>> {
+        -_repo: IInventoryRepository
+        -_unitOfWork: IUnitOfWork
+        -_lookupResolver: ILookupResolver
+        -_notificationService: INotificationService
+        -_fileStorage: IFileStorage
+        -_mediaRepository: IMediaRepository
+        +GetItemsAsync(filter: GetInventoryItemsFilterRequest): Task<PagedResultDTO<InventoryItemDto>>
+        +CreateTransactionAsync(request: CreateInventoryTransactionRequest, userId: long, files: IReadOnlyList<MediaFileInput>?): Task<InventoryTransactionDetailDto>
+        +GetTransactionDetailAsync(id: long): Task<InventoryTransactionDetailDto>
+        +GetTransactionsAsync(filter: GetTransactionsFilterRequest): Task<PagedResultDTO<InventoryTransactionListDto>>
+        +SubmitTransactionAsync(id: long, request: SubmitTransactionRequest?, userId: long): Task<InventoryTransactionDetailDto>
+        +ApproveTransactionAsync(id: long, request: ApproveTransactionRequest, userId: long): Task<InventoryTransactionDetailDto>
+        +GetStockCardAsync(ingredientId: long, pageIndex: int, pageSize: int): Task<PagedResultDTO<StockCardDto>>
+        +GetDashboardAsync(): Task<InventoryDashboardDto>
+        -SaveEvidenceFilesAsync(txId: long, tx: InventoryTransaction, files: IReadOnlyList<MediaFileInput>): Task
+        -GenerateTransactionCodeAsync(typeCode: string): Task<string>
+        -ValidateExportReasonScopingAsync(entity: InventoryTransaction): Task
+    }
+
+    InventoryService ..|> IInventoryService : implements
 }
 
-enum InventoryCategoryCode {
-    FOOD_INGREDIENT
-    KITCHEN_TOOL
-    CONSUMABLE_SUPPLY
-    EQUIPMENT
+' ══════════════════════════════════════════════════════════════
+'  PERSISTENCE LAYER
+' ══════════════════════════════════════════════════════════════
+
+package "Persistence Layer" {
+
+    interface IInventoryRepository <<interface>> {
+        +GetItemsPagedAsync(filter: GetInventoryItemsFilterRequest): Task<PagedResultDTO<InventoryItemDto>>
+        +CreateTransactionAsync(tx: InventoryTransaction, items: List<InventoryTransactionItem>): Task<long>
+        +GetTransactionByIdAsync(id: long): Task<InventoryTransaction?>
+        +GetTransactionsPagedAsync(filter: GetTransactionsFilterRequest): Task<PagedResultDTO<InventoryTransactionListDto>>
+        +UpdateTransactionAsync(tx: InventoryTransaction): Task
+        +GetCurrentStockAsync(ingredientId: long): Task<CurrentStock?>
+        +UpdateStockAsync(ingredientId: long, quantityChange: decimal): Task
+        +GetStockCardAsync(ingredientId: long, pageIndex: int, pageSize: int): Task<PagedResultDTO<StockCardDto>>
+        +GetDashboardAsync(): Task<InventoryDashboardDto>
+        +GetTodayTransactionCountByTypeAsync(typeCode: string): Task<int>
+    }
+
+    class InventoryRepository <<Repository>> {
+        -_context: AuLacDbContext
+    }
+
+    interface IMediaRepository <<interface>> {
+        +AddMediaAsync(asset: MediaAsset): Task<MediaAsset>
+    }
+
+    interface IUnitOfWork <<interface>> {
+        +BeginTransactionAsync(): Task
+        +CommitAsync(): Task
+        +RollbackAsync(): Task
+        +SaveChangesAsync(): Task
+    }
+
+    InventoryRepository ..|> IInventoryRepository : implements
 }
 
-enum ExportReasonCode {
-    COOKING
-    SPOILED
-    EXPIRED
-    BROKEN
-    LOST
-    DISPOSED
-    WORN_OUT
+' ══════════════════════════════════════════════════════════════
+'  DOMAIN LAYER
+' ══════════════════════════════════════════════════════════════
+
+package "Domain Layer" {
+
+    class InventoryTransaction <<Entity>> {
+        +TransactionId: long
+        +TransactionCode: string?
+        +CreatedBy: long?
+        +CreatedAt: DateTime?
+        +SubmittedAt: DateTime?
+        +ApprovedBy: long?
+        +ApprovedAt: DateTime?
+        +Note: string?
+        +TypeLvId: uint
+        +StatusLvId: uint
+        +SupplierId: long?
+        +ExportReasonLvId: uint?
+        +StockCheckAreaNote: string?
+    }
+
+    class InventoryTransactionItem <<Entity>> {
+        +TransactionItemId: long
+        +TransactionId: long
+        +IngredientId: long
+        +Quantity: decimal
+        +UnitLvId: uint
+        +UnitPrice: decimal?
+        +SystemQuantity: decimal?
+        +ActualQuantity: decimal?
+        +VarianceReasonLvId: uint?
+        +Note: string?
+    }
+
+    class InventoryTransactionMedium <<Entity>> {
+        +TransactionId: long
+        +MediaId: long
+        +IsPrimary: bool?
+    }
+
+    class Ingredient <<Entity>> {
+        +IngredientId: long
+        +IngredientName: string
+        +UnitLvId: uint
+        +TypeLvId: uint?
+        +CategoryLvId: uint?
+        +IngredientNameTextId: long?
+        +ImageId: long?
+    }
+
+    class CurrentStock <<Entity>> {
+        +IngredientId: long
+        +QuantityOnHand: decimal
+        +MinStockLevel: decimal
+        +LastUpdatedAt: DateTime?
+    }
+
+    class Supplier <<Entity>> {
+        +SupplierId: long
+        +SupplierName: string
+        +Phone: string?
+        +Email: string?
+        +Address: string?
+        +TaxCode: string?
+    }
+
+    class LookupValue <<Entity>> {
+        +ValueId: uint
+        +TypeId: ushort
+        +ValueCode: string
+        +ValueName: string
+    }
+
+    class MediaAsset <<Entity>> {
+        +MediaId: long
+        +Url: string
+        +MimeType: string
+        +MediaTypeLvId: uint
+        +CreatedAt: DateTime
+    }
+
+    class StaffAccount <<Entity>> {
+        +AccountId: long
+        +FullName: string
+        +RoleId: long
+    }
+
+    ' ── Domain Relationships ──
+
+    InventoryTransaction "1" *-- "1..*" InventoryTransactionItem : contains line items
+    InventoryTransaction "1" *-- "0..*" InventoryTransactionMedium : has evidence media
+    InventoryTransactionItem "0..*" --> "1" Ingredient : references ingredient
+    InventoryTransactionMedium "0..*" --> "1" MediaAsset : references media
+    Ingredient "1" *-- "0..1" CurrentStock : tracks current stock
+    InventoryTransaction "0..*" --> "0..1" Supplier : supplied by
+    InventoryTransaction "0..*" --> "1" LookupValue : transaction type
+    InventoryTransaction "0..*" --> "1" LookupValue : transaction status
+    InventoryTransaction "0..*" --> "0..1" LookupValue : export reason
+    InventoryTransactionItem "0..*" --> "1" LookupValue : unit
+    Ingredient "0..*" --> "0..1" LookupValue : ingredient type
+    Ingredient "0..*" --> "0..1" LookupValue : inventory category
+    InventoryTransaction "0..*" --> "0..1" StaffAccount : created by
+    InventoryTransaction "0..*" --> "0..1" StaffAccount : approved by
 }
 
-' ═══════════════════════════════════════════════════
-' DOMAIN LAYER — Entities
-' ═══════════════════════════════════════════════════
+' ══════════════════════════════════════════════════════════════
+'  CROSS-LAYER RELATIONSHIPS
+' ══════════════════════════════════════════════════════════════
 
-class InventoryTransaction {
-    +TransactionId: long
-    +TransactionCode: string?
-    +CreatedBy: long?
-    +CreatedAt: DateTime?
-    +SubmittedAt: DateTime?
-    +ApprovedBy: long?
-    +ApprovedAt: DateTime?
-    +Note: string?
-    +TypeLvId: uint
-    +StatusLvId: uint
-    +SupplierId: long?
-    +ExportReasonLvId: uint?
-    +StockCheckAreaNote: string?
-}
+' Presentation → Application
+InventoryController --> IInventoryService : uses for all inventory operations
+InventoryController ..> CreateInventoryTransactionFormRequest : receives multipart form payload
+InventoryController ..> CreateInventoryTransactionRequest : deserializes from RequestJson
+InventoryController ..> ApproveTransactionRequest : receives
+InventoryController ..> SubmitTransactionRequest : receives
+InventoryController ..> GetInventoryItemsFilterRequest : receives
+InventoryController ..> GetTransactionsFilterRequest : receives
+InventoryController ..> InventoryTransactionDetailDto : returns
+InventoryController ..> InventoryItemDto : returns
+InventoryController ..> StockCardDto : returns
+InventoryController ..> InventoryDashboardDto : returns
 
-class InventoryTransactionItem {
-    +TransactionItemId: long
-    +TransactionId: long
-    +IngredientId: long
-    +Quantity: decimal
-    +UnitLvId: uint
-    +UnitPrice: decimal?
-    +SystemQuantity: decimal?
-    +ActualQuantity: decimal?
-    +VarianceReasonLvId: uint?
-    +Note: string?
-}
+' DTO-to-DTO dependencies
+CreateInventoryTransactionRequest ..> TransactionItemRequest : contains item requests
+InventoryTransactionDetailDto ..> TransactionItemDto : contains transaction items
+InventoryTransactionDetailDto ..> TransactionMediaDto : contains evidence media
+InventoryDashboardDto ..> LowStockItemDto : contains low-stock summaries
+InventoryDashboardDto ..> RecentTransactionDto : contains recent transaction summaries
 
-class InventoryTransactionMedium {
-    +TransactionId: long
-    +MediaId: long
-    +IsPrimary: bool?
-}
+' Application → Persistence
+InventoryService --> IInventoryRepository : uses for data access
+InventoryService --> IUnitOfWork : uses for transactions
+InventoryService --> IMediaRepository : saves evidence files
 
-class Ingredient {
-    +IngredientId: long
-    +IngredientName: string
-    +UnitLvId: uint
-    +TypeLvId: uint?
-    +CategoryLvId: uint?
-    +ImageId: long?
-}
+' Contract DTO dependencies
+IInventoryService ..> InventoryTransactionListDto : returns paged transaction summaries
+IInventoryRepository ..> InventoryTransactionListDto : returns paged transaction summaries
 
-class CurrentStock {
-    +IngredientId: long
-    +QuantityOnHand: decimal
-    +MinStockLevel: decimal
-    +LastUpdatedAt: DateTime?
-}
-
-class Supplier {
-    +SupplierId: long
-    +SupplierName: string
-    +Phone: string?
-    +Email: string?
-    +Address: string?
-    +TaxCode: string?
-}
-
-' Cross-module entities (not owned by this module)
-
-class LookupValue <<cross-module>> {
-    +LookupValueId: uint
-    +ValueCode: string
-    +ValueName: string
-}
-
-class StaffAccount <<cross-module>> {
-    +AccountId: long
-    +FullName: string
-}
-
-class MediaAsset <<cross-module>> {
-    +MediaId: long
-    +Url: string
-    +MimeType: string
-}
-
-' --- Entity Relationships ---
-
-InventoryTransaction "1" *-- "0..*" InventoryTransactionItem : contains items
-InventoryTransaction "1" *-- "0..*" InventoryTransactionMedium : contains evidence media
-InventoryTransaction --> LookupValue : type classification (TypeLv)
-InventoryTransaction --> LookupValue : status tracking (StatusLv)
-InventoryTransaction --> LookupValue : export reason (ExportReasonLv)
-InventoryTransaction "0..*" --> "0..1" Supplier : belongs to supplier
-InventoryTransaction "0..*" --> "0..1" StaffAccount : created by staff
-InventoryTransaction "0..*" --> "0..1" StaffAccount : approved by staff
-
-InventoryTransactionItem "0..*" --> "1" Ingredient : references ingredient
-InventoryTransactionItem --> LookupValue : unit of measure (UnitLv)
-InventoryTransactionItem --> LookupValue : variance reason (VarianceReasonLv)
-
-InventoryTransactionMedium "0..*" --> "1" MediaAsset : references media asset
-
-Ingredient "1" *-- "0..1" CurrentStock : tracks current stock level
-Ingredient --> LookupValue : unit (UnitLv)
-Ingredient --> LookupValue : type (TypeLv)
-Ingredient --> LookupValue : category (CategoryLv)
-Ingredient "0..*" --> "0..1" MediaAsset : has profile image
-
-
-' ═══════════════════════════════════════════════════
-' PRESENTATION LAYER — Request DTOs
-' ═══════════════════════════════════════════════════
-
-class GetInventoryItemsFilterRequest {
-    +PageIndex: int
-    +PageSize: int
-    +Search: string?
-    +CategoryLvId: uint?
-    +TypeLvId: uint?
-    +IsLowStock: bool?
-}
-
-class GetTransactionsFilterRequest {
-    +PageIndex: int
-    +PageSize: int
-    +Search: string?
-    +TypeLvId: uint?
-    +StatusLvId: uint?
-    +ExportReasonLvId: uint?
-    +SupplierId: long?
-    +FromDate: DateTime?
-    +ToDate: DateTime?
-}
-
-class CreateInventoryTransactionRequest {
-    +TypeLvId: uint
-    +ExportReasonLvId: uint?
-    +SupplierId: long?
-    +StockCheckAreaNote: string?
-    +Note: string?
-    +Items: List<TransactionItemRequest>
-}
-
-class TransactionItemRequest {
-    +IngredientId: long
-    +Quantity: decimal
-    +UnitLvId: uint
-    +UnitPrice: decimal?
-    +Note: string?
-}
-
-class SubmitTransactionRequest {
-    +MediaIds: List<long>?
-}
-
-class ApproveTransactionRequest {
-    +IsApproved: bool
-    +Note: string?
-}
-
-class CreateInventoryTransactionFormRequest {
-    +RequestJson: string
-    +EvidenceFiles: List<IFormFile>?
-}
-
-CreateInventoryTransactionRequest "1" *-- "1..*" TransactionItemRequest : contains line items
-
-' ═══════════════════════════════════════════════════
-' PRESENTATION LAYER — Response DTOs
-' ═══════════════════════════════════════════════════
-
-class InventoryItemDto {
-    +IngredientId: long
-    +IngredientName: string
-    +UnitLvId: uint
-    +UnitName: string?
-    +TypeLvId: uint?
-    +TypeName: string?
-    +CategoryLvId: uint?
-    +CategoryCode: string?
-    +CategoryName: string?
-    +ImageId: long?
-    +ImageUrl: string?
-    +QuantityOnHand: decimal
-    +MinStockLevel: decimal
-    +LastUpdatedAt: DateTime?
-    +IsLowStock: bool
-}
-
-class InventoryTransactionListDto {
-    +TransactionId: long
-    +TransactionCode: string?
-    +TypeLvId: uint
-    +TypeCode: string?
-    +TypeName: string?
-    +StatusLvId: uint
-    +StatusCode: string?
-    +StatusName: string?
-    +ExportReasonLvId: uint?
-    +ExportReasonName: string?
-    +SupplierId: long?
-    +SupplierName: string?
-    +CreatedBy: long?
-    +CreatedByName: string?
-    +CreatedAt: DateTime?
-    +SubmittedAt: DateTime?
-    +ApprovedBy: long?
-    +ApprovedByName: string?
-    +ApprovedAt: DateTime?
-    +Note: string?
-    +ItemCount: int
-    +TotalValue: decimal?
-}
-
-class InventoryTransactionDetailDto {
-    +TransactionId: long
-    +TransactionCode: string?
-    +TypeLvId: uint
-    +TypeCode: string?
-    +TypeName: string?
-    +StatusLvId: uint
-    +StatusCode: string?
-    +StatusName: string?
-    +ExportReasonLvId: uint?
-    +ExportReasonCode: string?
-    +ExportReasonName: string?
-    +SupplierId: long?
-    +SupplierName: string?
-    +CreatedBy: long?
-    +CreatedByName: string?
-    +CreatedAt: DateTime?
-    +SubmittedAt: DateTime?
-    +ApprovedBy: long?
-    +ApprovedByName: string?
-    +ApprovedAt: DateTime?
-    +Note: string?
-    +StockCheckAreaNote: string?
-    +Items: List<TransactionItemDto>
-    +Media: List<TransactionMediaDto>
-}
-
-class TransactionItemDto {
-    +TransactionItemId: long
-    +IngredientId: long
-    +IngredientName: string?
-    +IngredientImageUrl: string?
-    +CategoryLvId: uint?
-    +CategoryCode: string?
-    +CategoryName: string?
-    +Quantity: decimal
-    +UnitLvId: uint
-    +UnitName: string?
-    +UnitPrice: decimal?
-    +SystemQuantity: decimal?
-    +ActualQuantity: decimal?
-    +VarianceReasonLvId: uint?
-    +VarianceReasonName: string?
-    +Note: string?
-}
-
-class TransactionMediaDto {
-    +MediaId: long
-    +Url: string?
-    +MediaType: string?
-}
-
-class StockCardDto {
-    +TransactionItemId: long
-    +TransactionId: long
-    +TransactionCode: string?
-    +TypeCode: string?
-    +TypeName: string?
-    +StatusCode: string?
-    +QuantityChanged: decimal
-    +UnitName: string?
-    +UnitPrice: decimal?
-    +ExportReasonName: string?
-    +Note: string?
-    +CreatedByName: string?
-    +CreatedAt: DateTime?
-}
-
-class InventoryDashboardDto {
-    +TotalItems: int
-    +LowStockItems: int
-    +OutOfStockItems: int
-    +PendingTransactions: int
-    +LowStockList: List<LowStockItemDto>
-    +RecentTransactions: List<RecentTransactionDto>
-}
-
-class LowStockItemDto {
-    +IngredientId: long
-    +IngredientName: string?
-    +CategoryName: string?
-    +QuantityOnHand: decimal
-    +MinStockLevel: decimal
-    +UnitName: string?
-}
-
-class RecentTransactionDto {
-    +TransactionId: long
-    +TransactionCode: string?
-    +TypeName: string?
-    +StatusName: string?
-    +CreatedByName: string?
-    +CreatedAt: DateTime?
-    +ItemCount: int
-}
-
-InventoryTransactionDetailDto "1" *-- "0..*" TransactionItemDto : contains item details
-InventoryTransactionDetailDto "1" *-- "0..*" TransactionMediaDto : contains media details
-InventoryDashboardDto "1" *-- "0..*" LowStockItemDto : contains low stock alerts
-InventoryDashboardDto "1" *-- "0..*" RecentTransactionDto : contains recent activity
-
-' ═══════════════════════════════════════════════════
-' APPLICATION LAYER — Interfaces
-' ═══════════════════════════════════════════════════
-
-interface IInventoryService {
-    +GetItemsAsync(filter: GetInventoryItemsFilterRequest, ct: CancellationToken): PagedResultDTO<InventoryItemDto>
-    +CreateTransactionAsync(request: CreateInventoryTransactionRequest, userId: long, files: IReadOnlyList<MediaFileInput>?, ct: CancellationToken): InventoryTransactionDetailDto
-    +GetTransactionDetailAsync(transactionId: long, ct: CancellationToken): InventoryTransactionDetailDto
-    +GetTransactionsAsync(filter: GetTransactionsFilterRequest, ct: CancellationToken): PagedResultDTO<InventoryTransactionListDto>
-    +SubmitTransactionAsync(transactionId: long, request: SubmitTransactionRequest?, userId: long, ct: CancellationToken): InventoryTransactionDetailDto
-    +ApproveTransactionAsync(transactionId: long, request: ApproveTransactionRequest, userId: long, ct: CancellationToken): InventoryTransactionDetailDto
-    +GetStockCardAsync(ingredientId: long, pageIndex: int, pageSize: int, ct: CancellationToken): PagedResultDTO<StockCardDto>
-    +GetDashboardAsync(ct: CancellationToken): InventoryDashboardDto
-}
-
-interface IInventoryRepository {
-    +GetItemsPagedAsync(filter: GetInventoryItemsFilterRequest, ct: CancellationToken): PagedResultDTO<InventoryItemDto>
-    +CreateTransactionAsync(transaction: InventoryTransaction, items: List<InventoryTransactionItem>, ct: CancellationToken): long
-    +GetTransactionByIdAsync(transactionId: long, ct: CancellationToken): InventoryTransaction?
-    +GetTransactionsPagedAsync(filter: GetTransactionsFilterRequest, ct: CancellationToken): PagedResultDTO<InventoryTransactionListDto>
-    +UpdateTransactionAsync(transaction: InventoryTransaction, ct: CancellationToken): void
-    +GetCurrentStockAsync(ingredientId: long, ct: CancellationToken): CurrentStock?
-    +UpdateStockAsync(ingredientId: long, quantityChange: decimal, ct: CancellationToken): void
-    +GetStockCardAsync(ingredientId: long, pageIndex: int, pageSize: int, ct: CancellationToken): PagedResultDTO<StockCardDto>
-    +GetDashboardAsync(ct: CancellationToken): InventoryDashboardDto
-    +GetTodayTransactionCountByTypeAsync(typeCode: string, ct: CancellationToken): int
-}
-
-' ═══════════════════════════════════════════════════
-' APPLICATION LAYER — Service Implementation
-' ═══════════════════════════════════════════════════
-
-class InventoryService {
-    -_repo: IInventoryRepository
-    -_unitOfWork: IUnitOfWork
-    -_lookupResolver: ILookupResolver
-    -_notificationService: INotificationService
-    -_fileStorage: IFileStorage
-    -_mediaRepository: IMediaRepository
-    +GetItemsAsync(filter, ct): PagedResultDTO<InventoryItemDto>
-    +CreateTransactionAsync(request, userId, files, ct): InventoryTransactionDetailDto
-    +GetTransactionDetailAsync(transactionId, ct): InventoryTransactionDetailDto
-    +GetTransactionsAsync(filter, ct): PagedResultDTO<InventoryTransactionListDto>
-    +SubmitTransactionAsync(transactionId, request, userId, ct): InventoryTransactionDetailDto
-    +ApproveTransactionAsync(transactionId, request, userId, ct): InventoryTransactionDetailDto
-    +GetStockCardAsync(ingredientId, pageIndex, pageSize, ct): PagedResultDTO<StockCardDto>
-    +GetDashboardAsync(ct): InventoryDashboardDto
-}
-
-' ═══════════════════════════════════════════════════
-' PERSISTENCE LAYER — Repository Implementation
-' ═══════════════════════════════════════════════════
-
-class InventoryRepository {
-    -_context: RestaurantMgmtContext
-    +GetItemsPagedAsync(filter, ct): PagedResultDTO<InventoryItemDto>
-    +CreateTransactionAsync(transaction, items, ct): long
-    +GetTransactionByIdAsync(transactionId, ct): InventoryTransaction?
-    +GetTransactionsPagedAsync(filter, ct): PagedResultDTO<InventoryTransactionListDto>
-    +UpdateTransactionAsync(transaction, ct): void
-    +GetCurrentStockAsync(ingredientId, ct): CurrentStock?
-    +UpdateStockAsync(ingredientId, quantityChange, ct): void
-    +GetStockCardAsync(ingredientId, pageIndex, pageSize, ct): PagedResultDTO<StockCardDto>
-    +GetDashboardAsync(ct): InventoryDashboardDto
-    +GetTodayTransactionCountByTypeAsync(typeCode, ct): int
-}
-
-' ═══════════════════════════════════════════════════
-' PRESENTATION LAYER — Controller
-' ═══════════════════════════════════════════════════
-
-class InventoryController {
-    -_inventoryService: IInventoryService
-    +GetItems(filter, ct): IActionResult
-    +GetTransactions(filter, ct): IActionResult
-    +GetTransactionDetail(id, ct): IActionResult
-    +CreateTransaction(formRequest, ct): IActionResult
-    +SubmitTransaction(id, request, ct): IActionResult
-    +ApproveTransaction(id, request, ct): IActionResult
-    +GetStockCard(ingredientId, pageIndex, pageSize, ct): IActionResult
-    +GetDashboard(ct): IActionResult
-}
-
-' ═══════════════════════════════════════════════════
-' Cross-module Interfaces (dependencies from other modules)
-' ═══════════════════════════════════════════════════
-
-interface IUnitOfWork <<cross-module>> {
-    +BeginTransactionAsync(ct): Task
-    +CommitAsync(ct): Task
-    +RollbackAsync(ct): Task
-}
-
-interface INotificationService <<cross-module>> {
-    +PublishAsync(request: PublishNotificationRequest, ct): Task
-}
-
-interface IFileStorage <<cross-module>> {
-    +SaveManyAsync(requests, folder, options, ct): List<FileUploadResult>
-}
-
-interface IMediaRepository <<cross-module>> {
-    +AddMediaAsync(asset: MediaAsset, ct): MediaAsset
-}
-
-interface ILookupResolver <<cross-module>> {
-    +GetIdAsync(lookupType, valueCode, ct): uint
-}
-
-' ═══════════════════════════════════════════════════
-' REALIZATION & DEPENDENCY RELATIONSHIPS
-' ═══════════════════════════════════════════════════
-
-' Realization (implements interface)
-InventoryService ..|> IInventoryService : implements
-InventoryRepository ..|> IInventoryRepository : implements
-
-' Controller layer dependencies
-InventoryController --> IInventoryService : uses for inventory operations
-InventoryController ..> GetInventoryItemsFilterRequest : receives item filter request
-InventoryController ..> GetTransactionsFilterRequest : receives transaction filter request
-InventoryController ..> CreateInventoryTransactionFormRequest : receives multipart form data
-InventoryController ..> SubmitTransactionRequest : receives submission request
-InventoryController ..> ApproveTransactionRequest : receives approval request
-InventoryController ..> InventoryItemDto : returns item list payload
-InventoryController ..> InventoryTransactionListDto : returns transaction list payload
-InventoryController ..> InventoryTransactionDetailDto : returns as response
-InventoryController ..> StockCardDto : returns stock card payload
-InventoryController ..> InventoryDashboardDto : returns dashboard payload
-
-' Service layer associations (held as fields)
-InventoryService --> IInventoryRepository : uses for data persistence
-InventoryService --> IUnitOfWork : uses for transaction management
-InventoryService --> ILookupResolver : uses for lookup value resolution
-InventoryService --> INotificationService : uses for push notifications
-InventoryService --> IFileStorage : uses for evidence file uploads
-InventoryService --> IMediaRepository : uses for media asset persistence
-
-' Service layer dependencies (temporary usage)
-InventoryService ..> InventoryTxTypeCode : uses transaction type codes
-InventoryService ..> InventoryTxStatusCode : uses transaction status codes
-InventoryService ..> InventoryCategoryCode : validates category scopes
-InventoryService ..> ExportReasonCode : validates export reason scopes
-InventoryService ..> CreateInventoryTransactionRequest : consumes create transaction request
-InventoryService ..> SubmitTransactionRequest : consumes submission request
-InventoryService ..> ApproveTransactionRequest : consumes approval request
-InventoryService ..> InventoryTransaction : creates and manages entity
-InventoryService ..> InventoryItemDto : returns item query results
-InventoryService ..> InventoryTransactionListDto : returns transaction query results
-InventoryService ..> InventoryTransactionDetailDto : maps entity to response DTO
-InventoryService ..> StockCardDto : returns stock movement results
-InventoryService ..> InventoryDashboardDto : returns dashboard summary
-
-' Repository layer dependency
-InventoryRepository --> InventoryTransaction : persists entity
-IInventoryService ..> GetInventoryItemsFilterRequest : defines item query contract
-IInventoryService ..> GetTransactionsFilterRequest : defines transaction query contract
-IInventoryService ..> CreateInventoryTransactionRequest : defines create transaction contract
-IInventoryService ..> SubmitTransactionRequest : defines submit transaction contract
-IInventoryService ..> ApproveTransactionRequest : defines approval contract
-IInventoryService ..> InventoryItemDto : exposes item response contract
-IInventoryService ..> InventoryTransactionListDto : exposes transaction list contract
-IInventoryService ..> InventoryTransactionDetailDto : exposes transaction detail contract
-IInventoryService ..> StockCardDto : exposes stock card contract
-IInventoryService ..> InventoryDashboardDto : exposes dashboard contract
-IInventoryRepository ..> GetInventoryItemsFilterRequest : accepts item filter criteria
-IInventoryRepository ..> GetTransactionsFilterRequest : accepts transaction filter criteria
-IInventoryRepository ..> InventoryItemDto : projects item query results
-IInventoryRepository ..> InventoryTransactionListDto : projects transaction list results
-IInventoryRepository ..> StockCardDto : projects stock card results
-IInventoryRepository ..> InventoryDashboardDto : projects dashboard results
-CreateInventoryTransactionFormRequest ..> CreateInventoryTransactionRequest : carries serialized transaction payload
+' Persistence → Domain
+InventoryRepository ..> InventoryTransaction : persists
+InventoryRepository ..> InventoryTransactionItem : persists
+InventoryRepository ..> CurrentStock : updates stock levels
+InventoryRepository ..> Ingredient : reads items
 
 @enduml

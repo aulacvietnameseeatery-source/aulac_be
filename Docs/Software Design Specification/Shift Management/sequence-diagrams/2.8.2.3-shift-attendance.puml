@@ -1,8 +1,11 @@
 @startuml
 autonumber
-title 2.8.2.3 Shift Attendance
+title 2.8.2.3 Shift Attendance (Check-in / Check-out / Adjust)
 
-actor Client
+actor User as U
+participant "FE Layer" as Client
+note over U, Client : User interacts through FE before backend calls
+U -> Client : uses web app UI
 participant "ShiftController" as Ctrl
 participant "AttendanceService" as Svc
 participant "IAttendanceRepository" as ARepo
@@ -18,62 +21,79 @@ database "Database" as DB
 
 Client -> Ctrl : POST /api/shifts/assignments/{id}/check-in
 activate Ctrl
+note right of Ctrl : Extract staffId from JWT token
 Ctrl -> Svc : CheckInAsync(assignmentId, staffId)
 activate Svc
+
 Svc -> SARepo : GetByIdWithDetailsAsync(assignmentId)
 activate SARepo
-SARepo -> DB : SELECT ... with Includes
+SARepo -> DB : SELECT ... with Includes\n(Template, Staff, Status, Attendance)
 activate DB
 DB --> SARepo : ShiftAssignment?
 deactivate DB
 SARepo --> Svc : ShiftAssignment?
 deactivate SARepo
-alt Not found
+
+alt Assignment not found
     Svc --> Ctrl : throw NotFoundException
-    Ctrl --> Client : 404
+    Ctrl --> Client : 404 Not Found
 end
-alt Not own shift
+alt Not own shift (StaffId != caller)
     Svc --> Ctrl : throw ForbiddenException
-    Ctrl --> Client : 403
+    Ctrl --> Client : 403 Forbidden
 end
-alt Cancelled assignment
+alt Cancelled assignment (IsActive == false)
     Svc --> Ctrl : throw ValidationException
-    Ctrl --> Client : 400
+    Ctrl --> Client : 400 Bad Request
 end
+
 Svc -> ARepo : GetByAssignmentIdAsync(assignmentId)
 activate ARepo
+ARepo -> DB : SELECT ... WHERE ShiftAssignmentId = @id
+activate DB
+DB --> ARepo : AttendanceRecord?
+deactivate DB
 ARepo --> Svc : AttendanceRecord?
 deactivate ARepo
-alt Already checked in
+
+alt Already checked in (ActualCheckInAt != null)
     Svc --> Ctrl : throw ConflictException
-    Ctrl --> Client : 409
+    Ctrl --> Client : 409 Conflict
 end
+
 Svc -> Settings : GetAllowedEarlyCheckInMinutesAsync()
 activate Settings
-Settings --> Svc : int minutes
+Settings --> Svc : int allowedEarlyMinutes
 deactivate Settings
-alt Too early to check in
-    Svc --> Ctrl : throw ValidationException
-    Ctrl --> Client : 400
+
+alt Now < PlannedStart - allowedEarlyMinutes
+    Svc --> Ctrl : throw ValidationException("Too early to check in")
+    Ctrl --> Client : 400 Bad Request
 end
-alt Shift already ended
-    Svc --> Ctrl : throw ValidationException
-    Ctrl --> Client : 400
+alt Now > PlannedEnd (shift already ended)
+    Svc --> Ctrl : throw ValidationException("Shift has already ended")
+    Ctrl --> Client : 400 Bad Request
 end
+
 Svc -> Settings : GetLateGraceMinutesAsync()
 activate Settings
-Settings --> Svc : int graceMinutes
+Settings --> Svc : int lateGraceMinutes
 deactivate Settings
-note right of Svc : Calculate isLate, lateMinutes
+
+note right of Svc : Calculate isLate = now > plannedStart + graceMinutes\nlateMinutes = isLate ? (now - plannedStart).Minutes : 0
+
 Svc -> Lookup : ToAttendanceStatusIdAsync(ACTIVE or LATE)
 activate Lookup
 Lookup --> Svc : uint statusLvId
 deactivate Lookup
-alt Existing record (SCHEDULED status)
-    note right of Svc : Update existing record
-else No record yet
+
+alt Existing record (SCHEDULED status, e.g. from no-show job)
+    note right of Svc : Update existing record:\nActualCheckInAt = now, StatusLvId, LateMinutes
+else No existing record
     Svc -> ARepo : Add(new AttendanceRecord)
+    note right of Svc : ShiftAssignmentId, ActualCheckInAt = now,\nAttendanceStatusLvId, LateMinutes
 end
+
 Svc -> UoW : SaveChangesAsync()
 activate UoW
 UoW -> DB : INSERT/UPDATE attendance_record
@@ -82,90 +102,116 @@ DB --> UoW : OK
 deactivate DB
 UoW --> Svc : OK
 deactivate UoW
-opt Staff is late
+
+opt Staff is late (isLate == true)
     Svc -> Notif : PublishAsync(ATTENDANCE_ALERT - Late Check-in)
     activate Notif
     Notif --> Svc : OK
     deactivate Notif
 end
+
 Svc -> RT : PublishBoardChangedAsync(attendance_checked_in)
 activate RT
 RT --> Svc : OK
 deactivate RT
+
+note right of Svc : Map to AttendanceRecordDto (with TimeLogs)
 Svc --> Ctrl : AttendanceRecordDto
 deactivate Svc
-Ctrl --> Client : 200 OK ApiResponse
+Ctrl --> Client : 200 OK ApiResponse<AttendanceRecordDto>
 deactivate Ctrl
 
 == Staff Check-Out ==
 
 Client -> Ctrl : POST /api/shifts/assignments/{id}/check-out
 activate Ctrl
+note right of Ctrl : Extract staffId from JWT token
 Ctrl -> Svc : CheckOutAsync(assignmentId, staffId)
 activate Svc
+
 Svc -> ARepo : GetByAssignmentIdAsync(assignmentId)
 activate ARepo
+ARepo -> DB : SELECT ... WHERE ShiftAssignmentId = @id
+activate DB
+DB --> ARepo : AttendanceRecord?
+deactivate DB
 ARepo --> Svc : AttendanceRecord?
 deactivate ARepo
-alt No record
+
+alt No attendance record
     Svc --> Ctrl : throw NotFoundException
-    Ctrl --> Client : 404
+    Ctrl --> Client : 404 Not Found
 end
-alt Not checked in yet
+alt Not checked in yet (ActualCheckInAt == null)
     Svc --> Ctrl : throw ValidationException
-    Ctrl --> Client : 400
+    Ctrl --> Client : 400 Bad Request
 end
-alt Already checked out
+alt Already checked out (ActualCheckOutAt != null)
     Svc --> Ctrl : throw ConflictException
-    Ctrl --> Client : 409
+    Ctrl --> Client : 409 Conflict
 end
+
 Svc -> SARepo : GetByIdAsync(assignmentId)
 activate SARepo
+SARepo -> DB : SELECT ... WHERE ShiftAssignmentId = @id
+activate DB
+DB --> SARepo : ShiftAssignment
+deactivate DB
 SARepo --> Svc : ShiftAssignment
 deactivate SARepo
-alt Not own shift
+
+alt Not own shift (StaffId != caller)
     Svc --> Ctrl : throw ForbiddenException
-    Ctrl --> Client : 403
+    Ctrl --> Client : 403 Forbidden
 end
+
 Svc -> Settings : GetEarlyLeaveBufferMinutesAsync()
 activate Settings
-Settings --> Svc : int buffer
+Settings --> Svc : int earlyLeaveBuffer
 deactivate Settings
-note right of Svc : Calculate isEarlyLeave, workedMinutes
+
+note right of Svc : Calculate isEarlyLeave = now < plannedEnd - buffer\nearlyLeaveMinutes = isEarlyLeave ? (plannedEnd - now).Minutes : 0\nworkedMinutes = (now - checkInAt).Minutes
+
 Svc -> Lookup : ToAttendanceStatusIdAsync(COMPLETED or EARLY_LEAVE)
 activate Lookup
 Lookup --> Svc : uint statusLvId
 deactivate Lookup
-note right of Svc : Update record with checkout data
+
+note right of Svc : Update record: ActualCheckOutAt = now,\nEarlyLeaveMinutes, WorkedMinutes, StatusLvId
+
 Svc -> UoW : SaveChangesAsync()
 activate UoW
-UoW -> DB : UPDATE attendance_record
+UoW -> DB : UPDATE attendance_record SET ...
 activate DB
 DB --> UoW : OK
 deactivate DB
 UoW --> Svc : OK
 deactivate UoW
-opt Early leave detected
+
+opt Early leave detected (isEarlyLeave == true)
     Svc -> Notif : PublishAsync(ATTENDANCE_ALERT - Early Leave)
     activate Notif
     Notif --> Svc : OK
     deactivate Notif
 end
+
 Svc -> RT : PublishBoardChangedAsync(attendance_checked_out)
 activate RT
 RT --> Svc : OK
 deactivate RT
+
 Svc --> Ctrl : AttendanceRecordDto
 deactivate Svc
-Ctrl --> Client : 200 OK ApiResponse
+Ctrl --> Client : 200 OK ApiResponse<AttendanceRecordDto>
 deactivate Ctrl
 
 == Manager Adjust Attendance ==
 
-Client -> Ctrl : PATCH /api/shifts/attendance/{id} (AdjustAttendanceRequest)
+Client -> Ctrl : PATCH /api/shifts/attendance/{id}\n(AdjustAttendanceRequest)
 activate Ctrl
 Ctrl -> Svc : AdjustAttendanceAsync(attendanceId, request, reviewerStaffId)
 activate Svc
+
 Svc -> ARepo : GetByIdWithDetailsAsync(attendanceId)
 activate ARepo
 ARepo -> DB : SELECT ... with ShiftAssignment include
@@ -174,52 +220,60 @@ DB --> ARepo : AttendanceRecord?
 deactivate DB
 ARepo --> Svc : AttendanceRecord?
 deactivate ARepo
+
 alt Not found
     Svc --> Ctrl : throw NotFoundException
-    Ctrl --> Client : 404
+    Ctrl --> Client : 404 Not Found
 end
-alt Missing adjustment reason
+alt Missing AdjustmentReason
     Svc --> Ctrl : throw ValidationException
-    Ctrl --> Client : 400
+    Ctrl --> Client : 400 Bad Request
 end
+
 opt Adjusting check-in time
     Svc -> Settings : GetLateGraceMinutesAsync()
     activate Settings
-    Settings --> Svc : int
+    Settings --> Svc : int graceMinutes
     deactivate Settings
-    note right of Svc : Recalculate LateMinutes
+    note right of Svc : Recalculate LateMinutes based on new check-in
 end
+
 opt Adjusting check-out time
     alt Check-out before check-in
         Svc --> Ctrl : throw ValidationException
-        Ctrl --> Client : 400
+        Ctrl --> Client : 400 Bad Request
     end
     Svc -> Settings : GetEarlyLeaveBufferMinutesAsync()
     activate Settings
-    Settings --> Svc : int
+    Settings --> Svc : int buffer
     deactivate Settings
     note right of Svc : Recalculate EarlyLeaveMinutes, WorkedMinutes
-    Svc -> Lookup : ToAttendanceStatusIdAsync(final status)
-    activate Lookup
-    Lookup --> Svc : uint
-    deactivate Lookup
 end
-note right of Svc : Set IsManualAdjustment=true, ReviewedBy, ReviewedAt
+
+Svc -> Lookup : ToAttendanceStatusIdAsync(final computed status)
+activate Lookup
+Lookup --> Svc : uint statusLvId
+deactivate Lookup
+
+note right of Svc : Set IsManualAdjustment = true,\nReviewedBy = reviewerStaffId,\nReviewedAt = now
+
 Svc -> UoW : SaveChangesAsync()
 activate UoW
-UoW -> DB : UPDATE attendance_record
+UoW -> DB : UPDATE attendance_record SET ...
 activate DB
 DB --> UoW : OK
 deactivate DB
 UoW --> Svc : OK
 deactivate UoW
+
 Svc -> RT : PublishBoardChangedAsync(attendance_adjusted)
 activate RT
 RT --> Svc : OK
 deactivate RT
+
 Svc --> Ctrl : AttendanceRecordDto
 deactivate Svc
-Ctrl --> Client : 200 OK ApiResponse
+Ctrl --> Client : 200 OK ApiResponse<AttendanceRecordDto>
 deactivate Ctrl
 
 @enduml

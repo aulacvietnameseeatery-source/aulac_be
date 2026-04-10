@@ -1,0 +1,292 @@
+@startuml
+title Shift Management - Presentation Layer Class Diagram
+
+
+package "Presentation Layer" {
+
+    class ShiftController <<Controller>> {
+        -_templateService: IShiftTemplateService
+        -_assignmentService: IShiftAssignmentService
+        -_attendanceService: IAttendanceService
+        -GetStaffId(): long
+        +GetTemplates(isActive: bool?): IActionResult
+        +GetTemplate(id: long): IActionResult
+        +CreateTemplate(request: CreateShiftTemplateRequest): IActionResult
+        +UpdateTemplate(id: long, request: UpdateShiftTemplateRequest): IActionResult
+        +DeactivateTemplate(id: long): IActionResult
+        +GetAssignments(request: GetShiftAssignmentRequest): IActionResult
+        +GetAssignment(id: long): IActionResult
+        +CreateAssignment(request: CreateShiftAssignmentRequest): IActionResult
+        +UpdateAssignment(id: long, request: UpdateShiftAssignmentRequest): IActionResult
+        +CancelAssignment(id: long): IActionResult
+        +BulkCreateAssignment(request: BulkCreateAssignmentRequest): IActionResult
+        +PublishAssignments(request: PublishAssignmentsRequest): IActionResult
+        +CopyWeek(request: CopyWeekRequest): IActionResult
+        +ReassignAssignment(id: long, request: ReassignRequest): IActionResult
+        +ConfirmAssignment(id: long): IActionResult
+        +GetTeamSchedule(request: TeamScheduleRequest): IActionResult
+        +GetMyShifts(request: GetShiftAssignmentRequest): IActionResult
+        +GetLiveBoard(request: GetShiftAssignmentRequest): IActionResult
+        +CheckIn(id: long): IActionResult
+        +CheckOut(id: long): IActionResult
+        +AdjustAttendance(id: long, request: AdjustAttendanceRequest): IActionResult
+        +GetReportSnapshot(fromDate: DateOnly, toDate: DateOnly): IActionResult
+        +GetAttendanceReport(request: AttendanceReportRequest): IActionResult
+        +GetWorkedHoursReport(fromDate: DateOnly, toDate: DateOnly, staffId: long?): IActionResult
+        +GetExceptionsReport(fromDate: DateOnly, toDate: DateOnly, staffId: long?): IActionResult
+    }
+
+    ' ── Template Request/Response DTOs ──
+
+    class CreateShiftTemplateRequest <<DTO>> {
+        +TemplateName: string
+        +DefaultStartTime: TimeOnly
+        +DefaultEndTime: TimeOnly
+        +Description: string?
+        +BufferBeforeMinutes: int?
+        +BufferAfterMinutes: int?
+    }
+
+    class UpdateShiftTemplateRequest <<DTO>> {
+        +TemplateName: string?
+        +DefaultStartTime: TimeOnly?
+        +DefaultEndTime: TimeOnly?
+        +Description: string?
+        +IsActive: bool?
+        +BufferBeforeMinutes: int?
+        +BufferAfterMinutes: int?
+    }
+
+    class GetShiftTemplateRequest <<DTO>> {
+        +IsActive: bool?
+        +PageIndex: int
+        +PageSize: int
+    }
+
+    class ShiftTemplateListDto <<DTO>> {
+        +ShiftTemplateId: long
+        +TemplateName: string
+        +DefaultStartTime: TimeOnly
+        +DefaultEndTime: TimeOnly
+        +Description: string?
+        +BufferBeforeMinutes: int?
+        +BufferAfterMinutes: int?
+        +IsActive: bool
+        +CreatedAt: DateTime
+    }
+
+    class ShiftTemplateDetailDto <<DTO>> {
+        +CreatedByName: string
+        +UpdatedByName: string?
+        +UpdatedAt: DateTime
+    }
+
+    ' ── Assignment Request/Response DTOs ──
+
+    class GetShiftAssignmentRequest <<DTO>> {
+        +StaffId: long?
+        +ShiftTemplateId: long?
+        +FromDate: DateOnly?
+        +ToDate: DateOnly?
+        +IsActive: bool?
+        +AssignmentStatusCode: string?
+        +PageIndex: int
+        +PageSize: int
+    }
+
+    class CreateShiftAssignmentRequest <<DTO>> {
+        +ShiftTemplateId: long
+        +StaffId: long
+        +WorkDate: DateOnly
+        +PlannedStartAt: DateTime?
+        +PlannedEndAt: DateTime?
+        +Notes: string?
+        +Tags: string?
+        +IsDraft: bool
+    }
+
+    class BulkCreateAssignmentRequest <<DTO>> {
+        +ShiftTemplateId: long
+        +StaffIds: List<long>
+        +WorkDate: DateOnly
+        +WorkDates: List<DateOnly>?
+        +PlannedStartAt: DateTime?
+        +PlannedEndAt: DateTime?
+        +Notes: string?
+        +Tags: string?
+        +IsDraft: bool
+        +GetEffectiveDates(): IReadOnlyList<DateOnly>
+    }
+
+    class PublishAssignmentsRequest <<DTO>> {
+        +AssignmentIds: List<long>?
+        +FromDate: DateOnly?
+        +ToDate: DateOnly?
+    }
+
+    class CopyWeekRequest <<DTO>> {
+        +SourceWeekStart: DateOnly
+        +TargetWeekStart: DateOnly
+        +AsDraft: bool
+    }
+
+    class ReassignRequest <<DTO>> {
+        +NewStaffId: long
+        +NewWorkDate: DateOnly?
+        +Reason: string?
+    }
+
+    class UpdateShiftAssignmentRequest <<DTO>> {
+        +PlannedStartAt: DateTime?
+        +PlannedEndAt: DateTime?
+        +Notes: string?
+        +Tags: string?
+    }
+
+    class TeamScheduleRequest <<DTO>> {
+        +WeekStart: DateOnly
+        +WeekEnd: DateOnly?
+        +ShiftTemplateId: long?
+    }
+
+    class ShiftAssignmentListDto <<DTO>> {
+        +ShiftAssignmentId: long
+        +ShiftTemplateId: long
+        +TemplateName: string
+        +StaffId: long
+        +StaffName: string
+        +WorkDate: DateOnly
+        +PlannedStartAt: DateTime
+        +PlannedEndAt: DateTime
+        +AssignmentStatusCode: string
+        +AssignmentStatusName: string
+        +IsActive: bool
+        +Tags: string?
+        +Notes: string?
+        +AssignedAt: DateTime
+        +AssignedByName: string
+    }
+
+    class ShiftAssignmentDetailDto <<DTO>> {
+        +Attendance: AttendanceRecordDto?
+    }
+
+    ' ── Attendance DTOs ──
+
+    class AdjustAttendanceRequest <<DTO>> {
+        +ActualCheckInAt: DateTime?
+        +ActualCheckOutAt: DateTime?
+        +AdjustmentReason: string
+    }
+
+    class AttendanceRecordDto <<DTO>> {
+        +AttendanceId: long
+        +ShiftAssignmentId: long
+        +AttendanceStatusCode: string
+        +AttendanceStatusName: string
+        +ActualCheckInAt: DateTime?
+        +ActualCheckOutAt: DateTime?
+        +LateMinutes: int
+        +EarlyLeaveMinutes: int
+        +WorkedMinutes: int
+        +IsManualAdjustment: bool
+        +AdjustmentReason: string?
+        +ReviewedByName: string?
+        +ReviewedAt: DateTime?
+        +TimeLogs: List<TimeLogDto>
+    }
+
+    class TimeLogDto <<DTO>> {
+        +TimeLogId: long
+        +PunchInTime: DateTime
+        +PunchOutTime: DateTime?
+        +ValidationStatus: string
+        +PunchDurationMinutes: int
+    }
+
+    ' ── Live Board DTOs ──
+
+    class ShiftLiveBoardItemDto <<DTO>> {
+        +ShiftAssignmentId: long
+        +StaffId: long
+        +StaffName: string
+        +LiveStatusCode: string
+        +LiveStatusName: string
+        +HasAlert: bool
+        +OrdersHandledCount: int?
+        +PaidBillsCount: int?
+        +CurrentRevenue: decimal?
+        +IssueCount: int
+    }
+
+    ' ── Report DTOs ──
+
+    class AttendanceReportRequest <<DTO>> {
+        +FromDate: DateOnly?
+        +ToDate: DateOnly?
+        +StaffId: long?
+        +ShiftTemplateId: long?
+        +AttendanceStatusCode: string?
+        +PageIndex: int
+        +PageSize: int
+    }
+
+    class AttendanceReportRowDto <<DTO>> {
+        +ShiftAssignmentId: long
+        +StaffId: long
+        +StaffName: string
+        +WorkDate: DateOnly
+        +AttendanceStatusCode: string
+        +LateMinutes: int
+        +WorkedMinutes: int
+    }
+
+    class WorkedHoursReportRowDto <<DTO>> {
+        +StaffId: long
+        +StaffName: string
+        +ScheduledMinutes: int
+        +WorkedMinutes: int
+        +VarianceMinutes: int
+    }
+
+    class AttendanceExceptionReportRowDto <<DTO>> {
+        +StaffId: long
+        +StaffName: string
+        +ExceptionType: string
+        +MinutesAffected: int
+        +IsManualAdjustment: bool
+    }
+
+    class ShiftReportSnapshotDto <<DTO>> {
+        +AttendanceCount: int
+        +WorkedStaffCount: int
+        +ExceptionCount: int
+    }
+
+    ShiftTemplateDetailDto --|> ShiftTemplateListDto
+    ShiftAssignmentDetailDto --|> ShiftAssignmentListDto
+}
+
+interface IShiftTemplateService <<interface>>
+interface IShiftAssignmentService <<interface>>
+interface IAttendanceService <<interface>>
+
+ShiftController --> IShiftTemplateService : uses for template operations
+ShiftController --> IShiftAssignmentService : uses for assignment operations
+ShiftController --> IAttendanceService : uses for attendance operations
+
+ShiftController ..> CreateShiftTemplateRequest : receives
+ShiftController ..> UpdateShiftTemplateRequest : receives
+ShiftController ..> CreateShiftAssignmentRequest : receives
+ShiftController ..> BulkCreateAssignmentRequest : receives
+ShiftController ..> PublishAssignmentsRequest : receives
+ShiftController ..> CopyWeekRequest : receives
+ShiftController ..> ReassignRequest : receives
+ShiftController ..> AdjustAttendanceRequest : receives
+ShiftController ..> AttendanceReportRequest : receives
+ShiftController ..> ShiftTemplateDetailDto : returns
+ShiftController ..> ShiftAssignmentDetailDto : returns
+ShiftController ..> AttendanceRecordDto : returns
+ShiftController ..> ShiftLiveBoardItemDto : returns
+ShiftController ..> ShiftReportSnapshotDto : returns
+@enduml
