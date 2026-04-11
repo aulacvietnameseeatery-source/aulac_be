@@ -251,4 +251,73 @@ public class ReportController : ControllerBase
 
         return Ok(result);
     }
+
+
+    /// <summary>
+    /// Gets detailed earning data for a specific day (used in Daily Earning Drawer).
+    /// </summary>
+    [HttpGet("earnings/daily-detail")]
+    // [HasPermission(Permissions.ViewReport)]
+    [ProducesResponseType(typeof(ApiResponse<DailyEarningDetailDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetDailyEarningDetail(
+        [FromQuery] DateTime date,
+        CancellationToken ct)
+    {
+        var result = await _reportService.GetDailyEarningDetailAsync(date, ct);
+
+        return Ok(new ApiResponse<DailyEarningDetailDto>
+        {
+            Success = true,
+            Code = 200,
+            UserMessage = "Daily earning detail retrieved successfully.",
+            Data = result,
+            ServerTime = DateTimeOffset.UtcNow
+        });
+    }
+
+    /// <summary>
+    /// Gets performance details, trends, and cross-sells for a specific dish (used in Sales Drawer).
+    /// </summary>
+    [HttpGet("sales/items/{dishId}/performance")]
+    // [HasPermission(Permissions.ViewReport)]
+    [ProducesResponseType(typeof(ApiResponse<DishPerformanceDetailDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetDishPerformanceDetail(
+        [FromRoute] long dishId,
+        [FromQuery] ReportFilterRequest request,
+        CancellationToken ct)
+    {
+        var result = await _reportService.GetDishPerformanceDetailAsync(dishId, request, ct);
+
+        return Ok(new ApiResponse<DishPerformanceDetailDto>
+        {
+            Success = true,
+            Code = 200,
+            UserMessage = "Dish performance detail retrieved successfully.",
+            Data = result,
+            ServerTime = DateTimeOffset.UtcNow
+        });
+    }
+
+    /// <summary>
+    /// Gets customer profile, preferences, and recent orders (used in Customer Drawer).
+    /// </summary>
+    [HttpGet("customers/{customerId}/profile")]
+    // [HasPermission(Permissions.ViewReport)]
+    [ProducesResponseType(typeof(ApiResponse<CustomerProfileDetailDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetCustomerProfileDetail(
+        [FromRoute] long customerId,
+        [FromQuery] ReportFilterRequest request,
+        CancellationToken ct)
+    {
+        var result = await _reportService.GetCustomerProfileDetailAsync(customerId, request, ct);
+
+        return Ok(new ApiResponse<CustomerProfileDetailDto>
+        {
+            Success = true,
+            Code = 200,
+            UserMessage = "Customer profile retrieved successfully.",
+            Data = result,
+            ServerTime = DateTimeOffset.UtcNow
+        });
+    }
 }
