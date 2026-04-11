@@ -7,7 +7,7 @@ skinparam sequence {
 }
 
 actor ":User" as U
-participant ":FE Layer" as Client
+participant ":CreateShiftTemplatePage" as Client
 participant ":ShiftController" as Ctrl
 participant ":ShiftTemplateService" as Svc
 participant ":IShiftTemplateRepository" as Repo

@@ -1,6 +1,6 @@
 @startuml
 title Shift Management - Application Layer Class Diagram
-
+skinparam Linetype ortho
 
 package "Application Layer" {
 

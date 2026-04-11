@@ -1,35 +1,41 @@
 @startuml
 autonumber
 title 2.10.2.2 View Transaction List
+skinparam sequence {
+	ParticipantBackgroundColor #ffffff
+	ActorBackgroundColor #ffffff
+}
 
-actor User as U
-participant "FE Layer" as Client
-note over U, Client : User interacts through FE before backend calls
-U -> Client : uses web app UI
-participant "InventoryController" as Ctrl
-participant "InventoryService" as Svc
-participant "IInventoryRepository" as Repo
-database "Database" as DB
+actor ":User" as U
+participant ":TransactionListPage" as Client
+participant ":InventoryController" as Ctrl
+participant ":InventoryService" as Svc
+participant ":IInventoryRepository" as Repo
+participant ":Database" as DB
 
-Client -> Ctrl : GET /api/inventory/transactions\n(GetTransactionsFilterRequest)
+activate U
+U ->> Client : Open inventory transaction list page
+activate Client
+Client ->> Ctrl : GET /api/inventory/transactions\n(GetTransactionsFilterRequest)
 activate Ctrl
-Ctrl -> Svc : GetTransactionsAsync(filter, ct)
+Ctrl ->> Svc : GetTransactionsAsync(filter, ct)
 activate Svc
 
-Svc -> Repo : GetTransactionsPagedAsync(filter, ct)
+Svc ->> Repo : GetTransactionsPagedAsync(filter, ct)
 activate Repo
-Repo -> DB : SELECT InventoryTransactions\nJOIN TypeLv, StatusLv, ExportReasonLv,\nSupplier, CreatedBy, ApprovedBy, Items\nWITH filters ORDER BY CreatedAt DESC
+Repo ->> DB : Query inventory transactions with type, status, export reason, supplier, creator, approver, and items\napplying filters and sorting by latest created time
 activate DB
-DB --> Repo : result rows
+DB -->> Repo : Return transaction rows
 deactivate DB
-note right of Repo : Map to InventoryTransactionListDto\nwith ItemCount and TotalValue
-Repo --> Svc : PagedResultDTO<InventoryTransactionListDto>
+Repo -->> Svc : PagedResultDTO<InventoryTransactionListDto>
 deactivate Repo
 
-Svc --> Ctrl : PagedResultDTO<InventoryTransactionListDto>
+Svc -->> Ctrl : PagedResultDTO<InventoryTransactionListDto>
 deactivate Svc
-Ctrl --> Client : 200 ApiResponse<PagedResultDTO<InventoryTransactionListDto>>
+Ctrl -->> Client : 200 ApiResponse<PagedResultDTO<InventoryTransactionListDto>>
 deactivate Ctrl
 
-Client -> U : displays transaction list with pagination
+Client -->> U : Display transaction list with pagination
+deactivate Client
+deactivate U
 @enduml

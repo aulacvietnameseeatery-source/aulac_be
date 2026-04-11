@@ -759,14 +759,14 @@ All `.puml` sequence diagrams **must** follow these rules:
    ```plantuml
    participant ":Database" as DB
    ```
-4. **Participant naming** — all participants (including actor and database) use the `":"` prefix convention:
+4. **Participant naming** — all participants (including actor and database) use the `":"` prefix convention, and the FE participant must be a specific page name ending with `Page` (do not use placeholders):
    ```plantuml
    actor ":User" as U
-   participant ":FE Layer" as Client
+   participant ":ShiftTemplateListPage" as Client
    participant ":ShiftController" as Ctrl
    participant ":Database" as DB
    ```
-5. **FE return to User** — every sequence must end with a return arrow from FE Layer back to User:
+5. **Page return to User** — every sequence must end with a return arrow from page participant back to User:
    ```plantuml
    Client -->> U : Display result
    ```

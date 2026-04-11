@@ -1,40 +1,48 @@
 @startuml
 autonumber
 title 2.10.2.3 View Transaction Detail
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
 
-actor User as U
-participant "FE Layer" as Client
-note over U, Client : User interacts through FE before backend calls
-U -> Client : uses web app UI
-participant "InventoryController" as Ctrl
-participant "InventoryService" as Svc
-participant "IInventoryRepository" as Repo
-database "Database" as DB
+actor ":User" as U
+participant ":TransactionDetailPage" as Client
+participant ":InventoryController" as Ctrl
+participant ":InventoryService" as Svc
+participant ":IInventoryRepository" as Repo
+participant ":Database" as DB
 
-Client -> Ctrl : GET /api/inventory/transactions/{id}
+activate U
+U ->> Client : Open transaction detail page
+activate Client
+Client ->> Ctrl : GET /api/inventory/transactions/{id}
 activate Ctrl
-Ctrl -> Svc : GetTransactionDetailAsync(id, ct)
+Ctrl ->> Svc : GetTransactionDetailAsync(id, ct)
 activate Svc
 
-Svc -> Repo : GetTransactionByIdAsync(id, ct)
+Svc ->> Repo : GetTransactionByIdAsync(id, ct)
 activate Repo
-Repo -> DB : SELECT InventoryTransaction with Includes\n(TypeLv, StatusLv, ExportReasonLv, Supplier,\nCreatedBy, ApprovedBy, Items→Ingredient→Image,\nItems→Ingredient→CategoryLv, Items→UnitLv,\nItems→VarianceReasonLv, Media→MediaAsset)
+Repo ->> DB : Query transaction detail with related type, status, export reason, supplier, creator, approver, items, ingredient metadata, and media
 activate DB
-DB --> Repo : InventoryTransaction entity
+DB -->> Repo : Return transaction entity
 deactivate DB
-Repo --> Svc : entity
+Repo -->> Svc : entity
 deactivate Repo
 
-alt Transaction not found
-    Svc --> Ctrl : throw KeyNotFoundException
-    Ctrl --> Client : 404 ApiResponse (Transaction not found)
+alt#White Transaction not found
+    Svc -->> Ctrl : throw KeyNotFoundException
+    Ctrl -->> Client : 404 ApiResponse (Transaction not found)
 end
 
-Svc -> Svc : MapToDetailDto(entity)
+Svc ->> Svc : MapToDetailDto(entity)
 
-Svc --> Ctrl : InventoryTransactionDetailDto
+Svc -->> Ctrl : InventoryTransactionDetailDto
 deactivate Svc
-Ctrl --> Client : 200 ApiResponse<InventoryTransactionDetailDto>
+Ctrl -->> Client : 200 ApiResponse<InventoryTransactionDetailDto>
 deactivate Ctrl
+Client -->> U : Display transaction detail
+deactivate Client
+deactivate U
 
 @enduml

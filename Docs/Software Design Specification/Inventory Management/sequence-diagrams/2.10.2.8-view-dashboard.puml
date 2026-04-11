@@ -1,45 +1,53 @@
 @startuml
 autonumber
 title 2.10.2.8 View Dashboard
+skinparam sequence {
+	ParticipantBackgroundColor #ffffff
+	ActorBackgroundColor #ffffff
+}
 
-actor User as U
-participant "FE Layer" as Client
-note over U, Client : User interacts through FE before backend calls
-U -> Client : uses web app UI
-participant "InventoryController" as Ctrl
-participant "InventoryService" as Svc
-participant "IInventoryRepository" as Repo
-database "Database" as DB
+actor ":User" as U
+participant ":InventoryDashboardPage" as Client
+participant ":InventoryController" as Ctrl
+participant ":InventoryService" as Svc
+participant ":IInventoryRepository" as Repo
+participant ":Database" as DB
 
-Client -> Ctrl : GET /api/inventory/dashboard
+activate U
+U ->> Client : Open inventory dashboard page
+activate Client
+Client ->> Ctrl : GET /api/inventory/dashboard
 activate Ctrl
-Ctrl -> Svc : GetDashboardAsync(ct)
+Ctrl ->> Svc : GetDashboardAsync(ct)
 activate Svc
 
-Svc -> Repo : GetDashboardAsync(ct)
+Svc ->> Repo : GetDashboardAsync(ct)
 activate Repo
 
-Repo -> DB : SELECT aggregated stats:\n- COUNT total ingredients\n- COUNT low stock (QuantityOnHand <= MinStockLevel)\n- COUNT out of stock (QuantityOnHand = 0)\n- COUNT pending transactions
+Repo ->> DB : Query dashboard summary counts for total ingredients, low stock, out of stock, and pending transactions
 activate DB
-DB --> Repo : summary counts
+DB -->> Repo : Return summary counts
 deactivate DB
 
-Repo -> DB : SELECT TOP low stock items\nJOIN Ingredient, CurrentStock, CategoryLv, UnitLv
+Repo ->> DB : Query top low stock items with ingredient, current stock, category, and unit information
 activate DB
-DB --> Repo : LowStockItemDto list
+DB -->> Repo : Return low stock item list
 deactivate DB
 
-Repo -> DB : SELECT TOP recent transactions\nJOIN TypeLv, StatusLv, CreatedBy, Items
+Repo ->> DB : Query top recent inventory transactions with type, status, creator, and items
 activate DB
-DB --> Repo : RecentTransactionDto list
+DB -->> Repo : Return recent transaction list
 deactivate DB
 
-Repo --> Svc : InventoryDashboardDto
+Repo -->> Svc : InventoryDashboardDto
 deactivate Repo
 
-Svc --> Ctrl : InventoryDashboardDto
+Svc -->> Ctrl : InventoryDashboardDto
 deactivate Svc
-Ctrl --> Client : 200 ApiResponse<InventoryDashboardDto>
+Ctrl -->> Client : 200 ApiResponse<InventoryDashboardDto>
 deactivate Ctrl
+Client -->> U : Display inventory dashboard
+deactivate Client
+deactivate U
 
 @enduml

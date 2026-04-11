@@ -1,33 +1,41 @@
 @startuml
 autonumber
 title 2.10.2.1 View Inventory List
+skinparam sequence {
+	ParticipantBackgroundColor #ffffff
+	ActorBackgroundColor #ffffff
+}
 
-actor User as U
-participant "FE Layer" as Client
-note over U, Client : User interacts through FE before backend calls
-U -> Client : uses web app UI
-participant "InventoryController" as Ctrl
-participant "InventoryService" as Svc
-participant "IInventoryRepository" as Repo
-database "Database" as DB
+actor ":User" as U
+participant ":InventoryListPage" as Client
+participant ":InventoryController" as Ctrl
+participant ":InventoryService" as Svc
+participant ":IInventoryRepository" as Repo
+participant ":Database" as DB
 
-Client -> Ctrl : GET /api/inventory/items\n(GetInventoryItemsFilterRequest)
+activate U
+U ->> Client : Open inventory item list page
+activate Client
+Client ->> Ctrl : GET /api/inventory/items\n(GetInventoryItemsFilterRequest)
 activate Ctrl
-Ctrl -> Svc : GetItemsAsync(filter, ct)
+Ctrl ->> Svc : GetItemsAsync(filter, ct)
 activate Svc
 
-Svc -> Repo : GetItemsPagedAsync(filter, ct)
+Svc ->> Repo : GetItemsPagedAsync(filter, ct)
 activate Repo
-Repo -> DB : SELECT Ingredients\nJOIN UnitLv, TypeLv, CategoryLv, Image, CurrentStock\nWITH filters + pagination
+Repo ->> DB : Query inventory items with related unit, type, category, image, and current stock\napplying filter and pagination
 activate DB
-DB --> Repo : result rows
+DB -->> Repo : Return inventory item rows
 deactivate DB
-Repo --> Svc : PagedResultDTO<InventoryItemDto>
+Repo -->> Svc : PagedResultDTO<InventoryItemDto>
 deactivate Repo
 
-Svc --> Ctrl : PagedResultDTO<InventoryItemDto>
+Svc -->> Ctrl : PagedResultDTO<InventoryItemDto>
 deactivate Svc
-Ctrl --> Client : 200 ApiResponse<PagedResultDTO<InventoryItemDto>>
+Ctrl -->> Client : 200 ApiResponse<PagedResultDTO<InventoryItemDto>>
 deactivate Ctrl
+Client -->> U : Display inventory item list
+deactivate Client
+deactivate U
 
 @enduml

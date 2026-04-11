@@ -7,7 +7,7 @@ skinparam sequence {
 }
 
 actor ":User" as U
-participant ":FE Layer" as Client
+participant ":ConfirmShiftAssignmentPage" as Client
 participant ":ShiftController" as Ctrl
 participant ":ShiftAssignmentService" as Svc
 participant ":IShiftAssignmentRepository" as ARepo
