@@ -1,0 +1,72 @@
+@startuml
+autonumber
+title 2.16.2.13 View Live Board
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+actor ":User" as U
+participant ":FE Layer" as Client
+participant ":ShiftController" as Ctrl
+participant ":ShiftAssignmentService" as ASvc
+participant ":IShiftAssignmentRepository" as ARepo
+participant ":IOrderRepository" as ORepo
+participant ":IShiftLiveRealtimePublisher" as RT
+participant ":Database" as DB
+
+activate U
+U ->> Client : Open live board page
+activate Client
+Client ->> Ctrl : GET /api/shifts/live-board?fromDate&toDate&filters
+activate Ctrl
+Ctrl ->> ASvc : GetLiveBoardAsync(request, ct)
+activate ASvc
+
+ASvc ->> ARepo : GetAssignmentsAsync(liveRequest)
+activate ARepo
+ARepo ->> DB : Query shift assignments with\ntemplate, staff, status, and attendance\napplying filters and paging
+activate DB
+DB -->> ARepo : Return paginated assignment list with total count
+deactivate DB
+ARepo -->> ASvc : (Items, TotalCount)
+deactivate ARepo
+
+alt#White No assignments found
+    ASvc -->> Ctrl : empty List<ShiftLiveBoardItemDto>
+    Ctrl -->> Client : 200 OK []
+    Client -->> U : Display empty live board
+end
+
+ASvc ->> ORepo : GetShiftLiveOrderSnapshotsAsync(queryStart, queryEnd, staffIds)
+activate ORepo
+ORepo ->> DB : Query orders with revenue, items,\nand paid bills within the shift window
+activate DB
+DB -->> ORepo : Return order snapshots
+deactivate DB
+ORepo -->> ASvc : orderSnapshots
+deactivate ORepo
+
+ASvc ->> ORepo : GetShiftLiveIssueSnapshotsAsync(queryStart, queryEnd, staffIds)
+activate ORepo
+ORepo ->> DB : Query service error events\nwithin the shift window
+activate DB
+DB -->> ORepo : Return issue snapshots
+deactivate DB
+ORepo -->> ASvc : issueSnapshots
+deactivate ORepo
+
+ASvc -->> Ctrl : List<ShiftLiveBoardItemDto>
+deactivate ASvc
+Ctrl -->> Client : 200 OK ApiResponse<List<ShiftLiveBoardItemDto>>
+deactivate Ctrl
+Client -->> U : Display live board
+deactivate Client
+
+== Real-time Live Board Updates (SignalR) ==
+
+RT ->> Client : ShiftLiveRealtimeEventDto via SignalR Hub
+Client -->> U : Update live board display
+deactivate U
+
+@enduml

@@ -1,0 +1,113 @@
+@startuml
+autonumber
+title 2.16.2.15 Bulk Create Shift Assignments
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+actor ":User" as U
+participant ":FE Layer" as Client
+participant ":ShiftController" as Ctrl
+participant ":ShiftAssignmentService" as Svc
+participant ":IShiftTemplateRepository" as TRepo
+participant ":IShiftAssignmentRepository" as ARepo
+participant ":IAccountRepository" as AccRepo
+participant ":ILookupResolver" as Lookup
+participant ":INotificationService" as Notif
+participant ":IShiftLiveRealtimePublisher" as RT
+participant ":IUnitOfWork" as UoW
+participant ":Database" as DB
+
+activate U
+U ->> Client : Submit bulk create assignments form
+activate Client
+Client ->> Ctrl : POST /api/shifts/assignments/bulk\n(BulkCreateAssignmentRequest)
+activate Ctrl
+Ctrl ->> Svc : BulkCreateAssignmentsAsync(request, staffId, ct)
+activate Svc
+
+Svc ->> TRepo : GetByIdAsync(templateId)
+activate TRepo
+TRepo -->> Svc : ShiftTemplate?
+deactivate TRepo
+alt#White Template not found or inactive
+    Svc -->> Ctrl : throw NotFoundException / ValidationException
+    Ctrl -->> Client : 404 / 400
+    Client -->> U : Display error
+end
+
+loop For each staffId in StaffIds
+    Svc ->> AccRepo : FindByIdWithRoleAsync(staffId)
+    activate AccRepo
+    AccRepo -->> Svc : StaffAccount?
+    deactivate AccRepo
+    alt#White Staff not found
+        Svc -->> Ctrl : throw NotFoundException
+        Ctrl -->> Client : 404
+        Client -->> U : Display error
+    end
+end
+
+Svc ->> Lookup : ToShiftAssignmentStatusIdAsync(DRAFT or ASSIGNED)
+activate Lookup
+Lookup -->> Svc : uint statusLvId
+deactivate Lookup
+
+loop For each workDate in GetEffectiveDates()
+    Svc ->> ARepo : GetAlreadyAssignedStaffIdsAsync(templateId, workDate, staffIds)
+    activate ARepo
+    ARepo -->> Svc : alreadyAssigned (skipped)
+    deactivate ARepo
+    loop For each valid (not yet assigned) staffId
+        Svc ->> ARepo : HasOverlappingAssignmentAsync(staffId, workDate, start, end)
+        activate ARepo
+        ARepo -->> Svc : bool (skip if true)
+        deactivate ARepo
+    end
+end
+
+alt#White No assignments could be created
+    Svc -->> Ctrl : throw ConflictException
+    Ctrl -->> Client : 409
+    Client -->> U : Display conflict error
+end
+
+Svc ->> ARepo : AddRange(List<ShiftAssignment>)
+Svc ->> UoW : SaveChangesAsync()
+activate UoW
+UoW ->> DB : Insert multiple shift assignment records
+activate DB
+DB -->> UoW : OK
+deactivate DB
+UoW -->> Svc : OK
+deactivate UoW
+
+opt#White Not a draft, published immediately
+    loop For each created assignment
+        Svc ->> Notif : PublishAsync(SHIFT_ASSIGNED)
+        activate Notif
+        Notif -->> Svc : OK
+        deactivate Notif
+    end
+end
+
+Svc ->> ARepo : GetByIdsWithDetailsAsync(createdIds)
+activate ARepo
+ARepo -->> Svc : List<ShiftAssignment>
+deactivate ARepo
+
+Svc ->> RT : PublishBoardChangedAsync(assignments_bulk_created)
+activate RT
+RT -->> Svc : OK
+deactivate RT
+
+Svc -->> Ctrl : List<ShiftAssignmentDetailDto>
+deactivate Svc
+Ctrl -->> Client : 201 Created ApiResponse
+deactivate Ctrl
+Client -->> U : Display created assignments
+deactivate Client
+deactivate U
+
+@enduml

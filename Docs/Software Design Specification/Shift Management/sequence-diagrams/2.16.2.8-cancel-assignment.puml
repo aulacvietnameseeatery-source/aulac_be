@@ -1,0 +1,70 @@
+@startuml
+autonumber
+title 2.16.2.8 Cancel Assignment
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+actor ":User" as U
+participant ":FE Layer" as Client
+participant ":ShiftController" as Ctrl
+participant ":ShiftAssignmentService" as Svc
+participant ":IShiftAssignmentRepository" as ARepo
+participant ":ILookupResolver" as Lookup
+participant ":IShiftLiveRealtimePublisher" as RT
+participant ":IUnitOfWork" as UoW
+participant ":Database" as DB
+
+activate U
+U ->> Client : Request cancel assignment
+activate Client
+Client ->> Ctrl : DELETE /api/shifts/assignments/{id}
+activate Ctrl
+Ctrl ->> Svc : CancelAssignmentAsync(id, ct)
+activate Svc
+
+Svc ->> ARepo : GetByIdAsync(id)
+activate ARepo
+ARepo -->> Svc : ShiftAssignment?
+deactivate ARepo
+
+alt#White Not found or already cancelled
+    Svc -->> Ctrl : throw NotFoundException / ValidationException
+    Ctrl -->> Client : 404 / 400
+    Client -->> U : Display error
+end
+alt#White Already checked in
+    Svc -->> Ctrl : throw ConflictException
+    Ctrl -->> Client : 409
+    Client -->> U : Display conflict error
+end
+
+Svc ->> Lookup : ToShiftAssignmentStatusIdAsync(CANCELLED)
+activate Lookup
+Lookup -->> Svc : uint statusLvId
+deactivate Lookup
+
+Svc ->> UoW : SaveChangesAsync()
+activate UoW
+UoW ->> DB : Mark assignment as cancelled and inactive
+activate DB
+DB -->> UoW : OK
+deactivate DB
+UoW -->> Svc : OK
+deactivate UoW
+
+Svc ->> RT : PublishBoardChangedAsync(assignment_cancelled)
+activate RT
+RT -->> Svc : OK
+deactivate RT
+
+Svc -->> Ctrl : void
+deactivate Svc
+Ctrl -->> Client : 204 No Content
+deactivate Ctrl
+Client -->> U : Display cancellation confirmation
+deactivate Client
+deactivate U
+
+@enduml

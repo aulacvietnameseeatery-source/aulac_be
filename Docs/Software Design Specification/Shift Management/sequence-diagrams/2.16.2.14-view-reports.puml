@@ -1,0 +1,136 @@
+@startuml
+autonumber
+title 2.16.2.14 View Reports
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+actor ":User" as U
+participant ":FE Layer" as Client
+participant ":ShiftController" as Ctrl
+participant ":AttendanceService" as AtSvc
+participant ":IShiftAssignmentRepository" as ARepo
+participant ":Database" as DB
+
+== Report KPI Snapshot ==
+
+activate U
+U ->> Client : Open report KPI snapshot page
+activate Client
+Client ->> Ctrl : GET /api/shifts/reports/snapshot?fromDate&toDate
+activate Ctrl
+Ctrl ->> AtSvc : GetReportSnapshotAsync(fromDate, toDate, ct)
+activate AtSvc
+
+AtSvc ->> ARepo : GetAttendanceReportAsync(request with PageSize=1)
+activate ARepo
+ARepo ->> DB : Count total attendance records in date range
+activate DB
+DB -->> ARepo : Return attendance count
+deactivate DB
+ARepo -->> AtSvc : (_, attendanceCount)
+deactivate ARepo
+
+AtSvc ->> ARepo : GetWorkedHoursDataAsync(fromDate, toDate, staffId: null)
+activate ARepo
+ARepo ->> DB : Query assignments with attendance\nwhere worked minutes is greater than zero
+activate DB
+DB -->> ARepo : Return assignment list with worked data
+deactivate DB
+ARepo -->> AtSvc : workedData
+deactivate ARepo
+
+AtSvc ->> ARepo : GetExceptionDataAsync(fromDate, toDate, staffId: null)
+activate ARepo
+ARepo ->> DB : Query assignments with late, absent,\nearly leave status or manual adjustments
+activate DB
+DB -->> ARepo : Return exception assignment list
+deactivate DB
+ARepo -->> AtSvc : exceptionData
+deactivate ARepo
+
+AtSvc -->> Ctrl : ShiftReportSnapshotDto
+deactivate AtSvc
+Ctrl -->> Client : 200 OK ApiResponse<ShiftReportSnapshotDto>
+deactivate Ctrl
+Client -->> U : Display report KPI snapshot
+deactivate Client
+
+== Attendance Report (paged) ==
+
+U ->> Client : Open attendance report page
+activate Client
+Client ->> Ctrl : GET /api/shifts/reports/attendance?filters
+activate Ctrl
+Ctrl ->> AtSvc : GetAttendanceReportAsync(request, ct)
+activate AtSvc
+
+AtSvc ->> ARepo : GetAttendanceReportAsync(request)
+activate ARepo
+ARepo ->> DB : Query shift assignments joined with\nattendance records applying filters and paging
+activate DB
+DB -->> ARepo : Return paginated assignment list with total count
+deactivate DB
+ARepo -->> AtSvc : (Items, TotalCount)
+deactivate ARepo
+
+AtSvc -->> Ctrl : (List<AttendanceReportRowDto>, TotalCount)
+deactivate AtSvc
+Ctrl -->> Client : 200 OK PagedResult<AttendanceReportRowDto>
+deactivate Ctrl
+Client -->> U : Display attendance report
+deactivate Client
+
+== Worked Hours Report ==
+
+U ->> Client : Open worked hours report page
+activate Client
+Client ->> Ctrl : GET /api/shifts/reports/worked-hours?fromDate&toDate&staffId
+activate Ctrl
+Ctrl ->> AtSvc : GetWorkedHoursReportAsync(fromDate, toDate, staffId?, ct)
+activate AtSvc
+
+AtSvc ->> ARepo : GetWorkedHoursDataAsync(fromDate, toDate, staffId)
+activate ARepo
+ARepo ->> DB : Query assignments with attendance\nwithin the specified date range
+activate DB
+DB -->> ARepo : Return assignment list
+deactivate DB
+ARepo -->> AtSvc : data
+deactivate ARepo
+
+AtSvc -->> Ctrl : List<WorkedHoursReportRowDto>
+deactivate AtSvc
+Ctrl -->> Client : 200 OK ApiResponse<List<WorkedHoursReportRowDto>>
+deactivate Ctrl
+Client -->> U : Display worked hours report
+deactivate Client
+
+== Exceptions Report ==
+
+U ->> Client : Open exceptions report page
+activate Client
+Client ->> Ctrl : GET /api/shifts/reports/exceptions?fromDate&toDate&staffId
+activate Ctrl
+Ctrl ->> AtSvc : GetExceptionsReportAsync(fromDate, toDate, staffId?, ct)
+activate AtSvc
+
+AtSvc ->> ARepo : GetExceptionDataAsync(fromDate, toDate, staffId)
+activate ARepo
+ARepo ->> DB : Query assignments with attendance exceptions\n(late, absent, early leave, or manual adjustments)
+activate DB
+DB -->> ARepo : Return exception assignment list
+deactivate DB
+ARepo -->> AtSvc : data
+deactivate ARepo
+
+AtSvc -->> Ctrl : List<AttendanceExceptionReportRowDto>
+deactivate AtSvc
+Ctrl -->> Client : 200 OK ApiResponse<List<AttendanceExceptionReportRowDto>>
+deactivate Ctrl
+Client -->> U : Display exceptions report
+deactivate Client
+deactivate U
+
+@enduml

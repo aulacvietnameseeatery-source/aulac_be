@@ -1,0 +1,73 @@
+@startuml
+autonumber
+title 2.16.2.2 Create Shift Template
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+actor ":User" as U
+participant ":FE Layer" as Client
+participant ":ShiftController" as Ctrl
+participant ":ShiftTemplateService" as Svc
+participant ":IShiftTemplateRepository" as Repo
+participant ":IUnitOfWork" as UoW
+participant ":Database" as DB
+
+activate U
+U ->> Client : Submit create shift template form
+activate Client
+Client ->> Ctrl : POST /api/shifts/templates\n(CreateShiftTemplateRequest)
+activate Ctrl
+Ctrl ->> Svc : CreateAsync(request, staffId, ct)
+activate Svc
+
+alt#White Start time is after or equal to end time
+    Svc -->> Ctrl : throw ValidationException
+    Ctrl -->> Client : 400 Bad Request
+    Client -->> U : Display validation error
+end
+
+Svc ->> Repo : ExistsByNameAsync(templateName)
+activate Repo
+Repo ->> DB : Check if template name already exists
+activate DB
+DB -->> Repo : Return existence result
+deactivate DB
+Repo -->> Svc : bool
+deactivate Repo
+
+alt#White Name already exists
+    Svc -->> Ctrl : throw ConflictException
+    Ctrl -->> Client : 409 Conflict
+    Client -->> U : Display conflict error
+end
+
+Svc ->> Repo : Add(ShiftTemplate)
+Svc ->> UoW : SaveChangesAsync()
+activate UoW
+UoW ->> DB : Insert new shift template record
+activate DB
+DB -->> UoW : OK
+deactivate DB
+UoW -->> Svc : OK
+deactivate UoW
+
+Svc ->> Repo : GetByIdAsync(newId)
+activate Repo
+Repo ->> DB : Fetch newly created shift template\nwith navigation properties
+activate DB
+DB -->> Repo : Return shift template
+deactivate DB
+Repo -->> Svc : ShiftTemplate
+deactivate Repo
+
+Svc -->> Ctrl : ShiftTemplateDetailDto
+deactivate Svc
+Ctrl -->> Client : 201 Created ApiResponse<ShiftTemplateDetailDto>
+deactivate Ctrl
+Client -->> U : Display created shift template
+deactivate Client
+deactivate U
+
+@enduml

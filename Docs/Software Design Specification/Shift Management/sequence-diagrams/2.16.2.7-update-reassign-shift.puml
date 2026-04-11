@@ -1,0 +1,180 @@
+@startuml
+autonumber
+title 2.16.2.7 Update / Reassign Shift
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+actor ":User" as U
+participant ":FE Layer" as Client
+participant ":ShiftController" as Ctrl
+participant ":ShiftAssignmentService" as Svc
+participant ":IShiftAssignmentRepository" as ARepo
+participant ":IAccountRepository" as AccRepo
+participant ":INotificationService" as Notif
+participant ":IShiftLiveRealtimePublisher" as RT
+participant ":IUnitOfWork" as UoW
+participant ":Database" as DB
+
+== Update Assignment ==
+
+activate U
+U ->> Client : Submit update assignment form
+activate Client
+Client ->> Ctrl : PUT /api/shifts/assignments/{id}\n(UpdateShiftAssignmentRequest)
+activate Ctrl
+Ctrl ->> Svc : UpdateAssignmentAsync(id, request, staffId, ct)
+activate Svc
+
+Svc ->> ARepo : GetByIdAsync(id)
+activate ARepo
+ARepo -->> Svc : ShiftAssignment?
+deactivate ARepo
+alt#White Not found
+    Svc -->> Ctrl : throw NotFoundException
+    Ctrl -->> Client : 404
+    Client -->> U : Display not found error
+end
+alt#White Cancelled assignment
+    Svc -->> Ctrl : throw ValidationException
+    Ctrl -->> Client : 400
+    Client -->> U : Display validation error
+end
+alt#White Already checked in
+    Svc -->> Ctrl : throw ConflictException
+    Ctrl -->> Client : 409
+    Client -->> U : Display conflict error
+end
+
+alt#White Planned start time is after or equal to planned end time
+    Svc -->> Ctrl : throw ValidationException
+    Ctrl -->> Client : 400
+    Client -->> U : Display validation error
+end
+
+opt#White Time changed
+    Svc ->> ARepo : HasOverlappingAssignmentAsync(staffId, workDate, start, end, excludeId)
+    activate ARepo
+    ARepo -->> Svc : bool
+    deactivate ARepo
+    alt#White Overlap found
+        Svc -->> Ctrl : throw ConflictException
+        Ctrl -->> Client : 409
+        Client -->> U : Display conflict error
+    end
+end
+
+Svc ->> UoW : SaveChangesAsync()
+activate UoW
+UoW ->> DB : Update shift assignment record
+activate DB
+DB -->> UoW : OK
+deactivate DB
+UoW -->> Svc : OK
+deactivate UoW
+
+Svc ->> ARepo : GetByIdWithDetailsAsync(id)
+activate ARepo
+ARepo -->> Svc : ShiftAssignment
+deactivate ARepo
+
+Svc ->> RT : PublishBoardChangedAsync(assignment_updated)
+activate RT
+RT -->> Svc : OK
+deactivate RT
+
+Svc -->> Ctrl : ShiftAssignmentDetailDto
+deactivate Svc
+Ctrl -->> Client : 200 OK ApiResponse<ShiftAssignmentDetailDto>
+deactivate Ctrl
+Client -->> U : Display updated assignment
+deactivate Client
+
+== Reassign Shift ==
+
+U ->> Client : Submit reassign shift form
+activate Client
+Client ->> Ctrl : PUT /api/shifts/assignments/{id}/reassign\n(ReassignRequest)
+activate Ctrl
+Ctrl ->> Svc : ReassignAsync(id, request, staffId, ct)
+activate Svc
+
+Svc ->> ARepo : GetByIdWithDetailsAsync(id)
+activate ARepo
+ARepo -->> Svc : ShiftAssignment?
+deactivate ARepo
+alt#White Not found
+    Svc -->> Ctrl : throw NotFoundException
+    Ctrl -->> Client : 404
+    Client -->> U : Display not found error
+end
+alt#White Cancelled assignment
+    Svc -->> Ctrl : throw ValidationException
+    Ctrl -->> Client : 400
+    Client -->> U : Display validation error
+end
+alt#White Already checked in
+    Svc -->> Ctrl : throw ConflictException
+    Ctrl -->> Client : 409
+    Client -->> U : Display conflict error
+end
+
+Svc ->> AccRepo : FindByIdWithRoleAsync(newStaffId)
+activate AccRepo
+AccRepo -->> Svc : StaffAccount?
+deactivate AccRepo
+alt#White New staff not found
+    Svc -->> Ctrl : throw NotFoundException
+    Ctrl -->> Client : 404
+    Client -->> U : Display not found error
+end
+alt#White Same staff and same date
+    Svc -->> Ctrl : throw ValidationException
+    Ctrl -->> Client : 400
+    Client -->> U : Display validation error
+end
+
+Svc ->> ARepo : HasOverlappingAssignmentAsync(newStaffId, targetDate, start, end, excludeId)
+activate ARepo
+ARepo -->> Svc : bool
+deactivate ARepo
+alt#White Overlap found
+    Svc -->> Ctrl : throw ConflictException
+    Ctrl -->> Client : 409
+    Client -->> U : Display conflict error
+end
+
+Svc ->> UoW : SaveChangesAsync()
+activate UoW
+UoW ->> DB : Update shift assignment with new staff
+activate DB
+DB -->> UoW : OK
+deactivate DB
+UoW -->> Svc : OK
+deactivate UoW
+
+Svc ->> Notif : PublishAsync(SHIFT_ASSIGNED to new staff)
+activate Notif
+Notif -->> Svc : OK
+deactivate Notif
+
+Svc ->> ARepo : GetByIdWithDetailsAsync(id)
+activate ARepo
+ARepo -->> Svc : ShiftAssignment
+deactivate ARepo
+
+Svc ->> RT : PublishBoardChangedAsync(assignment_reassigned)
+activate RT
+RT -->> Svc : OK
+deactivate RT
+
+Svc -->> Ctrl : ShiftAssignmentDetailDto
+deactivate Svc
+Ctrl -->> Client : 200 OK ApiResponse<ShiftAssignmentDetailDto>
+deactivate Ctrl
+Client -->> U : Display reassigned assignment
+deactivate Client
+deactivate U
+
+@enduml

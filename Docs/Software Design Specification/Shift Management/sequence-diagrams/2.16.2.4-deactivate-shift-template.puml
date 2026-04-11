@@ -1,0 +1,63 @@
+@startuml
+autonumber
+title 2.16.2.4 Deactivate Shift Template
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+actor ":User" as U
+participant ":FE Layer" as Client
+participant ":ShiftController" as Ctrl
+participant ":ShiftTemplateService" as Svc
+participant ":IShiftTemplateRepository" as Repo
+participant ":IUnitOfWork" as UoW
+participant ":Database" as DB
+
+activate U
+U ->> Client : Request deactivate shift template
+activate Client
+Client ->> Ctrl : DELETE /api/shifts/templates/{id}
+activate Ctrl
+Ctrl ->> Svc : DeactivateAsync(id, ct)
+activate Svc
+
+Svc ->> Repo : GetByIdAsync(id)
+activate Repo
+Repo ->> DB : Fetch shift template by ID
+activate DB
+DB -->> Repo : Return shift template or empty
+deactivate DB
+Repo -->> Svc : ShiftTemplate?
+deactivate Repo
+
+alt#White Not found
+    Svc -->> Ctrl : throw NotFoundException
+    Ctrl -->> Client : 404 Not Found
+    Client -->> U : Display not found error
+end
+
+alt#White Template already inactive
+    Svc -->> Ctrl : throw ValidationException
+    Ctrl -->> Client : 400 Bad Request
+    Client -->> U : Display validation error
+end
+
+Svc ->> UoW : SaveChangesAsync()
+activate UoW
+UoW ->> DB : Mark shift template as inactive
+activate DB
+DB -->> UoW : OK
+deactivate DB
+UoW -->> Svc : OK
+deactivate UoW
+
+Svc -->> Ctrl : void
+deactivate Svc
+Ctrl -->> Client : 204 No Content
+deactivate Ctrl
+Client -->> U : Display success confirmation
+deactivate Client
+deactivate U
+
+@enduml

@@ -1,0 +1,33 @@
+@startuml
+autonumber
+title 2.10.2.7 View Stock Card
+
+actor User as U
+participant "FE Layer" as Client
+note over U, Client : User interacts through FE before backend calls
+U -> Client : uses web app UI
+participant "InventoryController" as Ctrl
+participant "InventoryService" as Svc
+participant "IInventoryRepository" as Repo
+database "Database" as DB
+
+Client -> Ctrl : GET /api/inventory/items/{ingredientId}/stock-card\n(pageIndex, pageSize)
+activate Ctrl
+Ctrl -> Svc : GetStockCardAsync(ingredientId, pageIndex, pageSize, ct)
+activate Svc
+
+Svc -> Repo : GetStockCardAsync(ingredientId, pageIndex, pageSize, ct)
+activate Repo
+Repo -> DB : SELECT InventoryTransactionItems\nJOIN Transaction, TypeLv, StatusLv,\nExportReasonLv, CreatedByNavigation\nWHERE IngredientId = @ingredientId\nORDER BY CreatedAt DESC
+activate DB
+DB --> Repo : result rows
+deactivate DB
+Repo --> Svc : PagedResultDTO<StockCardDto>
+deactivate Repo
+
+Svc --> Ctrl : PagedResultDTO<StockCardDto>
+deactivate Svc
+Ctrl --> Client : 200 ApiResponse<PagedResultDTO<StockCardDto>>
+deactivate Ctrl
+
+@enduml

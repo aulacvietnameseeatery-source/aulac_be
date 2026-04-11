@@ -1,6 +1,6 @@
 @startuml
 autonumber
-title 2.10.2.2 Create Inventory Transaction
+title 2.10.2.4 Create Transaction
 
 actor User as U
 participant "FE Layer" as Client
@@ -77,7 +77,7 @@ opt Evidence files provided
     deactivate Repo
 end
 
-note right of Svc : GetTransactionDetailAsync\n→ reload entity + MapToDetailDto
+note right of Svc : Reload entity + MapToDetailDto
 
 Svc -> Repo : GetTransactionByIdAsync(transactionId, ct)
 activate Repo

@@ -1,0 +1,87 @@
+@startuml
+autonumber
+title 2.16.2.9 Publish Assignments
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+actor ":User" as U
+participant ":FE Layer" as Client
+participant ":ShiftController" as Ctrl
+participant ":ShiftAssignmentService" as Svc
+participant ":IShiftAssignmentRepository" as ARepo
+participant ":ILookupResolver" as Lookup
+participant ":INotificationService" as Notif
+participant ":IShiftLiveRealtimePublisher" as RT
+participant ":IUnitOfWork" as UoW
+participant ":Database" as DB
+
+activate U
+U ->> Client : Request publish assignments
+activate Client
+Client ->> Ctrl : POST /api/shifts/assignments/publish\n(PublishAssignmentsRequest)
+activate Ctrl
+Ctrl ->> Svc : PublishAssignmentsAsync(request, staffId, ct)
+activate Svc
+
+alt#White By specific assignment IDs
+    Svc ->> ARepo : GetByIdsWithDetailsAsync(ids)
+    activate ARepo
+    ARepo -->> Svc : List<ShiftAssignment>
+    deactivate ARepo
+else By date range (FromDate, ToDate)
+    Svc ->> ARepo : GetDraftAssignmentsAsync(fromDate, toDate)
+    activate ARepo
+    ARepo -->> Svc : List<ShiftAssignment>
+    deactivate ARepo
+else Neither provided
+    Svc -->> Ctrl : throw ValidationException
+    Ctrl -->> Client : 400
+    Client -->> U : Display validation error
+end
+
+alt#White No drafts found
+    Svc -->> Ctrl : empty list
+    Ctrl -->> Client : 200 OK []
+    Client -->> U : Display empty result
+end
+
+Svc ->> Lookup : ToShiftAssignmentStatusIdAsync(ASSIGNED)
+activate Lookup
+Lookup -->> Svc : uint assignedStatusId
+deactivate Lookup
+
+loop For each draft assignment
+end
+
+Svc ->> UoW : SaveChangesAsync()
+activate UoW
+UoW ->> DB : Update all draft assignments to assigned status
+activate DB
+DB -->> UoW : OK
+deactivate DB
+UoW -->> Svc : OK
+deactivate UoW
+
+loop For each published assignment
+    Svc ->> Notif : PublishAsync(SHIFT_ASSIGNED)
+    activate Notif
+    Notif -->> Svc : OK
+    deactivate Notif
+end
+
+Svc ->> RT : PublishBoardChangedAsync(assignments_published)
+activate RT
+RT -->> Svc : OK
+deactivate RT
+
+Svc -->> Ctrl : List<ShiftAssignmentListDto>
+deactivate Svc
+Ctrl -->> Client : 200 OK ApiResponse
+deactivate Ctrl
+Client -->> U : Display published assignments
+deactivate Client
+deactivate U
+
+@enduml

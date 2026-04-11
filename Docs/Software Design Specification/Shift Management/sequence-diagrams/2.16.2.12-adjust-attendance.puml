@@ -1,0 +1,94 @@
+@startuml
+autonumber
+title 2.16.2.12 Adjust Attendance
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+actor ":User" as U
+participant ":FE Layer" as Client
+participant ":ShiftController" as Ctrl
+participant ":AttendanceService" as Svc
+participant ":IAttendanceRepository" as ARepo
+participant ":IShiftSettingsProvider" as Settings
+participant ":ILookupResolver" as Lookup
+participant ":IShiftLiveRealtimePublisher" as RT
+participant ":IUnitOfWork" as UoW
+participant ":Database" as DB
+
+activate U
+U ->> Client : Submit adjust attendance form
+activate Client
+Client ->> Ctrl : PATCH /api/shifts/attendance/{id}\n(AdjustAttendanceRequest)
+activate Ctrl
+Ctrl ->> Svc : AdjustAttendanceAsync(attendanceId, request, reviewerStaffId, ct)
+activate Svc
+
+Svc ->> ARepo : GetByIdWithDetailsAsync(attendanceId)
+activate ARepo
+ARepo ->> DB : Fetch attendance record with shift assignment details
+activate DB
+DB -->> ARepo : Return attendance record or empty
+deactivate DB
+ARepo -->> Svc : AttendanceRecord?
+deactivate ARepo
+
+alt#White Not found
+    Svc -->> Ctrl : throw NotFoundException
+    Ctrl -->> Client : 404 Not Found
+    Client -->> U : Display not found error
+end
+alt#White Missing adjustment reason
+    Svc -->> Ctrl : throw ValidationException
+    Ctrl -->> Client : 400 Bad Request
+    Client -->> U : Display validation error
+end
+
+opt#White Adjusting check-in time
+    Svc ->> Settings : GetLateGraceMinutesAsync()
+    activate Settings
+    Settings -->> Svc : int graceMinutes
+    deactivate Settings
+end
+
+opt#White Adjusting check-out time
+    alt#White Check-out before check-in
+        Svc -->> Ctrl : throw ValidationException
+        Ctrl -->> Client : 400 Bad Request
+        Client -->> U : Display validation error
+    end
+    Svc ->> Settings : GetEarlyLeaveBufferMinutesAsync()
+    activate Settings
+    Settings -->> Svc : int buffer
+    deactivate Settings
+end
+
+Svc ->> Lookup : ToAttendanceStatusIdAsync(final computed status)
+activate Lookup
+Lookup -->> Svc : uint statusLvId
+deactivate Lookup
+
+Svc ->> UoW : SaveChangesAsync()
+activate UoW
+UoW ->> DB : Update attendance record with adjusted values
+activate DB
+DB -->> UoW : OK
+deactivate DB
+UoW -->> Svc : OK
+deactivate UoW
+
+Svc ->> RT : PublishBoardChangedAsync(attendance_adjusted)
+activate RT
+RT -->> Svc : OK
+deactivate RT
+
+Svc -->> Ctrl : AttendanceRecordDto
+deactivate Svc
+Ctrl -->> Client : 200 OK ApiResponse<AttendanceRecordDto>
+deactivate Ctrl
+Client -->> U : Display adjusted attendance
+deactivate Client
+deactivate U
+
+@enduml

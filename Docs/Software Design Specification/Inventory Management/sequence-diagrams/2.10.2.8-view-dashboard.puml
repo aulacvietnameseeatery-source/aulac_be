@@ -1,6 +1,6 @@
 @startuml
 autonumber
-title 2.10.2.6 View Inventory Dashboard
+title 2.10.2.8 View Dashboard
 
 actor User as U
 participant "FE Layer" as Client

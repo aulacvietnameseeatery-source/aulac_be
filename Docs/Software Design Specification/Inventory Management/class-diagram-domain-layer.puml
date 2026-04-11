@@ -1,7 +1,5 @@
 @startuml
 title Inventory Management - Domain Layer Class Diagram
-left to right direction
-skinparam linetype ortho
 
 package "Domain Layer" {
 

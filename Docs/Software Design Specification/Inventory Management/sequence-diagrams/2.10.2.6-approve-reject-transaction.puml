@@ -1,20 +1,19 @@
 @startuml
 autonumber
-title 2.10.2.4 Approve Stock In
+title 2.10.2.6 Approve / Reject Transaction
 
 actor User as U
-participant "FE Layer" as C
-note over U, C : User interacts through FE before backend calls
-U -> C : uses web app UI
+participant "FE Layer" as Client
+note over U, Client : User interacts through FE before backend calls
+U -> Client : uses web app UI
 participant "InventoryController" as Ctrl
 participant "InventoryService" as Svc
-participant "InventoryRepository" as Repo
+participant "IInventoryRepository" as Repo
+participant "IUnitOfWork" as UoW
 participant "INotificationService" as NS
 database "Database" as DB
 
-== POST /api/inventory/transactions/{id}/approve (Approve or Reject) ==
-
-C -> Ctrl : POST /transactions/{id}/approve (ApproveTransactionRequest)
+Client -> Ctrl : POST /api/inventory/transactions/{id}/approve\n(ApproveTransactionRequest)
 activate Ctrl
 Ctrl -> Ctrl : GetCurrentUserId()
 Ctrl -> Svc : ApproveTransactionAsync(id, request, approvedByUserId, ct)
@@ -29,37 +28,43 @@ deactivate DB
 Repo --> Svc : entity
 deactivate Repo
 
-alt entity is null
-    Svc --> C : KeyNotFoundException
+alt Transaction not found
+    Svc --> Ctrl : throw KeyNotFoundException
+    Ctrl --> Client : 404 ApiResponse (Transaction not found)
 end
 
 alt Status is not PENDING_APPROVAL
-    Svc --> C : InvalidOperationException
+    Svc --> Ctrl : throw InvalidOperationException
+    Ctrl --> Client : 400 ApiResponse (Only PENDING_APPROVAL can be processed)
 end
 
-Svc -> Svc : Set ApprovedBy, ApprovedAt
+Svc -> Svc : Set ApprovedBy = approvedByUserId\nSet ApprovedAt = UtcNow
 
 alt request.IsApproved == true (Approve)
     Svc -> Svc : Set StatusLvId = COMPLETED
-    Svc -> Svc : Append approval note if provided
+    Svc -> Svc : Append approval note (if provided)
 
-    Svc -> Svc : BeginTransaction via IUnitOfWork
+    Svc -> UoW : BeginTransactionAsync(ct)
+    activate UoW
+    UoW --> Svc : ok
+    deactivate UoW
+
     Svc -> Repo : UpdateTransactionAsync(entity, ct)
     activate Repo
-    Repo -> DB : UPDATE InventoryTransactions
+    Repo -> DB : UPDATE InventoryTransaction
     activate DB
     DB --> Repo : ok
     deactivate DB
     Repo --> Svc : ok
     deactivate Repo
 
-    note right of Svc : ApplyStockChangesAsync - update stock per type
+    note right of Svc : ApplyStockChangesAsync\n— update stock per transaction type
 
     loop Each InventoryTransactionItem
         alt TypeLvId == IN (Stock In)
             Svc -> Repo : UpdateStockAsync(ingredientId, +quantity, ct)
             activate Repo
-            Repo -> DB : UPDATE CurrentStocks SET QuantityOnHand += quantity
+            Repo -> DB : UPDATE CurrentStocks\nSET QuantityOnHand += quantity
             activate DB
             DB --> Repo : ok
             deactivate DB
@@ -68,7 +73,7 @@ alt request.IsApproved == true (Approve)
         else TypeLvId == OUT (Stock Out)
             Svc -> Repo : UpdateStockAsync(ingredientId, -quantity, ct)
             activate Repo
-            Repo -> DB : UPDATE CurrentStocks SET QuantityOnHand -= quantity
+            Repo -> DB : UPDATE CurrentStocks\nSET QuantityOnHand -= quantity
             activate DB
             DB --> Repo : ok
             deactivate DB
@@ -83,7 +88,7 @@ alt request.IsApproved == true (Approve)
             deactivate DB
             Repo --> Svc : CurrentStock
             deactivate Repo
-            Svc -> Svc : Calculate variance = ActualQuantity - currentQty
+            Svc -> Svc : variance = ActualQuantity - currentQty
             Svc -> Repo : UpdateStockAsync(ingredientId, variance, ct)
             activate Repo
             Repo -> DB : UPDATE CurrentStocks
@@ -95,36 +100,40 @@ alt request.IsApproved == true (Approve)
         end
     end
 
-    Svc -> Svc : CommitTransaction via IUnitOfWork
+    Svc -> UoW : CommitAsync(ct)
+    activate UoW
+    UoW --> Svc : ok
+    deactivate UoW
 
-    note right of Svc : CheckLowStockAlertsAsync
+    note right of Svc : CheckLowStockAlertsAsync\n— check each item after stock update
 
-    loop Each item
+    loop Each InventoryTransactionItem
         Svc -> Repo : GetCurrentStockAsync(ingredientId, ct)
         activate Repo
         Repo -> DB : SELECT CurrentStocks
         activate DB
-        DB --> Repo : CurrentStock
+        DB --> Repo : stock
         deactivate DB
-        Repo --> Svc : CurrentStock
+        Repo --> Svc : stock
         deactivate Repo
 
         opt QuantityOnHand <= MinStockLevel
-            Svc -> NS : PublishAsync(LOW_STOCK_ALERT)
+            Svc -> NS : PublishAsync(LOW_STOCK_ALERT\n→ targets: staff with ViewInventory permission)
             activate NS
             NS --> Svc : ok
             deactivate NS
         end
     end
 
-    Svc -> NS : PublishAsync(INVENTORY_TX_APPROVED to creator)
+    Svc -> NS : PublishAsync(INVENTORY_TX_APPROVED\n→ target: transaction creator)
     activate NS
     NS --> Svc : ok
     deactivate NS
 
 else request.IsApproved == false (Reject)
-    alt Note is empty
-        Svc --> C : InvalidOperationException (note required)
+    alt Rejection note is empty
+        Svc --> Ctrl : throw InvalidOperationException
+        Ctrl --> Client : 400 ApiResponse (Note required for rejection)
     end
 
     Svc -> Svc : Set StatusLvId = CANCELLED
@@ -132,31 +141,34 @@ else request.IsApproved == false (Reject)
 
     Svc -> Repo : UpdateTransactionAsync(entity, ct)
     activate Repo
-    Repo -> DB : UPDATE InventoryTransactions
+    Repo -> DB : UPDATE InventoryTransaction
     activate DB
     DB --> Repo : ok
     deactivate DB
     Repo --> Svc : ok
     deactivate Repo
 
-    Svc -> NS : PublishAsync(INVENTORY_TX_REJECTED to creator)
+    Svc -> NS : PublishAsync(INVENTORY_TX_REJECTED\n→ target: transaction creator)
     activate NS
     NS --> Svc : ok
     deactivate NS
 end
 
+note right of Svc : Reload entity + MapToDetailDto
+
 Svc -> Repo : GetTransactionByIdAsync(id, ct)
 activate Repo
-Repo -> DB : SELECT
+Repo -> DB : SELECT with all Includes
 activate DB
 DB --> Repo : entity
 deactivate DB
 Repo --> Svc : entity
 deactivate Repo
 Svc -> Svc : MapToDetailDto(entity)
+
 Svc --> Ctrl : InventoryTransactionDetailDto
 deactivate Svc
-Ctrl --> C : 200 ApiResponse with InventoryTransactionDetailDto
+Ctrl --> Client : 200 ApiResponse<InventoryTransactionDetailDto>
 deactivate Ctrl
 
 @enduml

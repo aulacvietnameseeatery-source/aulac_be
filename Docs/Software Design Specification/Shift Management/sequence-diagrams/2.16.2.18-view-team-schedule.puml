@@ -1,0 +1,47 @@
+@startuml
+autonumber
+title 2.16.2.18 View Team Schedule
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+actor ":User" as U
+participant ":FE Layer" as Client
+participant ":ShiftController" as Ctrl
+participant ":ShiftAssignmentService" as Svc
+participant ":IShiftAssignmentRepository" as ARepo
+participant ":Database" as DB
+
+activate U
+U ->> Client : Open team schedule page
+activate Client
+Client ->> Ctrl : GET /api/shifts/team-schedule?weekStart&weekEnd&templateId
+activate Ctrl
+Ctrl ->> Svc : GetTeamScheduleAsync(request, ct)
+activate Svc
+
+alt#White Week end is before week start
+    Svc -->> Ctrl : throw ValidationException
+    Ctrl -->> Client : 400
+    Client -->> U : Display validation error
+end
+
+Svc ->> ARepo : GetTeamScheduleAsync(weekStart, weekEnd, templateId?)
+activate ARepo
+ARepo ->> DB : Query active shift assignments joined with\ntemplate, staff, status, and attendance\nfor the specified week range
+activate DB
+DB -->> ARepo : Return assignment list for the week
+deactivate DB
+ARepo -->> Svc : List<ShiftAssignment>
+deactivate ARepo
+
+Svc -->> Ctrl : List<ShiftAssignmentListDto>
+deactivate Svc
+Ctrl -->> Client : 200 OK ApiResponse<List<ShiftAssignmentListDto>>
+deactivate Ctrl
+Client -->> U : Display team schedule
+deactivate Client
+deactivate U
+
+@enduml

@@ -1,0 +1,40 @@
+@startuml
+autonumber
+title 2.10.2.3 View Transaction Detail
+
+actor User as U
+participant "FE Layer" as Client
+note over U, Client : User interacts through FE before backend calls
+U -> Client : uses web app UI
+participant "InventoryController" as Ctrl
+participant "InventoryService" as Svc
+participant "IInventoryRepository" as Repo
+database "Database" as DB
+
+Client -> Ctrl : GET /api/inventory/transactions/{id}
+activate Ctrl
+Ctrl -> Svc : GetTransactionDetailAsync(id, ct)
+activate Svc
+
+Svc -> Repo : GetTransactionByIdAsync(id, ct)
+activate Repo
+Repo -> DB : SELECT InventoryTransaction with Includes\n(TypeLv, StatusLv, ExportReasonLv, Supplier,\nCreatedBy, ApprovedBy, Items→Ingredient→Image,\nItems→Ingredient→CategoryLv, Items→UnitLv,\nItems→VarianceReasonLv, Media→MediaAsset)
+activate DB
+DB --> Repo : InventoryTransaction entity
+deactivate DB
+Repo --> Svc : entity
+deactivate Repo
+
+alt Transaction not found
+    Svc --> Ctrl : throw KeyNotFoundException
+    Ctrl --> Client : 404 ApiResponse (Transaction not found)
+end
+
+Svc -> Svc : MapToDetailDto(entity)
+
+Svc --> Ctrl : InventoryTransactionDetailDto
+deactivate Svc
+Ctrl --> Client : 200 ApiResponse<InventoryTransactionDetailDto>
+deactivate Ctrl
+
+@enduml

@@ -1,6 +1,6 @@
 @startuml
 autonumber
-title 2.10.2.3 Submit Inventory Transaction
+title 2.10.2.5 Submit Transaction
 
 actor User as U
 participant "FE Layer" as Client
@@ -81,7 +81,7 @@ activate NS
 NS --> Svc : ok
 deactivate NS
 
-note right of Svc : GetTransactionDetailAsync\n→ reload entity + MapToDetailDto
+note right of Svc : Reload entity + MapToDetailDto
 
 Svc -> Repo : GetTransactionByIdAsync(id, ct)
 activate Repo

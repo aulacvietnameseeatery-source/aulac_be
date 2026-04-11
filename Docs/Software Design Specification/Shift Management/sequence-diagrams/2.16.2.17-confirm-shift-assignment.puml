@@ -1,0 +1,86 @@
+@startuml
+autonumber
+title 2.16.2.17 Confirm Shift Assignment
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+actor ":User" as U
+participant ":FE Layer" as Client
+participant ":ShiftController" as Ctrl
+participant ":ShiftAssignmentService" as Svc
+participant ":IShiftAssignmentRepository" as ARepo
+participant ":ILookupResolver" as Lookup
+participant ":IShiftLiveRealtimePublisher" as RT
+participant ":IUnitOfWork" as UoW
+participant ":Database" as DB
+
+activate U
+U ->> Client : Request confirm shift assignment
+activate Client
+Client ->> Ctrl : POST /api/shifts/assignments/{id}/confirm
+activate Ctrl
+Ctrl ->> Svc : ConfirmAssignmentAsync(id, staffId, ct)
+activate Svc
+
+Svc ->> ARepo : GetByIdWithDetailsAsync(id)
+activate ARepo
+ARepo -->> Svc : ShiftAssignment?
+deactivate ARepo
+
+alt#White Not found
+    Svc -->> Ctrl : throw NotFoundException
+    Ctrl -->> Client : 404
+    Client -->> U : Display not found error
+end
+alt#White Not own shift (StaffId != caller)
+    Svc -->> Ctrl : throw ForbiddenException
+    Ctrl -->> Client : 403
+    Client -->> U : Display forbidden error
+end
+
+Svc ->> Lookup : ToShiftAssignmentStatusIdAsync(ASSIGNED)
+activate Lookup
+Lookup -->> Svc : uint assignedStatusId
+deactivate Lookup
+
+alt#White Current status is not ASSIGNED
+    Svc -->> Ctrl : throw ValidationException
+    Ctrl -->> Client : 400
+    Client -->> U : Display validation error
+end
+
+Svc ->> Lookup : ToShiftAssignmentStatusIdAsync(CONFIRMED)
+activate Lookup
+Lookup -->> Svc : uint confirmedStatusId
+deactivate Lookup
+
+Svc ->> UoW : SaveChangesAsync()
+activate UoW
+UoW ->> DB : Update assignment status to confirmed
+activate DB
+DB -->> UoW : OK
+deactivate DB
+UoW -->> Svc : OK
+deactivate UoW
+
+Svc ->> ARepo : GetByIdWithDetailsAsync(id)
+activate ARepo
+ARepo -->> Svc : ShiftAssignment
+deactivate ARepo
+
+Svc ->> RT : PublishBoardChangedAsync(assignment_confirmed)
+activate RT
+RT -->> Svc : OK
+deactivate RT
+
+Svc -->> Ctrl : ShiftAssignmentDetailDto
+deactivate Svc
+Ctrl -->> Client : 200 OK ApiResponse<ShiftAssignmentDetailDto>
+deactivate Ctrl
+Client -->> U : Display confirmed assignment
+deactivate Client
+deactivate U
+
+@enduml

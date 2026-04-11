@@ -1,9 +1,11 @@
 @startuml
 title Inventory Management - Persistence Layer Class Diagram
-
+left to right direction
 
 package "Persistence Layer" {
-
+    class InventoryRepository <<Repository>> {
+        -_context: AuLacDbContext
+    }
     interface IInventoryRepository <<interface>> {
         +GetItemsPagedAsync(filter: GetInventoryItemsFilterRequest): Task<PagedResultDTO<InventoryItemDto>>
         +CreateTransactionAsync(tx: InventoryTransaction, items: List<InventoryTransactionItem>): Task<long>
@@ -17,9 +19,7 @@ package "Persistence Layer" {
         +GetTodayTransactionCountByTypeAsync(typeCode: string): Task<int>
     }
 
-    class InventoryRepository <<Repository>> {
-        -_context: AuLacDbContext
-    }
+
 
     interface IMediaRepository <<interface>> {
         +AddMediaAsync(asset: MediaAsset): Task<MediaAsset>
@@ -33,6 +33,7 @@ package "Persistence Layer" {
     }
 
     InventoryRepository ..|> IInventoryRepository : implements
+    class AuLacDbContext <<Repository>>
 }
 
 class GetInventoryItemsFilterRequest <<DTO>>
@@ -46,21 +47,6 @@ class InventoryTransactionItem <<Entity>>
 class CurrentStock <<Entity>>
 class Ingredient <<Entity>>
 class MediaAsset <<Entity>>
-class AuLacDbContext <<Repository>>
-
-IInventoryRepository -[hidden]right-> IUnitOfWork
-IUnitOfWork -[hidden]right-> IMediaRepository
-IInventoryRepository -[hidden]down-> InventoryRepository
-
-GetInventoryItemsFilterRequest -[hidden]right-> GetTransactionsFilterRequest
-InventoryItemDto -[hidden]right-> InventoryTransactionListDto
-InventoryTransactionListDto -[hidden]right-> StockCardDto
-StockCardDto -[hidden]right-> InventoryDashboardDto
-
-InventoryTransaction -[hidden]right-> InventoryTransactionItem
-InventoryTransactionItem -[hidden]right-> CurrentStock
-CurrentStock -[hidden]right-> Ingredient
-Ingredient -[hidden]right-> MediaAsset
 
 GetTransactionsFilterRequest -[hidden]down-> InventoryTransactionListDto
 InventoryDashboardDto -[hidden]down-> InventoryTransaction
@@ -77,5 +63,7 @@ IInventoryRepository ..> CurrentStock : reads and updates
 IInventoryRepository ..> Ingredient : reads ingredient data
 
 InventoryRepository --> AuLacDbContext : uses EF Core context
+InventoryRepository --> IMediaRepository : uses
+InventoryRepository --> IUnitOfWork : uses
 IMediaRepository ..> MediaAsset : persists media assets
 @enduml
