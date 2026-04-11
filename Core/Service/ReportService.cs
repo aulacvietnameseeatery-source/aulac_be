@@ -150,5 +150,21 @@ public class ReportService : IReportService
 
         return top5Customers;
     }
+    public async Task<DailyEarningDetailDto> GetDailyEarningDetailAsync(DateTime date, CancellationToken ct = default)
+    {
+        var completedId = await GetOrderStatusIdAsync(OrderStatusCode.COMPLETED, ct);
+        return await _reportRepository.GetDailyEarningDetailAsync(date, completedId, ct);
+    }
 
+    public async Task<DishPerformanceDetailDto> GetDishPerformanceDetailAsync(long dishId, ReportFilterRequest request, CancellationToken ct = default)
+    {
+        var completedId = await GetOrderStatusIdAsync(OrderStatusCode.COMPLETED, ct);
+        return await _reportRepository.GetDishPerformanceDetailAsync(dishId, request.StartDate, request.EndDate, completedId, ct);
+    }
+
+    public async Task<CustomerProfileDetailDto> GetCustomerProfileDetailAsync(long customerId, ReportFilterRequest request, CancellationToken ct = default)
+    {
+        var completedId = await GetOrderStatusIdAsync(OrderStatusCode.COMPLETED, ct);
+        return await _reportRepository.GetCustomerProfileDetailAsync(customerId, request.StartDate, request.EndDate, completedId, ct);
+    }
 }
