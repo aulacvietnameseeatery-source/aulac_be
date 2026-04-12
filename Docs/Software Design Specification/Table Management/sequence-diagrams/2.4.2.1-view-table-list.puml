@@ -1,0 +1,54 @@
+@startuml
+title 2.4.2.1 View Table List
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":User" as U
+participant ":TableListPage" as Client
+participant ":TableController" as Ctrl
+participant ":TableService" as Svc
+participant ":TableRepository" as Repo
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : Open Table Management page
+activate Client
+
+Client ->> Ctrl : GET /api/tables?PageIndex=1&PageSize=30&Search=...&ZoneId=...&TypeId=...&StatusId=...&IsOnline=...
+activate Ctrl
+
+Ctrl ->> Svc : GetTablesForManagementAsync(GetTableManagementRequest, ct)
+activate Svc
+
+Svc ->> Repo : GetTablesForManagementAsync(request, ct)
+activate Repo
+
+Repo ->> DB : Query tables with filters, paging, includes (Status, Type, Zone, Media, QR image)
+activate DB
+DB -->> Repo : Return filtered and paged table list with total count
+deactivate DB
+
+Repo -->> Svc : (List<RestaurantTable>, int totalCount)
+deactivate Repo
+
+Svc ->> Svc : MapToManagementDto for each table
+
+Svc -->> Ctrl : (List<TableManagementDto>, int totalCount)
+deactivate Svc
+
+Ctrl -->> Client : 200 OK — ApiResponse<PagedResult<TableManagementDto>>
+deactivate Ctrl
+
+Client -->> U : Display paginated table list with images, status, zone, type
+deactivate Client
+
+deactivate U
+
+@enduml

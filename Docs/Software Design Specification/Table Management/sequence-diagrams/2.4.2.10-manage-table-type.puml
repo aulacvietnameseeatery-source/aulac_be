@@ -1,0 +1,228 @@
+@startuml
+title 2.4.2.10 Manage Table Type
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":User" as U
+participant ":TableTypeManagerPage" as Client
+participant ":TableController" as Ctrl
+participant ":TableService" as Svc
+participant ":LookupService" as LSvc
+participant ":LookupRepo" as LRepo
+participant ":Database" as DB
+
+activate U
+
+== View Table Types ==
+
+U ->> Client : Open Table Type management modal
+activate Client
+
+Client ->> Ctrl : GET /api/tables/types
+activate Ctrl
+
+Ctrl ->> Svc : GetTableTypesAsync(ct)
+activate Svc
+
+Svc ->> LSvc : GetAllActiveByTypeAsync(TableType typeId, ct)
+activate LSvc
+
+LSvc ->> LRepo : GetAllActiveByTypeAsync(typeId, ct)
+activate LRepo
+
+LRepo ->> DB : Query all active lookup values for TableType type with i18n
+activate DB
+DB -->> LRepo : Return list of LookupValue entries
+deactivate DB
+
+LRepo -->> LSvc : List<LookupValue>
+deactivate LRepo
+
+LSvc ->> LSvc : Map to List<LookupValueI18nDto>
+
+LSvc -->> Svc : List<LookupValueI18nDto>
+deactivate LSvc
+
+Svc -->> Ctrl : List<LookupValueI18nDto>
+deactivate Svc
+
+Ctrl -->> Client : 200 OK — ApiResponse<List<LookupValueI18nDto>>
+deactivate Ctrl
+
+Client -->> U : Display table type list
+
+== Create Table Type ==
+
+U ->> Client : Fill in type name and submit
+Client ->> Ctrl : POST /api/tables/types (CreateLookupValueRequest)
+activate Ctrl
+
+Ctrl ->> Svc : CreateTableTypeAsync(CreateLookupValueRequest, ct)
+activate Svc
+
+Svc ->> LSvc : CreateAsync(TableType typeId, request, ct)
+activate LSvc
+
+LSvc ->> LRepo : ValueNameExistsAsync(typeId, name, ct)
+activate LRepo
+LRepo ->> DB : Check if type name already exists
+activate DB
+DB -->> LRepo : Return true/false
+deactivate DB
+LRepo -->> LSvc : bool
+deactivate LRepo
+
+alt#White Duplicate name or code
+    LSvc -->> Svc : throw ConflictException
+    Svc -->> Ctrl : throw ConflictException
+    Ctrl -->> Client : 409 Conflict
+    Client -->> U : Display duplicate type error
+else Name is unique
+    LSvc ->> LSvc : BeginTransaction, create i18n texts, build LookupValue entity
+
+    LSvc ->> LRepo : Add(LookupValue)
+    activate LRepo
+    LRepo ->> DB : Insert new table type lookup value
+    activate DB
+    DB -->> LRepo : Confirm insert
+    deactivate DB
+    LRepo -->> LSvc : Done
+    deactivate LRepo
+
+    LSvc ->> LSvc : SaveChanges, Commit, RefreshLookupCache
+
+    LSvc ->> LRepo : GetByIdWithI18nAsync(valueId, ct)
+    activate LRepo
+    LRepo ->> DB : Query newly created lookup value with i18n
+    activate DB
+    DB -->> LRepo : Return LookupValue
+    deactivate DB
+    LRepo -->> LSvc : LookupValue
+    deactivate LRepo
+
+    LSvc -->> Svc : LookupValueI18nDto
+    deactivate LSvc
+
+    Svc -->> Ctrl : LookupValueI18nDto
+    deactivate Svc
+
+    Ctrl -->> Client : 201 Created — ApiResponse<LookupValueI18nDto>
+    deactivate Ctrl
+
+    Client -->> U : Add new type to list
+end
+
+== Update Table Type ==
+
+U ->> Client : Edit type name and submit
+Client ->> Ctrl : PUT /api/tables/types/{valueId} (UpdateLookupValueRequest)
+activate Ctrl
+
+Ctrl ->> Svc : UpdateTableTypeAsync(valueId, UpdateLookupValueRequest, ct)
+activate Svc
+
+Svc ->> LSvc : UpdateAsync(TableType typeId, valueId, request, ct)
+activate LSvc
+
+LSvc ->> LRepo : GetByIdAsync(valueId, ct)
+activate LRepo
+LRepo ->> DB : Query lookup value by ID
+activate DB
+DB -->> LRepo : Return LookupValue or null
+deactivate DB
+LRepo -->> LSvc : LookupValue or null
+deactivate LRepo
+
+alt#White Not found or wrong type or locked
+    LSvc -->> Svc : throw NotFoundException / ValidationException
+    Svc -->> Ctrl : throw exception
+    Ctrl -->> Client : 404 / 400
+    Client -->> U : Display error message
+else Valid lookup value
+    LSvc ->> LSvc : Update name, sort order, i18n translations
+
+    LSvc ->> LSvc : SaveChanges, RefreshLookupCache
+
+    LSvc ->> LRepo : GetByIdWithI18nAsync(valueId, ct)
+    activate LRepo
+    LRepo ->> DB : Query updated lookup value with i18n
+    activate DB
+    DB -->> LRepo : Return updated LookupValue
+    deactivate DB
+    LRepo -->> LSvc : LookupValue
+    deactivate LRepo
+
+    LSvc -->> Svc : LookupValueI18nDto
+    deactivate LSvc
+
+    Svc -->> Ctrl : LookupValueI18nDto
+    deactivate Svc
+
+    Ctrl -->> Client : 200 OK — ApiResponse<LookupValueI18nDto>
+    deactivate Ctrl
+
+    Client -->> U : Update type in list
+end
+
+== Delete Table Type ==
+
+U ->> Client : Click delete on a type and confirm
+Client ->> Ctrl : DELETE /api/tables/types/{valueId}
+activate Ctrl
+
+Ctrl ->> Svc : DeleteTableTypeAsync(valueId, ct)
+activate Svc
+
+Svc ->> LSvc : DeleteAsync(TableType typeId, valueId, "type", ct)
+activate LSvc
+
+LSvc ->> LRepo : GetByIdAsync(valueId, ct)
+activate LRepo
+LRepo ->> DB : Query lookup value by ID
+activate DB
+DB -->> LRepo : Return LookupValue
+deactivate DB
+LRepo -->> LSvc : LookupValue
+deactivate LRepo
+
+LSvc ->> LRepo : CountTablesUsingLookupValueAsync(valueId, ct)
+activate LRepo
+LRepo ->> DB : Count non-deleted tables referencing this type
+activate DB
+DB -->> LRepo : Return count
+deactivate DB
+LRepo -->> LSvc : int tableCount
+deactivate LRepo
+
+alt#White Type is in use (tableCount > 0)
+    LSvc -->> Svc : throw ConflictException
+    Svc -->> Ctrl : throw ConflictException
+    Ctrl -->> Client : 409 Conflict — Type is in use
+    Client -->> U : Display conflict error
+else Type not in use
+    LSvc ->> LSvc : Set DeletedAt, IsActive = false
+
+    LSvc ->> LSvc : SaveChanges, RefreshLookupCache
+
+    LSvc -->> Svc : (void)
+    deactivate LSvc
+
+    Svc -->> Ctrl : (void)
+    deactivate Svc
+
+    Ctrl -->> Client : 204 No Content
+    deactivate Ctrl
+
+    Client -->> U : Remove type from list
+end
+
+deactivate Client
+deactivate U
+
+@enduml

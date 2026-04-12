@@ -1,0 +1,102 @@
+@startuml
+title 2.4.2.4 Update Table
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":User" as U
+participant ":TableEditPage" as Client
+participant ":TableController" as Ctrl
+participant ":TableService" as Svc
+participant ":TableRepository" as Repo
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : Edit table fields, add/remove images, submit (multipart/form-data)
+activate Client
+
+Client ->> Ctrl : PUT /api/tables/{id} (UpdateTableFormRequest with optional images + RemovedImageIds)
+activate Ctrl
+
+Ctrl ->> Ctrl : Map UpdateTableFormRequest to UpdateTableRequest + MapFiles + ParseRemovedImageIds
+
+Ctrl ->> Svc : UpdateTableAsync(id, UpdateTableRequest, List<MediaFileInput>, List<long> removedImageIds, ct)
+activate Svc
+
+Svc ->> Repo : GetByIdWithDetailsAsync(id, ct)
+activate Repo
+Repo ->> DB : Query table by ID with includes
+activate DB
+DB -->> Repo : Return table entity
+deactivate DB
+Repo -->> Svc : RestaurantTable or null
+deactivate Repo
+
+alt#White Table not found
+    Svc -->> Ctrl : throw NotFoundException
+    Ctrl -->> Client : 404 Not Found
+    Client -->> U : Display error message
+else Table found
+    opt#White TableCode changed
+        Svc ->> Repo : TableCodeExistsAsync(newCode, excludeId, ct)
+        activate Repo
+        Repo ->> DB : Check for duplicate code excluding current table
+        activate DB
+        DB -->> Repo : Return true/false
+        deactivate DB
+        Repo -->> Svc : bool
+        deactivate Repo
+
+        alt#White Duplicate code
+            Svc -->> Ctrl : throw ConflictException
+            Ctrl -->> Client : 409 Conflict
+            Client -->> U : Display duplicate code error
+        end
+    end
+
+    Svc ->> Svc : Update scalar fields (Capacity, IsOnline, StatusLvId, TypeLvId, ZoneLvId) + ValidateLookups
+
+    Svc ->> Repo : BeginTransactionAsync via IUnitOfWork
+    activate Repo
+
+    opt#White RemovedImageIds provided
+        Svc ->> Repo : GetTableMediaAsync + RemoveTableMedia + RemoveMediaAsync for each removed image
+    end
+
+    opt#White New images provided
+        Svc ->> Svc : SaveTableImagesAsync — upload, create MediaAssets, create TableMedium links
+    end
+
+    Svc ->> Repo : CommitAsync via IUnitOfWork
+    deactivate Repo
+
+    Svc ->> Repo : GetByIdWithDetailsAsync(id, ct)
+    activate Repo
+    Repo ->> DB : Query updated table with all includes
+    activate DB
+    DB -->> Repo : Return updated table
+    deactivate DB
+    Repo -->> Svc : RestaurantTable
+    deactivate Repo
+
+    Svc ->> Svc : MapToDetailDto
+
+    Svc -->> Ctrl : TableDetailDto
+    deactivate Svc
+
+    Ctrl -->> Client : 200 OK — ApiResponse<TableDetailDto>
+    deactivate Ctrl
+
+    Client -->> U : Display updated table detail
+end
+
+deactivate Client
+deactivate U
+
+@enduml

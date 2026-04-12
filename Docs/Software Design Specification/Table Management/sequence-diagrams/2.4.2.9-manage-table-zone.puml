@@ -1,0 +1,228 @@
+@startuml
+title 2.4.2.9 Manage Table Zone
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":User" as U
+participant ":TableZoneManagerPage" as Client
+participant ":TableController" as Ctrl
+participant ":TableService" as Svc
+participant ":LookupService" as LSvc
+participant ":LookupRepo" as LRepo
+participant ":Database" as DB
+
+activate U
+
+== View Zones ==
+
+U ->> Client : Open Zone management modal
+activate Client
+
+Client ->> Ctrl : GET /api/tables/zones
+activate Ctrl
+
+Ctrl ->> Svc : GetZonesAsync(ct)
+activate Svc
+
+Svc ->> LSvc : GetAllActiveByTypeAsync(TableZone typeId, ct)
+activate LSvc
+
+LSvc ->> LRepo : GetAllActiveByTypeAsync(typeId, ct)
+activate LRepo
+
+LRepo ->> DB : Query all active lookup values for TableZone type with i18n
+activate DB
+DB -->> LRepo : Return list of LookupValue entries
+deactivate DB
+
+LRepo -->> LSvc : List<LookupValue>
+deactivate LRepo
+
+LSvc ->> LSvc : Map to List<LookupValueI18nDto>
+
+LSvc -->> Svc : List<LookupValueI18nDto>
+deactivate LSvc
+
+Svc -->> Ctrl : List<LookupValueI18nDto>
+deactivate Svc
+
+Ctrl -->> Client : 200 OK — ApiResponse<List<LookupValueI18nDto>>
+deactivate Ctrl
+
+Client -->> U : Display zone list
+
+== Create Zone ==
+
+U ->> Client : Fill in zone name and submit
+Client ->> Ctrl : POST /api/tables/zones (CreateLookupValueRequest)
+activate Ctrl
+
+Ctrl ->> Svc : CreateZoneAsync(CreateLookupValueRequest, ct)
+activate Svc
+
+Svc ->> LSvc : CreateAsync(TableZone typeId, request, ct)
+activate LSvc
+
+LSvc ->> LRepo : ValueNameExistsAsync(typeId, name, ct)
+activate LRepo
+LRepo ->> DB : Check if zone name already exists
+activate DB
+DB -->> LRepo : Return true/false
+deactivate DB
+LRepo -->> LSvc : bool
+deactivate LRepo
+
+alt#White Duplicate name or code
+    LSvc -->> Svc : throw ConflictException
+    Svc -->> Ctrl : throw ConflictException
+    Ctrl -->> Client : 409 Conflict
+    Client -->> U : Display duplicate zone error
+else Name is unique
+    LSvc ->> LSvc : BeginTransaction, create i18n texts, build LookupValue entity
+
+    LSvc ->> LRepo : Add(LookupValue)
+    activate LRepo
+    LRepo ->> DB : Insert new zone lookup value
+    activate DB
+    DB -->> LRepo : Confirm insert
+    deactivate DB
+    LRepo -->> LSvc : Done
+    deactivate LRepo
+
+    LSvc ->> LSvc : SaveChanges, Commit, RefreshLookupCache
+
+    LSvc ->> LRepo : GetByIdWithI18nAsync(valueId, ct)
+    activate LRepo
+    LRepo ->> DB : Query newly created lookup value with i18n
+    activate DB
+    DB -->> LRepo : Return LookupValue
+    deactivate DB
+    LRepo -->> LSvc : LookupValue
+    deactivate LRepo
+
+    LSvc -->> Svc : LookupValueI18nDto
+    deactivate LSvc
+
+    Svc -->> Ctrl : LookupValueI18nDto
+    deactivate Svc
+
+    Ctrl -->> Client : 201 Created — ApiResponse<LookupValueI18nDto>
+    deactivate Ctrl
+
+    Client -->> U : Add new zone to list
+end
+
+== Update Zone ==
+
+U ->> Client : Edit zone name and submit
+Client ->> Ctrl : PUT /api/tables/zones/{valueId} (UpdateLookupValueRequest)
+activate Ctrl
+
+Ctrl ->> Svc : UpdateZoneAsync(valueId, UpdateLookupValueRequest, ct)
+activate Svc
+
+Svc ->> LSvc : UpdateAsync(TableZone typeId, valueId, request, ct)
+activate LSvc
+
+LSvc ->> LRepo : GetByIdAsync(valueId, ct)
+activate LRepo
+LRepo ->> DB : Query lookup value by ID
+activate DB
+DB -->> LRepo : Return LookupValue or null
+deactivate DB
+LRepo -->> LSvc : LookupValue or null
+deactivate LRepo
+
+alt#White Not found or wrong type or locked
+    LSvc -->> Svc : throw NotFoundException / ValidationException
+    Svc -->> Ctrl : throw exception
+    Ctrl -->> Client : 404 / 400
+    Client -->> U : Display error message
+else Valid lookup value
+    LSvc ->> LSvc : Update name, sort order, i18n translations
+
+    LSvc ->> LSvc : SaveChanges, RefreshLookupCache
+
+    LSvc ->> LRepo : GetByIdWithI18nAsync(valueId, ct)
+    activate LRepo
+    LRepo ->> DB : Query updated lookup value with i18n
+    activate DB
+    DB -->> LRepo : Return updated LookupValue
+    deactivate DB
+    LRepo -->> LSvc : LookupValue
+    deactivate LRepo
+
+    LSvc -->> Svc : LookupValueI18nDto
+    deactivate LSvc
+
+    Svc -->> Ctrl : LookupValueI18nDto
+    deactivate Svc
+
+    Ctrl -->> Client : 200 OK — ApiResponse<LookupValueI18nDto>
+    deactivate Ctrl
+
+    Client -->> U : Update zone in list
+end
+
+== Delete Zone ==
+
+U ->> Client : Click delete on a zone and confirm
+Client ->> Ctrl : DELETE /api/tables/zones/{valueId}
+activate Ctrl
+
+Ctrl ->> Svc : DeleteZoneAsync(valueId, ct)
+activate Svc
+
+Svc ->> LSvc : DeleteAsync(TableZone typeId, valueId, "zone", ct)
+activate LSvc
+
+LSvc ->> LRepo : GetByIdAsync(valueId, ct)
+activate LRepo
+LRepo ->> DB : Query lookup value by ID
+activate DB
+DB -->> LRepo : Return LookupValue
+deactivate DB
+LRepo -->> LSvc : LookupValue
+deactivate LRepo
+
+LSvc ->> LRepo : CountTablesUsingLookupValueAsync(valueId, ct)
+activate LRepo
+LRepo ->> DB : Count non-deleted tables referencing this zone
+activate DB
+DB -->> LRepo : Return count
+deactivate DB
+LRepo -->> LSvc : int tableCount
+deactivate LRepo
+
+alt#White Zone is in use (tableCount > 0)
+    LSvc -->> Svc : throw ConflictException
+    Svc -->> Ctrl : throw ConflictException
+    Ctrl -->> Client : 409 Conflict — Zone is in use
+    Client -->> U : Display conflict error
+else Zone not in use
+    LSvc ->> LSvc : Set DeletedAt, IsActive = false
+
+    LSvc ->> LSvc : SaveChanges, RefreshLookupCache
+
+    LSvc -->> Svc : (void)
+    deactivate LSvc
+
+    Svc -->> Ctrl : (void)
+    deactivate Svc
+
+    Ctrl -->> Client : 204 No Content
+    deactivate Ctrl
+
+    Client -->> U : Remove zone from list
+end
+
+deactivate Client
+deactivate U
+
+@enduml

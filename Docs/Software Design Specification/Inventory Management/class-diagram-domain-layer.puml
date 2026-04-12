@@ -1,6 +1,5 @@
-@startuml
+@startuml class-diagram-domain-layer
 title Inventory Management - Domain Layer Class Diagram
-
 package "Domain Layer" {
 
     class InventoryTransaction <<Entity>> {
@@ -84,27 +83,24 @@ package "Domain Layer" {
         +FullName: string
         +RoleId: long
     }
-
-    InventoryTransaction -right-> InventoryTransactionItem
-    InventoryTransactionItem -right-> InventoryTransactionMedium
-    InventoryTransactionMedium -right-> MediaAsset
-
-    Ingredient -right-> CurrentStock
-    Supplier -right-> LookupValue
-    LookupValue -right-> StaffAccount
-
-    InventoryTransaction -right-> Ingredient
-    InventoryTransactionMedium -right-> LookupValue
 }
 
-InventoryTransaction "1" *--- "1..*" InventoryTransactionItem : contains line items
-InventoryTransaction "1" *--- "0..*" InventoryTransactionMedium : has evidence media
+InventoryTransaction "1" *-- "1..*" InventoryTransactionItem : contains line items
+InventoryTransaction "1" *-- "0..*" InventoryTransactionMedium : has evidence media
 InventoryTransactionItem "0..*" --> "1" Ingredient : references ingredient
 InventoryTransactionMedium "0..*" --> "1" MediaAsset : references media
-Ingredient "1" *--- "0..1" CurrentStock : tracks current stock
-InventoryTransaction "0..*" -down-> "0..1" Supplier : supplied by
-InventoryTransaction "0..*" -down-> "0..1" LookupValue : references transaction lookups
-InventoryTransactionItem "0..*" -down-> "1" LookupValue : uses unit lookup
-Ingredient "0..*" -right-> "0..1" LookupValue : references type/category lookups
-InventoryTransaction "0..*" -right-> "0..1" StaffAccount : created/approved by
+Ingredient "1" *-- "0..1" CurrentStock : tracks current stock
+InventoryTransaction "0..*" --> "0..1" Supplier : supplied by
+InventoryTransaction "0..*" --> "1" LookupValue : uses transaction type lookup
+InventoryTransaction "0..*" --> "1" LookupValue : uses transaction status lookup
+InventoryTransaction "0..*" --> "0..1" LookupValue : uses export reason lookup
+InventoryTransactionItem "0..*" --> "1" LookupValue : uses unit lookup
+InventoryTransactionItem "0..*" --> "0..1" LookupValue : uses variance reason lookup
+Ingredient "0..*" --> "1" LookupValue : uses unit lookup
+Ingredient "0..*" --> "0..1" LookupValue : uses type lookup
+Ingredient "0..*" --> "0..1" LookupValue : uses category lookup
+Ingredient "0..*" --> "0..1" MediaAsset : uses image media
+MediaAsset "0..*" --> "1" LookupValue : uses media type lookup
+InventoryTransaction "0..*" --> "0..1" StaffAccount : created by
+InventoryTransaction "0..*" --> "0..1" StaffAccount : approved by
 @enduml

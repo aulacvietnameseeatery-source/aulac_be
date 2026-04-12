@@ -1,0 +1,76 @@
+@startuml
+title Table Management Module - Domain Layer Class Diagram
+
+package "Domain Layer" {
+
+    enum TableStatusCode <<enum>> {
+        AVAILABLE
+        OCCUPIED
+        RESERVED
+        LOCKED
+    }
+
+    class RestaurantTable <<Entity>> {
+        +TableId : long
+        +TableCode : string
+        +Capacity : int
+        +TableQrImg : long?
+        +TableStatusLvId : uint
+        +TableTypeLvId : uint
+        +ZoneLvId : uint
+        +IsOnline : bool?
+        +QrToken : string?
+        +CreatedAt : DateTime
+        +UpdatedAt : DateTime
+        +UpdatedByStaffId : long?
+        +IsDeleted : bool
+    }
+
+    class TableMedium <<Entity>> {
+        +TableId : long
+        +MediaId : long
+        +IsPrimary : bool?
+    }
+
+    class MediaAsset <<Entity>> {
+        +MediaId : long
+        +Url : string
+        +MimeType : string?
+        +Width : int?
+        +Height : int?
+        +DurationSec : int?
+        +CreatedAt : DateTime?
+        +MediaTypeLvId : uint
+    }
+
+    class LookupValue <<Entity>> {
+        +ValueId : uint
+        +TypeId : ushort
+        +ValueCode : string
+        +ValueName : string
+        +SortOrder : short
+        +IsActive : bool?
+        +Meta : string?
+        +IsSystem : bool?
+        +Locked : bool?
+        +DeletedAt : DateTime?
+        +Description : string?
+        +UpdateAt : DateTime?
+    }
+
+}
+
+' ── Relationships ──
+
+RestaurantTable *-- "0..*" TableMedium : contains images
+TableMedium --> "1" MediaAsset : references media
+
+RestaurantTable --> "0..1" MediaAsset : QR image (TableQrImg)
+
+RestaurantTable --> "1" LookupValue : table status (TableStatusLvId)
+RestaurantTable --> "1" LookupValue : table type (TableTypeLvId)
+RestaurantTable --> "1" LookupValue : zone (ZoneLvId)
+
+MediaAsset --> "1" LookupValue : media type (MediaTypeLvId)
+
+@enduml

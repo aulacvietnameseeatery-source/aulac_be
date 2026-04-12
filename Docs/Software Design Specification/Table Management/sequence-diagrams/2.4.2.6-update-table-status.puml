@@ -1,0 +1,99 @@
+@startuml
+title 2.4.2.6 Update Table Status
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":User" as U
+participant ":TableListPage" as Client
+participant ":TableController" as Ctrl
+participant ":TableService" as Svc
+participant ":TableRepository" as Repo
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : Select new status for a table
+activate Client
+
+Client ->> Ctrl : PATCH /api/tables/{id}/status (UpdateTableStatusRequest)
+activate Ctrl
+
+Ctrl ->> Svc : UpdateStatusAsync(id, UpdateTableStatusRequest, ct)
+activate Svc
+
+Svc ->> Repo : GetByIdAsync(id, ct)
+activate Repo
+Repo ->> DB : Query table by ID with status lookup
+activate DB
+DB -->> Repo : Return table entity
+deactivate DB
+Repo -->> Svc : RestaurantTable or null
+deactivate Repo
+
+alt#White Table not found
+    Svc -->> Ctrl : throw NotFoundException
+    Ctrl -->> Client : 404 Not Found
+    Client -->> U : Display error message
+else Table found
+    Svc ->> Svc : ValidateLookupAsync for new StatusLvId
+
+    Svc ->> Repo : GetLookupValueCodeAsync(request.StatusLvId, ct)
+    activate Repo
+    Repo ->> DB : Query lookup value code for new status
+    activate DB
+    DB -->> Repo : Return value code string
+    deactivate DB
+    Repo -->> Svc : string newCode
+    deactivate Repo
+
+    Svc ->> Svc : Check AllowedTransitions[currentCode] contains newCode
+
+    alt#White Invalid transition
+        Svc -->> Ctrl : throw ValidationException
+        Ctrl -->> Client : 400 Bad Request — Invalid status transition
+        Client -->> U : Display transition error
+    else Valid transition
+        Svc ->> Svc : Update TableStatusLvId and UpdatedAt
+
+        Svc ->> Repo : SaveChangesAsync via IUnitOfWork
+        activate Repo
+        Repo ->> DB : Update table status
+        activate DB
+        DB -->> Repo : Confirm update
+        deactivate DB
+        Repo -->> Svc : Done
+        deactivate Repo
+
+        Svc ->> Svc : Publish TABLE_STATUS_CHANGED notification via INotificationService
+
+        Svc ->> Repo : GetByIdAsync(id, ct)
+        activate Repo
+        Repo ->> DB : Query updated table
+        activate DB
+        DB -->> Repo : Return updated table
+        deactivate DB
+        Repo -->> Svc : RestaurantTable
+        deactivate Repo
+
+        Svc ->> Svc : MapToManagementDto
+
+        Svc -->> Ctrl : TableManagementDto
+        deactivate Svc
+
+        Ctrl -->> Client : 200 OK — ApiResponse<TableManagementDto>
+        deactivate Ctrl
+
+        Client -->> U : Display updated table status
+    end
+end
+
+deactivate Client
+deactivate U
+
+@enduml

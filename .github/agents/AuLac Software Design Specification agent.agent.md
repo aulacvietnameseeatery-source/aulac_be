@@ -744,11 +744,13 @@ All `.puml` sequence diagrams **must** follow these rules:
 
 1. **Skinparam** — always include at the top:
    ```plantuml
+   skinparam maxMessageSize 250
    skinparam sequence {
        ParticipantBackgroundColor #ffffff
        ActorBackgroundColor #ffffff
    }
    ```
+   `skinparam maxMessageSize 250` ensures long message labels wrap automatically instead of stretching the diagram horizontally.
 2. **Alt/Opt blocks** — always use `alt#White` and `opt#White` (white background):
    ```plantuml
    alt#White condition description

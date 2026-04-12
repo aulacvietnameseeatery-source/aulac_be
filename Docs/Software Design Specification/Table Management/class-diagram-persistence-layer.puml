@@ -1,0 +1,96 @@
+@startuml
+title Table Management Module - Persistence Layer Class Diagram
+
+package "Persistence Layer" {
+
+    interface ITableRepository <<interface>> {
+        +GetAvailableTablesAsync(ct: CancellationToken) : Task<List<RestaurantTable>>
+        +GetAvailableTablesAsync(targetTime: DateTime, ct: CancellationToken) : Task<List<RestaurantTable>>
+        +GetManualAvailableTablesAsync(isOnline: bool?, ct: CancellationToken) : Task<List<RestaurantTable>>
+        +GetByIdAsync(tableId: long, ct: CancellationToken) : Task<RestaurantTable?>
+        +GetByIdWithDetailsAsync(tableId: long, ct: CancellationToken) : Task<RestaurantTable?>
+        +GetByCodeAsync(tableCode: string, ct: CancellationToken) : Task<RestaurantTable?>
+        +ExistsAsync(tableId: long, ct: CancellationToken) : Task<bool>
+        +TableCodeExistsAsync(code: string, excludeId: long?, ct: CancellationToken) : Task<bool>
+        +CountActiveOrdersAsync(tableId: long, ct: CancellationToken) : Task<int>
+        +CountUpcomingReservationsAsync(tableId: long, ct: CancellationToken) : Task<int>
+        +GetTablesForManagementAsync(request: GetTableManagementRequest, ct: CancellationToken) : Task<(List<RestaurantTable>, int)>
+        +GetTablesWithRelationsAsync(ct: CancellationToken) : Task<List<RestaurantTable>>
+        +Add(table: RestaurantTable) : void
+        +UpdateAsync(table: RestaurantTable, ct: CancellationToken) : Task
+        +UpdateStatusAsync(tableId: long, statusLvId: uint, ct: CancellationToken) : Task
+        +IsValidLookupAsync(valueId: uint, typeId: ushort, ct: CancellationToken) : Task<bool>
+        +GetLookupValueCodeAsync(valueId: uint, ct: CancellationToken) : Task<string?>
+        +BulkSetOnlineByZoneAsync(zoneLvId: uint, isOnline: bool, ct: CancellationToken) : Task<int>
+        +GetTableMediaAsync(tableId: long, mediaId: long, ct: CancellationToken) : Task<TableMedium?>
+        +AddTableMedia(tableMedium: TableMedium) : void
+        +RemoveTableMedia(tableMedium: TableMedium) : void
+        +SetQrImageAsync(tableId: long, mediaId: long, ct: CancellationToken) : Task
+        +TryOccupyIfAvailableAsync(tableId: long, availableLvId: uint, occupiedLvId: uint, ct: CancellationToken) : Task<bool>
+        +LockTablesForUpdateAsync(tableIds: IEnumerable<long>, ct: CancellationToken) : Task
+    }
+
+    class TableRepository <<Repository>> {
+        -_context : RestaurantMgmtContext
+        +GetAvailableTablesAsync(ct: CancellationToken) : Task<List<RestaurantTable>>
+        +GetAvailableTablesAsync(targetTime: DateTime, ct: CancellationToken) : Task<List<RestaurantTable>>
+        +GetManualAvailableTablesAsync(isOnline: bool?, ct: CancellationToken) : Task<List<RestaurantTable>>
+        +GetByIdAsync(tableId: long, ct: CancellationToken) : Task<RestaurantTable?>
+        +GetByIdWithDetailsAsync(tableId: long, ct: CancellationToken) : Task<RestaurantTable?>
+        +GetByCodeAsync(tableCode: string, ct: CancellationToken) : Task<RestaurantTable?>
+        +ExistsAsync(tableId: long, ct: CancellationToken) : Task<bool>
+        +TableCodeExistsAsync(code: string, excludeId: long?, ct: CancellationToken) : Task<bool>
+        +CountActiveOrdersAsync(tableId: long, ct: CancellationToken) : Task<int>
+        +CountUpcomingReservationsAsync(tableId: long, ct: CancellationToken) : Task<int>
+        +GetTablesForManagementAsync(request: GetTableManagementRequest, ct: CancellationToken) : Task<(List<RestaurantTable>, int)>
+        +GetTablesWithRelationsAsync(ct: CancellationToken) : Task<List<RestaurantTable>>
+        +Add(table: RestaurantTable) : void
+        +UpdateAsync(table: RestaurantTable, ct: CancellationToken) : Task
+        +UpdateStatusAsync(tableId: long, statusLvId: uint, ct: CancellationToken) : Task
+        +IsValidLookupAsync(valueId: uint, typeId: ushort, ct: CancellationToken) : Task<bool>
+        +GetLookupValueCodeAsync(valueId: uint, ct: CancellationToken) : Task<string?>
+        +BulkSetOnlineByZoneAsync(zoneLvId: uint, isOnline: bool, ct: CancellationToken) : Task<int>
+        +GetTableMediaAsync(tableId: long, mediaId: long, ct: CancellationToken) : Task<TableMedium?>
+        +AddTableMedia(tableMedium: TableMedium) : void
+        +RemoveTableMedia(tableMedium: TableMedium) : void
+        +SetQrImageAsync(tableId: long, mediaId: long, ct: CancellationToken) : Task
+        +TryOccupyIfAvailableAsync(tableId: long, availableLvId: uint, occupiedLvId: uint, ct: CancellationToken) : Task<bool>
+        +LockTablesForUpdateAsync(tableIds: IEnumerable<long>, ct: CancellationToken) : Task
+    }
+
+    interface IMediaRepository <<interface>> {
+        +AddMediaAsync(media: MediaAsset, ct: CancellationToken) : Task<MediaAsset>
+        +AddAsync(asset: MediaAsset, ct: CancellationToken) : Task
+        +RemoveMediaAsync(media: MediaAsset, ct: CancellationToken) : Task
+    }
+
+    interface IUnitOfWork <<interface>> {
+        +BeginTransactionAsync(ct: CancellationToken) : Task
+        +CommitAsync(ct: CancellationToken) : Task
+        +RollbackAsync(ct: CancellationToken) : Task
+        +SaveChangesAsync(ct: CancellationToken) : Task
+    }
+
+}
+
+' ── External stubs ──
+class RestaurantMgmtContext <<DbContext>>
+class RestaurantTable <<Entity>>
+class TableMedium <<Entity>>
+class MediaAsset <<Entity>>
+
+' ── Relationships ──
+
+TableRepository ..|> ITableRepository : implements
+
+TableRepository --> RestaurantMgmtContext : uses for data access
+
+TableRepository ..> RestaurantTable : queries and persists
+TableRepository ..> TableMedium : manages join records
+TableRepository ..> MediaAsset : references media
+
+IMediaRepository ..> MediaAsset : manages media assets
+
+IUnitOfWork ..> RestaurantMgmtContext : coordinates transactions
+
+@enduml

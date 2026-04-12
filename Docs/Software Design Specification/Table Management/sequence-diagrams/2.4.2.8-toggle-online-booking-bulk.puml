@@ -1,0 +1,61 @@
+@startuml
+title 2.4.2.8 Toggle Online Booking (Bulk)
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":User" as U
+participant ":TableListPage" as Client
+participant ":TableController" as Ctrl
+participant ":TableService" as Svc
+participant ":TableRepository" as Repo
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : Select zone and toggle online/offline, confirm
+activate Client
+
+Client ->> Ctrl : PATCH /api/tables/bulk-online (BulkOnlineRequest)
+activate Ctrl
+
+Ctrl ->> Svc : BulkSetOnlineAsync(BulkOnlineRequest, ct)
+activate Svc
+
+Svc ->> Svc : ValidateLookupAsync for ZoneId (must be valid TableZone lookup)
+
+Svc ->> Repo : BulkSetOnlineByZoneAsync(zoneId, isOnline, ct)
+activate Repo
+
+Repo ->> DB : Query all non-deleted tables in the specified zone
+activate DB
+DB -->> Repo : Return list of tables in zone
+deactivate DB
+
+Repo ->> Repo : Set IsOnline and UpdatedAt for each table
+
+Repo ->> DB : Persist all updated tables
+activate DB
+DB -->> Repo : Confirm bulk update
+deactivate DB
+
+Repo -->> Svc : int affectedCount
+deactivate Repo
+
+Svc -->> Ctrl : int affectedCount
+deactivate Svc
+
+Ctrl -->> Client : 200 OK — ApiResponse with { affectedCount }
+deactivate Ctrl
+
+Client -->> U : Display success message with number of tables updated
+deactivate Client
+
+deactivate U
+
+@enduml

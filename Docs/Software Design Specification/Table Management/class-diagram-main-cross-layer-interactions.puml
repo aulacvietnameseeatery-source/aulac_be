@@ -1,0 +1,105 @@
+@startuml
+title Table Management Module - Main Cross-Layer Interactions
+
+package "Presentation Layer" {
+    class TableController <<Controller>> {
+        -_tableService : ITableService
+        +GetTables(request, ct) : Task<IActionResult>
+        +GetTable(id, ct) : Task<IActionResult>
+        +CreateTable(request, ct) : Task<IActionResult>
+        +UpdateTable(id, request, ct) : Task<IActionResult>
+        +DeleteTable(id, ct) : Task<IActionResult>
+        +UpdateTableStatus(id, request, ct) : Task<IActionResult>
+        +BulkOnline(request, ct) : Task<IActionResult>
+        +RegenerateQrCode(id, ct) : Task<IActionResult>
+    }
+}
+
+package "Application Layer" {
+    interface ITableService <<interface>> {
+        +GetTablesForManagementAsync(request, ct) : Task<(List<TableManagementDto>, int)>
+        +GetTableByIdAsync(id, ct) : Task<TableDetailDto>
+        +CreateTableAsync(request, images, ct) : Task<TableDetailDto>
+        +UpdateTableAsync(id, request, images, removedIds, ct) : Task<TableDetailDto>
+        +DeleteTableAsync(id, ct) : Task
+        +UpdateStatusAsync(id, request, ct) : Task<TableManagementDto>
+        +BulkSetOnlineAsync(request, ct) : Task<int>
+        +RegenerateQrCodeAsync(tableId, ct) : Task<QrCodeDto>
+        +GetZonesAsync(ct) : Task<List<LookupValueI18nDto>>
+        +GetTableTypesAsync(ct) : Task<List<LookupValueI18nDto>>
+        +CreateZoneAsync(request, ct) : Task<LookupValueI18nDto>
+        +CreateTableTypeAsync(request, ct) : Task<LookupValueI18nDto>
+    }
+
+    class TableService <<Service>> {
+        -_tableRepository : ITableRepository
+        -_unitOfWork : IUnitOfWork
+        -_lookupResolver : ILookupResolver
+        -_lookupService : ILookupService
+        -_fileStorage : IFileStorage
+        -_mediaRepository : IMediaRepository
+        -_qrCodeGenerator : IQrCodeGenerator
+        -_notificationService : INotificationService
+    }
+}
+
+package "Persistence Layer" {
+    interface ITableRepository <<interface>> {
+        +GetByIdAsync(tableId, ct) : Task<RestaurantTable?>
+        +GetByIdWithDetailsAsync(tableId, ct) : Task<RestaurantTable?>
+        +GetTablesForManagementAsync(request, ct) : Task<(List<RestaurantTable>, int)>
+        +TableCodeExistsAsync(code, excludeId, ct) : Task<bool>
+        +Add(table) : void
+        +UpdateStatusAsync(tableId, statusLvId, ct) : Task
+        +BulkSetOnlineByZoneAsync(zoneLvId, isOnline, ct) : Task<int>
+    }
+
+    class TableRepository <<Repository>> {
+        -_context : RestaurantMgmtContext
+    }
+
+    interface IMediaRepository <<interface>> {
+        +AddMediaAsync(media, ct) : Task<MediaAsset>
+        +RemoveMediaAsync(media, ct) : Task
+    }
+
+    interface IUnitOfWork <<interface>> {
+        +BeginTransactionAsync(ct) : Task
+        +CommitAsync(ct) : Task
+        +RollbackAsync(ct) : Task
+        +SaveChangesAsync(ct) : Task
+    }
+}
+
+package "Domain Layer" {
+    class RestaurantTable <<Entity>> {
+        +TableId : long
+        +TableCode : string
+        +Capacity : int
+        +IsOnline : bool?
+        +IsDeleted : bool
+    }
+
+    class LookupValue <<Entity>> {
+        +ValueId : uint
+        +TypeId : ushort
+        +ValueCode : string
+        +ValueName : string
+    }
+}
+
+' ── Cross-layer relationships ──
+
+TableController --> ITableService : depends on for business logic
+
+TableService ..|> ITableService : implements
+TableService --> ITableRepository : uses for data access
+TableService --> IUnitOfWork : uses for transactions
+TableService --> IMediaRepository : uses for media persistence
+
+TableRepository ..|> ITableRepository : implements
+TableRepository ..> RestaurantTable : queries and persists
+
+RestaurantTable --> LookupValue : references status, type, zone
+
+@enduml
