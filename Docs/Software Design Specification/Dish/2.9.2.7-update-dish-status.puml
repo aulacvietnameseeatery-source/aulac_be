@@ -1,0 +1,122 @@
+@startuml 2.9.2.7-update-dish-status
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam sequenceParticipant underline
+skinparam ArrowColor #000000
+skinparam ArrowThickness 2
+skinparam ArrowFontSize 11
+skinparam ArrowFontColor #000000
+skinparam ClassBorderColor #000000
+skinparam ClassBorderThickness 2
+skinparam ClassFontSize 12
+skinparam ClassFontColor #000000
+skinparam ClassBackgroundColor #FFFFFF
+skinparam ClassStereotypeFontSize 10
+skinparam ClassStereotypeFontColor #000000
+skinparam NoteBorderColor #000000
+skinparam NoteBorderThickness 1
+skinparam NoteFontSize 10
+skinparam NoteFontColor #000000
+skinparam NoteBackgroundColor #FFFFCC
+skinparam PackageBorderColor #000000
+skinparam PackageBorderThickness 2
+skinparam PackageFontSize 12
+skinparam PackageFontColor #000000
+skinparam PackageBackgroundColor #FFFFFF
+skinparam ActivityBorderColor #000000
+skinparam ActivityBorderThickness 2
+skinparam ActivityFontSize 12
+skinparam ActivityFontColor #000000
+skinparam ActivityBackgroundColor #FFFFFF
+skinparam SequenceLifeLineBorderColor #000000
+skinparam SequenceLifeLineBorderThickness 2
+skinparam SequenceLifeLineFontSize 12
+skinparam SequenceLifeLineFontColor #000000
+skinparam SequenceLifeLineBackgroundColor #FFFFFF
+skinparam SequenceParticipantBorderColor #000000
+skinparam SequenceParticipantBorderThickness 2
+skinparam SequenceParticipantFontSize 12
+skinparam SequenceParticipantFontColor #000000
+skinparam SequenceParticipantBackgroundColor #FFFFFF
+skinparam ActorBorderColor #000000
+skinparam ActorBorderThickness 2
+skinparam ActorFontSize 12
+skinparam ActorFontColor #000000
+skinparam ActorBackgroundColor #FFFFFF
+skinparam UsecaseBorderColor #000000
+skinparam UsecaseBorderThickness 2
+skinparam UsecaseFontSize 12
+skinparam UsecaseFontColor #000000
+skinparam UsecaseBackgroundColor #FFFFFF
+skinparam UsecaseStereotypeFontSize 10
+skinparam UsecaseStereotypeFontColor #000000
+
+title 2.9.2.7 Update Dish Status
+
+actor "Admin User" as Admin
+participant "DishController" as Controller
+participant "IDishService" as IService
+participant "DishService" as Service
+participant "IDishRepository" as IRepo
+participant "DishRepository" as Repo
+participant "AuLacDbContext" as Context
+
+autonumber
+
+Admin -> Controller: PATCH /api/dish/{id}/status\n{"status": "OUT_OF_STOCK"}
+activate Controller
+
+Controller -> IService: UpdateDishStatusAsync(id, request.Status, cancellationToken)
+activate IService
+
+IService -> Service: UpdateDishStatusAsync(id, newStatus, cancellationToken)
+activate Service
+
+Service -> IRepo: UpdateStatusAsync(id, newStatus, cancellationToken)
+activate IRepo
+
+IRepo -> Repo: UpdateStatusAsync(id, newStatus, cancellationToken)
+activate Repo
+
+Repo -> Context: Find dish by ID
+activate Context
+
+Context --> Repo: Return dish entity
+deactivate Context
+
+alt dish not found
+    Repo --> IRepo: Return null
+    IRepo --> Service: Return null
+    Service --> Service: Throw exception or return error
+else dish found
+    Repo -> Context: Update dish status and UpdatedAt
+    activate Context
+    Context --> Repo: Save changes
+    deactivate Context
+
+    Repo -> Context: Query updated dish with status info
+    activate Context
+    Context --> Repo: Return DishStatusDto
+    deactivate Context
+
+    Repo --> IRepo: Return DishStatusDto
+    deactivate Repo
+
+    IRepo --> Service: Return DishStatusDto
+    deactivate IRepo
+
+    Service --> IService: Return DishStatusDto
+    deactivate Service
+
+    IService --> Controller: Return DishStatusDto
+    deactivate IService
+
+    Controller -> Controller: Create ApiResponse<DishStatusDto>
+    Controller -> Controller: Log status update
+
+    Controller --> Admin: Return 200 OK with updated status
+end
+
+deactivate Controller
+
+@enduml

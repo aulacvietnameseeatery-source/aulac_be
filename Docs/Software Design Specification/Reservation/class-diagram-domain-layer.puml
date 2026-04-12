@@ -1,0 +1,68 @@
+@startuml Reservation Module - Domain Layer
+
+package "Domain Layer" {
+
+class Reservation <<Entity>> {
++ ReservationId: long
++ CustomerId: long?
++ CustomerName: string
++ Phone: string
++ Email: string?
++ PartySize: int
++ ReservedTime: DateTime
++ CreatedAt: DateTime?
++ SourceLvId: uint
++ Notes: string?
++ ReservationStatusLvId: uint
+}
+
+class RestaurantTable <<Entity>> {
++ TableId: long
++ TableCode: string
++ Capacity: int
++ TableQrImg: long?
++ TableStatusLvId: uint
++ TableTypeLvId: uint
++ ZoneLvId: uint
++ IsOnline: bool?
++ QrToken: string?
++ CreatedAt: DateTime
++ UpdatedAt: DateTime
++ UpdatedByStaffId: long?
++ IsDeleted: bool
+}
+
+class Customer <<Entity>> {
++ CustomerId: long
++ Name: string
++ Phone: string
++ Email: string?
++ CreatedAt: DateTime
++ UpdatedAt: DateTime
++ IsDeleted: bool
+}
+
+class LookupValue <<Entity>> {
++ ValueId: uint
++ TypeId: long
++ ValueName: string
++ ValueCode: string
++ IsActive: bool
++ CreatedAt: DateTime
++ UpdatedAt: DateTime
++ IsDeleted: bool
+}
+
+}
+
+' Relationships
+Reservation --> Customer : belongs to (0..1) "has customer"
+Reservation --> LookupValue : has status (1) "reservation status"
+Reservation --> LookupValue : has source (1) "reservation source"
+Reservation --> RestaurantTable : assigned to (0..*) "assigned tables"
+
+RestaurantTable --> LookupValue : has status (1) "table status"
+RestaurantTable --> LookupValue : has type (1) "table type"
+RestaurantTable --> LookupValue : in zone (1) "table zone"
+
+@enduml

@@ -1,0 +1,108 @@
+@startuml 2.9.2.1-view-dish-list-admin
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam sequenceParticipant underline
+skinparam ArrowColor #000000
+skinparam ArrowThickness 2
+skinparam ArrowFontSize 11
+skinparam ArrowFontColor #000000
+skinparam ClassBorderColor #000000
+skinparam ClassBorderThickness 2
+skinparam ClassFontSize 12
+skinparam ClassFontColor #000000
+skinparam ClassBackgroundColor #FFFFFF
+skinparam ClassStereotypeFontSize 10
+skinparam ClassStereotypeFontColor #000000
+skinparam NoteBorderColor #000000
+skinparam NoteBorderThickness 1
+skinparam NoteFontSize 10
+skinparam NoteFontColor #000000
+skinparam NoteBackgroundColor #FFFFCC
+skinparam PackageBorderColor #000000
+skinparam PackageBorderThickness 2
+skinparam PackageFontSize 12
+skinparam PackageFontColor #000000
+skinparam PackageBackgroundColor #FFFFFF
+skinparam ActivityBorderColor #000000
+skinparam ActivityBorderThickness 2
+skinparam ActivityFontSize 12
+skinparam ActivityFontColor #000000
+skinparam ActivityBackgroundColor #FFFFFF
+skinparam SequenceLifeLineBorderColor #000000
+skinparam SequenceLifeLineBorderThickness 2
+skinparam SequenceLifeLineFontSize 12
+skinparam SequenceLifeLineFontColor #000000
+skinparam SequenceLifeLineBackgroundColor #FFFFFF
+skinparam SequenceParticipantBorderColor #000000
+skinparam SequenceParticipantBorderThickness 2
+skinparam SequenceParticipantFontSize 12
+skinparam SequenceParticipantFontColor #000000
+skinparam SequenceParticipantBackgroundColor #FFFFFF
+skinparam ActorBorderColor #000000
+skinparam ActorBorderThickness 2
+skinparam ActorFontSize 12
+skinparam ActorFontColor #000000
+skinparam ActorBackgroundColor #FFFFFF
+skinparam UsecaseBorderColor #000000
+skinparam UsecaseBorderThickness 2
+skinparam UsecaseFontSize 12
+skinparam UsecaseFontColor #000000
+skinparam UsecaseBackgroundColor #FFFFFF
+skinparam UsecaseStereotypeFontSize 10
+skinparam UsecaseStereotypeFontColor #000000
+
+title 2.9.2.1 View Dish List (Admin)
+
+actor "Admin User" as Admin
+participant "DishController" as Controller
+participant "IDishService" as IService
+participant "DishService" as Service
+participant "IDishRepository" as IRepo
+participant "DishRepository" as Repo
+participant "AuLacDbContext" as Context
+
+autonumber
+
+Admin -> Controller: GET /api/dish/management\n?PageIndex=0&PageSize=10&SearchTerm=&CategoryId=&Status=&Locale=en
+activate Controller
+
+Controller -> Controller: Extract locale from headers\n(rawLocale = Request.Headers["x-locale"] ?? "en")
+
+Controller -> IService: GetDishesForAdminAsync(request, cancellationToken)
+activate IService
+
+IService -> Service: GetDishesForAdminAsync(request, cancellationToken)
+activate Service
+
+Service -> IRepo: GetDishesAsync(request, cancellationToken)
+activate IRepo
+
+IRepo -> Repo: GetDishesAsync(request, cancellationToken)
+activate Repo
+
+Repo -> Context: Query Dishes with filters\n(Include Category, Status, Search, Pagination)
+activate Context
+
+Context --> Repo: Return (dishes, totalCount)
+deactivate Context
+
+Repo --> IRepo: Return (dishes, totalCount)
+deactivate Repo
+
+IRepo --> Service: Return (dishes, totalCount)
+deactivate IRepo
+
+Service -> Service: Map dishes to DishManagementDto list
+Service --> IService: Return (items, totalCount)
+deactivate Service
+
+IService --> Controller: Return (items, totalCount)
+deactivate IService
+
+Controller -> Controller: Create PagedResult<DishManagementDto>
+Controller -> Controller: Create ApiResponse<PagedResult<DishManagementDto>>
+
+Controller --> Admin: Return 200 OK with paged dish list
+deactivate Controller
+
+@enduml

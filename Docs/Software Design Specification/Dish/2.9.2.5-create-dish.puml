@@ -1,0 +1,136 @@
+@startuml 2.9.2.5-create-dish
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam sequenceParticipant underline
+skinparam ArrowColor #000000
+skinparam ArrowThickness 2
+skinparam ArrowFontSize 11
+skinparam ArrowFontColor #000000
+skinparam ClassBorderColor #000000
+skinparam ClassBorderThickness 2
+skinparam ClassFontSize 12
+skinparam ClassFontColor #000000
+skinparam ClassBackgroundColor #FFFFFF
+skinparam ClassStereotypeFontSize 10
+skinparam ClassStereotypeFontColor #000000
+skinparam NoteBorderColor #000000
+skinparam NoteBorderThickness 1
+skinparam NoteFontSize 10
+skinparam NoteFontColor #000000
+skinparam NoteBackgroundColor #FFFFCC
+skinparam PackageBorderColor #000000
+skinparam PackageBorderThickness 2
+skinparam PackageFontSize 12
+skinparam PackageFontColor #000000
+skinparam PackageBackgroundColor #FFFFFF
+skinparam ActivityBorderColor #000000
+skinparam ActivityBorderThickness 2
+skinparam ActivityFontSize 12
+skinparam ActivityFontColor #000000
+skinparam ActivityBackgroundColor #FFFFFF
+skinparam SequenceLifeLineBorderColor #000000
+skinparam SequenceLifeLineBorderThickness 2
+skinparam SequenceLifeLineFontSize 12
+skinparam SequenceLifeLineFontColor #000000
+skinparam SequenceLifeLineBackgroundColor #FFFFFF
+skinparam SequenceParticipantBorderColor #000000
+skinparam SequenceParticipantBorderThickness 2
+skinparam SequenceParticipantFontSize 12
+skinparam SequenceParticipantFontColor #000000
+skinparam SequenceParticipantBackgroundColor #FFFFFF
+skinparam ActorBorderColor #000000
+skinparam ActorBorderThickness 2
+skinparam ActorFontSize 12
+skinparam ActorFontColor #000000
+skinparam ActorBackgroundColor #FFFFFF
+skinparam UsecaseBorderColor #000000
+skinparam UsecaseBorderThickness 2
+skinparam UsecaseFontSize 12
+skinparam UsecaseFontColor #000000
+skinparam UsecaseBackgroundColor #FFFFFF
+skinparam UsecaseStereotypeFontSize 10
+skinparam UsecaseStereotypeFontColor #000000
+
+title 2.9.2.5 Create Dish
+
+actor "Admin User" as Admin
+participant "DishController" as Controller
+participant "IDishService" as IService
+participant "DishService" as Service
+participant "IDishRepository" as IRepo
+participant "DishRepository" as Repo
+participant "AuLacDbContext" as Context
+participant "IFileStorageService" as FileStorage
+
+autonumber
+
+Admin -> Controller: POST /api/dish\n[multipart/form-data with dish data and files]
+activate Controller
+
+Controller -> Controller: Deserialize CreateDishRequest from form data
+Controller -> Controller: Map form files to MediaFileInput[]
+
+Controller -> IService: CreateDishAsync(request, staticImages, images360, video, ct)
+activate IService
+
+IService -> Service: CreateDishAsync(request, staticImages, images360, video, ct)
+activate Service
+
+Service -> Service: Validate request data
+Service -> Service: Create Dish entity from request
+
+alt has static images
+    Service -> FileStorage: Upload static images
+    activate FileStorage
+    FileStorage --> Service: Return uploaded Media entities
+    deactivate FileStorage
+end
+
+alt has 360 images
+    Service -> FileStorage: Upload 360 images
+    activate FileStorage
+    FileStorage --> Service: Return uploaded Media entities
+    deactivate FileStorage
+end
+
+alt has video
+    Service -> FileStorage: Upload video
+    activate FileStorage
+    FileStorage --> Service: Return uploaded Media entity
+    deactivate FileStorage
+end
+
+Service -> Service: Create DishMedia entities linking dish to media
+Service -> Service: Create Recipe entities from request.Recipes
+Service -> Service: Create DishTag entities from request.Tags
+
+Service -> IRepo: CreateDishAsync(dish, ct)
+activate IRepo
+
+IRepo -> Repo: CreateDishAsync(dish, ct)
+activate Repo
+
+Repo -> Context: Add dish with related entities\n(DishMedia, Recipes, DishTags)
+activate Context
+
+Context --> Repo: Save changes and return dishId
+deactivate Context
+
+Repo --> IRepo: Return dishId
+deactivate Repo
+
+IRepo --> Service: Return dishId
+deactivate IRepo
+
+Service --> IService: Return dishId
+deactivate Service
+
+IService --> Controller: Return dishId
+deactivate IService
+
+Controller -> Controller: Create ApiResponse<long>
+
+Controller --> Admin: Return 200 OK with created dish ID
+deactivate Controller
+
+@enduml

@@ -1,0 +1,169 @@
+@startuml class-diagram-application-layer
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam sequenceParticipant underline
+skinparam ArrowColor #000000
+skinparam ArrowThickness 2
+skinparam ArrowFontSize 11
+skinparam ArrowFontColor #000000
+skinparam ClassBorderColor #000000
+skinparam ClassBorderThickness 2
+skinparam ClassFontSize 12
+skinparam ClassFontColor #000000
+skinparam ClassBackgroundColor #FFFFFF
+skinparam ClassStereotypeFontSize 10
+skinparam ClassStereotypeFontColor #000000
+skinparam NoteBorderColor #000000
+skinparam NoteBorderThickness 1
+skinparam NoteFontSize 10
+skinparam NoteFontColor #000000
+skinparam NoteBackgroundColor #FFFFCC
+skinparam PackageBorderColor #000000
+skinparam PackageBorderThickness 2
+skinparam PackageFontSize 12
+skinparam PackageFontColor #000000
+skinparam PackageBackgroundColor #FFFFFF
+skinparam ActivityBorderColor #000000
+skinparam ActivityBorderThickness 2
+skinparam ActivityFontSize 12
+skinparam ActivityFontColor #000000
+skinparam ActivityBackgroundColor #FFFFFF
+skinparam SequenceLifeLineBorderColor #000000
+skinparam SequenceLifeLineBorderThickness 2
+skinparam SequenceLifeLineFontSize 12
+skinparam SequenceLifeLineFontColor #000000
+skinparam SequenceLifeLineBackgroundColor #FFFFFF
+skinparam SequenceParticipantBorderColor #000000
+skinparam SequenceParticipantBorderThickness 2
+skinparam SequenceParticipantFontSize 12
+skinparam SequenceParticipantFontColor #000000
+skinparam SequenceParticipantBackgroundColor #FFFFFF
+skinparam ActorBorderColor #000000
+skinparam ActorBorderThickness 2
+skinparam ActorFontSize 12
+skinparam ActorFontColor #000000
+skinparam ActorBackgroundColor #FFFFFF
+skinparam UsecaseBorderColor #000000
+skinparam UsecaseBorderThickness 2
+skinparam UsecaseFontSize 12
+skinparam UsecaseFontColor #000000
+skinparam UsecaseBackgroundColor #FFFFFF
+skinparam UsecaseStereotypeFontSize 10
+skinparam UsecaseStereotypeFontColor #000000
+
+title Dish Module - Application Layer
+
+package "Services" as Services {
+    interface IDishService {
+        +GetDishByIdAsync(long, string?, CancellationToken): Task<DishDetailDto?>
+        +GetDishesForAdminAsync(GetDishesRequest, CancellationToken): Task<(IEnumerable<DishManagementDto>, int)>
+        +GetDishesForCustomerAsync(GetDishesRequest, CancellationToken): Task<(IEnumerable<DishDisplayDto>, int)>
+        +GetAllCategoriesAsync(CancellationToken): Task<List<string>>
+        +GetDishStatusesAsync(CancellationToken): Task<List<DishStatusDto>>
+        +UpdateDishStatusAsync(long, DishStatusCode, CancellationToken): Task<DishStatusDto>
+        +CreateDishAsync(CreateDishRequest, IReadOnlyList<MediaFileInput>, IReadOnlyList<MediaFileInput>, MediaFileInput?, CancellationToken): Task<long>
+        +GetDishByIdAsync(long, CancellationToken): Task<DishDetailForActionsDto>
+        +UpdateDishAsync(UpdateDishRequest, IReadOnlyList<MediaFileInput>, IReadOnlyList<MediaFileInput>, MediaFileInput?, IReadOnlyList<long>, CancellationToken): Task
+        +GetAllDishCategoriesAsync(): Task<List<DishCategorySimpleDto>>
+        +GetPosDishesAsync(bool): Task<List<DishPosResponseDto>>
+    }
+
+    class DishService {
+        -_dishRepository: IDishRepository
+        -_lookupService: ILookupService
+        -_fileStorage: IFileStorageService
+        -_logger: ILogger<DishService>
+        +GetDishByIdAsync(long, string?, CancellationToken): Task<DishDetailDto?>
+        +GetDishesForAdminAsync(GetDishesRequest, CancellationToken): Task<(IEnumerable<DishManagementDto>, int)>
+        +GetDishesForCustomerAsync(GetDishesRequest, CancellationToken): Task<(IEnumerable<DishDisplayDto>, int)>
+        +GetAllCategoriesAsync(CancellationToken): Task<List<string>>
+        +GetDishStatusesAsync(CancellationToken): Task<List<DishStatusDto>>
+        +UpdateDishStatusAsync(long, DishStatusCode, CancellationToken): Task<DishStatusDto>
+        +CreateDishAsync(CreateDishRequest, IReadOnlyList<MediaFileInput>, IReadOnlyList<MediaFileInput>, MediaFileInput?, CancellationToken): Task<long>
+        +GetDishByIdAsync(long, CancellationToken): Task<DishDetailForActionsDto>
+        +UpdateDishAsync(UpdateDishRequest, IReadOnlyList<MediaFileInput>, IReadOnlyList<MediaFileInput>, MediaFileInput?, IReadOnlyList<long>, CancellationToken): Task
+        +GetAllDishCategoriesAsync(): Task<List<DishCategorySimpleDto>>
+        +GetPosDishesAsync(bool): Task<List<DishPosResponseDto>>
+    }
+}
+
+package "DTOs" as DTOs {
+    class CreateDishRequest {
+        +CategoryId: int
+        +DishName: string
+        +Price: decimal
+        +Description: string?
+        +ShortDescription: string?
+        +Slogan: string?
+        +Calories: int?
+        +PrepTimeMinutes: int?
+        +CookTimeMinutes: int?
+        +IsOnline: bool
+        +Recipes: List<CreateRecipeRequest>
+        +Tags: List<int>
+    }
+
+    class UpdateDishRequest {
+        +DishId: long
+        +CategoryId: int
+        +DishName: string
+        +Price: decimal
+        +Description: string?
+        +ShortDescription: string?
+        +Slogan: string?
+        +Calories: int?
+        +PrepTimeMinutes: int?
+        +CookTimeMinutes: int?
+        +IsOnline: bool
+        +Recipes: List<UpdateRecipeRequest>
+        +Tags: List<int>
+    }
+
+    class CreateRecipeRequest {
+        +IngredientId: int
+        +Quantity: decimal
+        +Unit: string
+        +Note: string?
+    }
+
+    class UpdateRecipeRequest {
+        +RecipeId: long?
+        +IngredientId: int
+        +Quantity: decimal
+        +Unit: string
+        +Note: string?
+    }
+
+    class MediaFileInput {
+        +FileName: string
+        +ContentType: string
+        +Content: Stream
+    }
+}
+
+package "Mappers" as Mappers {
+    class DishMapper {
+        +ToDetailDto(Dish, List<DishTag>, IFileStorageService): DishDetailForActionsDto
+        +ToManagementDto(Dish): DishManagementDto
+        +ToDisplayDto(Dish, string): DishDisplayDto
+        +ToPosResponseDto(Dish): DishPosResponseDto
+    }
+}
+
+' Relationships
+DishService ..|> IDishService : implements
+DishService --> IDishRepository : uses
+DishService --> ILookupService : uses
+DishService --> IFileStorageService : uses
+DishService --> DishMapper : uses
+
+DishService --> CreateDishRequest : uses
+DishService --> UpdateDishRequest : uses
+DishService --> MediaFileInput : uses
+
+DishMapper --> DishDetailForActionsDto : creates
+DishMapper --> DishManagementDto : creates
+DishMapper --> DishDisplayDto : creates
+DishMapper --> DishPosResponseDto : creates
+
+@enduml

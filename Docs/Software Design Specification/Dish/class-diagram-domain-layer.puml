@@ -1,0 +1,212 @@
+@startuml class-diagram-domain-layer
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam sequenceParticipant underline
+skinparam ArrowColor #000000
+skinparam ArrowThickness 2
+skinparam ArrowFontSize 11
+skinparam ArrowFontColor #000000
+skinparam ClassBorderColor #000000
+skinparam ClassBorderThickness 2
+skinparam ClassFontSize 12
+skinparam ClassFontColor #000000
+skinparam ClassBackgroundColor #FFFFFF
+skinparam ClassStereotypeFontSize 10
+skinparam ClassStereotypeFontColor #000000
+skinparam NoteBorderColor #000000
+skinparam NoteBorderThickness 1
+skinparam NoteFontSize 10
+skinparam NoteFontColor #000000
+skinparam NoteBackgroundColor #FFFFCC
+skinparam PackageBorderColor #000000
+skinparam PackageBorderThickness 2
+skinparam PackageFontSize 12
+skinparam PackageFontColor #000000
+skinparam PackageBackgroundColor #FFFFFF
+skinparam ActivityBorderColor #000000
+skinparam ActivityBorderThickness 2
+skinparam ActivityFontSize 12
+skinparam ActivityFontColor #000000
+skinparam ActivityBackgroundColor #FFFFFF
+skinparam SequenceLifeLineBorderColor #000000
+skinparam SequenceLifeLineBorderThickness 2
+skinparam SequenceLifeLineFontSize 12
+skinparam SequenceLifeLineFontColor #000000
+skinparam SequenceLifeLineBackgroundColor #FFFFFF
+skinparam SequenceParticipantBorderColor #000000
+skinparam SequenceParticipantBorderThickness 2
+skinparam SequenceParticipantFontSize 12
+skinparam SequenceParticipantFontColor #000000
+skinparam SequenceParticipantBackgroundColor #FFFFFF
+skinparam ActorBorderColor #000000
+skinparam ActorBorderThickness 2
+skinparam ActorFontSize 12
+skinparam ActorFontColor #000000
+skinparam ActorBackgroundColor #FFFFFF
+skinparam UsecaseBorderColor #000000
+skinparam UsecaseBorderThickness 2
+skinparam UsecaseFontSize 12
+skinparam UsecaseFontColor #000000
+skinparam UsecaseBackgroundColor #FFFFFF
+skinparam UsecaseStereotypeFontSize 10
+skinparam UsecaseStereotypeFontColor #000000
+
+title Dish Module - Domain Layer
+
+package "Entities" as Entities {
+    class Dish {
+        +DishId: long
+        +CategoryId: int
+        +DishName: string
+        +DishNameText: TranslationText?
+        +Price: decimal
+        +DescriptionText: TranslationText?
+        +ShortDescriptionText: TranslationText?
+        +SloganText: TranslationText?
+        +Calories: int?
+        +PrepTimeMinutes: int?
+        +CookTimeMinutes: int?
+        +IsOnline: bool
+        +IsActive: bool
+        +CreatedAt: DateTimeOffset
+        +UpdatedAt: DateTimeOffset?
+        +Category: DishCategory
+        +DishMedia: ICollection<DishMedia>
+        +Recipes: ICollection<Recipe>
+        +DishTags: ICollection<DishTag>
+        +Orders: ICollection<Order>
+    }
+
+    class DishCategory {
+        +CategoryId: int
+        +CategoryName: string
+        +CategoryNameText: TranslationText?
+        +IsActive: bool
+        +CreatedAt: DateTimeOffset
+        +UpdatedAt: DateTimeOffset?
+        +Dishes: ICollection<Dish>
+    }
+
+    class DishMedia {
+        +DishMediaId: long
+        +DishId: long
+        +MediaId: long
+        +Is360Image: bool
+        +Dish: Dish
+        +Media: Media
+    }
+
+    class Recipe {
+        +RecipeId: long
+        +DishId: long
+        +IngredientId: int
+        +Quantity: decimal
+        +Unit: string
+        +Note: string?
+        +Dish: Dish
+        +Ingredient: Ingredient
+    }
+
+    class DishTag {
+        +DishTagId: long
+        +DishId: long
+        +TagId: int
+        +Dish: Dish
+        +Tag: LookupValue
+    }
+}
+
+package "Value Objects" as ValueObjects {
+    class TranslationText {
+        +En: string?
+        +Fr: string?
+        +Vi: string?
+        +GetTranslation(string): string
+    }
+}
+
+package "Enums" as Enums {
+    enum DishStatusCode {
+        AVAILABLE
+        OUT_OF_STOCK
+        HIDDEN
+    }
+}
+
+package "Related Entities" as Related {
+    class Media {
+        +MediaId: long
+        +Url: string
+        +MimeType: string?
+        +FileName: string
+        +FileSize: long
+        +IsActive: bool
+        +CreatedAt: DateTimeOffset
+        +UpdatedAt: DateTimeOffset?
+    }
+
+    class Ingredient {
+        +IngredientId: int
+        +IngredientName: string
+        +IngredientNameText: TranslationText?
+        +IsActive: bool
+        +CreatedAt: DateTimeOffset
+        +UpdatedAt: DateTimeOffset?
+    }
+
+    class LookupValue {
+        +LookupValueId: int
+        +LookupTypeId: int
+        +Value: string
+        +ValueText: TranslationText?
+        +IsActive: bool
+        +CreatedAt: DateTimeOffset
+        +UpdatedAt: DateTimeOffset?
+    }
+
+    class Order {
+        +OrderId: long
+        +CustomerId: string
+        +OrderDate: DateTimeOffset
+        +Status: string
+        +TotalAmount: decimal
+        +Dishes: ICollection<OrderDish>
+    }
+
+    class OrderDish {
+        +OrderDishId: long
+        +OrderId: long
+        +DishId: long
+        +Quantity: int
+        +UnitPrice: decimal
+        +Order: Order
+        +Dish: Dish
+    }
+}
+
+' Relationships
+Dish --> DishCategory : belongs to (CategoryId)
+Dish --> DishMedia : has many (DishMedia)
+Dish --> Recipe : has many (Recipes)
+Dish --> DishTag : has many (DishTags)
+Dish --> Order : has many (Orders)
+
+DishCategory --> Dish : has many (Dishes)
+
+DishMedia --> Dish : belongs to (DishId)
+DishMedia --> Media : belongs to (MediaId)
+
+Recipe --> Dish : belongs to (DishId)
+Recipe --> Ingredient : belongs to (IngredientId)
+
+DishTag --> Dish : belongs to (DishId)
+DishTag --> LookupValue : belongs to (TagId)
+
+Dish --> TranslationText : uses (DishNameText, DescriptionText, etc.)
+DishCategory --> TranslationText : uses (CategoryNameText)
+
+Order --> OrderDish : has many (Dishes)
+OrderDish --> Dish : belongs to (DishId)
+OrderDish --> Order : belongs to (OrderId)
+
+@enduml

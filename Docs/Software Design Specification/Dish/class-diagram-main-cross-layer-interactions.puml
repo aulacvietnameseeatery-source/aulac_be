@@ -1,0 +1,230 @@
+@startuml class-diagram-main-cross-layer-interactions
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam sequenceParticipant underline
+skinparam ArrowColor #000000
+skinparam ArrowThickness 2
+skinparam ArrowFontSize 11
+skinparam ArrowFontColor #000000
+skinparam ClassBorderColor #000000
+skinparam ClassBorderThickness 2
+skinparam ClassFontSize 12
+skinparam ClassFontColor #000000
+skinparam ClassBackgroundColor #FFFFFF
+skinparam ClassStereotypeFontSize 10
+skinparam ClassStereotypeFontColor #000000
+skinparam NoteBorderColor #000000
+skinparam NoteBorderThickness 1
+skinparam NoteFontSize 10
+skinparam NoteFontColor #000000
+skinparam NoteBackgroundColor #FFFFCC
+skinparam PackageBorderColor #000000
+skinparam PackageBorderThickness 2
+skinparam PackageFontSize 12
+skinparam PackageFontColor #000000
+skinparam PackageBackgroundColor #FFFFFF
+skinparam ActivityBorderColor #000000
+skinparam ActivityBorderThickness 2
+skinparam ActivityFontSize 12
+skinparam ActivityFontColor #000000
+skinparam ActivityBackgroundColor #FFFFFF
+skinparam SequenceLifeLineBorderColor #000000
+skinparam SequenceLifeLineBorderThickness 2
+skinparam SequenceLifeLineFontSize 12
+skinparam SequenceLifeLineFontColor #000000
+skinparam SequenceLifeLineBackgroundColor #FFFFFF
+skinparam SequenceParticipantBorderColor #000000
+skinparam SequenceParticipantBorderThickness 2
+skinparam SequenceParticipantFontSize 12
+skinparam SequenceParticipantFontColor #000000
+skinparam SequenceParticipantBackgroundColor #FFFFFF
+skinparam ActorBorderColor #000000
+skinparam ActorBorderThickness 2
+skinparam ActorFontSize 12
+skinparam ActorFontColor #000000
+skinparam ActorBackgroundColor #FFFFFF
+skinparam UsecaseBorderColor #000000
+skinparam UsecaseBorderThickness 2
+skinparam UsecaseFontSize 12
+skinparam UsecaseFontColor #000000
+skinparam UsecaseBackgroundColor #FFFFFF
+skinparam UsecaseStereotypeFontSize 10
+skinparam UsecaseStereotypeFontColor #000000
+
+title Dish Module - Main Cross-Layer Interactions
+
+package "Presentation Layer" as PL {
+    class DishController {
+        +GetDishById(long, string?, CancellationToken): IActionResult
+        +GetDishesForAdmin(GetDishesRequest, CancellationToken): IActionResult
+        +GetMenuForCustomer(GetDishesRequest, CancellationToken): IActionResult
+        +GetAllCategories(CancellationToken): IActionResult
+        +GetDishStatuses(CancellationToken): IActionResult
+        +UpdateDishStatus(long, UpdateDishStatusRequest, CancellationToken): IActionResult
+        +CreateDish(CreateDishFormRequest, CancellationToken): IActionResult
+        +GetById(long, CancellationToken): IActionResult
+        +UpdateDishMedia(long, UpdateDishFormRequest, CancellationToken): IActionResult
+        +GetActiveDishStatuses(): IActionResult
+        +GetDishCategories(): IActionResult
+        +GetAllTags(): IActionResult
+        +GetAllDishDiet(): IActionResult
+        +GetDishes(bool): IActionResult
+    }
+}
+
+package "Application Layer" as AL {
+    class IDishService {
+        +GetDishByIdAsync(long, string?, CancellationToken): Task<DishDetailDto?>
+        +GetDishesForAdminAsync(GetDishesRequest, CancellationToken): Task<(IEnumerable<DishManagementDto>, int)>
+        +GetDishesForCustomerAsync(GetDishesRequest, CancellationToken): Task<(IEnumerable<DishDisplayDto>, int)>
+        +GetAllCategoriesAsync(CancellationToken): Task<List<string>>
+        +GetDishStatusesAsync(CancellationToken): Task<List<DishStatusDto>>
+        +UpdateDishStatusAsync(long, DishStatusCode, CancellationToken): Task<DishStatusDto>
+        +CreateDishAsync(CreateDishRequest, IReadOnlyList<MediaFileInput>, IReadOnlyList<MediaFileInput>, MediaFileInput?, CancellationToken): Task<long>
+        +GetDishByIdAsync(long, CancellationToken): Task<DishDetailForActionsDto>
+        +UpdateDishAsync(UpdateDishRequest, IReadOnlyList<MediaFileInput>, IReadOnlyList<MediaFileInput>, MediaFileInput?, IReadOnlyList<long>, CancellationToken): Task
+        +GetAllDishCategoriesAsync(): Task<List<DishCategorySimpleDto>>
+        +GetPosDishesAsync(bool): Task<List<DishPosResponseDto>>
+    }
+
+    class DishService {
+        -_dishRepository: IDishRepository
+        -_lookupService: ILookupService
+        -_fileStorage: IFileStorageService
+        -_logger: ILogger<DishService>
+        +GetDishByIdAsync(long, string?, CancellationToken): Task<DishDetailDto?>
+        +GetDishesForAdminAsync(GetDishesRequest, CancellationToken): Task<(IEnumerable<DishManagementDto>, int)>
+        +GetDishesForCustomerAsync(GetDishesRequest, CancellationToken): Task<(IEnumerable<DishDisplayDto>, int)>
+        +GetAllCategoriesAsync(CancellationToken): Task<List<string>>
+        +GetDishStatusesAsync(CancellationToken): Task<List<DishStatusDto>>
+        +UpdateDishStatusAsync(long, DishStatusCode, CancellationToken): Task<DishStatusDto>
+        +CreateDishAsync(CreateDishRequest, IReadOnlyList<MediaFileInput>, IReadOnlyList<MediaFileInput>, MediaFileInput?, CancellationToken): Task<long>
+        +GetDishByIdAsync(long, CancellationToken): Task<DishDetailForActionsDto>
+        +UpdateDishAsync(UpdateDishRequest, IReadOnlyList<MediaFileInput>, IReadOnlyList<MediaFileInput>, MediaFileInput?, IReadOnlyList<long>, CancellationToken): Task
+        +GetAllDishCategoriesAsync(): Task<List<DishCategorySimpleDto>>
+        +GetPosDishesAsync(bool): Task<List<DishPosResponseDto>>
+    }
+}
+
+package "Persistence Layer" as PersL {
+    class IDishRepository {
+        +FindByIdAsync(long, CancellationToken): Task<Dish?>
+        +GetDishByIdAsync(long, CancellationToken): Task<Dish?>
+        +FindByIdForActionAsync(long, CancellationToken): Task<Dish?>
+        +FindTagByDishIdAsync(long, CancellationToken): Task<List<DishTag>>
+        +UpdateStatusAsync(long, DishStatusCode, CancellationToken): Task<DishStatusDto>
+        +GetDishesAsync(GetDishesRequest, CancellationToken): Task<(IEnumerable<Dish>, int)>
+        +GetDishesForCustomerAsync(GetDishesRequest, CancellationToken): Task<(IEnumerable<Dish>, int)>
+        +GetAllCategoriesAsync(CancellationToken): Task<List<string>>
+        +GetDishStatusesAsync(CancellationToken): Task<List<DishStatusDto>>
+        +CreateDishAsync(Dish, CancellationToken): Task<long>
+        +UpdateDishAsync(Dish, CancellationToken): Task
+        +GetAllDishCategoriesAsync(): Task<List<DishCategorySimpleDto>>
+        +GetPosDishesAsync(bool): Task<List<DishPosResponseDto>>
+    }
+
+    class DishRepository {
+        -_context: AuLacDbContext
+        -_logger: ILogger<DishRepository>
+        +FindByIdAsync(long, CancellationToken): Task<Dish?>
+        +GetDishByIdAsync(long, CancellationToken): Task<Dish?>
+        +FindByIdForActionAsync(long, CancellationToken): Task<Dish?>
+        +FindTagByDishIdAsync(long, CancellationToken): Task<List<DishTag>>
+        +UpdateStatusAsync(long, DishStatusCode, CancellationToken): Task<DishStatusDto>
+        +GetDishesAsync(GetDishesRequest, CancellationToken): Task<(IEnumerable<Dish>, int)>
+        +GetDishesForCustomerAsync(GetDishesRequest, CancellationToken): Task<(IEnumerable<Dish>, int)>
+        +GetAllCategoriesAsync(CancellationToken): Task<List<string>>
+        +GetDishStatusesAsync(CancellationToken): Task<List<DishStatusDto>>
+        +CreateDishAsync(Dish, CancellationToken): Task<long>
+        +UpdateDishAsync(Dish, CancellationToken): Task
+        +GetAllDishCategoriesAsync(): Task<List<DishCategorySimpleDto>>
+        +GetPosDishesAsync(bool): Task<List<DishPosResponseDto>>
+    }
+}
+
+package "Domain Layer" as DL {
+    class Dish {
+        +DishId: long
+        +CategoryId: int
+        +DishName: string
+        +DishNameText: TranslationText?
+        +Price: decimal
+        +DescriptionText: TranslationText?
+        +ShortDescriptionText: TranslationText?
+        +SloganText: TranslationText?
+        +Calories: int?
+        +PrepTimeMinutes: int?
+        +CookTimeMinutes: int?
+        +IsOnline: bool
+        +IsActive: bool
+        +CreatedAt: DateTimeOffset
+        +UpdatedAt: DateTimeOffset?
+        +Category: DishCategory
+        +DishMedia: ICollection<DishMedia>
+        +Recipes: ICollection<Recipe>
+        +DishTags: ICollection<DishTag>
+        +Orders: ICollection<Order>
+    }
+
+    class DishCategory {
+        +CategoryId: int
+        +CategoryName: string
+        +CategoryNameText: TranslationText?
+        +IsActive: bool
+        +CreatedAt: DateTimeOffset
+        +UpdatedAt: DateTimeOffset?
+        +Dishes: ICollection<Dish>
+    }
+
+    class DishMedia {
+        +DishMediaId: long
+        +DishId: long
+        +MediaId: long
+        +Is360Image: bool
+        +Dish: Dish
+        +Media: Media
+    }
+
+    class Recipe {
+        +RecipeId: long
+        +DishId: long
+        +IngredientId: int
+        +Quantity: decimal
+        +Unit: string
+        +Note: string?
+        +Dish: Dish
+        +Ingredient: Ingredient
+    }
+
+    class DishTag {
+        +DishTagId: long
+        +DishId: long
+        +TagId: int
+        +Dish: Dish
+        +Tag: LookupValue
+    }
+}
+
+' Relationships
+DishController --> IDishService : uses
+DishService ..|> IDishService : implements
+DishService --> IDishRepository : uses
+DishRepository ..|> IDishRepository : implements
+
+Dish --> DishCategory : belongs to
+Dish --> DishMedia : has many
+Dish --> Recipe : has many
+Dish --> DishTag : has many
+
+DishCategory --> Dish : has many
+
+DishMedia --> Dish : belongs to
+DishMedia --> Media : belongs to
+
+Recipe --> Dish : belongs to
+Recipe --> Ingredient : belongs to
+
+DishTag --> Dish : belongs to
+DishTag --> LookupValue : belongs to
+
+@enduml

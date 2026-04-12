@@ -1,0 +1,47 @@
+@startuml Reservation Module - Persistence Layer
+
+package "Persistence Layer" {
+
+interface IReservationRepository <<interface>> {
++ CreateAsync(reservation: Reservation, ct: CancellationToken): Task<Reservation>
++ GetByIdAsync(reservationId: long, ct: CancellationToken): Task<Reservation?>
++ GetTableReservationsForTimeAsync(tableId: long, reservedTime: DateTime, durationMinutes: int, cancelledStatusId: uint, noShowStatusId: uint, completedStatusId: uint, ct: CancellationToken): Task<List<Reservation>>
++ GetReservationsAsync(request: GetReservationsRequest, ct: CancellationToken): Task<(List<ReservationManagementDto>, int)>
++ GetReservationStatusesAsync(ct: CancellationToken): Task<List<LookupValue>>
++ GetByIdWithTablesAsync(id: long, ct: CancellationToken): Task<Reservation?>
++ UpdateAsync(reservation: Reservation, ct: CancellationToken): Task
++ GetByIdWithFullDetailsAsync(reservationId: long, ct: CancellationToken): Task<Reservation?>
++ DeleteAsync(reservation: Reservation, ct: CancellationToken): Task
+}
+
+class ReservationRepository <<Repository>> {
+- _context: RestaurantMgmtContext
++ CreateAsync(reservation: Reservation, ct: CancellationToken): Task<Reservation>
++ GetByIdAsync(reservationId: long, ct: CancellationToken): Task<Reservation?>
++ GetTableReservationsForTimeAsync(tableId: long, reservedTime: DateTime, durationMinutes: int, cancelledStatusId: uint, noShowStatusId: uint, completedStatusId: uint, ct: CancellationToken): Task<List<Reservation>>
++ GetReservationsAsync(request: GetReservationsRequest, ct: CancellationToken): Task<(List<ReservationManagementDto>, int)>
++ GetReservationStatusesAsync(ct: CancellationToken): Task<List<LookupValue>>
++ GetByIdWithTablesAsync(id: long, ct: CancellationToken): Task<Reservation?>
++ UpdateAsync(reservation: Reservation, ct: CancellationToken): Task
++ GetByIdWithFullDetailsAsync(reservationId: long, ct: CancellationToken): Task<Reservation?>
++ DeleteAsync(reservation: Reservation, ct: CancellationToken): Task
+}
+
+}
+
+' External type stubs
+class RestaurantMgmtContext <<DbContext>>
+class Reservation <<Entity>>
+class LookupValue <<Entity>>
+class GetReservationsRequest <<DTO>>
+class ReservationManagementDto <<DTO>>
+
+' Relationships
+IReservationRepository ..|> ReservationRepository : implements
+
+ReservationRepository --> RestaurantMgmtContext : depends on for database access
+
+ReservationRepository --> Reservation : creates and retrieves reservation entities
+ReservationRepository --> LookupValue : retrieves lookup values
+
+@enduml

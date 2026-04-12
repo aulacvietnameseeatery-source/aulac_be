@@ -1,0 +1,125 @@
+@startuml Reservation Module - Application Layer
+
+package "Application Layer" {
+
+interface IPublicReservationService <<interface>> {
++ GetAvailableTablesAsync(reservedTime: DateTime?, ct: CancellationToken): Task<List<TableAvailabilityDto>>
++ CheckReservationFitAsync(request: ReservationFitCheckRequest, ct: CancellationToken): Task<ReservationFitCheckResponse>
++ CreateReservationAsync(request: CreateReservationRequest, ct: CancellationToken): Task<ReservationResponseDto>
+}
+
+class PublicReservationService <<Service>> {
+- _tableRepository: ITableRepository
+- _reservationRepository: IReservationRepository
+- _logger: ILogger<PublicReservationService>
+- _lookupResolver: ILookupResolver
+- _uow: IUnitOfWork
+- _systemSettingService: ISystemSettingService
+- _customerService: ICustomerService
+- _emailTemplateService: IEmailTemplateService
+- _emailQueue: IEmailQueue
+- _realtimeNotification: IRealtimeNotificationService
+- _notificationService: INotificationService
+- _jobScheduler: IJobSchedulerService
+- _restaurantTz: TimeZoneInfo
++ GetAvailableTablesAsync(reservedTime: DateTime?, ct: CancellationToken): Task<List<TableAvailabilityDto>>
++ CheckReservationFitAsync(request: ReservationFitCheckRequest, ct: CancellationToken): Task<ReservationFitCheckResponse>
++ CreateReservationAsync(request: CreateReservationRequest, ct: CancellationToken): Task<ReservationResponseDto>
+}
+
+interface IAdminReservationService <<interface>> {
++ GetReservationsAsync(request: GetReservationsRequest, ct: CancellationToken): Task<(List<ReservationManagementDto>, int)>
++ GetReservationStatusesAsync(ct: CancellationToken): Task<List<ReservationStatusDto>>
++ GetReservationDetailAsync(reservationId: long, ct: CancellationToken): Task<ReservationDetailDto>
++ GetManualAvailableTablesAsync(reservedTime: DateTime?, partySize: int?, ct: CancellationToken): Task<List<ManualTableOptionDto>>
++ CreateManualReservationAsync(request: CreateManualReservationRequest, ct: CancellationToken): Task<ReservationResponseDto>
++ CheckAndMarkNoShowAsync(reservationId: long): Task
++ UpdateReservationStatusAsync(reservationId: long, newStatusCode: string, note: string?, ct: CancellationToken): Task
++ UpdateReservationStatusAsync(reservationId: long, staffId: long, request: UpdateReservationStatusRequest, ct: CancellationToken): Task<ReservationStatusResponseDTO>
++ AssignTableAndConfirmAsync(reservationId: long, tableIds: List<long>, ct: CancellationToken): Task
++ UpdateReservationAsync(id: long, request: UpdateReservationRequest, ct: CancellationToken): Task
++ DeleteReservationAsync(id: long, ct: CancellationToken): Task
++ LockTablesForReservationAsync(reservationId: long): Task
+}
+
+class AdminReservationService <<Service>> {
+- _reservationRepository: IReservationRepository
+- _tableRepository: ITableRepository
+- _logger: ILogger<AdminReservationService>
+- _lookupResolver: ILookupResolver
+- _realtimeNotification: IRealtimeNotificationService
+- _uow: IUnitOfWork
+- _jobScheduler: IJobSchedulerService
+- _systemSettingService: ISystemSettingService
+- _broadcastService: IReservationBroadcastService
+- _orderRepository: IOrderRepository
+- _customerService: ICustomerService
+- _notificationService: INotificationService
+- _emailTemplateService: IEmailTemplateService
+- _emailQueue: IEmailQueue
+- _restaurantTz: TimeZoneInfo
++ GetReservationsAsync(request: GetReservationsRequest, ct: CancellationToken): Task<(List<ReservationManagementDto>, int)>
++ GetReservationStatusesAsync(ct: CancellationToken): Task<List<ReservationStatusDto>>
++ GetReservationDetailAsync(reservationId: long, ct: CancellationToken): Task<ReservationDetailDto>
++ GetManualAvailableTablesAsync(reservedTime: DateTime?, partySize: int?, ct: CancellationToken): Task<List<ManualTableOptionDto>>
++ CreateManualReservationAsync(request: CreateManualReservationRequest, ct: CancellationToken): Task<ReservationResponseDto>
++ CheckAndMarkNoShowAsync(reservationId: long): Task
++ UpdateReservationStatusAsync(reservationId: long, newStatusCode: string, note: string?, ct: CancellationToken): Task
++ UpdateReservationStatusAsync(reservationId: long, staffId: long, request: UpdateReservationStatusRequest, ct: CancellationToken): Task<ReservationStatusResponseDTO>
++ AssignTableAndConfirmAsync(reservationId: long, tableIds: List<long>, ct: CancellationToken): Task
++ UpdateReservationAsync(id: long, request: UpdateReservationRequest, ct: CancellationToken): Task
++ DeleteReservationAsync(id: long, ct: CancellationToken): Task
++ LockTablesForReservationAsync(reservationId: long): Task
+}
+
+}
+
+' External type stubs
+class ITableRepository <<interface>>
+class IReservationRepository <<interface>>
+class ILogger <<interface>>
+class ILookupResolver <<interface>>
+class IUnitOfWork <<interface>>
+class ISystemSettingService <<interface>>
+class ICustomerService <<interface>>
+class IEmailTemplateService <<interface>>
+class IEmailQueue <<interface>>
+class IRealtimeNotificationService <<interface>>
+class INotificationService <<interface>>
+class IJobSchedulerService <<interface>>
+class IReservationBroadcastService <<interface>>
+class IOrderRepository <<interface>>
+
+' Relationships
+IPublicReservationService ..|> PublicReservationService : implements
+IAdminReservationService ..|> AdminReservationService : implements
+
+PublicReservationService --> ITableRepository : depends on for table data
+PublicReservationService --> IReservationRepository : depends on for reservation data
+PublicReservationService --> ILogger : depends on for logging
+PublicReservationService --> ILookupResolver : depends on for lookup resolution
+PublicReservationService --> IUnitOfWork : depends on for transaction management
+PublicReservationService --> ISystemSettingService : depends on for system settings
+PublicReservationService --> ICustomerService : depends on for customer management
+PublicReservationService --> IEmailTemplateService : depends on for email templates
+PublicReservationService --> IEmailQueue : depends on for email queuing
+PublicReservationService --> IRealtimeNotificationService : depends on for real-time notifications
+PublicReservationService --> INotificationService : depends on for notifications
+PublicReservationService --> IJobSchedulerService : depends on for job scheduling
+
+AdminReservationService --> IReservationRepository : depends on for reservation data
+AdminReservationService --> ITableRepository : depends on for table data
+AdminReservationService --> ILogger : depends on for logging
+AdminReservationService --> ILookupResolver : depends on for lookup resolution
+AdminReservationService --> IRealtimeNotificationService : depends on for real-time notifications
+AdminReservationService --> IUnitOfWork : depends on for transaction management
+AdminReservationService --> IJobSchedulerService : depends on for job scheduling
+AdminReservationService --> ISystemSettingService : depends on for system settings
+AdminReservationService --> IReservationBroadcastService : depends on for broadcasting
+AdminReservationService --> IOrderRepository : depends on for order data
+AdminReservationService --> ICustomerService : depends on for customer management
+AdminReservationService --> INotificationService : depends on for notifications
+AdminReservationService --> IEmailTemplateService : depends on for email templates
+AdminReservationService --> IEmailQueue : depends on for email queuing
+
+@enduml

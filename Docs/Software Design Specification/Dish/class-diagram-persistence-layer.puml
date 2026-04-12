@@ -1,0 +1,129 @@
+@startuml class-diagram-persistence-layer
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam sequenceParticipant underline
+skinparam ArrowColor #000000
+skinparam ArrowThickness 2
+skinparam ArrowFontSize 11
+skinparam ArrowFontColor #000000
+skinparam ClassBorderColor #000000
+skinparam ClassBorderThickness 2
+skinparam ClassFontSize 12
+skinparam ClassFontColor #000000
+skinparam ClassBackgroundColor #FFFFFF
+skinparam ClassStereotypeFontSize 10
+skinparam ClassStereotypeFontColor #000000
+skinparam NoteBorderColor #000000
+skinparam NoteBorderThickness 1
+skinparam NoteFontSize 10
+skinparam NoteFontColor #000000
+skinparam NoteBackgroundColor #FFFFCC
+skinparam PackageBorderColor #000000
+skinparam PackageBorderThickness 2
+skinparam PackageFontSize 12
+skinparam PackageFontColor #000000
+skinparam PackageBackgroundColor #FFFFFF
+skinparam ActivityBorderColor #000000
+skinparam ActivityBorderThickness 2
+skinparam ActivityFontSize 12
+skinparam ActivityFontColor #000000
+skinparam ActivityBackgroundColor #FFFFFF
+skinparam SequenceLifeLineBorderColor #000000
+skinparam SequenceLifeLineBorderThickness 2
+skinparam SequenceLifeLineFontSize 12
+skinparam SequenceLifeLineFontColor #000000
+skinparam SequenceLifeLineBackgroundColor #FFFFFF
+skinparam SequenceParticipantBorderColor #000000
+skinparam SequenceParticipantBorderThickness 2
+skinparam SequenceParticipantFontSize 12
+skinparam SequenceLifeLineFontColor #000000
+skinparam SequenceParticipantBackgroundColor #FFFFFF
+skinparam ActorBorderColor #000000
+skinparam ActorBorderThickness 2
+skinparam ActorFontSize 12
+skinparam ActorFontColor #000000
+skinparam ActorBackgroundColor #FFFFFF
+skinparam UsecaseBorderColor #000000
+skinparam UsecaseBorderThickness 2
+skinparam UsecaseFontSize 12
+skinparam UsecaseFontColor #000000
+skinparam UsecaseBackgroundColor #FFFFFF
+skinparam UsecaseStereotypeFontSize 10
+skinparam UsecaseStereotypeFontColor #000000
+
+title Dish Module - Persistence Layer
+
+package "Repositories" as Repositories {
+    interface IDishRepository {
+        +FindByIdAsync(long, CancellationToken): Task<Dish?>
+        +GetDishByIdAsync(long, CancellationToken): Task<Dish?>
+        +FindByIdForActionAsync(long, CancellationToken): Task<Dish?>
+        +FindTagByDishIdAsync(long, CancellationToken): Task<List<DishTag>>
+        +UpdateStatusAsync(long, DishStatusCode, CancellationToken): Task<DishStatusDto>
+        +GetDishesAsync(GetDishesRequest, CancellationToken): Task<(IEnumerable<Dish>, int)>
+        +GetDishesForCustomerAsync(GetDishesRequest, CancellationToken): Task<(IEnumerable<Dish>, int)>
+        +GetAllCategoriesAsync(CancellationToken): Task<List<string>>
+        +GetDishStatusesAsync(CancellationToken): Task<List<DishStatusDto>>
+        +CreateDishAsync(Dish, CancellationToken): Task<long>
+        +UpdateDishAsync(Dish, CancellationToken): Task
+        +GetAllDishCategoriesAsync(): Task<List<DishCategorySimpleDto>>
+        +GetPosDishesAsync(bool): Task<List<DishPosResponseDto>>
+    }
+
+    class DishRepository {
+        -_context: AuLacDbContext
+        -_logger: ILogger<DishRepository>
+        +FindByIdAsync(long, CancellationToken): Task<Dish?>
+        +GetDishByIdAsync(long, CancellationToken): Task<Dish?>
+        +FindByIdForActionAsync(long, CancellationToken): Task<Dish?>
+        +FindTagByDishIdAsync(long, CancellationToken): Task<List<DishTag>>
+        +UpdateStatusAsync(long, DishStatusCode, CancellationToken): Task<DishStatusDto>
+        +GetDishesAsync(GetDishesRequest, CancellationToken): Task<(IEnumerable<Dish>, int)>
+        +GetDishesForCustomerAsync(GetDishesRequest, CancellationToken): Task<(IEnumerable<Dish>, int)>
+        +GetAllCategoriesAsync(CancellationToken): Task<List<string>>
+        +GetDishStatusesAsync(CancellationToken): Task<List<DishStatusDto>>
+        +CreateDishAsync(Dish, CancellationToken): Task<long>
+        +UpdateDishAsync(Dish, CancellationToken): Task
+        +GetAllDishCategoriesAsync(): Task<List<DishCategorySimpleDto>>
+        +GetPosDishesAsync(bool): Task<List<DishPosResponseDto>>
+    }
+}
+
+package "Data Context" as Context {
+    class AuLacDbContext {
+        +Dishes: DbSet<Dish>
+        +DishCategories: DbSet<DishCategory>
+        +DishMedia: DbSet<DishMedia>
+        +Recipes: DbSet<Recipe>
+        +DishTags: DbSet<DishTag>
+        +LookupValues: DbSet<LookupValue>
+        +Media: DbSet<Media>
+        +Ingredients: DbSet<Ingredient>
+    }
+}
+
+package "Queries" as Queries {
+    class GetDishesRequest {
+        +PageIndex: int
+        +PageSize: int
+        +SearchTerm: string?
+        +CategoryId: int?
+        +Status: DishStatusCode?
+        +Locale: string
+        +SortBy: string?
+        +SortDirection: string?
+    }
+}
+
+' Relationships
+DishRepository ..|> IDishRepository : implements
+DishRepository --> AuLacDbContext : uses
+DishRepository --> GetDishesRequest : uses
+
+AuLacDbContext --> Dish : contains
+AuLacDbContext --> DishCategory : contains
+AuLacDbContext --> DishMedia : contains
+AuLacDbContext --> Recipe : contains
+AuLacDbContext --> DishTag : contains
+
+@enduml

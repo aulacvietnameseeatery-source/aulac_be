@@ -1,0 +1,42 @@
+@startuml
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":User" as U
+participant ":PublicReservationController" as Ctrl
+participant ":IPublicReservationService" as Svc
+participant ":PublicReservationService" as SvcImpl
+participant ":ITableRepository" as TableRepo
+participant ":TableRepository" as TableRepoImpl
+database ":Database" as DB
+
+U ->> Ctrl : POST /api/public/reservations/fit (ReservationFitCheckRequest)
+activate U
+Ctrl ->> Svc : CheckReservationFitAsync(request, ct)
+activate Ctrl
+Svc ->> SvcImpl : CheckReservationFitAsync(request, ct)
+activate Svc
+SvcImpl ->> TableRepo : GetAvailableTablesAsync(reservedTime, partySize, ct)
+activate SvcImpl
+TableRepo ->> TableRepoImpl : GetAvailableTablesAsync(reservedTime, partySize, ct)
+activate TableRepo
+TableRepoImpl ->> DB : SELECT available tables based on time and capacity
+activate DB
+DB -->> TableRepoImpl : List of available tables
+deactivate DB
+TableRepoImpl -->> TableRepo : List of available tables
+deactivate TableRepo
+TableRepo -->> SvcImpl : List of available tables
+deactivate SvcImpl
+SvcImpl ->> SvcImpl : Check if tables can accommodate party size
+SvcImpl -->> Svc : ReservationFitCheckResponse
+deactivate Svc
+Svc -->> Ctrl : ReservationFitCheckResponse
+deactivate Ctrl
+Ctrl -->> U : 200 OK (ReservationFitCheckResponse)
+deactivate U
+@enduml

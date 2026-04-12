@@ -1,0 +1,41 @@
+@startuml
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":User" as U
+participant ":ReservationController" as Ctrl
+participant ":IAdminReservationService" as Svc
+participant ":AdminReservationService" as SvcImpl
+participant ":IReservationRepository" as Repo
+participant ":ReservationRepository" as RepoImpl
+database ":Database" as DB
+
+U ->> Ctrl : GET /api/reservations (GetReservationsRequest)
+activate U
+Ctrl ->> Svc : GetReservationsAsync(request, ct)
+activate Ctrl
+Svc ->> SvcImpl : GetReservationsAsync(request, ct)
+activate Svc
+SvcImpl ->> Repo : GetReservationsAsync(request, ct)
+activate SvcImpl
+Repo ->> RepoImpl : GetReservationsAsync(request, ct)
+activate Repo
+RepoImpl ->> DB : SELECT reservations with filters and pagination
+activate DB
+DB -->> RepoImpl : (List<ReservationManagementDto>, totalCount)
+deactivate DB
+RepoImpl -->> Repo : (List<ReservationManagementDto>, totalCount)
+deactivate Repo
+Repo -->> SvcImpl : (List<ReservationManagementDto>, totalCount)
+deactivate SvcImpl
+SvcImpl -->> Svc : (List<ReservationManagementDto>, totalCount)
+deactivate Svc
+Svc -->> Ctrl : (List<ReservationManagementDto>, totalCount)
+deactivate Ctrl
+Ctrl -->> U : 200 OK (PagedResult<ReservationManagementDto>)
+deactivate U
+@enduml

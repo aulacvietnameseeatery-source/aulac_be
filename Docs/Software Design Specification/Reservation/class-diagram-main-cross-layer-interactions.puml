@@ -1,0 +1,210 @@
+@startuml Reservation Module - Main Cross-Layer Interactions
+
+package "Presentation Layer" {
+
+class ReservationController <<Controller>> {
++ GetReservations(request: GetReservationsRequest): Task<IActionResult>
++ GetStatuses(): Task<IActionResult>
++ GetReservationDetail(id: long): Task<IActionResult>
++ UpdateReservationStatus(id: long, payload: UpdateReservationStatusRequest): Task<IActionResult>
++ AssignTableAndConfirm(id: long, payload: AssignTableRequest): Task<IActionResult>
++ UpdateReservation(id: long, payload: UpdateReservationRequest): Task<IActionResult>
++ DeleteReservation(id: long): Task<IActionResult>
+}
+
+class PublicReservationController <<Controller>> {
++ GetCustomerByPhone(phone: string): Task<IActionResult>
++ CheckReservationFit(request: ReservationFitCheckRequest): Task<IActionResult>
++ CreateReservation(request: CreateReservationRequest): Task<IActionResult>
++ OccupyTable(tableCode: string, token: string?): Task<IActionResult>
++ RequestPayment(orderId: long, tableCode: string?): Task<IActionResult>
+}
+
+class ManualReservationController <<Controller>> {
++ GetAvailability(reservedTime: DateTime?, partySize: int?): Task<IActionResult>
++ CreateReservation(request: CreateManualReservationRequest): Task<IActionResult>
++ UpdateReservationStatus(id: long, request: UpdateReservationStatusRequest): Task<IActionResult>
+}
+
+}
+
+package "Application Layer" {
+
+interface IPublicReservationService <<interface>> {
++ GetAvailableTablesAsync(reservedTime: DateTime?, ct: CancellationToken): Task<List<TableAvailabilityDto>>
++ CheckReservationFitAsync(request: ReservationFitCheckRequest, ct: CancellationToken): Task<ReservationFitCheckResponse>
++ CreateReservationAsync(request: CreateReservationRequest, ct: CancellationToken): Task<ReservationResponseDto>
+}
+
+class PublicReservationService <<Service>> {
+- _tableRepository: ITableRepository
+- _reservationRepository: IReservationRepository
+- _logger: ILogger<PublicReservationService>
+- _lookupResolver: ILookupResolver
+- _uow: IUnitOfWork
+- _systemSettingService: ISystemSettingService
+- _customerService: ICustomerService
+- _emailTemplateService: IEmailTemplateService
+- _emailQueue: IEmailQueue
+- _realtimeNotification: IRealtimeNotificationService
+- _notificationService: INotificationService
+- _jobScheduler: IJobSchedulerService
+- _restaurantTz: TimeZoneInfo
++ GetAvailableTablesAsync(reservedTime: DateTime?, ct: CancellationToken): Task<List<TableAvailabilityDto>>
++ CheckReservationFitAsync(request: ReservationFitCheckRequest, ct: CancellationToken): Task<ReservationFitCheckResponse>
++ CreateReservationAsync(request: CreateReservationRequest, ct: CancellationToken): Task<ReservationResponseDto>
+}
+
+interface IAdminReservationService <<interface>> {
++ GetReservationsAsync(request: GetReservationsRequest, ct: CancellationToken): Task<(List<ReservationManagementDto>, int)>
++ GetReservationStatusesAsync(ct: CancellationToken): Task<List<ReservationStatusDto>>
++ GetReservationDetailAsync(reservationId: long, ct: CancellationToken): Task<ReservationDetailDto>
++ GetManualAvailableTablesAsync(reservedTime: DateTime?, partySize: int?, ct: CancellationToken): Task<List<ManualTableOptionDto>>
++ CreateManualReservationAsync(request: CreateManualReservationRequest, ct: CancellationToken): Task<ReservationResponseDto>
++ CheckAndMarkNoShowAsync(reservationId: long): Task
++ UpdateReservationStatusAsync(reservationId: long, newStatusCode: string, note: string?, ct: CancellationToken): Task
++ UpdateReservationStatusAsync(reservationId: long, staffId: long, request: UpdateReservationStatusRequest, ct: CancellationToken): Task<ReservationStatusResponseDTO>
++ AssignTableAndConfirmAsync(reservationId: long, tableIds: List<long>, ct: CancellationToken): Task
++ UpdateReservationAsync(id: long, request: UpdateReservationRequest, ct: CancellationToken): Task
++ DeleteReservationAsync(id: long, ct: CancellationToken): Task
++ LockTablesForReservationAsync(reservationId: long): Task
+}
+
+class AdminReservationService <<Service>> {
+- _reservationRepository: IReservationRepository
+- _tableRepository: ITableRepository
+- _logger: ILogger<AdminReservationService>
+- _lookupResolver: ILookupResolver
+- _realtimeNotification: IRealtimeNotificationService
+- _uow: IUnitOfWork
+- _jobScheduler: IJobSchedulerService
+- _systemSettingService: ISystemSettingService
+- _broadcastService: IReservationBroadcastService
+- _orderRepository: IOrderRepository
+- _customerService: ICustomerService
+- _notificationService: INotificationService
+- _emailTemplateService: IEmailTemplateService
+- _emailQueue: IEmailQueue
+- _restaurantTz: TimeZoneInfo
++ GetReservationsAsync(request: GetReservationsRequest, ct: CancellationToken): Task<(List<ReservationManagementDto>, int)>
++ GetReservationStatusesAsync(ct: CancellationToken): Task<List<ReservationStatusDto>>
++ GetReservationDetailAsync(reservationId: long, ct: CancellationToken): Task<ReservationDetailDto>
++ GetManualAvailableTablesAsync(reservedTime: DateTime?, partySize: int?, ct: CancellationToken): Task<List<ManualTableOptionDto>>
++ CreateManualReservationAsync(request: CreateManualReservationRequest, ct: CancellationToken): Task<ReservationResponseDto>
++ CheckAndMarkNoShowAsync(reservationId: long): Task
++ UpdateReservationStatusAsync(reservationId: long, newStatusCode: string, note: string?, ct: CancellationToken): Task
++ UpdateReservationStatusAsync(reservationId: long, staffId: long, request: UpdateReservationStatusRequest, ct: CancellationToken): Task<ReservationStatusResponseDTO>
++ AssignTableAndConfirmAsync(reservationId: long, tableIds: List<long>, ct: CancellationToken): Task
++ UpdateReservationAsync(id: long, request: UpdateReservationRequest, ct: CancellationToken): Task
++ DeleteReservationAsync(id: long, ct: CancellationToken): Task
++ LockTablesForReservationAsync(reservationId: long): Task
+}
+
+}
+
+package "Persistence Layer" {
+
+interface IReservationRepository <<interface>> {
++ CreateAsync(reservation: Reservation, ct: CancellationToken): Task<Reservation>
++ GetByIdAsync(reservationId: long, ct: CancellationToken): Task<Reservation?>
++ GetTableReservationsForTimeAsync(tableId: long, reservedTime: DateTime, durationMinutes: int, cancelledStatusId: uint, noShowStatusId: uint, completedStatusId: uint, ct: CancellationToken): Task<List<Reservation>>
++ GetReservationsAsync(request: GetReservationsRequest, ct: CancellationToken): Task<(List<ReservationManagementDto>, int)>
++ GetReservationStatusesAsync(ct: CancellationToken): Task<List<LookupValue>>
++ GetByIdWithTablesAsync(id: long, ct: CancellationToken): Task<Reservation?>
++ UpdateAsync(reservation: Reservation, ct: CancellationToken): Task
++ GetByIdWithFullDetailsAsync(reservationId: long, ct: CancellationToken): Task<Reservation?>
++ DeleteAsync(reservation: Reservation, ct: CancellationToken): Task
+}
+
+class ReservationRepository <<Repository>> {
+- _context: RestaurantMgmtContext
++ CreateAsync(reservation: Reservation, ct: CancellationToken): Task<Reservation>
++ GetByIdAsync(reservationId: long, ct: CancellationToken): Task<Reservation?>
++ GetTableReservationsForTimeAsync(tableId: long, reservedTime: DateTime, durationMinutes: int, cancelledStatusId: uint, noShowStatusId: uint, completedStatusId: uint, ct: CancellationToken): Task<List<Reservation>>
++ GetReservationsAsync(request: GetReservationsRequest, ct: CancellationToken): Task<(List<ReservationManagementDto>, int)>
++ GetReservationStatusesAsync(ct: CancellationToken): Task<List<LookupValue>>
++ GetByIdWithTablesAsync(id: long, ct: CancellationToken): Task<Reservation?>
++ UpdateAsync(reservation: Reservation, ct: CancellationToken): Task
++ GetByIdWithFullDetailsAsync(reservationId: long, ct: CancellationToken): Task<Reservation?>
++ DeleteAsync(reservation: Reservation, ct: CancellationToken): Task
+}
+
+}
+
+package "Domain Layer" {
+
+class Reservation <<Entity>> {
++ ReservationId: long
++ CustomerId: long?
++ CustomerName: string
++ Phone: string
++ Email: string?
++ PartySize: int
++ ReservedTime: DateTime
++ CreatedAt: DateTime?
++ SourceLvId: uint
++ Notes: string?
++ ReservationStatusLvId: uint
+}
+
+class RestaurantTable <<Entity>> {
++ TableId: long
++ TableCode: string
++ Capacity: int
++ TableQrImg: long?
++ TableStatusLvId: uint
++ TableTypeLvId: uint
++ ZoneLvId: uint
++ IsOnline: bool?
++ QrToken: string?
++ CreatedAt: DateTime
++ UpdatedAt: DateTime
++ UpdatedByStaffId: long?
++ IsDeleted: bool
+}
+
+class Customer <<Entity>> {
++ CustomerId: long
++ Name: string
++ Phone: string
++ Email: string?
++ CreatedAt: DateTime
++ UpdatedAt: DateTime
++ IsDeleted: bool
+}
+
+class LookupValue <<Entity>> {
++ ValueId: uint
++ TypeId: long
++ ValueName: string
++ ValueCode: string
++ IsActive: bool
++ CreatedAt: DateTime
++ UpdatedAt: DateTime
++ IsDeleted: bool
+}
+
+}
+
+' Relationships
+
+ReservationController --> IAdminReservationService : uses for admin reservation management
+PublicReservationController --> IPublicReservationService : uses for public reservation operations
+ManualReservationController --> IAdminReservationService : uses for manual reservation creation
+
+IPublicReservationService ..|> PublicReservationService : implements
+IAdminReservationService ..|> AdminReservationService : implements
+
+PublicReservationService --> IReservationRepository : depends on for reservation data access
+AdminReservationService --> IReservationRepository : depends on for reservation data access
+
+IReservationRepository ..|> ReservationRepository : implements
+
+ReservationRepository --> Reservation : creates and manages reservation entities
+
+Reservation *-- RestaurantTable : has assigned tables (many-to-many)
+Reservation --> Customer : belongs to customer (optional)
+Reservation --> LookupValue : has reservation status
+Reservation --> LookupValue : has reservation source
+
+@enduml

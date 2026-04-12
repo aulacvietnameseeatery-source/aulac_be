@@ -1,0 +1,68 @@
+@startuml
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":User" as U
+participant ":ReservationController" as Ctrl
+participant ":IAdminReservationService" as Svc
+participant ":AdminReservationService" as SvcImpl
+participant ":IReservationRepository" as Repo
+participant ":ReservationRepository" as RepoImpl
+participant ":IUnitOfWork" as UoW
+database ":Database" as DB
+
+U ->> Ctrl : PATCH /api/reservations/{id}/status (UpdateReservationStatusRequest)
+activate U
+Ctrl ->> Svc : UpdateReservationStatusAsync(id, request.Status.ToString(), request.Notes, ct)
+activate Ctrl
+Svc ->> SvcImpl : UpdateReservationStatusAsync(id, statusCode, notes, ct)
+activate Svc
+SvcImpl ->> Repo : GetByIdAsync(id, ct)
+activate SvcImpl
+Repo ->> RepoImpl : GetByIdAsync(id, ct)
+activate Repo
+RepoImpl ->> DB : SELECT reservation WHERE id = {id}
+activate DB
+DB -->> RepoImpl : Reservation entity
+deactivate DB
+RepoImpl -->> Repo : Reservation entity
+deactivate Repo
+Repo -->> SvcImpl : Reservation entity
+deactivate SvcImpl
+
+alt#White reservation found
+    SvcImpl ->> SvcImpl : Update status and notes
+    SvcImpl ->> Repo : UpdateAsync(reservation, ct)
+    activate SvcImpl
+    Repo ->> RepoImpl : UpdateAsync(reservation, ct)
+    activate Repo
+    RepoImpl ->> DB : UPDATE Reservations SET status = {newStatus}
+    activate DB
+    DB -->> RepoImpl : success
+    deactivate DB
+    RepoImpl -->> Repo : success
+    deactivate Repo
+    Repo -->> SvcImpl : success
+    deactivate SvcImpl
+    SvcImpl ->> UoW : CommitAsync(ct)
+    activate SvcImpl
+    UoW -->> SvcImpl : success
+    deactivate SvcImpl
+    SvcImpl -->> Svc : success
+    deactivate Svc
+    Svc -->> Ctrl : success
+    deactivate Ctrl
+    Ctrl -->> U : 200 OK
+else reservation not found
+    SvcImpl -->> Svc : KeyNotFoundException
+    deactivate Svc
+    Svc -->> Ctrl : KeyNotFoundException
+    deactivate Ctrl
+    Ctrl -->> U : 404 Not Found
+end
+deactivate U
+@enduml

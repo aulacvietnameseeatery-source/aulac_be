@@ -1,0 +1,225 @@
+@startuml class-diagram-presentation-layer
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam sequenceParticipant underline
+skinparam ArrowColor #000000
+skinparam ArrowThickness 2
+skinparam ArrowFontSize 11
+skinparam ArrowFontColor #000000
+skinparam ClassBorderColor #000000
+skinparam ClassBorderThickness 2
+skinparam ClassFontSize 12
+skinparam ClassFontColor #000000
+skinparam ClassBackgroundColor #FFFFFF
+skinparam ClassStereotypeFontSize 10
+skinparam ClassStereotypeFontColor #000000
+skinparam NoteBorderColor #000000
+skinparam NoteBorderThickness 1
+skinparam NoteFontSize 10
+skinparam NoteFontColor #000000
+skinparam NoteBackgroundColor #FFFFCC
+skinparam PackageBorderColor #000000
+skinparam PackageBorderThickness 2
+skinparam PackageFontSize 12
+skinparam PackageFontColor #000000
+skinparam PackageBackgroundColor #FFFFFF
+skinparam ActivityBorderColor #000000
+skinparam ActivityBorderThickness 2
+skinparam ActivityFontSize 12
+skinparam ActivityFontColor #000000
+skinparam ActivityBackgroundColor #FFFFFF
+skinparam SequenceLifeLineBorderColor #000000
+skinparam SequenceLifeLineBorderThickness 2
+skinparam SequenceLifeLineFontSize 12
+skinparam SequenceLifeLineFontColor #000000
+skinparam SequenceLifeLineBackgroundColor #FFFFFF
+skinparam SequenceParticipantBorderColor #000000
+skinparam SequenceParticipantBorderThickness 2
+skinparam SequenceParticipantFontSize 12
+skinparam SequenceParticipantFontColor #000000
+skinparam SequenceParticipantBackgroundColor #FFFFFF
+skinparam ActorBorderColor #000000
+skinparam ActorBorderThickness 2
+skinparam ActorFontSize 12
+skinparam ActorFontColor #000000
+skinparam ActorBackgroundColor #FFFFFF
+skinparam UsecaseBorderColor #000000
+skinparam UsecaseBorderThickness 2
+skinparam UsecaseFontSize 12
+skinparam UsecaseFontColor #000000
+skinparam UsecaseBackgroundColor #FFFFFF
+skinparam UsecaseStereotypeFontSize 10
+skinparam UsecaseStereotypeFontColor #000000
+
+title Dish Module - Presentation Layer
+
+package "Controllers" as Controllers {
+    class DishController {
+        -_dishService: IDishService
+        -_lookupService: ILookupService
+        -_logger: ILogger<DishController>
+        +GetDishById(long, string?, CancellationToken): IActionResult
+        +GetDishesForAdmin(GetDishesRequest, CancellationToken): IActionResult
+        +GetMenuForCustomer(GetDishesRequest, CancellationToken): IActionResult
+        +GetAllCategories(CancellationToken): IActionResult
+        +GetDishStatuses(CancellationToken): IActionResult
+        +UpdateDishStatus(long, UpdateDishStatusRequest, CancellationToken): IActionResult
+        +CreateDish(CreateDishFormRequest, CancellationToken): IActionResult
+        +GetById(long, CancellationToken): IActionResult
+        +UpdateDishMedia(long, UpdateDishFormRequest, CancellationToken): IActionResult
+        +GetActiveDishStatuses(): IActionResult
+        +GetDishCategories(): IActionResult
+        +GetAllTags(): IActionResult
+        +GetAllDishDiet(): IActionResult
+        +GetDishes(bool): IActionResult
+    }
+}
+
+package "DTOs" as DTOs {
+    class GetDishesRequest {
+        +PageIndex: int
+        +PageSize: int
+        +SearchTerm: string?
+        +CategoryId: int?
+        +Status: DishStatusCode?
+        +Locale: string
+        +SortBy: string?
+        +SortDirection: string?
+    }
+
+    class UpdateDishStatusRequest {
+        +Status: DishStatusCode
+    }
+
+    class CreateDishFormRequest {
+        +Dish: string
+        +StaticImages: IFormFileCollection?
+        +Images360: IFormFileCollection?
+        +Video: IFormFile?
+    }
+
+    class UpdateDishFormRequest {
+        +Dish: string
+        +StaticImages: IFormFileCollection?
+        +Images360: IFormFileCollection?
+        +Video: IFormFile?
+        +RemovedMediaIds: string
+    }
+
+    class DishDetailDto {
+        +DishId: long
+        +DishName: string
+        +Price: decimal
+        +CategoryName: string
+        +Description: string?
+        +ShortDescription: string?
+        +Slogan: string?
+        +Calories: int?
+        +PrepTimeMinutes: int?
+        +CookTimeMinutes: int?
+        +ImageUrls: List<string>
+        +VideoUrl: string?
+        +Composition: List<RecipeItemDto>
+    }
+
+    class DishDetailForActionsDto {
+        +DishId: long
+        +CategoryId: int
+        +DishName: string
+        +Price: decimal
+        +Description: string?
+        +ShortDescription: string?
+        +Slogan: string?
+        +Calories: int?
+        +PrepTimeMinutes: int?
+        +CookTimeMinutes: int?
+        +IsOnline: bool
+        +IsActive: bool
+        +ImageUrls: List<string>
+        +VideoUrl: string?
+        +Images360Urls: List<string>
+        +Composition: List<RecipeItemDto>
+        +Tags: List<string>
+    }
+
+    class DishManagementDto {
+        +DishId: long
+        +DishName: string
+        +Price: decimal
+        +CategoryName: string
+        +Status: string
+        +IsOnline: bool
+        +IsActive: bool
+        +CreatedAt: DateTimeOffset
+        +UpdatedAt: DateTimeOffset?
+    }
+
+    class DishDisplayDto {
+        +DishId: long
+        +DishName: string
+        +Price: decimal
+        +CategoryName: string
+        +ShortDescription: string?
+        +ImageUrl: string?
+        +IsOnline: bool
+    }
+
+    class DishStatusDto {
+        +StatusCode: DishStatusCode
+        +StatusName: string
+    }
+
+    class DishCategorySimpleDto {
+        +CategoryId: int
+        +CategoryName: string
+    }
+
+    class DishPosResponseDto {
+        +DishId: long
+        +DishName: string
+        +Price: decimal
+        +CategoryName: string
+        +IsOnline: bool
+        +IsActive: bool
+    }
+
+    class RecipeItemDto {
+        +IngredientId: int
+        +IngredientName: string
+        +Quantity: decimal
+        +Unit: string
+        +Note: string?
+    }
+}
+
+package "Models" as Models {
+    class ApiResponse<T> {
+        +Success: bool
+        +Code: int
+        +UserMessage: string?
+        +SystemMessage: string?
+        +Data: T
+        +ServerTime: DateTimeOffset
+    }
+
+    class PageResult<T> {
+        +PageData: List<T>
+        +PageIndex: int
+        +PageSize: int
+        +TotalCount: int
+        +TotalPage: int
+    }
+}
+
+' Relationships
+DishController --> GetDishesRequest : uses
+DishController --> UpdateDishStatusRequest : uses
+DishController --> CreateDishFormRequest : uses
+DishController --> UpdateDishFormRequest : uses
+DishController --> ApiResponse : returns
+DishController --> PageResult : returns
+
+DishDetailDto --> RecipeItemDto : contains
+DishDetailForActionsDto --> RecipeItemDto : contains
+
+@enduml

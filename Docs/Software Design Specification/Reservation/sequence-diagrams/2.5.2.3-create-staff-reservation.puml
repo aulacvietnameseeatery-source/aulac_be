@@ -1,0 +1,46 @@
+@startuml
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":User" as U
+participant ":ManualReservationController" as Ctrl
+participant ":IAdminReservationService" as Svc
+participant ":AdminReservationService" as SvcImpl
+participant ":IReservationRepository" as Repo
+participant ":ReservationRepository" as RepoImpl
+participant ":IUnitOfWork" as UoW
+database ":Database" as DB
+
+U ->> Ctrl : POST /api/manual/reservations (CreateManualReservationRequest)
+activate U
+Ctrl ->> Svc : CreateManualReservationAsync(request, ct)
+activate Ctrl
+Svc ->> SvcImpl : CreateManualReservationAsync(request, ct)
+activate Svc
+SvcImpl ->> Repo : CreateAsync(reservation, ct)
+activate SvcImpl
+Repo ->> RepoImpl : CreateAsync(reservation, ct)
+activate Repo
+RepoImpl ->> DB : INSERT INTO Reservations with assigned tables
+activate DB
+DB -->> RepoImpl : reservationId
+deactivate DB
+RepoImpl -->> Repo : Reservation entity
+deactivate Repo
+Repo -->> SvcImpl : Reservation entity
+deactivate SvcImpl
+SvcImpl ->> UoW : CommitAsync(ct)
+activate SvcImpl
+UoW -->> SvcImpl : success
+deactivate SvcImpl
+SvcImpl -->> Svc : ReservationResponseDto
+deactivate Svc
+Svc -->> Ctrl : ReservationResponseDto
+deactivate Ctrl
+Ctrl -->> U : 200 OK (ReservationResponseDto)
+deactivate U
+@enduml

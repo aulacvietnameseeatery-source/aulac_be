@@ -1,0 +1,211 @@
+@startuml Reservation Module - Presentation Layer
+
+package "Presentation Layer" {
+
+class ReservationController <<Controller>> {
+- _reservationService: IAdminReservationService
++ GetReservations(request: GetReservationsRequest): Task<IActionResult>
++ GetStatuses(): Task<IActionResult>
++ GetReservationDetail(id: long): Task<IActionResult>
++ UpdateReservationStatus(id: long, payload: UpdateReservationStatusRequest): Task<IActionResult>
++ AssignTableAndConfirm(id: long, payload: AssignTableRequest): Task<IActionResult>
++ UpdateReservation(id: long, payload: UpdateReservationRequest): Task<IActionResult>
++ DeleteReservation(id: long): Task<IActionResult>
+}
+
+class PublicReservationController <<Controller>> {
+- _reservationService: IPublicReservationService
+- _customerService: ICustomerService
+- _tableService: ITableService
+- _notificationService: INotificationService
+- _logger: ILogger<PublicReservationController>
++ GetCustomerByPhone(phone: string): Task<IActionResult>
++ CheckReservationFit(request: ReservationFitCheckRequest): Task<IActionResult>
++ CreateReservation(request: CreateReservationRequest): Task<IActionResult>
++ OccupyTable(tableCode: string, token: string?): Task<IActionResult>
++ RequestPayment(orderId: long, tableCode: string?): Task<IActionResult>
+}
+
+class ManualReservationController <<Controller>> {
+- _reservationService: IAdminReservationService
+- _logger: ILogger<ManualReservationController>
++ GetAvailability(reservedTime: DateTime?, partySize: int?): Task<IActionResult>
++ CreateReservation(request: CreateManualReservationRequest): Task<IActionResult>
++ UpdateReservationStatus(id: long, request: UpdateReservationStatusRequest): Task<IActionResult>
+}
+
+class CreateReservationRequest <<DTO>> {
++ CustomerId: int?
++ CustomerName: string
++ Phone: string
++ Email: string?
++ PartySize: int
++ ReservedTime: DateTime
++ Notes: string?
+}
+
+class ReservationResponseDto <<DTO>> {
++ ReservationId: long
++ CustomerName: string
++ Phone: string
++ Email: string?
++ PartySize: int
++ ReservedTime: DateTime
++ TableCode: string
++ Zone: string
++ Status: string
++ CreatedAt: DateTime
+}
+
+class GetReservationsRequest <<DTO>> {
++ PageIndex: int
++ PageSize: int
++ Date: DateTime?
++ StatusId: uint?
++ Search: string?
+}
+
+class ReservationManagementDto <<DTO>> {
++ ReservationId: long
++ CustomerName: string
++ Phone: string
++ PartySize: int
++ ReservedTime: DateTime
++ Status: string
++ TableCodes: List<string>
++ CreatedAt: DateTime
+}
+
+class ReservationDetailDto <<DTO>> {
++ ReservationId: long
++ CustomerId: long?
++ CustomerName: string
++ Phone: string
++ Email: string?
++ PartySize: int
++ ReservedTime: DateTime
++ Notes: string?
++ Status: string
++ Source: string
++ CreatedAt: DateTime
++ Tables: List<ReservationTableDto>
+}
+
+class ReservationTableDto <<DTO>> {
++ TableId: long
++ TableCode: string
++ Capacity: int
++ TableType: string
++ Zone: string
+}
+
+class ReservationStatusDto <<DTO>> {
++ StatusId: uint
++ StatusName: string
++ StatusCode: string
+}
+
+class UpdateReservationStatusRequest <<DTO>> {
++ Status: ReservationStatusCode
++ Notes: string?
+}
+
+class AssignTableRequest <<DTO>> {
++ TableIds: List<long>
+}
+
+class UpdateReservationRequest <<DTO>> {
++ CustomerName: string
++ Phone: string
++ PartySize: int
++ ReservedTime: DateTime
++ Notes: string?
+}
+
+class CreateManualReservationRequest <<DTO>> {
++ CustomerId: int?
++ CustomerName: string
++ Phone: string
++ Email: string?
++ PartySize: int
++ ReservedTime: DateTime
++ TableIds: List<long>
++ Notes: string?
+}
+
+class ManualTableOptionDto <<DTO>> {
++ TableId: long
++ TableCode: string
++ Capacity: int
++ TableType: string
++ Zone: string
++ IsAvailable: bool
+}
+
+class ReservationFitCheckRequest <<DTO>> {
++ ReservedTime: DateTime
++ PartySize: int
+}
+
+class ReservationFitCheckResponse <<DTO>> {
++ CanBookOnline: bool
++ Message: string
++ SuggestedTables: List<TableAvailabilityDto>
+}
+
+class TableAvailabilityDto <<DTO>> {
++ TableId: long
++ TableCode: string
++ Capacity: int
++ TableType: string
++ Zone: string
++ IsAvailable: bool
+}
+
+class ReservationStatusResponseDTO <<DTO>> {
++ ReservationId: long
++ NewStatus: string
++ UpdatedAt: DateTime
++ Notes: string?
+}
+
+class UpdateReservationStatusRequest <<DTO>> {
++ Status: ReservationStatusCode
++ Notes: string?
+}
+
+}
+
+' External type stubs
+class IPublicReservationService <<interface>>
+class IAdminReservationService <<interface>>
+class ICustomerService <<interface>>
+class ITableService <<interface>>
+class INotificationService <<interface>>
+
+' Relationships
+ReservationController --> IAdminReservationService : injects
+PublicReservationController --> IPublicReservationService : injects
+PublicReservationController --> ICustomerService : injects
+PublicReservationController --> ITableService : injects
+PublicReservationController --> INotificationService : injects
+ManualReservationController --> IAdminReservationService : injects
+
+ReservationController --> GetReservationsRequest : receives
+ReservationController --> ReservationManagementDto : returns
+ReservationController --> ReservationDetailDto : returns
+ReservationController --> UpdateReservationStatusRequest : receives
+ReservationController --> AssignTableRequest : receives
+ReservationController --> UpdateReservationRequest : receives
+
+PublicReservationController --> ReservationFitCheckRequest : receives
+PublicReservationController --> ReservationFitCheckResponse : returns
+PublicReservationController --> CreateReservationRequest : receives
+PublicReservationController --> ReservationResponseDto : returns
+
+ManualReservationController --> CreateManualReservationRequest : receives
+ManualReservationController --> ReservationResponseDto : returns
+ManualReservationController --> UpdateReservationStatusRequest : receives
+ManualReservationController --> ManualTableOptionDto : returns
+
+@enduml
