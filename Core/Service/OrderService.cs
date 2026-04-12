@@ -613,9 +613,6 @@ public class OrderService : IOrderService
     }
 
 
-    public Task<CustomerOrderHistoryDTO> GetCustomerOrderHistoryAsync(string tableCode, CancellationToken cancellationToken = default)
-        => _orderRepository.GetCustomerOrderHistoryAsync(tableCode, cancellationToken);
-
     public Task<CustomerOrderHistoryDTO> GetCustomerOrderByIdAsync(long orderId, CancellationToken cancellationToken = default)
         => _orderRepository.GetCustomerOrderByIdAsync(orderId, cancellationToken);
 
