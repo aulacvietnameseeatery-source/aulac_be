@@ -20,11 +20,6 @@ public interface IOrderService
 	/// <summary>Creates a new order from the customer-facing menu (QR flow).</summary>
 	Task<CreateOrderResponseDTO> CreateOrderAsync(CreateOrderRequestDTO request, CancellationToken cancellationToken = default);
 
-	/// <summary>
-	/// Returns all orders placed at the given table today, grouped as rounds.
-	/// Public endpoint – no authentication required.
-	/// </summary>
-	Task<CustomerOrderHistoryDTO> GetCustomerOrderHistoryAsync(string tableCode, CancellationToken cancellationToken = default);
 
 	/// <summary>
 	/// Appends more items to an existing order (same table / same customer session).

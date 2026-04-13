@@ -25,6 +25,7 @@ public class PublicReservationController : ControllerBase
     private readonly ICustomerService _customerService;
     private readonly ITableService _tableService;
     private readonly INotificationService _notificationService;
+    private readonly IOrderService _orderService;
     private readonly ILogger<PublicReservationController> _logger;
 
     public PublicReservationController(
@@ -32,12 +33,14 @@ public class PublicReservationController : ControllerBase
         ICustomerService customerService,
         ITableService tableService,
         INotificationService notificationService,
+        IOrderService orderService,
         ILogger<PublicReservationController> logger)
     {
         _reservationService = reservationService;
         _customerService = customerService;
         _tableService = tableService;
         _notificationService = notificationService;
+        _orderService = orderService;
         _logger = logger;
     }
 
@@ -176,6 +179,24 @@ public class PublicReservationController : ControllerBase
                 Success = false,
                 Code = 400,
                 UserMessage = "Invalid order ID.",
+                ServerTime = DateTimeOffset.UtcNow
+            });
+        }
+
+        // Check if all non-rejected/non-cancelled items are SERVED
+        var orderHistory = await _orderService.GetCustomerOrderByIdAsync(orderId, cancellationToken);
+        var unservedItems = orderHistory.Items
+            .Where(i => i.ItemStatus != "REJECTED" && i.ItemStatus != "CANCELLED" && i.ItemStatus != "SERVED")
+            .ToList();
+
+        if (unservedItems.Any())
+        {
+            return BadRequest(new ApiResponse<object>
+            {
+                Success = false,
+                Code = 400,
+                SubCode = 10,
+                UserMessage = "Bạn vẫn còn món chưa được phục vụ. Vui lòng đợi hoàn tất trước khi thanh toán.",
                 ServerTime = DateTimeOffset.UtcNow
             });
         }
