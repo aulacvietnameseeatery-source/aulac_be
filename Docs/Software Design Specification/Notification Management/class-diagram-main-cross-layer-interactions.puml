@@ -43,6 +43,8 @@ package "Application Layer" {
     class NotificationRealtimePublisher <<Service>> {
         -_hubContext : IHubContext<RestaurantHub>
     }
+
+    class RestaurantHub <<Hub>>
 }
 
 package "Persistence Layer" {
@@ -62,6 +64,8 @@ package "Persistence Layer" {
     class NotificationRepository <<Repository>> {
         -_context : RestaurantMgmtContext
     }
+
+    class RestaurantMgmtContext <<DbContext>>
 }
 
 package "Domain Layer" {
@@ -100,6 +104,8 @@ NotificationRepository ..|> INotificationRepository : implements
 NotificationController --> INotificationService : depends on for business logic
 NotificationService --> INotificationRepository : uses for data access
 NotificationService --> INotificationRealtimePublisher : uses for real-time push
+NotificationRealtimePublisher --> RestaurantHub : pushes notifications to connected clients
+NotificationRepository --> RestaurantMgmtContext : persists through DbContext
 NotificationRepository --> Notification : queries and persists
 NotificationRepository --> NotificationReadState : queries and persists
 NotificationRepository --> NotificationPreference : queries and persists
