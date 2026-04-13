@@ -1,0 +1,244 @@
+@startuml
+title Dish Management Module - Presentation Layer Class Diagram
+
+package "Presentation Layer" {
+
+    class DishController <<Controller>> {
+        -_dishService : IDishService
+        -_lookupService : ILookupService
+        +GetDishById(id: long, lang: string?, ct: CancellationToken) : Task<IActionResult>
+        +GetDishesForAdmin(request: GetDishesRequest, ct: CancellationToken) : Task<IActionResult>
+        +GetMenuForCustomer(request: GetDishesRequest, ct: CancellationToken) : Task<IActionResult>
+        +GetAllCategories(ct: CancellationToken) : Task<IActionResult>
+        +GetDishStatuses(ct: CancellationToken) : Task<IActionResult>
+        +UpdateDishStatus(id: long, request: UpdateDishStatusRequest, ct: CancellationToken) : Task<IActionResult>
+        +CreateDish(request: DishFormRequest, ct: CancellationToken) : Task<IActionResult>
+        +UpdateDish(id: long, request: DishFormRequest, ct: CancellationToken) : Task<IActionResult>
+        +GetDishForActions(id: long, ct: CancellationToken) : Task<IActionResult>
+        +GetActiveDishStatuses(ct: CancellationToken) : Task<IActionResult>
+        +GetAllDishCategories(ct: CancellationToken) : Task<IActionResult>
+        +GetAllActiveTags(ct: CancellationToken) : Task<IActionResult>
+    }
+
+    class DishCategoryController <<Controller>> {
+        -_dishCategoryService : IDishCategoryService
+        +GetAllCategories(query: DishCategoryListQueryDTO, ct: CancellationToken) : Task<IActionResult>
+        +GetCategoryById(id: long, ct: CancellationToken) : Task<IActionResult>
+        +CreateCategory(request: CreateDishCategoryRequest, ct: CancellationToken) : Task<IActionResult>
+        +UpdateCategory(id: long, request: UpdateDishCategoryRequest, ct: CancellationToken) : Task<IActionResult>
+        +ToggleCategoryStatus(id: long, isDisabled: bool, ct: CancellationToken) : Task<IActionResult>
+    }
+
+    ' ── Request DTOs ──
+
+    class GetDishesRequest <<DTO>> {
+        +PageIndex : int
+        +PageSize : int
+        +Search : string?
+        +Category : string?
+        +Status : DishStatusCode?
+        +SortBy : string?
+        +IsDescending : bool
+        +IsCustomerView : bool
+        +Locale : string?
+    }
+
+    class UpdateDishStatusRequest <<DTO>> {
+        +Status : DishStatusCode
+    }
+
+    class CreateDishRequest <<DTO>> {
+        +CategoryId : long
+        +Price : decimal
+        +IsOnline : bool
+        +ChefRecommended : bool
+        +Calories : int?
+        +PrepTimeMinutes : int?
+        +CookTimeMinutes : int?
+        +DishStatusLvId : uint
+        +TagIds : List<uint>
+        +I18n : Dictionary<string, DishI18nDto>
+    }
+
+    class UpdateDishRequest <<DTO>> {
+        +DishId : long
+        +CategoryId : long
+        +Price : decimal
+        +IsOnline : bool
+        +ChefRecommended : bool
+        +Calories : int?
+        +PrepTimeMinutes : int?
+        +CookTimeMinutes : int?
+        +DishStatusLvId : uint
+        +TagIds : List<uint>
+        +I18n : Dictionary<string, DishI18nDto>
+    }
+
+    class DishCategoryListQueryDTO <<DTO>> {
+        +Search : string?
+        +IsDisabled : bool?
+        +PageIndex : int
+        +PageSize : int
+    }
+
+    class CreateDishCategoryRequest <<DTO>> {
+        +I18n : Dictionary<string, CategoryI18nDto>
+        +IsDisabled : bool
+    }
+
+    class UpdateDishCategoryRequest <<DTO>> {
+        +I18n : Dictionary<string, CategoryI18nDto>
+        +IsDisabled : bool
+    }
+
+    class DishI18nDto <<DTO>> {
+        +DishName : string
+        +Description : string?
+        +Slogan : string?
+        +Note : string?
+        +ShortDescription : string?
+    }
+
+    ' ── Response DTOs ──
+
+    class DishDetailDto <<DTO>> {
+        +DishId : long
+        +DishName : string
+        +Price : decimal
+        +CategoryName : string
+        +Description : string?
+        +ShortDescription : string?
+        +Slogan : string?
+        +Calories : int?
+        +PrepTimeMinutes : int?
+        +CookTimeMinutes : int?
+        +ImageUrls : List<string>
+        +VideoUrl : string?
+        +Composition : List<RecipeItemDto>
+    }
+
+    class DishDetailForActionsDto <<DTO>> {
+        +DishId : long
+        +CategoryId : long
+        +CategoryName : Dictionary<string, string>
+        +Price : decimal
+        +DishStatusLvId : uint
+        +DishStatus : Dictionary<string, string>
+        +TagIds : List<uint>
+        +IsOnline : bool
+        +ChefRecommended : bool
+        +Calories : int?
+        +PrepTimeMinutes : int?
+        +CookTimeMinutes : int?
+        +I18n : Dictionary<string, DishI18nDto>
+        +Media : List<DishMediaDto>
+    }
+
+    class DishManagementDto <<DTO>> {
+        +DishId : long
+        +DishName : string
+        +CategoryName : string
+        +NameI18n : I18nTextDto
+        +DescriptionI18n : I18nTextDto
+        +CategoryNameI18n : I18nTextDto
+        +Price : decimal
+        +Status : string
+        +StatusId : long
+        +IsOnline : bool
+        +CreatedAt : DateTime?
+    }
+
+    class DishDisplayDto <<DTO>> {
+        +DishId : long
+        +DishName : I18nTextDto
+        +CategoryId : long
+        +Price : decimal
+        +CategoryName : I18nTextDto
+        +Description : I18nTextDto?
+        +ImageUrl : string?
+        +IsChefRecommended : bool
+    }
+
+    class DishStatusDto <<DTO>> {
+        +DishId : long
+        +DishName : string
+        +StatusCode : DishStatusCode
+        +StatusId : uint
+        +StatusName : string
+        +UpdatedAt : DateTime
+    }
+
+    class ActiveDishStatusDto <<DTO>> {
+        +DishStatusLvId : uint
+        +ValueName : string
+        +ValueCode : string
+    }
+
+    class DishCategorySimpleDto <<DTO>> {
+        +CategoryId : long
+        +NameVi : string
+        +NameEn : string
+        +NameFr : string
+    }
+
+    class DishTagDto <<DTO>> {
+        +TagId : uint
+        +Code : string
+        +Name : string
+        +NameI18n : I18nTextDto
+        +DescriptionI18n : I18nTextDto
+    }
+
+    class DishMediaDto <<DTO>> {
+        +MediaId : long
+        +Url : string
+        +MediaType : string
+        +IsPrimary : bool
+    }
+
+    class DishCategoryDto <<DTO>> {
+        +CategoryId : long
+        +CategoryName : string
+        +Description : string?
+        +IsDisabled : bool
+        +NameI18n : I18nTextDto
+        +DescriptionI18n : I18nTextDto
+    }
+
+    class I18nTextDto <<DTO>> {
+        +Vi : string?
+        +En : string?
+        +Fr : string?
+    }
+
+}
+
+' ── Relationships ──
+
+DishController ..> GetDishesRequest : receives
+DishController ..> UpdateDishStatusRequest : receives
+DishController ..> CreateDishRequest : receives
+DishController ..> UpdateDishRequest : receives
+DishController ..> DishDetailDto : returns
+DishController ..> DishDetailForActionsDto : returns
+DishController ..> DishManagementDto : returns in admin list
+DishController ..> DishDisplayDto : returns in public menu
+DishController ..> DishStatusDto : returns
+DishController ..> ActiveDishStatusDto : returns
+DishController ..> DishCategorySimpleDto : returns
+DishController ..> DishTagDto : returns
+
+DishCategoryController ..> DishCategoryListQueryDTO : receives
+DishCategoryController ..> CreateDishCategoryRequest : receives
+DishCategoryController ..> UpdateDishCategoryRequest : receives
+DishCategoryController ..> DishCategoryDto : returns
+
+CreateDishRequest ..> DishI18nDto : contains i18n entries
+UpdateDishRequest ..> DishI18nDto : contains i18n entries
+DishDetailForActionsDto ..> DishMediaDto : contains media list
+DishDetailForActionsDto ..> DishI18nDto : contains i18n map
+DishManagementDto ..> I18nTextDto : contains i18n fields
+DishDisplayDto ..> I18nTextDto : contains i18n fields
+DishCategoryDto ..> I18nTextDto : contains i18n fields
+
+@enduml

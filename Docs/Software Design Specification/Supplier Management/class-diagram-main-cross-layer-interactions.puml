@@ -1,0 +1,88 @@
+@startuml
+title Supplier Management - Main Cross-Layer Interactions
+
+
+package "Presentation Layer" {
+    class SupplierController <<Controller>> {
+        -_supplierService: ISupplierService
+        -_logger: ILogger<SupplierController>
+        +GetAllSuppliers(query: SupplierListQueryDTO): IActionResult
+        +GetSupplierById(id: long): IActionResult
+        +CreateSupplier(request: CreateSupplierRequest): IActionResult
+        +UpdateSupplier(id: long, request: UpdateSupplierRequest): IActionResult
+        +DeleteSupplier(id: long): IActionResult
+    }
+}
+
+package "Application Layer" {
+    interface ISupplierService <<interface>> {
+        +GetAllSuppliersAsync(query: SupplierListQueryDTO, ct: CancellationToken): Task<PagedResultDTO<SupplierDto>>
+        +GetSupplierDetailAsync(id: long, ct: CancellationToken): Task<SupplierDetailDto>
+        +CreateSupplierAsync(request: CreateSupplierRequest, ct: CancellationToken): Task<SupplierDto>
+        +UpdateSupplierAsync(id: long, request: UpdateSupplierRequest, ct: CancellationToken): Task<SupplierDto>
+        +DeleteSupplierAsync(id: long, ct: CancellationToken): Task<bool>
+    }
+
+    class SupplierService <<Service>> {
+        -_supplierRepository: ISupplierRepository
+        -_logger: ILogger<SupplierService>
+        -MapToDto(supplier: Supplier): SupplierDto
+    }
+
+    SupplierService ..|> ISupplierService : implements
+}
+
+package "Persistence Layer" {
+    interface ISupplierRepository <<interface>> {
+        +GetAllSuppliersAsync(query: SupplierListQueryDTO, ct: CancellationToken): Task<PagedResultDTO<SupplierDto>>
+        +GetByIdAsync(id: long, ct: CancellationToken): Task<Supplier?>
+        +GetByIdWithIngredientsAsync(id: long, ct: CancellationToken): Task<Supplier?>
+        +CreateAsync(supplier: Supplier, ct: CancellationToken): Task<Supplier>
+        +UpdateAsync(supplier: Supplier, ct: CancellationToken): Task<Supplier>
+        +DeleteAsync(id: long, ct: CancellationToken): Task<bool>
+        +ExistsByNameAsync(name: string, excludeId: long?, ct: CancellationToken): Task<bool>
+        +HasDependenciesAsync(id: long, ct: CancellationToken): Task<bool>
+        +UpdateSupplierIngredientsAsync(supplierId: long, ingredientIds: List<long>, ct: CancellationToken): Task
+    }
+
+    class SupplierRepository <<Repository>> {
+        -_context: RestaurantMgmtContext
+    }
+
+    SupplierRepository ..|> ISupplierRepository : implements
+}
+
+package "Domain Layer" {
+    class Supplier <<Entity>> {
+        +SupplierId: long
+        +SupplierName: string
+        +Phone: string?
+        +Email: string?
+        +Address: string?
+        +TaxCode: string?
+    }
+
+    class IngredientSupplier <<Entity>> {
+        +IngredientSupplierId: long
+        +SupplierId: long?
+        +IngredientId: long?
+        +CreatedAt: DateTime?
+    }
+
+    class Ingredient <<Entity>> {
+        +IngredientId: long
+        +IngredientName: string
+    }
+
+    Supplier "1" *-- "0..*" IngredientSupplier : supplies
+    IngredientSupplier "0..*" --> "1" Ingredient : links to
+}
+
+' Cross-layer relationships
+SupplierController --> ISupplierService : uses for supplier operations
+
+SupplierService --> ISupplierRepository : uses for persistence
+
+SupplierRepository ..> Supplier : persists
+SupplierRepository ..> IngredientSupplier : manages relationships
+@enduml

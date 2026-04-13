@@ -1,0 +1,71 @@
+@startuml
+title Coupon Management - Domain Layer Class Diagram
+
+
+package "Domain Layer" {
+
+    class Coupon <<Entity>> {
+        +CouponId: long
+        +CustomerId: long?
+        +CouponCode: string
+        +CouponName: string
+        +Description: string?
+        +StartTime: DateTime
+        +EndTime: DateTime
+        +DiscountValue: decimal
+        +MaxUsage: int?
+        +UsedCount: int?
+        +CreatedAt: DateTime?
+        +TypeLvId: uint
+        +CouponStatusLvId: uint
+    }
+
+    class OrderCoupon <<Entity>> {
+        +OrderCouponId: long
+        +OrderId: long
+        +CouponId: long
+        +DiscountAmount: decimal
+        +AppliedAt: DateTime?
+    }
+
+    class LookupValue <<Entity>> {
+        +ValueId: uint
+        +TypeId: ushort
+        +ValueCode: string
+        +ValueName: string
+        +SortOrder: short
+        +IsActive: bool?
+    }
+
+    class Customer <<Entity>> {
+        +CustomerId: long
+        +FullName: string
+    }
+
+    class Order <<Entity>> {
+        +OrderId: long
+    }
+
+    enum CouponStatusCode <<Enum>> {
+        ACTIVE
+        DISABLED
+        SCHEDULED
+        EXPIRED
+    }
+
+    enum CouponTypeCode <<Enum>> {
+        FIXED_AMOUNT
+        PERCENT
+    }
+}
+
+' ── Domain Relationships ──
+
+Coupon "1" *-- "0..*" OrderCoupon : owns
+Coupon "0..*" --> "1" LookupValue : TypeLv (CouponType)
+Coupon "0..*" --> "1" LookupValue : CouponStatusLv (CouponStatus)
+Coupon "0..*" --> "0..1" Customer : belongs to
+
+OrderCoupon "0..*" --> "1" Order : applied to
+OrderCoupon "0..*" --> "1" Coupon : references
+@enduml

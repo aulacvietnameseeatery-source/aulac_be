@@ -1,0 +1,116 @@
+@startuml
+title Coupon Management - Presentation Layer Class Diagram
+
+
+package "Presentation Layer" {
+
+    class CouponController <<Controller>> {
+        -_couponService: ICouponService
+        -_logger: ILogger<CouponController>
+        +GetCoupons(customerId: long?): IActionResult
+        +GetAllCoupons(query: CouponListQueryDTO): IActionResult
+        +GetCouponById(id: long): IActionResult
+        +CreateCoupon(request: CreateCouponRequest): IActionResult
+        +UpdateCoupon(id: long, request: UpdateCouponRequest): IActionResult
+        +DeleteCoupon(id: long): IActionResult
+        +DisableCoupon(id: long): IActionResult
+        +ActivateCoupon(id: long): IActionResult
+    }
+
+    ' ── Request DTOs ──
+
+    class CreateCouponRequest <<DTO>> {
+        +CouponCode: string
+        +CouponName: string
+        +Description: string?
+        +StartTime: DateTime
+        +EndTime: DateTime
+        +DiscountValue: decimal
+        +MaxUsage: int?
+        +Type: string
+    }
+
+    class UpdateCouponRequest <<DTO>> {
+        +CouponCode: string
+        +CouponName: string
+        +Description: string?
+        +StartTime: DateTime
+        +EndTime: DateTime
+        +DiscountValue: decimal
+        +MaxUsage: int?
+        +Type: string
+    }
+
+    class CouponListQueryDTO <<DTO>> {
+        +Search: string?
+        +PageIndex: int
+        +PageSize: int
+    }
+
+    ' ── Response DTOs ──
+
+    class CouponDTO <<DTO>> {
+        +CouponId: long
+        +CouponCode: string
+        +CouponName: string
+        +CustomerId: long?
+        +CustomerName: string?
+        +StartTime: DateTime
+        +EndTime: DateTime
+        +DiscountValue: decimal
+        +MaxUsage: int?
+        +UsedCount: int?
+        +Type: string
+        +CouponStatus: string
+    }
+
+    class CouponDetailDto <<DTO>> {
+        +CouponId: long
+        +CouponCode: string
+        +CouponName: string
+        +Description: string?
+        +StartTime: DateTime
+        +EndTime: DateTime
+        +DiscountValue: decimal
+        +MaxUsage: int?
+        +UsedCount: int?
+        +Type: string
+        +CouponStatus: string
+        +CreatedAt: DateTime?
+    }
+
+    class "PagedResultDTO<T>" as PagedResultDTO <<DTO>> {
+        +PageData: List<T>
+        +PageIndex: int
+        +PageSize: int
+        +TotalCount: int
+        +TotalPage: int
+    }
+
+    class "ApiResponse<T>" as ApiResponse <<DTO>> {
+        +Success: bool
+        +Code: int
+        +SubCode: int
+        +UserMessage: string?
+        +SystemMessage: string?
+        +ValidateInfo: IReadOnlyList<string>
+        +Data: T
+        +ServerTime: DateTimeOffset
+    }
+}
+
+' External type stubs
+interface ICouponService <<interface>>
+
+' ── Relationships ──
+
+CouponController --> ICouponService : uses
+
+CouponController ..> CreateCouponRequest : receives
+CouponController ..> UpdateCouponRequest : receives
+CouponController ..> CouponListQueryDTO : receives
+CouponController ..> CouponDTO : returns
+CouponController ..> CouponDetailDto : returns
+CouponController ..> PagedResultDTO : returns
+CouponController ..> ApiResponse : wraps response
+@enduml

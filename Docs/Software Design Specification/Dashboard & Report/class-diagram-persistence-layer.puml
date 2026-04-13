@@ -1,0 +1,107 @@
+@startuml
+title Dashboard & Report Module - Persistence Layer Class Diagram
+
+package "Persistence Layer" {
+
+    interface IDashboardRepository <<interface>> {
+        +GetSummaryDataAsync(startDate: DateTime, endDate: DateTime, completedOrderStatusId: uint, completedReservationStatusId: uint, ct: CancellationToken) : Task<(int OrderCount, decimal TotalSales, int ReservationCount)>
+        +GetRevenueChartAsync(startDate: DateTime, endDate: DateTime, completedOrderStatusId: uint, ct: CancellationToken) : Task<List<RevenueChartItemDto>>
+        +GetTopSellingAsync(startDate: DateTime, endDate: DateTime, completedOrderStatusId: uint, imageMediaTypeId: uint, limit: int, ct: CancellationToken) : Task<List<TopSellingItemDto>>
+        +GetStatisticsAsync(startDate: DateTime, endDate: DateTime, completedOrderStatusId: uint, ct: CancellationToken) : Task<DashboardStatisticsDto>
+    }
+
+    class DashboardRepository <<Repository>> {
+        -_context : RestaurantMgmtContext
+        +GetSummaryDataAsync(startDate: DateTime, endDate: DateTime, completedOrderStatusId: uint, completedReservationStatusId: uint, ct: CancellationToken) : Task<(int OrderCount, decimal TotalSales, int ReservationCount)>
+        +GetRevenueChartAsync(startDate: DateTime, endDate: DateTime, completedOrderStatusId: uint, ct: CancellationToken) : Task<List<RevenueChartItemDto>>
+        +GetTopSellingAsync(startDate: DateTime, endDate: DateTime, completedOrderStatusId: uint, imageMediaTypeId: uint, limit: int, ct: CancellationToken) : Task<List<TopSellingItemDto>>
+        +GetStatisticsAsync(startDate: DateTime, endDate: DateTime, completedOrderStatusId: uint, ct: CancellationToken) : Task<DashboardStatisticsDto>
+    }
+
+    interface IReportRepository <<interface>> {
+        +GetEarningSummaryAsync(startDate: DateTime, endDate: DateTime, completedStatusId: uint, ct: CancellationToken) : Task<EarningSummaryDto>
+        +GetPaymentMethodChartAsync(startDate: DateTime, endDate: DateTime, completedStatusId: uint, ct: CancellationToken) : Task<List<PaymentMethodRevenueDto>>
+        +GetEarningTableAsync(startDate: DateTime, endDate: DateTime, completedStatusId: uint, skip: int, take: int, ct: CancellationToken) : Task<(List<EarningTableItemDto>, int)>
+        +GetOrderMetricsAsync(startDate: DateTime, endDate: DateTime, completedStatusId: uint, cancelledStatusId: uint, ct: CancellationToken) : Task<OrderMetricsDto>
+        +GetSalesItemsAsync(startDate: DateTime, endDate: DateTime, completedStatusId: uint, skip: int, take: int, ct: CancellationToken) : Task<(List<SalesItemDto>, int)>
+        +GetTopSpendersAsync(startDate: DateTime, endDate: DateTime, completedStatusId: uint, skip: int, take: int, ct: CancellationToken) : Task<(List<TopCustomerDto>, int)>
+        +GetDashboardTopSpendersAsync(startDate: DateTime, endDate: DateTime, completedStatusId: uint, ct: CancellationToken) : Task<List<TopCustomerDto>>
+        +GetDailyEarningDetailAsync(targetDate: DateTime, completedStatusId: uint, ct: CancellationToken) : Task<DailyEarningDetailDto>
+        +GetDishPerformanceDetailAsync(dishId: long, startDate: DateTime, endDate: DateTime, completedStatusId: uint, ct: CancellationToken) : Task<DishPerformanceDetailDto>
+        +GetCustomerProfileDetailAsync(customerId: long, startDate: DateTime, endDate: DateTime, completedStatusId: uint, ct: CancellationToken) : Task<CustomerProfileDetailDto>
+    }
+
+    class ReportRepository <<Repository>> {
+        -_context : RestaurantMgmtContext
+        +GetEarningSummaryAsync(startDate: DateTime, endDate: DateTime, completedStatusId: uint, ct: CancellationToken) : Task<EarningSummaryDto>
+        +GetPaymentMethodChartAsync(startDate: DateTime, endDate: DateTime, completedStatusId: uint, ct: CancellationToken) : Task<List<PaymentMethodRevenueDto>>
+        +GetEarningTableAsync(startDate: DateTime, endDate: DateTime, completedStatusId: uint, skip: int, take: int, ct: CancellationToken) : Task<(List<EarningTableItemDto>, int)>
+        +GetOrderMetricsAsync(startDate: DateTime, endDate: DateTime, completedStatusId: uint, cancelledStatusId: uint, ct: CancellationToken) : Task<OrderMetricsDto>
+        +GetSalesItemsAsync(startDate: DateTime, endDate: DateTime, completedStatusId: uint, skip: int, take: int, ct: CancellationToken) : Task<(List<SalesItemDto>, int)>
+        +GetTopSpendersAsync(startDate: DateTime, endDate: DateTime, completedStatusId: uint, skip: int, take: int, ct: CancellationToken) : Task<(List<TopCustomerDto>, int)>
+        +GetDashboardTopSpendersAsync(startDate: DateTime, endDate: DateTime, completedStatusId: uint, ct: CancellationToken) : Task<List<TopCustomerDto>>
+        +GetDailyEarningDetailAsync(targetDate: DateTime, completedStatusId: uint, ct: CancellationToken) : Task<DailyEarningDetailDto>
+        +GetDishPerformanceDetailAsync(dishId: long, startDate: DateTime, endDate: DateTime, completedStatusId: uint, ct: CancellationToken) : Task<DishPerformanceDetailDto>
+        +GetCustomerProfileDetailAsync(customerId: long, startDate: DateTime, endDate: DateTime, completedStatusId: uint, ct: CancellationToken) : Task<CustomerProfileDetailDto>
+    }
+
+}
+
+' ── External stubs ──
+class RestaurantMgmtContext <<DbContext>>
+class Order <<Entity>>
+class OrderItem <<Entity>>
+class Reservation <<Entity>>
+class Payment <<Entity>>
+class Dish <<Entity>>
+class DishMedium <<Entity>>
+class Customer <<Entity>>
+class LookupValue <<Entity>>
+
+class RevenueChartItemDto <<DTO>>
+class TopSellingItemDto <<DTO>>
+class DashboardStatisticsDto <<DTO>>
+class EarningSummaryDto <<DTO>>
+class PaymentMethodRevenueDto <<DTO>>
+class EarningTableItemDto <<DTO>>
+class OrderMetricsDto <<DTO>>
+class SalesItemDto <<DTO>>
+class TopCustomerDto <<DTO>>
+class DailyEarningDetailDto <<DTO>>
+class DishPerformanceDetailDto <<DTO>>
+class CustomerProfileDetailDto <<DTO>>
+
+' ── Relationships ──
+
+DashboardRepository ..|> IDashboardRepository : implements
+ReportRepository ..|> IReportRepository : implements
+
+DashboardRepository --> RestaurantMgmtContext : uses for data access
+ReportRepository --> RestaurantMgmtContext : uses for data access
+
+DashboardRepository ..> Order : aggregates sales and order counts
+DashboardRepository ..> Reservation : counts completed reservations
+DashboardRepository ..> OrderItem : joins for top-selling dishes
+DashboardRepository ..> Dish : resolves dish names and images
+DashboardRepository ..> DishMedium : resolves primary images
+DashboardRepository ..> RevenueChartItemDto : projects grouped revenue
+DashboardRepository ..> TopSellingItemDto : projects top dishes
+DashboardRepository ..> DashboardStatisticsDto : projects statistics
+
+ReportRepository ..> Order : aggregates revenue, counts
+ReportRepository ..> OrderItem : aggregates per-dish sales
+ReportRepository ..> Payment : aggregates by payment method
+ReportRepository ..> Dish : joins for sales details
+ReportRepository ..> Customer : joins for top spender data
+ReportRepository ..> LookupValue : reads payment method names
+ReportRepository ..> EarningSummaryDto : projects earning totals
+ReportRepository ..> PaymentMethodRevenueDto : projects payment breakdown
+ReportRepository ..> EarningTableItemDto : projects paged daily rows
+ReportRepository ..> OrderMetricsDto : projects order counts
+ReportRepository ..> SalesItemDto : projects paginated dish sales
+ReportRepository ..> TopCustomerDto : projects top spenders
+ReportRepository ..> DailyEarningDetailDto : projects daily earning detail
+ReportRepository ..> DishPerformanceDetailDto : projects dish performance
+ReportRepository ..> CustomerProfileDetailDto : projects customer profile
+
+@enduml

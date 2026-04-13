@@ -1,0 +1,109 @@
+@startuml
+title Dashboard & Report Module - Domain Layer Class Diagram
+
+package "Domain Layer" {
+
+    class Order <<Entity>> {
+        +OrderId : long
+        +OrderStatusLvId : uint
+        +TotalAmount : decimal
+        +SubTotalAmount : decimal
+        +TaxAmount : decimal
+        +CreatedAt : DateTime?
+    }
+
+    class OrderItem <<Entity>> {
+        +OrderItemId : long
+        +OrderId : long
+        +DishId : long
+        +Quantity : int
+        +UnitPrice : decimal
+    }
+
+    class Reservation <<Entity>> {
+        +ReservationId : long
+        +ReservationStatusLvId : uint
+        +ReservedTime : DateTime
+        +CustomerId : long?
+    }
+
+    class Invoice <<Entity>> {
+        +InvoiceId : long
+        +OrderId : long
+        +CustomerId : long?
+        +NetTotal : decimal
+        +TaxTotal : decimal
+        +CreatedAt : DateTime?
+    }
+
+    class Payment <<Entity>> {
+        +PaymentId : long
+        +OrderId : long
+        +MethodLvId : uint
+        +ReceivedAmount : decimal
+        +ChangeAmount : decimal
+        +PaidAt : DateTime?
+    }
+
+    class Dish <<Entity>> {
+        +DishId : long
+        +DishName : string
+        +CategoryId : long
+        +Price : decimal
+    }
+
+    class DishCategory <<Entity>> {
+        +CategoryId : long
+        +CategoryName : string
+    }
+
+    class DishMedium <<Entity>> {
+        +DishId : long
+        +MediaId : long
+        +IsPrimary : bool?
+    }
+
+    class MediaAsset <<Entity>> {
+        +MediaId : long
+        +Url : string
+        +MediaTypeLvId : uint
+    }
+
+    class Customer <<Entity>> {
+        +CustomerId : long
+        +FullName : string
+        +Phone : string
+        +LoyaltyPoints : int?
+    }
+
+    class LookupValue <<Entity>> {
+        +ValueId : uint
+        +TypeId : ushort
+        +ValueCode : string
+        +ValueName : string
+        +IsActive : bool?
+    }
+
+}
+
+' ── Relationships ──
+
+Order "1" *-- "0..*" OrderItem : contains line items
+Order --> "1" LookupValue : order status
+Order "1" *-- "0..*" Payment : paid via
+
+Reservation --> "0..1" Customer : made by
+Reservation --> "1" LookupValue : reservation status
+
+Invoice --> "1" Order : generated for
+Invoice --> "0..1" Customer : billed to
+
+OrderItem --> "1" Dish : refers to dish
+
+Dish --> "1" DishCategory : belongs to category
+Dish *-- "0..*" DishMedium : has media
+DishMedium --> "1" MediaAsset : references file
+
+Payment --> "1" LookupValue : payment method (MethodLvId)
+
+@enduml

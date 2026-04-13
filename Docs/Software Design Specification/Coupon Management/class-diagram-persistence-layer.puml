@@ -1,0 +1,46 @@
+@startuml
+title Coupon Management - Persistence Layer Class Diagram
+
+
+package "Persistence Layer" {
+
+    interface ICouponRepository <<interface>> {
+        +GetActiveCouponsAsync(now: DateTime, ct: CancellationToken): Task<List<Coupon>>
+        +GetAllCouponsAsync(query: CouponListQueryDTO, ct: CancellationToken): Task<PagedResultDTO<CouponDTO>>
+        +GetByIdAsync(id: long, ct: CancellationToken): Task<Coupon?>
+        +GetByCodeAsync(code: string, ct: CancellationToken): Task<Coupon?>
+        +CreateAsync(coupon: Coupon, ct: CancellationToken): Task<Coupon>
+        +UpdateAsync(coupon: Coupon, ct: CancellationToken): Task<Coupon>
+        +DeleteAsync(id: long, ct: CancellationToken): Task<bool>
+    }
+
+    class CouponRepository <<Repository>> {
+        -_context: RestaurantMgmtContext
+        +GetActiveCouponsAsync(now: DateTime, ct: CancellationToken): Task<List<Coupon>>
+        +GetAllCouponsAsync(query: CouponListQueryDTO, ct: CancellationToken): Task<PagedResultDTO<CouponDTO>>
+        +GetByIdAsync(id: long, ct: CancellationToken): Task<Coupon?>
+        +GetByCodeAsync(code: string, ct: CancellationToken): Task<Coupon?>
+        +CreateAsync(coupon: Coupon, ct: CancellationToken): Task<Coupon>
+        +UpdateAsync(coupon: Coupon, ct: CancellationToken): Task<Coupon>
+        +DeleteAsync(id: long, ct: CancellationToken): Task<bool>
+    }
+
+    CouponRepository ..|> ICouponRepository : implements
+}
+
+' External type stubs
+class Coupon <<Entity>>
+class RestaurantMgmtContext <<DbContext>>
+class CouponListQueryDTO <<DTO>>
+class CouponDTO <<DTO>>
+class "PagedResultDTO<CouponDTO>" as PagedResultDTO <<DTO>>
+
+' ── Dependencies ──
+
+CouponRepository --> RestaurantMgmtContext : uses EF Core context
+
+ICouponRepository ..> Coupon : persists
+ICouponRepository ..> CouponListQueryDTO : filters with
+ICouponRepository ..> CouponDTO : projects to
+ICouponRepository ..> PagedResultDTO : returns paged result
+@enduml

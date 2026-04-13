@@ -1,0 +1,52 @@
+@startuml
+title Supplier Management - Application Layer Class Diagram
+skinparam Linetype ortho
+
+package "Application Layer" {
+
+    interface ISupplierService <<interface>> {
+        +GetAllSuppliersAsync(query: SupplierListQueryDTO, ct: CancellationToken): Task<PagedResultDTO<SupplierDto>>
+        +GetSupplierDetailAsync(id: long, ct: CancellationToken): Task<SupplierDetailDto>
+        +CreateSupplierAsync(request: CreateSupplierRequest, ct: CancellationToken): Task<SupplierDto>
+        +UpdateSupplierAsync(id: long, request: UpdateSupplierRequest, ct: CancellationToken): Task<SupplierDto>
+        +DeleteSupplierAsync(id: long, ct: CancellationToken): Task<bool>
+    }
+
+    class SupplierService <<Service>> {
+        -_supplierRepository: ISupplierRepository
+        -_logger: ILogger<SupplierService>
+        +GetAllSuppliersAsync(query: SupplierListQueryDTO, ct: CancellationToken): Task<PagedResultDTO<SupplierDto>>
+        +GetSupplierDetailAsync(id: long, ct: CancellationToken): Task<SupplierDetailDto>
+        +CreateSupplierAsync(request: CreateSupplierRequest, ct: CancellationToken): Task<SupplierDto>
+        +UpdateSupplierAsync(id: long, request: UpdateSupplierRequest, ct: CancellationToken): Task<SupplierDto>
+        +DeleteSupplierAsync(id: long, ct: CancellationToken): Task<bool>
+        -MapToDto(supplier: Supplier): SupplierDto
+    }
+
+    SupplierService ..|> ISupplierService : implements
+}
+
+' External type stubs
+interface ISupplierRepository <<interface>>
+class CreateSupplierRequest <<DTO>>
+class UpdateSupplierRequest <<DTO>>
+class SupplierListQueryDTO <<DTO>>
+class SupplierDto <<DTO>>
+class SupplierDetailDto <<DTO>>
+class IngredientDTO <<DTO>>
+class "PagedResultDTO<SupplierDto>" as PagedResultDTO <<DTO>>
+class Supplier <<Entity>>
+
+' ── Dependencies ──
+
+SupplierService --> ISupplierRepository : uses for persistence
+
+SupplierService ..> CreateSupplierRequest : consumes
+SupplierService ..> UpdateSupplierRequest : consumes
+SupplierService ..> SupplierListQueryDTO : consumes
+SupplierService ..> SupplierDto : produces
+SupplierService ..> SupplierDetailDto : produces
+SupplierService ..> IngredientDTO : produces (in detail)
+SupplierService ..> PagedResultDTO : produces
+SupplierService ..> Supplier : maps from entity
+@enduml

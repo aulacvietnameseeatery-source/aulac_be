@@ -1,0 +1,75 @@
+@startuml
+title Dashboard & Report Module - Application Layer Class Diagram
+
+package "Application Layer" {
+
+    ' ── Dashboard ──
+
+    interface IDashboardService <<interface>> {
+        +GetSummaryAsync(request: DashboardFilterRequest, ct: CancellationToken) : Task<DashboardSummaryDto>
+        +GetRevenueChartAsync(request: DashboardFilterRequest, ct: CancellationToken) : Task<List<RevenueChartItemDto>>
+        +GetTopSellingAsync(request: DashboardFilterRequest, limit: int, ct: CancellationToken) : Task<List<TopSellingItemDto>>
+        +GetStatisticsAsync(request: DashboardFilterRequest, ct: CancellationToken) : Task<DashboardStatisticsDto>
+    }
+
+    class DashboardService <<Service>> {
+        -_dashboardRepository : IDashboardRepository
+        -_lookupResolver : ILookupResolver
+        +GetSummaryAsync(request: DashboardFilterRequest, ct: CancellationToken) : Task<DashboardSummaryDto>
+        +GetRevenueChartAsync(request: DashboardFilterRequest, ct: CancellationToken) : Task<List<RevenueChartItemDto>>
+        +GetTopSellingAsync(request: DashboardFilterRequest, limit: int, ct: CancellationToken) : Task<List<TopSellingItemDto>>
+        +GetStatisticsAsync(request: DashboardFilterRequest, ct: CancellationToken) : Task<DashboardStatisticsDto>
+        -CalculateTrend(current: decimal, previous: decimal) : TrendValueDto
+    }
+
+    ' ── Report ──
+
+    interface IReportService <<interface>> {
+        +GetEarningSummaryAsync(request: ReportFilterRequest, ct: CancellationToken) : Task<EarningSummaryDto>
+        +GetPaymentMethodChartAsync(request: ReportFilterRequest, ct: CancellationToken) : Task<List<PaymentMethodRevenueDto>>
+        +GetEarningTableAsync(request: ReportFilterRequest, pageIndex: int, pageSize: int, ct: CancellationToken) : Task<(List<EarningTableItemDto>, int)>
+        +GetOrderMetricsAsync(request: ReportFilterRequest, ct: CancellationToken) : Task<OrderMetricsDto>
+        +GetSalesItemsAsync(request: ReportFilterRequest, pageIndex: int, pageSize: int, ct: CancellationToken) : Task<(List<SalesItemDto>, int)>
+        +GetTopSpendersAsync(request: ReportFilterRequest, pageIndex: int, pageSize: int, ct: CancellationToken) : Task<(List<TopCustomerDto>, int)>
+        +GetTop5SpendersAsync(startDate: DateTime, endDate: DateTime, ct: CancellationToken) : Task<List<TopCustomerDto>>
+        +GetDailyEarningDetailAsync(date: DateTime, ct: CancellationToken) : Task<DailyEarningDetailDto>
+        +GetDishPerformanceDetailAsync(dishId: long, request: ReportFilterRequest, ct: CancellationToken) : Task<DishPerformanceDetailDto>
+        +GetCustomerProfileDetailAsync(customerId: long, request: ReportFilterRequest, ct: CancellationToken) : Task<CustomerProfileDetailDto>
+    }
+
+    class ReportService <<Service>> {
+        -_reportRepository : IReportRepository
+        -_lookupResolver : ILookupResolver
+        -_logger : ILogger<ReportService>
+        +GetEarningSummaryAsync(request: ReportFilterRequest, ct: CancellationToken) : Task<EarningSummaryDto>
+        +GetPaymentMethodChartAsync(request: ReportFilterRequest, ct: CancellationToken) : Task<List<PaymentMethodRevenueDto>>
+        +GetEarningTableAsync(request: ReportFilterRequest, pageIndex: int, pageSize: int, ct: CancellationToken) : Task<(List<EarningTableItemDto>, int)>
+        +GetOrderMetricsAsync(request: ReportFilterRequest, ct: CancellationToken) : Task<OrderMetricsDto>
+        +GetSalesItemsAsync(request: ReportFilterRequest, pageIndex: int, pageSize: int, ct: CancellationToken) : Task<(List<SalesItemDto>, int)>
+        +GetTopSpendersAsync(request: ReportFilterRequest, pageIndex: int, pageSize: int, ct: CancellationToken) : Task<(List<TopCustomerDto>, int)>
+        +GetTop5SpendersAsync(startDate: DateTime, endDate: DateTime, ct: CancellationToken) : Task<List<TopCustomerDto>>
+        +GetDailyEarningDetailAsync(date: DateTime, ct: CancellationToken) : Task<DailyEarningDetailDto>
+        +GetDishPerformanceDetailAsync(dishId: long, request: ReportFilterRequest, ct: CancellationToken) : Task<DishPerformanceDetailDto>
+        +GetCustomerProfileDetailAsync(customerId: long, request: ReportFilterRequest, ct: CancellationToken) : Task<CustomerProfileDetailDto>
+        -GetOrderStatusIdAsync(statusCode: OrderStatusCode, ct: CancellationToken) : Task<uint>
+    }
+
+}
+
+' ── External stubs ──
+class IDashboardRepository <<interface>>
+class IReportRepository <<interface>>
+class ILookupResolver <<interface>>
+
+' ── Relationships ──
+
+DashboardService ..|> IDashboardService : implements
+ReportService ..|> IReportService : implements
+
+DashboardService --> IDashboardRepository : delegates data queries
+DashboardService --> ILookupResolver : resolves status lookup IDs
+
+ReportService --> IReportRepository : delegates data queries
+ReportService --> ILookupResolver : resolves order status IDs
+
+@enduml

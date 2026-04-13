@@ -1,0 +1,106 @@
+@startuml
+title Supplier Management - Presentation Layer Class Diagram
+
+
+package "Presentation Layer" {
+
+    class SupplierController <<Controller>> {
+        -_supplierService: ISupplierService
+        -_logger: ILogger<SupplierController>
+        +GetAllSuppliers(query: SupplierListQueryDTO): IActionResult
+        +GetSupplierById(id: long): IActionResult
+        +CreateSupplier(request: CreateSupplierRequest): IActionResult
+        +UpdateSupplier(id: long, request: UpdateSupplierRequest): IActionResult
+        +DeleteSupplier(id: long): IActionResult
+    }
+
+    ' ── Request DTOs ──
+
+    class CreateSupplierRequest <<DTO>> {
+        +SupplierName: string
+        +Phone: string?
+        +Email: string?
+        +Address: string?
+        +TaxCode: string?
+        +IngredientIds: List<long>
+    }
+
+    class UpdateSupplierRequest <<DTO>> {
+        +SupplierName: string
+        +Phone: string?
+        +Email: string?
+        +Address: string?
+        +TaxCode: string?
+        +IngredientIds: List<long>
+    }
+
+    class SupplierListQueryDTO <<DTO>> {
+        +Search: string?
+        +PageIndex: int
+        +PageSize: int
+    }
+
+    ' ── Response DTOs ──
+
+    class SupplierDto <<DTO>> {
+        +SupplierId: long
+        +SupplierName: string
+        +Phone: string?
+        +Email: string?
+        +Address: string?
+        +TaxCode: string?
+    }
+
+    class SupplierDetailDto <<DTO>> {
+        +SupplierId: long
+        +SupplierName: string
+        +Phone: string?
+        +Email: string?
+        +Address: string?
+        +TaxCode: string?
+        +Ingredients: List<IngredientDTO>
+    }
+
+    class IngredientDTO <<DTO>> {
+        +IngredientId: long
+        +IngredientName: string
+        +UnitLvId: uint
+    }
+
+    class "PagedResultDTO<T>" as PagedResultDTO <<DTO>> {
+        +PageData: List<T>
+        +PageIndex: int
+        +PageSize: int
+        +TotalCount: int
+        +TotalPage: int
+    }
+
+    class "ApiResponse<T>" as ApiResponse <<DTO>> {
+        +Success: bool
+        +Code: int
+        +SubCode: int
+        +UserMessage: string?
+        +SystemMessage: string?
+        +ValidateInfo: IReadOnlyList<string>
+        +Data: T
+        +ServerTime: DateTimeOffset
+    }
+}
+
+' External type stubs
+interface ISupplierService <<interface>>
+
+' ── Relationships ──
+
+SupplierController --> ISupplierService : uses
+
+SupplierController ..> CreateSupplierRequest : receives
+SupplierController ..> UpdateSupplierRequest : receives
+SupplierController ..> SupplierListQueryDTO : receives
+SupplierController ..> SupplierDto : returns
+SupplierController ..> SupplierDetailDto : returns
+SupplierController ..> PagedResultDTO : returns
+SupplierController ..> ApiResponse : wraps response
+
+SupplierDetailDto *-- "0..*" IngredientDTO : contains
+@enduml

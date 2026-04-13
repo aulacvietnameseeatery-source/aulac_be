@@ -1,0 +1,115 @@
+@startuml
+title Dish Management Module - Persistence Layer Class Diagram
+
+package "Persistence Layer" {
+
+    interface IDishRepository <<interface>> {
+        +FindByIdAsync(dishId: long, ct: CancellationToken) : Task<Dish?>
+        +GetDishByIdAsync(dishId: long, ct: CancellationToken) : Task<Dish?>
+        +FindByIdForActionAsync(id: long, ct: CancellationToken) : Task<Dish?>
+        +ExistsAsync(dishId: long, ct: CancellationToken) : Task<bool>
+        +GetDishesAsync(request: GetDishesRequest, ct: CancellationToken) : Task<(List<Dish>, int)>
+        +AddAsync(dish: Dish, ct: CancellationToken) : Task
+        +UpdateStatusAsync(dishId: long, statusLvId: uint, ct: CancellationToken) : Task
+        +GetAllCategoriesAsync(ct: CancellationToken) : Task<List<string>>
+        +GetDishStatusesAsync(ct: CancellationToken) : Task<List<LookupValue>>
+        +GetActiveDishStatusEntitiesAsync() : Task<List<LookupValue>>
+        +GetAllDishCategoriesAsync() : Task<List<DishCategory>>
+        +GetAllActiveTagsAsync() : Task<List<LookupValue>>
+        +AddDishTagAsync(dishTag: DishTag, ct: CancellationToken) : Task
+        +FindTagByDishIdAsync(id: long, ct: CancellationToken) : Task<List<DishTag>>
+        +GetTagIdsByDishIdAsync(dishId: long, ct: CancellationToken) : Task<List<uint>>
+        +RemoveDishTagsAsync(dishId: long, tagIds: List<uint>, ct: CancellationToken) : Task
+        +GetActiveDishesAsync() : Task<List<Dish>>
+        +GetByIdsAsync(ids: List<long>, ct: CancellationToken) : Task<List<Dish>>
+    }
+
+    class DishRepository <<Repository>> {
+        -_context : RestaurantMgmtContext
+        +FindByIdAsync(dishId: long, ct: CancellationToken) : Task<Dish?>
+        +GetDishByIdAsync(dishId: long, ct: CancellationToken) : Task<Dish?>
+        +FindByIdForActionAsync(id: long, ct: CancellationToken) : Task<Dish?>
+        +ExistsAsync(dishId: long, ct: CancellationToken) : Task<bool>
+        +GetDishesAsync(request: GetDishesRequest, ct: CancellationToken) : Task<(List<Dish>, int)>
+        +AddAsync(dish: Dish, ct: CancellationToken) : Task
+        +UpdateStatusAsync(dishId: long, statusLvId: uint, ct: CancellationToken) : Task
+        +GetAllCategoriesAsync(ct: CancellationToken) : Task<List<string>>
+        +GetDishStatusesAsync(ct: CancellationToken) : Task<List<LookupValue>>
+        +GetActiveDishStatusEntitiesAsync() : Task<List<LookupValue>>
+        +GetAllDishCategoriesAsync() : Task<List<DishCategory>>
+        +GetAllActiveTagsAsync() : Task<List<LookupValue>>
+        +AddDishTagAsync(dishTag: DishTag, ct: CancellationToken) : Task
+        +FindTagByDishIdAsync(id: long, ct: CancellationToken) : Task<List<DishTag>>
+        +GetTagIdsByDishIdAsync(dishId: long, ct: CancellationToken) : Task<List<uint>>
+        +RemoveDishTagsAsync(dishId: long, tagIds: List<uint>, ct: CancellationToken) : Task
+        +GetActiveDishesAsync() : Task<List<Dish>>
+        +GetByIdsAsync(ids: List<long>, ct: CancellationToken) : Task<List<Dish>>
+    }
+
+    interface IDishCategoryRepository <<interface>> {
+        +GetAllCategoriesAsync(query: DishCategoryListQueryDTO, ct: CancellationToken) : Task<PagedResultDTO<DishCategoryDto>>
+        +GetByIdAsync(id: long, ct: CancellationToken) : Task<DishCategory?>
+        +CreateAsync(category: DishCategory, ct: CancellationToken) : Task<DishCategory>
+        +UpdateAsync(category: DishCategory, ct: CancellationToken) : Task<DishCategory>
+        +HasDishesAsync(id: long, ct: CancellationToken) : Task<bool>
+        +ExistsByNameAsync(name: string, excludeId: long?, ct: CancellationToken) : Task<bool>
+        +GetMaxDisplayOrderAsync(ct: CancellationToken) : Task<int>
+    }
+
+    class DishCategoryRepository <<Repository>> {
+        -_context : RestaurantMgmtContext
+        +GetAllCategoriesAsync(query: DishCategoryListQueryDTO, ct: CancellationToken) : Task<PagedResultDTO<DishCategoryDto>>
+        +GetByIdAsync(id: long, ct: CancellationToken) : Task<DishCategory?>
+        +CreateAsync(category: DishCategory, ct: CancellationToken) : Task<DishCategory>
+        +UpdateAsync(category: DishCategory, ct: CancellationToken) : Task<DishCategory>
+        +HasDishesAsync(id: long, ct: CancellationToken) : Task<bool>
+        +ExistsByNameAsync(name: string, excludeId: long?, ct: CancellationToken) : Task<bool>
+        +GetMaxDisplayOrderAsync(ct: CancellationToken) : Task<int>
+    }
+
+    interface IMediaRepository <<interface>> {
+        +AddAsync(asset: MediaAsset, ct: CancellationToken) : Task
+        +AddMediaAsync(media: MediaAsset, ct: CancellationToken) : Task<MediaAsset>
+        +RemoveMediaAsync(media: MediaAsset, ct: CancellationToken) : Task
+    }
+
+    interface IUnitOfWork <<interface>> {
+        +BeginTransactionAsync(ct: CancellationToken) : Task
+        +CommitAsync(ct: CancellationToken) : Task
+        +RollbackAsync(ct: CancellationToken) : Task
+        +SaveChangesAsync(ct: CancellationToken) : Task
+    }
+
+}
+
+' ── External stubs ──
+class RestaurantMgmtContext <<DbContext>>
+class Dish <<Entity>>
+class DishCategory <<Entity>>
+class DishTag <<Entity>>
+class MediaAsset <<Entity>>
+class LookupValue <<Entity>>
+class GetDishesRequest <<DTO>>
+class DishCategoryListQueryDTO <<DTO>>
+class DishCategoryDto <<DTO>>
+
+' ── Relationships ──
+
+DishRepository ..|> IDishRepository : implements
+DishCategoryRepository ..|> IDishCategoryRepository : implements
+
+DishRepository --> RestaurantMgmtContext : uses for data access
+DishCategoryRepository --> RestaurantMgmtContext : uses for data access
+
+DishRepository ..> Dish : queries and persists
+DishRepository ..> DishTag : manages tag associations
+DishRepository ..> LookupValue : reads status and tag lookup values
+DishRepository ..> DishCategory : reads category data
+
+DishCategoryRepository ..> DishCategory : queries and persists
+DishCategoryRepository ..> DishCategoryDto : projects to list DTO
+
+IMediaRepository ..> MediaAsset : manages media assets
+IUnitOfWork ..> RestaurantMgmtContext : coordinates transactions
+
+@enduml
