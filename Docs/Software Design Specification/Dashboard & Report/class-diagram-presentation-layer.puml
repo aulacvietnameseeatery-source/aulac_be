@@ -1,0 +1,145 @@
+@startuml
+title Dashboard & Report Module - Presentation Layer Class Diagram
+
+package "Presentation Layer" {
+
+    class DashboardController <<Controller>> {
+        -_dashboardService : IDashboardService
+        +GetSummary(request: DashboardFilterRequest, ct: CancellationToken) : Task<IActionResult>
+        +GetRevenueChart(request: DashboardFilterRequest, ct: CancellationToken) : Task<IActionResult>
+        +GetTopSelling(request: DashboardFilterRequest, limit: int, ct: CancellationToken) : Task<IActionResult>
+        +GetStatistics(request: DashboardFilterRequest, ct: CancellationToken) : Task<IActionResult>
+    }
+
+    class ReportController <<Controller>> {
+        -_reportService : IReportService
+        -_logger : ILogger<ReportController>
+        +GetEarningSummary(request: ReportFilterRequest, ct: CancellationToken) : Task<IActionResult>
+        +GetPaymentMethods(request: ReportFilterRequest, ct: CancellationToken) : Task<IActionResult>
+        +GetEarningTable(request: ReportFilterRequest, pageIndex: int, pageSize: int, ct: CancellationToken) : Task<IActionResult>
+        +GetOrderMetrics(request: ReportFilterRequest, ct: CancellationToken) : Task<IActionResult>
+        +GetSalesItems(request: ReportFilterRequest, pageIndex: int, pageSize: int, ct: CancellationToken) : Task<IActionResult>
+        +GetTopSpenders(request: ReportFilterRequest, pageIndex: int, pageSize: int, ct: CancellationToken) : Task<IActionResult>
+        +GetTop5Spenders(startDate: DateTime?, endDate: DateTime?, ct: CancellationToken) : Task<IActionResult>
+    }
+
+    ' ── Request DTOs ──
+
+    class DashboardFilterRequest <<DTO>> {
+        +StartDate : DateTime?
+        +EndDate : DateTime?
+    }
+
+    class ReportFilterRequest <<DTO>> {
+        +StartDate : DateTime
+        +EndDate : DateTime
+    }
+
+    ' ── Dashboard Response DTOs ──
+
+    class DashboardSummaryDto <<DTO>> {
+        +TotalOrders : TrendValueDto
+        +TotalSales : TrendValueDto
+        +AverageOrderValue : TrendValueDto
+        +TotalReservations : TrendValueDto
+    }
+
+    class TrendValueDto <<DTO>> {
+        +Value : decimal
+        +Trend : decimal
+        +IsUp : bool
+    }
+
+    class RevenueChartItemDto <<DTO>> {
+        +Date : string
+        +Revenue : decimal
+        +Orders : int
+    }
+
+    class TopSellingItemDto <<DTO>> {
+        +DishId : long
+        +DishName : string
+        +TotalQuantity : int
+        +ImageUrl : string?
+    }
+
+    class DashboardStatisticsDto <<DTO>> {
+        +OrdersByType : Dictionary<string, int>
+        +TopCustomers : DashboardTopCustomerDto?
+    }
+
+    class DashboardTopCustomerDto <<DTO>> {
+        +CustomerId : long
+        +CustomerName : string
+        +Spent : decimal
+    }
+
+    ' ── Report Response DTOs ──
+
+    class EarningSummaryDto <<DTO>> {
+        +GrossRevenue : decimal
+        +NetRevenue : decimal
+        +TotalTax : decimal
+        +TotalDiscount : decimal
+    }
+
+    class PaymentMethodRevenueDto <<DTO>> {
+        +MethodName : string
+        +Amount : decimal
+        +Percentage : double
+    }
+
+    class EarningTableItemDto <<DTO>> {
+        +Date : string
+        +TotalOrders : int
+        +GrossRevenue : decimal
+        +NetRevenue : decimal
+        +TotalTax : decimal
+    }
+
+    class OrderMetricsDto <<DTO>> {
+        +TotalOrders : int
+        +CompletedOrders : int
+        +CancelledOrders : int
+        +CancelRate : double
+    }
+
+    class SalesItemDto <<DTO>> {
+        +DishId : long
+        +DishName : string
+        +CategoryName : string
+        +QuantitySold : int
+        +TotalRevenue : decimal
+    }
+
+    class ReportTopCustomerDto <<DTO>> {
+        +CustomerId : long
+        +CustomerName : string
+        +Phone : string
+        +TotalOrders : int
+        +TotalSpent : decimal
+        +LastVisitDate : DateTime?
+    }
+
+}
+
+' ── Relationships ──
+
+DashboardController --> DashboardFilterRequest : receives in query
+DashboardController ..> DashboardSummaryDto : returns summary
+DashboardController ..> RevenueChartItemDto : returns chart items
+DashboardController ..> TopSellingItemDto : returns top dishes
+DashboardController ..> DashboardStatisticsDto : returns statistics
+
+ReportController --> ReportFilterRequest : receives in query
+ReportController ..> EarningSummaryDto : returns earning summary
+ReportController ..> PaymentMethodRevenueDto : returns payment breakdown
+ReportController ..> EarningTableItemDto : returns paged earning rows
+ReportController ..> OrderMetricsDto : returns order metrics
+ReportController ..> SalesItemDto : returns paged sales items
+ReportController ..> ReportTopCustomerDto : returns paged top customers
+
+DashboardSummaryDto *-- "4" TrendValueDto : wraps trend values
+DashboardStatisticsDto --> "0..1" DashboardTopCustomerDto : top customer snapshot
+
+@enduml

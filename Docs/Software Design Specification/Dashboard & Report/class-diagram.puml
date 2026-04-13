@@ -1,0 +1,487 @@
+@startuml "Dashboard & Report Module - Specification Class Diagram"
+
+!theme plain
+skinparam linetype ortho
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam shadowing false
+
+title Dashboard & Report Module — Specification Class Diagram
+
+' ============================================================
+'  PRESENTATION LAYER
+' ============================================================
+package "Presentation Layer" <<Rectangle>> {
+
+    class DashboardController <<Controller>> {
+        - _dashboardService : IDashboardService
+        + GetSummary(request: DashboardFilterRequest, ct: CancellationToken) : Task<IActionResult>
+        + GetRevenueChart(request: DashboardFilterRequest, ct: CancellationToken) : Task<IActionResult>
+        + GetTopSelling(request: DashboardFilterRequest, limit: int, ct: CancellationToken) : Task<IActionResult>
+        + GetStatistics(request: DashboardFilterRequest, ct: CancellationToken) : Task<IActionResult>
+    }
+
+    class ReportController <<Controller>> {
+        - _reportService : IReportService
+        - _logger : ILogger<ReportController>
+        + GetEarningSummary(request: ReportFilterRequest, ct: CancellationToken) : Task<IActionResult>
+        + GetPaymentMethods(request: ReportFilterRequest, ct: CancellationToken) : Task<IActionResult>
+        + GetEarningTable(request: ReportFilterRequest, pageIndex: int, pageSize: int, ct: CancellationToken) : Task<IActionResult>
+        + GetOrderMetrics(request: ReportFilterRequest, ct: CancellationToken) : Task<IActionResult>
+        + GetSalesItems(request: ReportFilterRequest, pageIndex: int, pageSize: int, ct: CancellationToken) : Task<IActionResult>
+        + GetTopSpenders(request: ReportFilterRequest, pageIndex: int, pageSize: int, ct: CancellationToken) : Task<IActionResult>
+        + GetTop5Spenders(startDate: DateTime?, endDate: DateTime?, ct: CancellationToken) : Task<IActionResult>
+    }
+
+    class ApiResponse<T> <<DTO>> {
+        + Success : bool
+        + Code : int
+        + UserMessage : string?
+        + Data : T
+        + ServerTime : DateTimeOffset
+    }
+
+    ' ── Filter Requests ──
+
+    class DashboardFilterRequest <<DTO>> {
+        + StartDate : DateTime?
+        + EndDate : DateTime?
+    }
+
+    class ReportFilterRequest <<DTO>> {
+        + StartDate : DateTime
+        + EndDate : DateTime
+    }
+
+    ' ── Dashboard Response DTOs ──
+
+    class DashboardSummaryDto <<DTO>> {
+        + TotalOrders : TrendValueDto
+        + TotalSales : TrendValueDto
+        + AverageOrderValue : TrendValueDto
+        + TotalReservations : TrendValueDto
+    }
+
+    class TrendValueDto <<DTO>> {
+        + Value : decimal
+        + Trend : decimal
+        + IsUp : bool
+    }
+
+    class RevenueChartItemDto <<DTO>> {
+        + Date : string
+        + Revenue : decimal
+        + Orders : int
+    }
+
+    class TopSellingItemDto <<DTO>> {
+        + DishId : long
+        + DishName : string
+        + TotalQuantity : int
+        + ImageUrl : string?
+    }
+
+    class DashboardStatisticsDto <<DTO>> {
+        + OrdersByType : Dictionary<string, int>
+        + TopCustomers : DashboardTopCustomerDto?
+    }
+
+    class DashboardTopCustomerDto <<DTO>> {
+        + CustomerId : long
+        + CustomerName : string
+        + Spent : decimal
+    }
+
+    ' ── Report Response DTOs ──
+
+    class EarningSummaryDto <<DTO>> {
+        + GrossRevenue : decimal
+        + NetRevenue : decimal
+        + TotalTax : decimal
+        + TotalDiscount : decimal
+    }
+
+    class PaymentMethodRevenueDto <<DTO>> {
+        + MethodName : string
+        + Amount : decimal
+        + Percentage : double
+    }
+
+    class EarningTableItemDto <<DTO>> {
+        + Date : string
+        + TotalOrders : int
+        + GrossRevenue : decimal
+        + NetRevenue : decimal
+        + TotalTax : decimal
+    }
+
+    class OrderMetricsDto <<DTO>> {
+        + TotalOrders : int
+        + CompletedOrders : int
+        + CancelledOrders : int
+        + CancelRate : double
+    }
+
+    class SalesItemDto <<DTO>> {
+        + DishId : long
+        + DishName : string
+        + CategoryName : string
+        + QuantitySold : int
+        + TotalRevenue : decimal
+    }
+
+    class TopCustomerDto <<DTO>> {
+        + CustomerId : long
+        + CustomerName : string
+        + Phone : string
+        + TotalOrders : int
+        + TotalSpent : decimal
+        + LastVisitDate : DateTime?
+    }
+
+    class DailyEarningDetailDto <<DTO>> {
+        + TotalNet : decimal
+        + AvgOrder : decimal
+        + TotalOrders : int
+        + HourlyRevenue : List<HourlyRevenueDto>
+        + RecentOrders : List<RecentOrderDto>
+    }
+
+    class HourlyRevenueDto <<DTO>> {
+        + Time : string
+        + Revenue : decimal
+    }
+
+    class RecentOrderDto <<DTO>> {
+        + Id : string
+        + Time : string
+        + Customer : string
+        + Amount : decimal
+        + Status : string
+    }
+
+    class DishPerformanceDetailDto <<DTO>> {
+        + TotalRevenue : decimal
+        + TotalSold : int
+        + AvgDailySold : double
+        + Trend : List<SalesTrendDto>
+        + FrequentlyBoughtWith : List<CrossSellItemDto>
+    }
+
+    class SalesTrendDto <<DTO>> {
+        + Date : string
+        + Quantity : int
+    }
+
+    class CrossSellItemDto <<DTO>> {
+        + Id : string
+        + Name : string
+        + Frequency : int
+    }
+
+    class CustomerProfileDetailDto <<DTO>> {
+        + TotalSpent : decimal
+        + TotalOrders : int
+        + AvgOrder : decimal
+        + Points : int
+        + Preferences : List<CategoryPreferenceDto>
+        + RecentOrders : List<RecentOrderDto>
+    }
+
+    class CategoryPreferenceDto <<DTO>> {
+        + Name : string
+        + Value : decimal
+        + Color : string
+    }
+
+    class "PagedResult<T>" as PagedResult <<DTO>> {
+        + PageData : List<T>
+        + PageIndex : int
+        + PageSize : int
+        + TotalCount : int
+        + TotalPage : int
+    }
+}
+
+' ============================================================
+'  APPLICATION LAYER
+' ============================================================
+package "Application Layer" <<Rectangle>> {
+
+    interface IDashboardService <<interface>> {
+        + GetSummaryAsync(request: DashboardFilterRequest, ct: CancellationToken) : Task<DashboardSummaryDto>
+        + GetRevenueChartAsync(request: DashboardFilterRequest, ct: CancellationToken) : Task<List<RevenueChartItemDto>>
+        + GetTopSellingAsync(request: DashboardFilterRequest, limit: int, ct: CancellationToken) : Task<List<TopSellingItemDto>>
+        + GetStatisticsAsync(request: DashboardFilterRequest, ct: CancellationToken) : Task<DashboardStatisticsDto>
+    }
+
+    class DashboardService <<Service>> {
+        - _dashboardRepository : IDashboardRepository
+        - _lookupResolver : ILookupResolver
+        + GetSummaryAsync(request: DashboardFilterRequest, ct: CancellationToken) : Task<DashboardSummaryDto>
+        + GetRevenueChartAsync(request: DashboardFilterRequest, ct: CancellationToken) : Task<List<RevenueChartItemDto>>
+        + GetTopSellingAsync(request: DashboardFilterRequest, limit: int, ct: CancellationToken) : Task<List<TopSellingItemDto>>
+        + GetStatisticsAsync(request: DashboardFilterRequest, ct: CancellationToken) : Task<DashboardStatisticsDto>
+        - CalculateTrend(current: decimal, previous: decimal) : TrendValueDto
+    }
+
+    interface IReportService <<interface>> {
+        + GetEarningSummaryAsync(request: ReportFilterRequest, ct: CancellationToken) : Task<EarningSummaryDto>
+        + GetPaymentMethodChartAsync(request: ReportFilterRequest, ct: CancellationToken) : Task<List<PaymentMethodRevenueDto>>
+        + GetEarningTableAsync(request: ReportFilterRequest, pageIndex: int, pageSize: int, ct: CancellationToken) : Task<(List<EarningTableItemDto>, int)>
+        + GetOrderMetricsAsync(request: ReportFilterRequest, ct: CancellationToken) : Task<OrderMetricsDto>
+        + GetSalesItemsAsync(request: ReportFilterRequest, pageIndex: int, pageSize: int, ct: CancellationToken) : Task<(List<SalesItemDto>, int)>
+        + GetTopSpendersAsync(request: ReportFilterRequest, pageIndex: int, pageSize: int, ct: CancellationToken) : Task<(List<TopCustomerDto>, int)>
+        + GetTop5SpendersAsync(startDate: DateTime, endDate: DateTime, ct: CancellationToken) : Task<List<TopCustomerDto>>
+        + GetDailyEarningDetailAsync(date: DateTime, ct: CancellationToken) : Task<DailyEarningDetailDto>
+        + GetDishPerformanceDetailAsync(dishId: long, request: ReportFilterRequest, ct: CancellationToken) : Task<DishPerformanceDetailDto>
+        + GetCustomerProfileDetailAsync(customerId: long, request: ReportFilterRequest, ct: CancellationToken) : Task<CustomerProfileDetailDto>
+    }
+
+    class ReportService <<Service>> {
+        - _reportRepository : IReportRepository
+        - _lookupResolver : ILookupResolver
+        - _logger : ILogger<ReportService>
+        + GetEarningSummaryAsync(request: ReportFilterRequest, ct: CancellationToken) : Task<EarningSummaryDto>
+        + GetPaymentMethodChartAsync(request: ReportFilterRequest, ct: CancellationToken) : Task<List<PaymentMethodRevenueDto>>
+        + GetEarningTableAsync(request: ReportFilterRequest, pageIndex: int, pageSize: int, ct: CancellationToken) : Task<(List<EarningTableItemDto>, int)>
+        + GetOrderMetricsAsync(request: ReportFilterRequest, ct: CancellationToken) : Task<OrderMetricsDto>
+        + GetSalesItemsAsync(request: ReportFilterRequest, pageIndex: int, pageSize: int, ct: CancellationToken) : Task<(List<SalesItemDto>, int)>
+        + GetTopSpendersAsync(request: ReportFilterRequest, pageIndex: int, pageSize: int, ct: CancellationToken) : Task<(List<TopCustomerDto>, int)>
+        + GetTop5SpendersAsync(startDate: DateTime, endDate: DateTime, ct: CancellationToken) : Task<List<TopCustomerDto>>
+        + GetDailyEarningDetailAsync(date: DateTime, ct: CancellationToken) : Task<DailyEarningDetailDto>
+        + GetDishPerformanceDetailAsync(dishId: long, request: ReportFilterRequest, ct: CancellationToken) : Task<DishPerformanceDetailDto>
+        + GetCustomerProfileDetailAsync(customerId: long, request: ReportFilterRequest, ct: CancellationToken) : Task<CustomerProfileDetailDto>
+        - GetOrderStatusIdAsync(statusCode: OrderStatusCode, ct: CancellationToken) : Task<uint>
+    }
+
+    interface ILookupResolver <<interface>> {
+        + GetIdAsync(typeId: ushort, valueCode: string, ct: CancellationToken) : Task<uint>
+    }
+}
+
+' ============================================================
+'  PERSISTENCE LAYER
+' ============================================================
+package "Persistence Layer" <<Rectangle>> {
+
+    interface IDashboardRepository <<interface>> {
+        + GetSummaryDataAsync(startDate: DateTime, endDate: DateTime, completedOrderStatusId: uint, completedReservationStatusId: uint, ct: CancellationToken) : Task<(int, decimal, int)>
+        + GetRevenueChartAsync(startDate: DateTime, endDate: DateTime, completedOrderStatusId: uint, ct: CancellationToken) : Task<List<RevenueChartItemDto>>
+        + GetTopSellingAsync(startDate: DateTime, endDate: DateTime, completedOrderStatusId: uint, imageMediaTypeId: uint, limit: int, ct: CancellationToken) : Task<List<TopSellingItemDto>>
+        + GetStatisticsAsync(startDate: DateTime, endDate: DateTime, completedOrderStatusId: uint, ct: CancellationToken) : Task<DashboardStatisticsDto>
+    }
+
+    class DashboardRepository <<Repository>> {
+        - _context : RestaurantMgmtContext
+        + GetSummaryDataAsync(startDate: DateTime, endDate: DateTime, completedOrderStatusId: uint, completedReservationStatusId: uint, ct: CancellationToken) : Task<(int, decimal, int)>
+        + GetRevenueChartAsync(startDate: DateTime, endDate: DateTime, completedOrderStatusId: uint, ct: CancellationToken) : Task<List<RevenueChartItemDto>>
+        + GetTopSellingAsync(startDate: DateTime, endDate: DateTime, completedOrderStatusId: uint, imageMediaTypeId: uint, limit: int, ct: CancellationToken) : Task<List<TopSellingItemDto>>
+        + GetStatisticsAsync(startDate: DateTime, endDate: DateTime, completedOrderStatusId: uint, ct: CancellationToken) : Task<DashboardStatisticsDto>
+    }
+
+    interface IReportRepository <<interface>> {
+        + GetEarningSummaryAsync(startDate: DateTime, endDate: DateTime, completedStatusId: uint, ct: CancellationToken) : Task<EarningSummaryDto>
+        + GetPaymentMethodChartAsync(startDate: DateTime, endDate: DateTime, completedStatusId: uint, ct: CancellationToken) : Task<List<PaymentMethodRevenueDto>>
+        + GetEarningTableAsync(startDate: DateTime, endDate: DateTime, completedStatusId: uint, skip: int, take: int, ct: CancellationToken) : Task<(List<EarningTableItemDto>, int)>
+        + GetOrderMetricsAsync(startDate: DateTime, endDate: DateTime, completedStatusId: uint, cancelledStatusId: uint, ct: CancellationToken) : Task<OrderMetricsDto>
+        + GetSalesItemsAsync(startDate: DateTime, endDate: DateTime, completedStatusId: uint, skip: int, take: int, ct: CancellationToken) : Task<(List<SalesItemDto>, int)>
+        + GetTopSpendersAsync(startDate: DateTime, endDate: DateTime, completedStatusId: uint, skip: int, take: int, ct: CancellationToken) : Task<(List<TopCustomerDto>, int)>
+        + GetDashboardTopSpendersAsync(startDate: DateTime, endDate: DateTime, completedStatusId: uint, ct: CancellationToken) : Task<List<TopCustomerDto>>
+        + GetDailyEarningDetailAsync(targetDate: DateTime, completedStatusId: uint, ct: CancellationToken) : Task<DailyEarningDetailDto>
+        + GetDishPerformanceDetailAsync(dishId: long, startDate: DateTime, endDate: DateTime, completedStatusId: uint, ct: CancellationToken) : Task<DishPerformanceDetailDto>
+        + GetCustomerProfileDetailAsync(customerId: long, startDate: DateTime, endDate: DateTime, completedStatusId: uint, ct: CancellationToken) : Task<CustomerProfileDetailDto>
+    }
+
+    class ReportRepository <<Repository>> {
+        - _context : RestaurantMgmtContext
+        + GetEarningSummaryAsync(startDate: DateTime, endDate: DateTime, completedStatusId: uint, ct: CancellationToken) : Task<EarningSummaryDto>
+        + GetPaymentMethodChartAsync(startDate: DateTime, endDate: DateTime, completedStatusId: uint, ct: CancellationToken) : Task<List<PaymentMethodRevenueDto>>
+        + GetEarningTableAsync(startDate: DateTime, endDate: DateTime, completedStatusId: uint, skip: int, take: int, ct: CancellationToken) : Task<(List<EarningTableItemDto>, int)>
+        + GetOrderMetricsAsync(startDate: DateTime, endDate: DateTime, completedStatusId: uint, cancelledStatusId: uint, ct: CancellationToken) : Task<OrderMetricsDto>
+        + GetSalesItemsAsync(startDate: DateTime, endDate: DateTime, completedStatusId: uint, skip: int, take: int, ct: CancellationToken) : Task<(List<SalesItemDto>, int)>
+        + GetTopSpendersAsync(startDate: DateTime, endDate: DateTime, completedStatusId: uint, skip: int, take: int, ct: CancellationToken) : Task<(List<TopCustomerDto>, int)>
+        + GetDashboardTopSpendersAsync(startDate: DateTime, endDate: DateTime, completedStatusId: uint, ct: CancellationToken) : Task<List<TopCustomerDto>>
+        + GetDailyEarningDetailAsync(targetDate: DateTime, completedStatusId: uint, ct: CancellationToken) : Task<DailyEarningDetailDto>
+        + GetDishPerformanceDetailAsync(dishId: long, startDate: DateTime, endDate: DateTime, completedStatusId: uint, ct: CancellationToken) : Task<DishPerformanceDetailDto>
+        + GetCustomerProfileDetailAsync(customerId: long, startDate: DateTime, endDate: DateTime, completedStatusId: uint, ct: CancellationToken) : Task<CustomerProfileDetailDto>
+    }
+
+    class RestaurantMgmtContext <<DbContext>> {
+        + Orders : DbSet<Order>
+        + OrderItems : DbSet<OrderItem>
+        + Reservations : DbSet<Reservation>
+        + Payments : DbSet<Payment>
+        + Dishes : DbSet<Dish>
+        + Customers : DbSet<Customer>
+    }
+}
+
+' ============================================================
+'  DOMAIN LAYER
+' ============================================================
+package "Domain Layer" <<Rectangle>> {
+
+    class Order <<Entity>> {
+        + OrderId : long
+        + OrderStatusLvId : uint
+        + TotalAmount : decimal
+        + SubTotalAmount : decimal
+        + TaxAmount : decimal
+        + CreatedAt : DateTime?
+    }
+
+    class OrderItem <<Entity>> {
+        + OrderItemId : long
+        + OrderId : long
+        + DishId : long
+        + Quantity : int
+        + UnitPrice : decimal
+    }
+
+    class Reservation <<Entity>> {
+        + ReservationId : long
+        + ReservationStatusLvId : uint
+        + ReservedTime : DateTime
+        + CustomerId : long?
+    }
+
+    class Payment <<Entity>> {
+        + PaymentId : long
+        + OrderId : long
+        + MethodLvId : uint
+        + ReceivedAmount : decimal
+        + ChangeAmount : decimal
+        + PaidAt : DateTime?
+    }
+
+    class Dish <<Entity>> {
+        + DishId : long
+        + DishName : string
+        + CategoryId : long
+        + Price : decimal
+    }
+
+    class DishMedium <<Entity>> {
+        + DishId : long
+        + MediaId : long
+        + IsPrimary : bool?
+    }
+
+    class MediaAsset <<Entity>> {
+        + MediaId : long
+        + Url : string
+        + MediaTypeLvId : uint
+    }
+
+    class Customer <<Entity>> {
+        + CustomerId : long
+        + FullName : string
+        + Phone : string
+        + LoyaltyPoints : int?
+    }
+
+    class LookupValue <<Entity>> {
+        + ValueId : uint
+        + TypeId : ushort
+        + ValueCode : string
+        + ValueName : string
+        + IsActive : bool?
+    }
+}
+
+' ============================================================
+'  RELATIONSHIPS
+' ============================================================
+
+' --- Presentation → Application ---
+DashboardController --> IDashboardService : uses
+ReportController --> IReportService : uses
+
+' --- Presentation → DTOs ---
+DashboardController ..> DashboardFilterRequest : receives
+DashboardController ..> DashboardSummaryDto : returns
+DashboardController ..> RevenueChartItemDto : returns
+DashboardController ..> TopSellingItemDto : returns
+DashboardController ..> DashboardStatisticsDto : returns
+DashboardController ..> ApiResponse : wraps response
+
+ReportController ..> ReportFilterRequest : receives
+ReportController ..> EarningSummaryDto : returns
+ReportController ..> PaymentMethodRevenueDto : returns
+ReportController ..> EarningTableItemDto : returns
+ReportController ..> OrderMetricsDto : returns
+ReportController ..> SalesItemDto : returns
+ReportController ..> TopCustomerDto : returns
+ReportController ..> PagedResult : paginates results
+ReportController ..> ApiResponse : wraps response
+
+' --- Application: realization ---
+DashboardService ..|> IDashboardService
+ReportService ..|> IReportService
+
+' --- Application → Persistence ---
+DashboardService --> IDashboardRepository : uses
+DashboardService --> ILookupResolver : uses
+ReportService --> IReportRepository : uses
+ReportService --> ILookupResolver : uses
+
+' --- Application → DTOs ---
+DashboardService ..> DashboardSummaryDto : creates
+DashboardService ..> TrendValueDto : creates
+DashboardService ..> RevenueChartItemDto : returns
+DashboardService ..> TopSellingItemDto : returns
+DashboardService ..> DashboardStatisticsDto : returns
+
+ReportService ..> EarningSummaryDto : returns
+ReportService ..> PaymentMethodRevenueDto : returns
+ReportService ..> EarningTableItemDto : returns
+ReportService ..> OrderMetricsDto : returns
+ReportService ..> SalesItemDto : returns
+ReportService ..> TopCustomerDto : returns
+ReportService ..> DailyEarningDetailDto : returns
+ReportService ..> DishPerformanceDetailDto : returns
+ReportService ..> CustomerProfileDetailDto : returns
+
+' --- Persistence: realization ---
+DashboardRepository ..|> IDashboardRepository
+ReportRepository ..|> IReportRepository
+
+' --- Persistence → DbContext ---
+DashboardRepository --> RestaurantMgmtContext : uses
+ReportRepository --> RestaurantMgmtContext : uses
+
+' --- Persistence → Domain ---
+IDashboardRepository ..> Order : aggregates orders
+IDashboardRepository ..> Reservation : counts reservations
+IDashboardRepository ..> OrderItem : joins for top dishes
+IDashboardRepository ..> Dish : resolves dish names
+IDashboardRepository ..> DishMedium : resolves images
+
+IReportRepository ..> Order : aggregates revenue
+IReportRepository ..> OrderItem : aggregates per-dish sales
+IReportRepository ..> Payment : groups by method
+IReportRepository ..> Dish : joins for dish details
+IReportRepository ..> Customer : joins for customer data
+IReportRepository ..> LookupValue : reads method names
+
+' --- Domain: entity relationships ---
+Order "1" *-- "0..*" OrderItem : contains
+Order "1" *-- "0..*" Payment : paid via
+Order --> "1" LookupValue : order status
+OrderItem --> "1" Dish : refers to
+Dish *-- "0..*" DishMedium : has media
+DishMedium --> "1" MediaAsset : references
+Payment --> "1" LookupValue : payment method
+Reservation --> "0..1" Customer : made by
+Reservation --> "1" LookupValue : reservation status
+DashboardSummaryDto *-- "4" TrendValueDto : wraps trends
+DashboardStatisticsDto --> "0..1" DashboardTopCustomerDto : top customer
+DailyEarningDetailDto *-- "0..*" HourlyRevenueDto : hourly breakdown
+DailyEarningDetailDto *-- "0..*" RecentOrderDto : recent orders
+DishPerformanceDetailDto *-- "0..*" SalesTrendDto : sales trend
+DishPerformanceDetailDto *-- "0..*" CrossSellItemDto : cross-sell items
+CustomerProfileDetailDto *-- "0..*" CategoryPreferenceDto : preferences
+CustomerProfileDetailDto *-- "0..*" RecentOrderDto : recent orders
+
+@enduml

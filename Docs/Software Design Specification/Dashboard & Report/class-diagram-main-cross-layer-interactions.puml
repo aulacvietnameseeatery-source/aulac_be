@@ -1,0 +1,106 @@
+@startuml
+title Dashboard & Report Module - Main Cross-Layer Interactions
+
+package "Presentation Layer" {
+    class DashboardController <<Controller>> {
+        -_dashboardService : IDashboardService
+        +GetSummary(request, ct) : Task<IActionResult>
+        +GetRevenueChart(request, ct) : Task<IActionResult>
+        +GetTopSelling(request, limit, ct) : Task<IActionResult>
+        +GetStatistics(request, ct) : Task<IActionResult>
+    }
+
+    class ReportController <<Controller>> {
+        -_reportService : IReportService
+        +GetEarningSummary(request, ct) : Task<IActionResult>
+        +GetPaymentMethods(request, ct) : Task<IActionResult>
+        +GetEarningTable(request, pageIndex, pageSize, ct) : Task<IActionResult>
+        +GetOrderMetrics(request, ct) : Task<IActionResult>
+        +GetSalesItems(request, pageIndex, pageSize, ct) : Task<IActionResult>
+        +GetTopSpenders(request, pageIndex, pageSize, ct) : Task<IActionResult>
+    }
+}
+
+package "Application Layer" {
+    interface IDashboardService <<interface>> {
+        +GetSummaryAsync(request, ct) : Task<DashboardSummaryDto>
+        +GetRevenueChartAsync(request, ct) : Task<List<RevenueChartItemDto>>
+        +GetTopSellingAsync(request, limit, ct) : Task<List<TopSellingItemDto>>
+        +GetStatisticsAsync(request, ct) : Task<DashboardStatisticsDto>
+    }
+
+    class DashboardService <<Service>> {
+        -_dashboardRepository : IDashboardRepository
+        -_lookupResolver : ILookupResolver
+        -CalculateTrend(current, previous) : TrendValueDto
+    }
+
+    interface IReportService <<interface>> {
+        +GetEarningSummaryAsync(request, ct) : Task<EarningSummaryDto>
+        +GetPaymentMethodChartAsync(request, ct) : Task<List<PaymentMethodRevenueDto>>
+        +GetEarningTableAsync(request, pageIndex, pageSize, ct) : Task<(List<EarningTableItemDto>, int)>
+        +GetOrderMetricsAsync(request, ct) : Task<OrderMetricsDto>
+        +GetSalesItemsAsync(request, pageIndex, pageSize, ct) : Task<(List<SalesItemDto>, int)>
+        +GetTopSpendersAsync(request, pageIndex, pageSize, ct) : Task<(List<TopCustomerDto>, int)>
+        +GetDailyEarningDetailAsync(date, ct) : Task<DailyEarningDetailDto>
+        +GetDishPerformanceDetailAsync(dishId, request, ct) : Task<DishPerformanceDetailDto>
+        +GetCustomerProfileDetailAsync(customerId, request, ct) : Task<CustomerProfileDetailDto>
+    }
+
+    class ReportService <<Service>> {
+        -_reportRepository : IReportRepository
+        -_lookupResolver : ILookupResolver
+        -GetOrderStatusIdAsync(statusCode, ct) : Task<uint>
+    }
+}
+
+package "Persistence Layer" {
+    interface IDashboardRepository <<interface>> {
+        +GetSummaryDataAsync(start, end, orderStatusId, reservationStatusId, ct) : Task<(int, decimal, int)>
+        +GetRevenueChartAsync(start, end, completedStatusId, ct) : Task<List<RevenueChartItemDto>>
+        +GetTopSellingAsync(start, end, completedStatusId, imageTypeId, limit, ct) : Task<List<TopSellingItemDto>>
+        +GetStatisticsAsync(start, end, completedStatusId, ct) : Task<DashboardStatisticsDto>
+    }
+
+    class DashboardRepository <<Repository>> {
+        -_context : RestaurantMgmtContext
+    }
+
+    interface IReportRepository <<interface>> {
+        +GetEarningSummaryAsync(start, end, completedId, ct) : Task<EarningSummaryDto>
+        +GetPaymentMethodChartAsync(start, end, completedId, ct) : Task<List<PaymentMethodRevenueDto>>
+        +GetEarningTableAsync(start, end, completedId, skip, take, ct) : Task<(List<EarningTableItemDto>, int)>
+        +GetOrderMetricsAsync(start, end, completedId, cancelledId, ct) : Task<OrderMetricsDto>
+        +GetSalesItemsAsync(start, end, completedId, skip, take, ct) : Task<(List<SalesItemDto>, int)>
+        +GetTopSpendersAsync(start, end, completedId, skip, take, ct) : Task<(List<TopCustomerDto>, int)>
+        +GetDailyEarningDetailAsync(date, completedId, ct) : Task<DailyEarningDetailDto>
+        +GetDishPerformanceDetailAsync(dishId, start, end, completedId, ct) : Task<DishPerformanceDetailDto>
+        +GetCustomerProfileDetailAsync(customerId, start, end, completedId, ct) : Task<CustomerProfileDetailDto>
+    }
+
+    class ReportRepository <<Repository>> {
+        -_context : RestaurantMgmtContext
+    }
+}
+
+' ── External stubs ──
+class RestaurantMgmtContext <<DbContext>>
+class ILookupResolver <<interface>>
+
+' ── Relationships ──
+
+DashboardController --> IDashboardService : calls
+DashboardService ..|> IDashboardService : implements
+DashboardService --> IDashboardRepository : queries data
+DashboardService --> ILookupResolver : resolves status IDs
+DashboardRepository ..|> IDashboardRepository : implements
+DashboardRepository --> RestaurantMgmtContext : queries via EF Core
+
+ReportController --> IReportService : calls
+ReportService ..|> IReportService : implements
+ReportService --> IReportRepository : queries data
+ReportService --> ILookupResolver : resolves order status IDs
+ReportRepository ..|> IReportRepository : implements
+ReportRepository --> RestaurantMgmtContext : queries via EF Core
+
+@enduml

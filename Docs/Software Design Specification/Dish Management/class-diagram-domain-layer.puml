@@ -1,0 +1,102 @@
+@startuml
+title Dish Management Module - Domain Layer Class Diagram
+
+package "Domain Layer" {
+
+    enum DishStatusCode <<enum>> {
+        AVAILABLE
+        OUT_OF_STOCK
+        HIDDEN
+    }
+
+    class Dish <<Entity>> {
+        +DishId : long
+        +CategoryId : long
+        +DishName : string
+        +Price : decimal
+        +DishStatusLvId : uint
+        +Description : string?
+        +Slogan : string?
+        +Note : string?
+        +ShortDescription : string?
+        +Calories : int?
+        +PrepTimeMinutes : int?
+        +CookTimeMinutes : int?
+        +DisplayOrder : sbyte?
+        +ChefRecommended : bool?
+        +IsOnline : bool?
+        +CreatedAt : DateTime?
+        +DishNameTextId : long
+        +DescriptionTextId : long?
+        +SloganTextId : long?
+        +NoteTextId : long?
+        +ShortDescriptionTextId : long?
+    }
+
+    class DishCategory <<Entity>> {
+        +CategoryId : long
+        +CategoryName : string
+        +Description : string?
+        +DisPlayOrder : int
+        +IsDisabled : bool
+        +CategoryNameTextId : long?
+        +DescriptionTextId : long?
+    }
+
+    class DishMedium <<Entity>> {
+        +DishId : long
+        +MediaId : long
+        +IsPrimary : bool?
+    }
+
+    class DishTag <<Entity>> {
+        +DishTagId : long
+        +DishId : long
+        +TagId : uint
+    }
+
+    class MediaAsset <<Entity>> {
+        +MediaId : long
+        +Url : string
+        +MimeType : string?
+        +Width : int?
+        +Height : int?
+        +DurationSec : int?
+        +CreatedAt : DateTime?
+        +MediaTypeLvId : uint
+    }
+
+    class I18nText <<Entity>> {
+        +TextId : long
+        +Key : string
+    }
+
+    class LookupValue <<Entity>> {
+        +ValueId : uint
+        +TypeId : ushort
+        +ValueCode : string
+        +ValueName : string
+        +SortOrder : short
+        +IsActive : bool?
+    }
+
+}
+
+' ── Relationships ──
+
+Dish --> "1" DishCategory : belongs to category
+Dish *-- "0..*" DishMedium : contains media
+Dish *-- "0..*" DishTag : tagged with
+Dish --> "1" LookupValue : dish status (DishStatusLvId)
+Dish --> "1" I18nText : dish name translation
+Dish --> "0..1" I18nText : description translation
+Dish --> "0..1" I18nText : slogan translation
+
+DishCategory --> "0..1" I18nText : category name translation
+DishCategory --> "0..1" I18nText : description translation
+DishCategory "1" o-- "0..*" Dish : groups dishes
+
+DishMedium --> "1" MediaAsset : references media file
+DishTag --> "1" LookupValue : tag value
+
+@enduml

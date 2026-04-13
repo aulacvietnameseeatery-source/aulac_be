@@ -1,0 +1,543 @@
+@startuml "Dish Management Module - Specification Class Diagram"
+
+!theme plain
+skinparam linetype ortho
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam shadowing false
+
+title Dish Management Module — Specification Class Diagram
+
+' ============================================================
+'  PRESENTATION LAYER
+' ============================================================
+package "Presentation Layer" <<Rectangle>> {
+
+    class DishController <<Controller>> {
+        - _dishService : IDishService
+        - _lookupService : ILookupService
+        + GetDishById(id: long, lang: string?, ct: CancellationToken) : Task<IActionResult>
+        + GetDishesForAdmin(request: GetDishesRequest, ct: CancellationToken) : Task<IActionResult>
+        + GetMenuForCustomer(request: GetDishesRequest, ct: CancellationToken) : Task<IActionResult>
+        + GetAllCategories(ct: CancellationToken) : Task<IActionResult>
+        + GetDishStatuses(ct: CancellationToken) : Task<IActionResult>
+        + UpdateDishStatus(id: long, request: UpdateDishStatusRequest, ct: CancellationToken) : Task<IActionResult>
+        + CreateDish(request: DishFormRequest, ct: CancellationToken) : Task<IActionResult>
+        + UpdateDish(id: long, request: DishFormRequest, ct: CancellationToken) : Task<IActionResult>
+        + GetDishForActions(id: long, ct: CancellationToken) : Task<IActionResult>
+        + GetActiveDishStatuses(ct: CancellationToken) : Task<IActionResult>
+        + GetAllDishCategories(ct: CancellationToken) : Task<IActionResult>
+        + GetAllActiveTags(ct: CancellationToken) : Task<IActionResult>
+    }
+
+    class DishCategoryController <<Controller>> {
+        - _dishCategoryService : IDishCategoryService
+        + GetAllCategories(query: DishCategoryListQueryDTO, ct: CancellationToken) : Task<IActionResult>
+        + GetCategoryById(id: long, ct: CancellationToken) : Task<IActionResult>
+        + CreateCategory(request: CreateDishCategoryRequest, ct: CancellationToken) : Task<IActionResult>
+        + UpdateCategory(id: long, request: UpdateDishCategoryRequest, ct: CancellationToken) : Task<IActionResult>
+        + ToggleCategoryStatus(id: long, isDisabled: bool, ct: CancellationToken) : Task<IActionResult>
+    }
+
+    ' ── Request DTOs ──
+
+    class GetDishesRequest <<DTO>> {
+        + PageIndex : int
+        + PageSize : int
+        + Search : string?
+        + Category : string?
+        + Status : DishStatusCode?
+        + SortBy : string?
+        + IsDescending : bool
+        + IsCustomerView : bool
+        + Locale : string?
+    }
+
+    class UpdateDishStatusRequest <<DTO>> {
+        + Status : DishStatusCode
+    }
+
+    class CreateDishRequest <<DTO>> {
+        + CategoryId : long
+        + Price : decimal
+        + IsOnline : bool
+        + ChefRecommended : bool
+        + Calories : int?
+        + PrepTimeMinutes : int?
+        + CookTimeMinutes : int?
+        + DishStatusLvId : uint
+        + TagIds : List<uint>
+        + I18n : Dictionary<string, DishI18nDto>
+    }
+
+    class UpdateDishRequest <<DTO>> {
+        + DishId : long
+        + CategoryId : long
+        + Price : decimal
+        + IsOnline : bool
+        + ChefRecommended : bool
+        + Calories : int?
+        + PrepTimeMinutes : int?
+        + CookTimeMinutes : int?
+        + DishStatusLvId : uint
+        + TagIds : List<uint>
+        + I18n : Dictionary<string, DishI18nDto>
+    }
+
+    class DishCategoryListQueryDTO <<DTO>> {
+        + Search : string?
+        + IsDisabled : bool?
+        + PageIndex : int
+        + PageSize : int
+    }
+
+    class CreateDishCategoryRequest <<DTO>> {
+        + I18n : Dictionary<string, CategoryI18nDto>
+        + IsDisabled : bool
+    }
+
+    class UpdateDishCategoryRequest <<DTO>> {
+        + I18n : Dictionary<string, CategoryI18nDto>
+        + IsDisabled : bool
+    }
+
+    class DishI18nDto <<DTO>> {
+        + DishName : string
+        + Description : string?
+        + Slogan : string?
+        + Note : string?
+        + ShortDescription : string?
+    }
+
+    ' ── Response DTOs ──
+
+    class DishDetailDto <<DTO>> {
+        + DishId : long
+        + DishName : string
+        + Price : decimal
+        + CategoryName : string
+        + Description : string?
+        + ShortDescription : string?
+        + Slogan : string?
+        + Calories : int?
+        + PrepTimeMinutes : int?
+        + CookTimeMinutes : int?
+        + ImageUrls : List<string>
+        + VideoUrl : string?
+    }
+
+    class DishDetailForActionsDto <<DTO>> {
+        + DishId : long
+        + CategoryId : long
+        + CategoryName : Dictionary<string, string>
+        + Price : decimal
+        + DishStatusLvId : uint
+        + DishStatus : Dictionary<string, string>
+        + TagIds : List<uint>
+        + IsOnline : bool
+        + ChefRecommended : bool
+        + Calories : int?
+        + PrepTimeMinutes : int?
+        + CookTimeMinutes : int?
+        + I18n : Dictionary<string, DishI18nDto>
+        + Media : List<DishMediaDto>
+    }
+
+    class DishManagementDto <<DTO>> {
+        + DishId : long
+        + DishName : string
+        + CategoryName : string
+        + NameI18n : I18nTextDto
+        + Price : decimal
+        + Status : string
+        + StatusId : long
+        + IsOnline : bool
+        + CreatedAt : DateTime?
+    }
+
+    class DishDisplayDto <<DTO>> {
+        + DishId : long
+        + DishName : I18nTextDto
+        + CategoryId : long
+        + Price : decimal
+        + CategoryName : I18nTextDto
+        + Description : I18nTextDto?
+        + ImageUrl : string?
+        + IsChefRecommended : bool
+    }
+
+    class DishStatusDto <<DTO>> {
+        + DishId : long
+        + DishName : string
+        + StatusCode : DishStatusCode
+        + StatusId : uint
+        + StatusName : string
+        + UpdatedAt : DateTime
+    }
+
+    class ActiveDishStatusDto <<DTO>> {
+        + DishStatusLvId : uint
+        + ValueName : string
+        + ValueCode : string
+    }
+
+    class DishCategorySimpleDto <<DTO>> {
+        + CategoryId : long
+        + NameVi : string
+        + NameEn : string
+        + NameFr : string
+    }
+
+    class DishTagDto <<DTO>> {
+        + TagId : uint
+        + Code : string
+        + Name : string
+        + NameI18n : I18nTextDto
+    }
+
+    class DishMediaDto <<DTO>> {
+        + MediaId : long
+        + Url : string
+        + MediaType : string
+        + IsPrimary : bool
+    }
+
+    class DishCategoryDto <<DTO>> {
+        + CategoryId : long
+        + CategoryName : string
+        + Description : string?
+        + IsDisabled : bool
+        + NameI18n : I18nTextDto
+        + DescriptionI18n : I18nTextDto
+    }
+
+    class I18nTextDto <<DTO>> {
+        + Vi : string?
+        + En : string?
+        + Fr : string?
+    }
+
+    class "PagedResultDTO<T>" as PagedResultDTO <<DTO>> {
+        + PageData : List<T>
+        + PageIndex : int
+        + PageSize : int
+        + TotalCount : int
+        + TotalPage : int
+    }
+}
+
+' ============================================================
+'  APPLICATION LAYER
+' ============================================================
+package "Application Layer" <<Rectangle>> {
+
+    interface IDishService <<interface>> {
+        + GetDishByIdAsync(id: long, langCode: string?, ct: CancellationToken) : Task<DishDetailDto?>
+        + GetDishByIdAsync(dishId: long, ct: CancellationToken) : Task<DishDetailForActionsDto>
+        + GetDishesForAdminAsync(request: GetDishesRequest, ct: CancellationToken) : Task<(List<DishManagementDto>, int)>
+        + GetDishesForCustomerAsync(request: GetDishesRequest, ct: CancellationToken) : Task<(List<DishDisplayDto>, int)>
+        + CreateDishAsync(request: CreateDishRequest, staticImages: IReadOnlyList<MediaFileInput>, images360: IReadOnlyList<MediaFileInput>, video: MediaFileInput?, ct: CancellationToken) : Task<long>
+        + UpdateDishAsync(request: UpdateDishRequest, staticImages: IReadOnlyList<MediaFileInput>, images360: IReadOnlyList<MediaFileInput>, video: MediaFileInput?, removedMediaIds: IReadOnlyList<long>, ct: CancellationToken) : Task
+        + UpdateDishStatusAsync(dishId: long, newStatus: DishStatusCode, ct: CancellationToken) : Task<DishStatusDto>
+        + GetAllCategoriesAsync(ct: CancellationToken) : Task<List<string>>
+        + GetDishStatusesAsync(ct: CancellationToken) : Task<List<DishStatusDto>>
+        + GetActiveDishStatusesAsync() : Task<List<ActiveDishStatusDto>>
+        + GetAllDishCategoriesAsync() : Task<List<DishCategorySimpleDto>>
+        + GetAllActiveTagsAsync() : Task<List<DishTagDto>>
+    }
+
+    class DishService <<Service>> {
+        - _dishRepository : IDishRepository
+        - _lookupResolver : ILookupResolver
+        - _dishI18nService : IDishI18nService
+        - _mediaRepo : IMediaRepository
+        - _uow : IUnitOfWork
+        - _fileStorage : IFileStorage
+        - _systemSettingService : ISystemSettingService
+        + GetDishByIdAsync(id: long, langCode: string?, ct: CancellationToken) : Task<DishDetailDto?>
+        + GetDishByIdAsync(dishId: long, ct: CancellationToken) : Task<DishDetailForActionsDto>
+        + GetDishesForAdminAsync(request: GetDishesRequest, ct: CancellationToken) : Task<(List<DishManagementDto>, int)>
+        + GetDishesForCustomerAsync(request: GetDishesRequest, ct: CancellationToken) : Task<(List<DishDisplayDto>, int)>
+        + CreateDishAsync(request: CreateDishRequest, staticImages: IReadOnlyList<MediaFileInput>, images360: IReadOnlyList<MediaFileInput>, video: MediaFileInput?, ct: CancellationToken) : Task<long>
+        + UpdateDishAsync(request: UpdateDishRequest, staticImages: IReadOnlyList<MediaFileInput>, images360: IReadOnlyList<MediaFileInput>, video: MediaFileInput?, removedMediaIds: IReadOnlyList<long>, ct: CancellationToken) : Task
+        + UpdateDishStatusAsync(dishId: long, newStatus: DishStatusCode, ct: CancellationToken) : Task<DishStatusDto>
+        + GetAllCategoriesAsync(ct: CancellationToken) : Task<List<string>>
+        + GetDishStatusesAsync(ct: CancellationToken) : Task<List<DishStatusDto>>
+        + GetActiveDishStatusesAsync() : Task<List<ActiveDishStatusDto>>
+        + GetAllDishCategoriesAsync() : Task<List<DishCategorySimpleDto>>
+        + GetAllActiveTagsAsync() : Task<List<DishTagDto>>
+    }
+
+    interface IDishCategoryService <<interface>> {
+        + GetAllCategoriesAsync(query: DishCategoryListQueryDTO, ct: CancellationToken) : Task<PagedResultDTO<DishCategoryDto>>
+        + GetCategoryByIdAsync(id: long, ct: CancellationToken) : Task<DishCategoryDto?>
+        + CreateCategoryAsync(request: CreateDishCategoryRequest, ct: CancellationToken) : Task<DishCategoryDto>
+        + UpdateCategoryAsync(id: long, request: UpdateDishCategoryRequest, ct: CancellationToken) : Task<DishCategoryDto>
+        + ToggleCategoryStatusAsync(id: long, isDisabled: bool, ct: CancellationToken) : Task<DishCategoryDto>
+    }
+
+    class DishCategoryService <<Service>> {
+        - _dishCategoryRepository : IDishCategoryRepository
+        - _i18nService : Ii18nService
+        + GetAllCategoriesAsync(query: DishCategoryListQueryDTO, ct: CancellationToken) : Task<PagedResultDTO<DishCategoryDto>>
+        + GetCategoryByIdAsync(id: long, ct: CancellationToken) : Task<DishCategoryDto?>
+        + CreateCategoryAsync(request: CreateDishCategoryRequest, ct: CancellationToken) : Task<DishCategoryDto>
+        + UpdateCategoryAsync(id: long, request: UpdateDishCategoryRequest, ct: CancellationToken) : Task<DishCategoryDto>
+        + ToggleCategoryStatusAsync(id: long, isDisabled: bool, ct: CancellationToken) : Task<DishCategoryDto>
+        - MapToDto(category: DishCategory) : DishCategoryDto
+    }
+
+    interface ILookupResolver <<interface>> {
+        + GetIdAsync(typeId: ushort, valueCode: string, ct: CancellationToken) : Task<uint>
+    }
+}
+
+' ============================================================
+'  PERSISTENCE LAYER
+' ============================================================
+package "Persistence Layer" <<Rectangle>> {
+
+    interface IDishRepository <<interface>> {
+        + FindByIdAsync(dishId: long, ct: CancellationToken) : Task<Dish?>
+        + GetDishByIdAsync(dishId: long, ct: CancellationToken) : Task<Dish?>
+        + FindByIdForActionAsync(id: long, ct: CancellationToken) : Task<Dish?>
+        + ExistsAsync(dishId: long, ct: CancellationToken) : Task<bool>
+        + GetDishesAsync(request: GetDishesRequest, ct: CancellationToken) : Task<(List<Dish>, int)>
+        + AddAsync(dish: Dish, ct: CancellationToken) : Task
+        + UpdateStatusAsync(dishId: long, statusLvId: uint, ct: CancellationToken) : Task
+        + GetAllCategoriesAsync(ct: CancellationToken) : Task<List<string>>
+        + GetDishStatusesAsync(ct: CancellationToken) : Task<List<LookupValue>>
+        + GetActiveDishStatusEntitiesAsync() : Task<List<LookupValue>>
+        + GetAllDishCategoriesAsync() : Task<List<DishCategory>>
+        + GetAllActiveTagsAsync() : Task<List<LookupValue>>
+        + AddDishTagAsync(dishTag: DishTag, ct: CancellationToken) : Task
+        + FindTagByDishIdAsync(id: long, ct: CancellationToken) : Task<List<DishTag>>
+        + GetTagIdsByDishIdAsync(dishId: long, ct: CancellationToken) : Task<List<uint>>
+        + RemoveDishTagsAsync(dishId: long, tagIds: List<uint>, ct: CancellationToken) : Task
+        + GetActiveDishesAsync() : Task<List<Dish>>
+        + GetByIdsAsync(ids: List<long>, ct: CancellationToken) : Task<List<Dish>>
+    }
+
+    class DishRepository <<Repository>> {
+        - _context : RestaurantMgmtContext
+        + FindByIdAsync(dishId: long, ct: CancellationToken) : Task<Dish?>
+        + GetDishByIdAsync(dishId: long, ct: CancellationToken) : Task<Dish?>
+        + FindByIdForActionAsync(id: long, ct: CancellationToken) : Task<Dish?>
+        + ExistsAsync(dishId: long, ct: CancellationToken) : Task<bool>
+        + GetDishesAsync(request: GetDishesRequest, ct: CancellationToken) : Task<(List<Dish>, int)>
+        + AddAsync(dish: Dish, ct: CancellationToken) : Task
+        + UpdateStatusAsync(dishId: long, statusLvId: uint, ct: CancellationToken) : Task
+        + GetAllCategoriesAsync(ct: CancellationToken) : Task<List<string>>
+        + GetDishStatusesAsync(ct: CancellationToken) : Task<List<LookupValue>>
+        + GetActiveDishStatusEntitiesAsync() : Task<List<LookupValue>>
+        + GetAllDishCategoriesAsync() : Task<List<DishCategory>>
+        + GetAllActiveTagsAsync() : Task<List<LookupValue>>
+        + AddDishTagAsync(dishTag: DishTag, ct: CancellationToken) : Task
+        + FindTagByDishIdAsync(id: long, ct: CancellationToken) : Task<List<DishTag>>
+        + GetTagIdsByDishIdAsync(dishId: long, ct: CancellationToken) : Task<List<uint>>
+        + RemoveDishTagsAsync(dishId: long, tagIds: List<uint>, ct: CancellationToken) : Task
+        + GetActiveDishesAsync() : Task<List<Dish>>
+        + GetByIdsAsync(ids: List<long>, ct: CancellationToken) : Task<List<Dish>>
+    }
+
+    interface IDishCategoryRepository <<interface>> {
+        + GetAllCategoriesAsync(query: DishCategoryListQueryDTO, ct: CancellationToken) : Task<PagedResultDTO<DishCategoryDto>>
+        + GetByIdAsync(id: long, ct: CancellationToken) : Task<DishCategory?>
+        + CreateAsync(category: DishCategory, ct: CancellationToken) : Task<DishCategory>
+        + UpdateAsync(category: DishCategory, ct: CancellationToken) : Task<DishCategory>
+        + HasDishesAsync(id: long, ct: CancellationToken) : Task<bool>
+        + ExistsByNameAsync(name: string, excludeId: long?, ct: CancellationToken) : Task<bool>
+        + GetMaxDisplayOrderAsync(ct: CancellationToken) : Task<int>
+    }
+
+    class DishCategoryRepository <<Repository>> {
+        - _context : RestaurantMgmtContext
+        + GetAllCategoriesAsync(query: DishCategoryListQueryDTO, ct: CancellationToken) : Task<PagedResultDTO<DishCategoryDto>>
+        + GetByIdAsync(id: long, ct: CancellationToken) : Task<DishCategory?>
+        + CreateAsync(category: DishCategory, ct: CancellationToken) : Task<DishCategory>
+        + UpdateAsync(category: DishCategory, ct: CancellationToken) : Task<DishCategory>
+        + HasDishesAsync(id: long, ct: CancellationToken) : Task<bool>
+        + ExistsByNameAsync(name: string, excludeId: long?, ct: CancellationToken) : Task<bool>
+        + GetMaxDisplayOrderAsync(ct: CancellationToken) : Task<int>
+    }
+
+    interface IMediaRepository <<interface>> {
+        + AddAsync(asset: MediaAsset, ct: CancellationToken) : Task
+        + AddMediaAsync(media: MediaAsset, ct: CancellationToken) : Task<MediaAsset>
+        + RemoveMediaAsync(media: MediaAsset, ct: CancellationToken) : Task
+    }
+
+    interface IUnitOfWork <<interface>> {
+        + BeginTransactionAsync(ct: CancellationToken) : Task
+        + CommitAsync(ct: CancellationToken) : Task
+        + RollbackAsync(ct: CancellationToken) : Task
+        + SaveChangesAsync(ct: CancellationToken) : Task
+    }
+
+    class RestaurantMgmtContext <<DbContext>> {
+        + Dishes : DbSet<Dish>
+        + DishCategories : DbSet<DishCategory>
+        + DishMedia : DbSet<DishMedium>
+        + DishTags : DbSet<DishTag>
+        + MediaAssets : DbSet<MediaAsset>
+    }
+}
+
+' ============================================================
+'  DOMAIN LAYER
+' ============================================================
+package "Domain Layer" <<Rectangle>> {
+
+    enum DishStatusCode <<Enum>> {
+        AVAILABLE
+        OUT_OF_STOCK
+        HIDDEN
+    }
+
+    class Dish <<Entity>> {
+        + DishId : long
+        + CategoryId : long
+        + DishName : string
+        + Price : decimal
+        + DishStatusLvId : uint
+        + Description : string?
+        + Slogan : string?
+        + Note : string?
+        + ShortDescription : string?
+        + Calories : int?
+        + PrepTimeMinutes : int?
+        + CookTimeMinutes : int?
+        + DisplayOrder : sbyte?
+        + ChefRecommended : bool?
+        + IsOnline : bool?
+        + CreatedAt : DateTime?
+        + DishNameTextId : long
+        + DescriptionTextId : long?
+    }
+
+    class DishCategory <<Entity>> {
+        + CategoryId : long
+        + CategoryName : string
+        + Description : string?
+        + DisPlayOrder : int
+        + IsDisabled : bool
+        + CategoryNameTextId : long?
+        + DescriptionTextId : long?
+    }
+
+    class DishMedium <<Entity>> {
+        + DishId : long
+        + MediaId : long
+        + IsPrimary : bool?
+    }
+
+    class DishTag <<Entity>> {
+        + DishTagId : long
+        + DishId : long
+        + TagId : uint
+    }
+
+    class MediaAsset <<Entity>> {
+        + MediaId : long
+        + Url : string
+        + MimeType : string?
+        + Width : int?
+        + Height : int?
+        + DurationSec : int?
+        + CreatedAt : DateTime?
+        + MediaTypeLvId : uint
+    }
+
+    class I18nText <<Entity>> {
+        + TextId : long
+        + Key : string
+    }
+
+    class LookupValue <<Entity>> {
+        + ValueId : uint
+        + TypeId : ushort
+        + ValueCode : string
+        + ValueName : string
+        + SortOrder : short
+        + IsActive : bool?
+    }
+}
+
+' ============================================================
+'  RELATIONSHIPS
+' ============================================================
+
+' --- Presentation → Application ---
+DishController --> IDishService : uses
+DishCategoryController --> IDishCategoryService : uses
+
+' --- Presentation → DTOs ---
+DishController ..> GetDishesRequest : receives
+DishController ..> UpdateDishStatusRequest : receives
+DishController ..> CreateDishRequest : receives
+DishController ..> UpdateDishRequest : receives
+DishController ..> DishDetailDto : returns
+DishController ..> DishDetailForActionsDto : returns
+DishController ..> DishManagementDto : returns (admin list)
+DishController ..> DishDisplayDto : returns (public menu)
+DishController ..> DishStatusDto : returns
+DishController ..> ActiveDishStatusDto : returns
+DishController ..> DishCategorySimpleDto : returns
+DishController ..> DishTagDto : returns
+
+DishCategoryController ..> DishCategoryListQueryDTO : receives
+DishCategoryController ..> CreateDishCategoryRequest : receives
+DishCategoryController ..> UpdateDishCategoryRequest : receives
+DishCategoryController ..> DishCategoryDto : returns
+DishCategoryController ..> PagedResultDTO : paginates results
+
+CreateDishRequest ..> DishI18nDto : contains i18n map
+UpdateDishRequest ..> DishI18nDto : contains i18n map
+DishDetailForActionsDto ..> DishI18nDto : contains i18n map
+DishDetailForActionsDto ..> DishMediaDto : contains media list
+DishManagementDto ..> I18nTextDto : i18n fields
+DishDisplayDto ..> I18nTextDto : i18n fields
+DishCategoryDto ..> I18nTextDto : i18n fields
+DishTagDto ..> I18nTextDto : i18n fields
+
+' --- Application: realization ---
+DishService ..|> IDishService
+DishCategoryService ..|> IDishCategoryService
+
+' --- Application → Persistence ---
+DishService --> IDishRepository : uses
+DishService --> IMediaRepository : uses
+DishService --> IUnitOfWork : uses
+DishService --> ILookupResolver : uses
+
+DishCategoryService --> IDishCategoryRepository : uses
+
+' --- Persistence: realization ---
+DishRepository ..|> IDishRepository
+DishCategoryRepository ..|> IDishCategoryRepository
+
+' --- Persistence → DbContext ---
+DishRepository --> RestaurantMgmtContext : uses
+DishCategoryRepository --> RestaurantMgmtContext : uses
+
+' --- Persistence → Domain ---
+IDishRepository ..> Dish : queries and persists
+IDishRepository ..> DishTag : manages tag associations
+IDishRepository ..> LookupValue : reads status and tag lookups
+IDishRepository ..> DishCategory : reads category data
+IDishCategoryRepository ..> DishCategory : queries and persists
+IMediaRepository ..> MediaAsset : manages media assets
+
+' --- Domain: entity relationships ---
+Dish --> "1" DishCategory : belongs to
+Dish *-- "0..*" DishMedium : contains media
+Dish *-- "0..*" DishTag : tagged with
+Dish --> "1" LookupValue : dish status
+Dish --> "1" I18nText : name translation
+Dish --> "0..1" I18nText : description translation
+DishCategory "1" o-- "0..*" Dish : groups dishes
+DishCategory --> "0..1" I18nText : name translation
+DishMedium --> "1" MediaAsset : references file
+DishTag --> "1" LookupValue : tag value
+
+@enduml

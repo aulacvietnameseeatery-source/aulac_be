@@ -1,0 +1,52 @@
+@startuml
+title Supplier Management - Persistence Layer Class Diagram
+
+
+package "Persistence Layer" {
+
+    interface ISupplierRepository <<interface>> {
+        +GetAllSuppliersAsync(query: SupplierListQueryDTO, ct: CancellationToken): Task<PagedResultDTO<SupplierDto>>
+        +GetByIdAsync(id: long, ct: CancellationToken): Task<Supplier?>
+        +GetByIdWithIngredientsAsync(id: long, ct: CancellationToken): Task<Supplier?>
+        +CreateAsync(supplier: Supplier, ct: CancellationToken): Task<Supplier>
+        +UpdateAsync(supplier: Supplier, ct: CancellationToken): Task<Supplier>
+        +DeleteAsync(id: long, ct: CancellationToken): Task<bool>
+        +ExistsByNameAsync(name: string, excludeId: long?, ct: CancellationToken): Task<bool>
+        +HasDependenciesAsync(id: long, ct: CancellationToken): Task<bool>
+        +UpdateSupplierIngredientsAsync(supplierId: long, ingredientIds: List<long>, ct: CancellationToken): Task
+    }
+
+    class SupplierRepository <<Repository>> {
+        -_context: RestaurantMgmtContext
+        +GetAllSuppliersAsync(query: SupplierListQueryDTO, ct: CancellationToken): Task<PagedResultDTO<SupplierDto>>
+        +GetByIdAsync(id: long, ct: CancellationToken): Task<Supplier?>
+        +GetByIdWithIngredientsAsync(id: long, ct: CancellationToken): Task<Supplier?>
+        +CreateAsync(supplier: Supplier, ct: CancellationToken): Task<Supplier>
+        +UpdateAsync(supplier: Supplier, ct: CancellationToken): Task<Supplier>
+        +DeleteAsync(id: long, ct: CancellationToken): Task<bool>
+        +ExistsByNameAsync(name: string, excludeId: long?, ct: CancellationToken): Task<bool>
+        +HasDependenciesAsync(id: long, ct: CancellationToken): Task<bool>
+        +UpdateSupplierIngredientsAsync(supplierId: long, ingredientIds: List<long>, ct: CancellationToken): Task
+    }
+
+    SupplierRepository ..|> ISupplierRepository : implements
+}
+
+' External type stubs
+class Supplier <<Entity>>
+class IngredientSupplier <<Entity>>
+class RestaurantMgmtContext <<DbContext>>
+class SupplierListQueryDTO <<DTO>>
+class SupplierDto <<DTO>>
+class "PagedResultDTO<SupplierDto>" as PagedResultDTO <<DTO>>
+
+' ── Dependencies ──
+
+SupplierRepository --> RestaurantMgmtContext : uses EF Core context
+
+ISupplierRepository ..> Supplier : persists
+ISupplierRepository ..> IngredientSupplier : manages relationships
+ISupplierRepository ..> SupplierListQueryDTO : filters with
+ISupplierRepository ..> SupplierDto : projects to
+ISupplierRepository ..> PagedResultDTO : returns paged result
+@enduml

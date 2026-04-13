@@ -1,0 +1,145 @@
+@startuml
+title Reservation Management Module - Main Cross-Layer Interactions
+
+package "Presentation Layer" {
+    class PublicReservationController <<Controller>> {
+        -_reservationService : IPublicReservationService
+        +CheckReservationFit(request, ct) : Task<IActionResult>
+        +CreateReservation(request, ct) : Task<IActionResult>
+    }
+
+    class ReservationController <<Controller>> {
+        -_reservationService : IAdminReservationService
+        +GetReservations(request, ct) : Task<IActionResult>
+        +GetReservationDetail(id, ct) : Task<IActionResult>
+        +UpdateReservation(id, request, ct) : Task<IActionResult>
+        +UpdateReservationStatus(id, payload, ct) : Task<IActionResult>
+        +AssignTableAndConfirm(id, request, ct) : Task<IActionResult>
+    }
+
+    class ManualReservationController <<Controller>> {
+        -_reservationService : IAdminReservationService
+        +GetAvailability(reservedTime, partySize, ct) : Task<IActionResult>
+        +CreateReservation(request, ct) : Task<IActionResult>
+        +UpdateReservationStatus(id, request, ct) : Task<IActionResult>
+    }
+}
+
+package "Application Layer" {
+    interface IPublicReservationService <<interface>> {
+        +CheckReservationFitAsync(request, ct) : Task<ReservationFitCheckResponse>
+        +CreateReservationAsync(request, ct) : Task<ReservationResponseDto>
+    }
+
+    class PublicReservationService <<Service>> {
+        -_reservationRepository : IReservationRepository
+        -_tableRepository : ITableRepository
+        -_uow : IUnitOfWork
+        -_lookupResolver : ILookupResolver
+        -_systemSettingService : ISystemSettingService
+        -_customerService : ICustomerService
+        -_jobScheduler : IJobSchedulerService
+    }
+
+    interface IAdminReservationService <<interface>> {
+        +GetReservationsAsync(request, ct) : Task<(List<ReservationManagementDto>, int)>
+        +GetReservationDetailAsync(id, ct) : Task<ReservationDetailDto>
+        +GetManualAvailableTablesAsync(reservedTime, partySize, ct) : Task<List<ManualTableOptionDto>>
+        +CreateManualReservationAsync(request, ct) : Task<ReservationResponseDto>
+        +UpdateReservationAsync(id, request, ct) : Task
+        +UpdateReservationStatusAsync(id, staffId, request, ct) : Task<ReservationStatusResponseDTO>
+        +AssignTableAndConfirmAsync(id, tableIds, ct) : Task
+    }
+
+    class AdminReservationService <<Service>> {
+        -_reservationRepository : IReservationRepository
+        -_tableRepository : ITableRepository
+        -_uow : IUnitOfWork
+        -_lookupResolver : ILookupResolver
+        -_systemSettingService : ISystemSettingService
+        -_customerService : ICustomerService
+        -_broadcastService : IReservationBroadcastService
+        -_jobScheduler : IJobSchedulerService
+    }
+}
+
+package "Persistence Layer" {
+    interface IReservationRepository <<interface>> {
+        +CreateAsync(reservation, ct) : Task<Reservation>
+        +GetByIdWithFullDetailsAsync(id, ct) : Task<Reservation?>
+        +GetReservationsAsync(request, ct) : Task<(List<ReservationManagementDto>, int)>
+        +GetTableReservationsForTimeAsync(...) : Task<List<Reservation>>
+        +UpdateAsync(reservation, ct) : Task
+        +DeleteAsync(reservation, ct) : Task
+    }
+
+    class ReservationRepository <<Repository>> {
+        -_context : RestaurantMgmtContext
+    }
+
+    interface ITableRepository <<interface>> {
+        +GetManualAvailableTablesAsync(isOnline, ct) : Task<List<RestaurantTable>>
+        +GetByIdAsync(tableId, ct) : Task<RestaurantTable?>
+        +LockTablesForUpdateAsync(tableIds, ct) : Task
+    }
+
+    interface IUnitOfWork <<interface>> {
+        +BeginTransactionAsync(ct) : Task
+        +CommitAsync(ct) : Task
+        +SaveChangesAsync(ct) : Task
+    }
+}
+
+package "Domain Layer" {
+    class Reservation <<Entity>> {
+        +ReservationId : long
+        +CustomerName : string
+        +Phone : string
+        +PartySize : int
+        +ReservedTime : DateTime
+        +ReservationStatusLvId : uint
+        +SourceLvId : uint
+    }
+
+    class RestaurantTable <<Entity>> {
+        +TableId : long
+        +TableCode : string
+        +Capacity : int
+        +TableStatusLvId : uint
+    }
+
+    enum ReservationStatusCode <<enum>> {
+        PENDING
+        CONFIRMED
+        CHECKED_IN
+        COMPLETED
+        CANCELLED
+        NO_SHOW
+    }
+}
+
+' ── Cross-layer relationships ──
+
+PublicReservationController --> IPublicReservationService : delegates public reservation flows
+ReservationController --> IAdminReservationService : delegates admin reservation management
+ManualReservationController --> IAdminReservationService : delegates staff manual reservation flows
+
+PublicReservationService ..|> IPublicReservationService : implements
+AdminReservationService ..|> IAdminReservationService : implements
+
+PublicReservationService --> IReservationRepository : uses for reservation data access
+PublicReservationService --> ITableRepository : uses for table availability checks
+PublicReservationService --> IUnitOfWork : uses for transactions
+
+AdminReservationService --> IReservationRepository : uses for reservation data access
+AdminReservationService --> ITableRepository : uses for table availability and assignment
+AdminReservationService --> IUnitOfWork : uses for transactions
+
+ReservationRepository ..|> IReservationRepository : implements
+ReservationRepository ..> Reservation : queries and persists
+ReservationRepository ..> RestaurantTable : joins for table assignment
+
+Reservation --> "1" ReservationStatusCode : status
+Reservation "0..*" o-- "0..*" RestaurantTable : assigned tables
+
+@enduml
