@@ -1,0 +1,58 @@
+@startuml
+title Role & Permission Management - Application Layer Class Diagram
+skinparam Linetype ortho
+
+package "Application Layer" {
+
+    interface IRoleService <<interface>> {
+        +GetPagedAsync(query: PagedQuery): Task<(List<RoleListItemDto>, int)>
+        +GetRoleDetailAsync(roleId: long): Task<RoleDetailDto>
+        +CreateRoleAsync(request: CreateRoleRequestDto): Task<RoleDetailDto>
+        +UpdateRoleAsync(roleId: long, request: UpdateRoleRequestDto): Task<RoleDetailDto>
+        +DeleteRoleAsync(roleId: long): Task
+    }
+
+    class RoleService <<Service>> {
+        -_roleRepository: IRoleRepository
+        +GetPagedAsync(query: PagedQuery): Task<(List<RoleListItemDto>, int)>
+        +GetRoleDetailAsync(roleId: long): Task<RoleDetailDto>
+        +CreateRoleAsync(request: CreateRoleRequestDto): Task<RoleDetailDto>
+        +UpdateRoleAsync(roleId: long, request: UpdateRoleRequestDto): Task<RoleDetailDto>
+        +DeleteRoleAsync(roleId: long): Task
+        -GetScreenDisplayName(screenCode: string): string
+        -GetActionDisplayName(actionCode: string): string
+        -GetActionOrder(actionCode: string): int
+        -GetScreenOrder(screenCode: string): int
+    }
+
+    RoleService ..|> IRoleService : implements
+}
+
+' External type stubs
+interface IRoleRepository <<interface>>
+class PagedQuery <<DTO>>
+class RoleListItemDto <<DTO>>
+class RoleDetailDto <<DTO>>
+class PermissionGroupDto <<DTO>>
+class PermissionItemDto <<DTO>>
+class CreateRoleRequestDto <<DTO>>
+class UpdateRoleRequestDto <<DTO>>
+class Role <<Entity>>
+class Permission <<Entity>>
+enum RoleStatusCode <<Enum>>
+
+' ── Dependencies ──
+
+RoleService --> IRoleRepository : uses for persistence
+
+RoleService ..> PagedQuery : consumes
+RoleService ..> CreateRoleRequestDto : consumes
+RoleService ..> UpdateRoleRequestDto : consumes
+RoleService ..> RoleListItemDto : produces
+RoleService ..> RoleDetailDto : produces
+RoleService ..> PermissionGroupDto : produces (grouped)
+RoleService ..> PermissionItemDto : produces (per permission)
+RoleService ..> Role : maps from entity
+RoleService ..> Permission : reads for assignment
+RoleService ..> RoleStatusCode : uses for status resolution
+@enduml

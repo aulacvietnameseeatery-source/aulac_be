@@ -1,0 +1,96 @@
+@startuml
+title Role & Permission Management - Main Cross-Layer Interactions
+
+
+package "Presentation Layer" {
+    class RoleController <<Controller>> {
+        -_roleService: IRoleService
+        -_logger: ILogger<RoleController>
+        +GetRoles(query: PagedQuery): IActionResult
+        +GetRoleDetail(id: long): IActionResult
+        +CreateRole(request: CreateRoleRequestDto): IActionResult
+        +UpdateRole(id: long, request: UpdateRoleRequestDto): IActionResult
+        +DeleteRole(id: long): IActionResult
+    }
+}
+
+package "Application Layer" {
+    interface IRoleService <<interface>> {
+        +GetPagedAsync(query: PagedQuery): Task<(List<RoleListItemDto>, int)>
+        +GetRoleDetailAsync(roleId: long): Task<RoleDetailDto>
+        +CreateRoleAsync(request: CreateRoleRequestDto): Task<RoleDetailDto>
+        +UpdateRoleAsync(roleId: long, request: UpdateRoleRequestDto): Task<RoleDetailDto>
+        +DeleteRoleAsync(roleId: long): Task
+    }
+
+    class RoleService <<Service>> {
+        -_roleRepository: IRoleRepository
+        -GetScreenDisplayName(screenCode: string): string
+        -GetActionDisplayName(actionCode: string): string
+    }
+
+    RoleService ..|> IRoleService : implements
+}
+
+package "Persistence Layer" {
+    interface IRoleRepository <<interface>> {
+        +FindByIdAsync(roleId: long, ct: CancellationToken): Task<Role?>
+        +GetPagedWithStaffCountAsync(pageIndex: int, pageSize: int, search: string?): Task<(List<Role>, int)>
+        +GetRoleWithPermissionsAsync(roleId: long, ct: CancellationToken): Task<Role?>
+        +GetRoleWithPermissionsForUpdateAsync(roleId: long, ct: CancellationToken): Task<Role?>
+        +GetAllPermissionsAsync(ct: CancellationToken): Task<List<Permission>>
+        +GetPermissionsByIdsAsync(permissionIds: List<long>, ct: CancellationToken): Task<List<Permission>>
+        +AddAsync(role: Role, ct: CancellationToken): Task<Role>
+        +UpdateAsync(role: Role): Task
+        +DeleteAsync(role: Role): Task
+        +GetRoleStatusIdAsync(statusCode: string): Task<uint?>
+        +HasStaffAssignedAsync(roleId: long, ct: CancellationToken): Task<bool>
+        +RoleCodeExistsAsync(roleCode: string, ct: CancellationToken): Task<bool>
+    }
+
+    class RoleRepository <<Repository>> {
+        -_context: RestaurantMgmtContext
+    }
+
+    RoleRepository ..|> IRoleRepository : implements
+}
+
+package "Domain Layer" {
+    class Role <<Entity>> {
+        +RoleId: long
+        +RoleCode: string
+        +RoleName: string
+        +RoleStatusLvId: uint
+    }
+
+    class Permission <<Entity>> {
+        +PermissionId: long
+        +ScreenCode: string
+        +ActionCode: string
+    }
+
+    class StaffAccount <<Entity>> {
+        +AccountId: long
+        +RoleId: long
+    }
+
+    class LookupValue <<Entity>> {
+        +ValueId: uint
+        +ValueCode: string
+    }
+
+    Role "0..*" -- "0..*" Permission : many-to-many
+    Role "1" o-- "0..*" StaffAccount : assigned to
+    Role "0..*" --> "1" LookupValue : RoleStatusLv
+}
+
+' Cross-layer relationships
+RoleController --> IRoleService : uses for role operations
+
+RoleService --> IRoleRepository : uses for persistence
+
+RoleRepository ..> Role : persists
+RoleRepository ..> Permission : queries / manages
+RoleRepository ..> StaffAccount : checks assignment
+RoleRepository ..> LookupValue : resolves status
+@enduml
