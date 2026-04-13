@@ -1,0 +1,110 @@
+@startuml
+title Notification Management Module - Main Cross-Layer Interactions
+
+package "Presentation Layer" {
+    class NotificationController <<Controller>> {
+        -_notificationService : INotificationService
+        +GetNotifications(query, ct) : Task<IActionResult>
+        +GetUnreadCount(ct) : Task<IActionResult>
+        +GetMissed(after, ct) : Task<IActionResult>
+        +MarkAsRead(id, ct) : Task<IActionResult>
+        +MarkAllRead(ct) : Task<IActionResult>
+        +Acknowledge(id, ct) : Task<IActionResult>
+        +GetPreferences(ct) : Task<IActionResult>
+        +UpdatePreferences(request, ct) : Task<IActionResult>
+    }
+}
+
+package "Application Layer" {
+    interface INotificationService <<interface>> {
+        +PublishAsync(request, ct) : Task
+        +GetNotificationsAsync(query, userPermissions, userId, ct) : Task<List<NotificationListItemDto>>
+        +GetUnreadCountAsync(userPermissions, userId, ct) : Task<int>
+        +GetMissedAsync(userPermissions, userId, afterUtc, ct) : Task<List<NotificationListItemDto>>
+        +MarkAsReadAsync(notificationId, userId, ct) : Task
+        +MarkAllReadAsync(userPermissions, userId, ct) : Task
+        +AcknowledgeAsync(notificationId, userId, ct) : Task
+        +GetPreferencesAsync(userId, ct) : Task<List<NotificationPreferenceDto>>
+        +UpdatePreferencesAsync(userId, request, ct) : Task
+    }
+
+    class NotificationService <<Service>> {
+        -_notificationRepository : INotificationRepository
+        -_realtimePublisher : INotificationRealtimePublisher
+        -_logger : ILogger<NotificationService>
+    }
+
+    interface INotificationRealtimePublisher <<interface>> {
+        +PublishToPermissionsAsync(permissions, dto, ct) : Task
+        +PublishToUserAsync(userId, dto, ct) : Task
+        +PublishToAllAsync(dto, ct) : Task
+    }
+
+    class NotificationRealtimePublisher <<Service>> {
+        -_hubContext : IHubContext<RestaurantHub>
+    }
+}
+
+package "Persistence Layer" {
+    interface INotificationRepository <<interface>> {
+        +AddAsync(notification, ct) : Task
+        +GetByUserAsync(userPermissions, userId, query, ct) : Task<List<NotificationListItemDto>>
+        +GetUnreadCountAsync(userPermissions, userId, ct) : Task<int>
+        +GetMissedAsync(userPermissions, userId, afterUtc, ct) : Task<List<NotificationListItemDto>>
+        +MarkAsReadAsync(notificationId, userId, ct) : Task
+        +MarkAllReadAsync(userPermissions, userId, ct) : Task
+        +AcknowledgeAsync(notificationId, userId, ct) : Task
+        +GetPreferencesAsync(userId, ct) : Task<List<NotificationPreference>>
+        +UpsertPreferencesAsync(userId, preferences, ct) : Task
+        +GetDisabledTypesAsync(userId, ct) : Task<HashSet<string>>
+    }
+
+    class NotificationRepository <<Repository>> {
+        -_context : RestaurantMgmtContext
+    }
+}
+
+package "Domain Layer" {
+    class Notification <<Entity>> {
+        +NotificationId : long
+        +Type : string
+        +Title : string
+        +Priority : string
+        +RequireAck : bool
+        +CreatedAt : DateTime
+    }
+
+    class NotificationReadState <<Entity>> {
+        +NotificationReadStateId : long
+        +NotificationId : long
+        +UserId : long
+        +IsRead : bool
+        +IsAcknowledged : bool
+    }
+
+    class NotificationPreference <<Entity>> {
+        +NotificationPreferenceId : long
+        +UserId : long
+        +NotificationType : string
+        +IsEnabled : bool
+        +SoundEnabled : bool
+    }
+}
+
+' Realization relationships
+NotificationService ..|> INotificationService : implements
+NotificationRealtimePublisher ..|> INotificationRealtimePublisher : implements
+NotificationRepository ..|> INotificationRepository : implements
+
+' Cross-layer dependencies
+NotificationController --> INotificationService : depends on for business logic
+NotificationService --> INotificationRepository : uses for data access
+NotificationService --> INotificationRealtimePublisher : uses for real-time push
+NotificationRepository --> Notification : queries and persists
+NotificationRepository --> NotificationReadState : queries and persists
+NotificationRepository --> NotificationPreference : queries and persists
+
+' Entity relationships
+Notification *-- "0..*" NotificationReadState : owns read states
+
+@enduml

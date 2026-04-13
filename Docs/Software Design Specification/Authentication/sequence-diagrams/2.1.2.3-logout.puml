@@ -1,0 +1,69 @@
+@startuml
+title 2.1.2.3 - Logout
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+actor ":User" as U
+participant ":DashboardPage" as Client
+participant ":AuthController" as Ctrl
+participant ":ITokenService" as TokenSvc
+participant ":AuthService" as Svc
+participant ":IAuthSessionRepository" as SessRepo
+participant ":Database" as DB
+
+autonumber
+
+activate U
+
+U ->> Client : Click Logout
+activate Client
+
+Client ->> Ctrl : POST /api/auth/logout\n(Authorization: Bearer {accessToken})
+activate Ctrl
+
+Ctrl ->> Ctrl : TryGetSessionIdFromToken()
+
+alt#White Token is valid (not expired)
+    Ctrl ->> Ctrl : GetCurrentSessionId() from JWT claims
+else Token is expired
+    Ctrl ->> TokenSvc : GetPrincipalFromExpiredToken(token)
+    activate TokenSvc
+    TokenSvc -->> Ctrl : Return ClaimsPrincipal or null
+    deactivate TokenSvc
+    Ctrl ->> Ctrl : Extract session_id from claims
+end
+
+alt#White Session ID found
+    Ctrl ->> Svc : LogoutAsync(sessionId)
+    activate Svc
+
+    Svc ->> SessRepo : RevokeSessionAsync(sessionId)
+    activate SessRepo
+    SessRepo ->> DB : Mark session as revoked
+    activate DB
+    DB -->> SessRepo : Confirm session revoked
+    deactivate DB
+    SessRepo -->> Svc : Return true
+    deactivate SessRepo
+
+    Svc -->> Ctrl : Return true
+    deactivate Svc
+else No session ID (no token or parsing failed)
+    Ctrl ->> Ctrl : Log "Logout called without valid session"
+end
+
+Ctrl ->> Ctrl : Delete refresh_token HttpOnly cookie
+
+Ctrl -->> Client : 200 OK ("Logout successful.")
+deactivate Ctrl
+
+Client -->> U : Redirect to Login page
+
+deactivate Client
+deactivate U
+
+@enduml

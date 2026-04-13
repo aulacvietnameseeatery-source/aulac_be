@@ -1,0 +1,92 @@
+@startuml
+title 2.18.2.4 Notification Preferences
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":User" as U
+participant ":NotificationPreferencesPage" as Client
+participant ":NotificationController" as Ctrl
+participant ":NotificationService" as Svc
+participant ":NotificationRepository" as Repo
+participant ":Database" as DB
+
+activate U
+
+' === Get Preferences ===
+U ->> Client : Open notification preferences page
+
+Client ->> Ctrl : GET /api/notifications/preferences
+activate Ctrl
+
+Ctrl ->> Ctrl : ExtractUserContext() from JWT claims
+Ctrl ->> Svc : GetPreferencesAsync(userId, ct)
+activate Svc
+
+Svc ->> Repo : GetPreferencesAsync(userId, ct)
+activate Repo
+
+Repo ->> DB : Query all notification preferences\nfor this user, ordered by type
+activate DB
+DB -->> Repo : Return list of persisted preferences
+deactivate DB
+
+Repo -->> Svc : List<NotificationPreference>
+deactivate Repo
+
+Svc ->> Svc : Merge persisted preferences with\nall NotificationType enum values;\ndefault IsEnabled=true, SoundEnabled=true\nfor types without a saved preference
+
+Svc -->> Ctrl : List<NotificationPreferenceDto>
+deactivate Svc
+
+Ctrl -->> Client : 200 OK - ApiResponse<List<NotificationPreferenceDto>>
+deactivate Ctrl
+
+Client -->> U : Display preference toggles\nfor each notification type
+
+' === Update Preferences ===
+U ->> Client : Toggle preferences and click Save
+
+Client ->> Ctrl : PUT /api/notifications/preferences\nBody: UpdateNotificationPreferencesRequest
+activate Ctrl
+
+Ctrl ->> Ctrl : ExtractUserContext() from JWT claims
+Ctrl ->> Svc : UpdatePreferencesAsync(userId, request, ct)
+activate Svc
+
+Svc ->> Svc : Map NotificationPreferenceItemRequest list\nto NotificationPreference entities
+
+Svc ->> Repo : UpsertPreferencesAsync(userId, preferences, ct)
+activate Repo
+
+Repo ->> DB : Fetch existing preferences for this user
+activate DB
+DB -->> Repo : Return existing preference records
+deactivate DB
+
+Repo ->> Repo : For each preference in request:\n- If exists: update IsEnabled, SoundEnabled, UpdatedAt\n- If new: insert new record
+
+Repo ->> DB : Save all changes (update existing + insert new)
+activate DB
+DB -->> Repo : Confirm save
+deactivate DB
+
+Repo -->> Svc : Completed
+deactivate Repo
+
+Svc -->> Ctrl : Completed
+deactivate Svc
+
+Ctrl -->> Client : 200 OK - "Notification preferences updated."
+deactivate Ctrl
+
+Client -->> U : Display success confirmation
+
+deactivate U
+
+@enduml

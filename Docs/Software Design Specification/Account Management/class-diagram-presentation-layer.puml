@@ -1,0 +1,172 @@
+@startuml
+title Account Management Module - Presentation Layer Class Diagram
+
+package "Presentation Layer" {
+
+    class AccountController <<Controller>> {
+        -_accountService: IAccountService
+        -_logger: ILogger<AccountController>
+        +CreateAccount(request: CreateAccountRequest, ct: CancellationToken): Task<IActionResult>
+        +UpdateAccount(id: long, request: UpdateAccountRequest, ct: CancellationToken): Task<IActionResult>
+        +UpdateStatus(id: long, status: string, ct: CancellationToken): Task<IActionResult>
+        +GetAccountDetail(id: long, ct: CancellationToken): Task<IActionResult>
+        +GetCurrentUser(ct: CancellationToken): Task<IActionResult>
+        +GetAccountById(id: long, ct: CancellationToken): Task<IActionResult>
+        +ResetPassword(id: long, ct: CancellationToken): Task<IActionResult>
+        +ChangePassword(request: ChangePasswordRequest, ct: CancellationToken): Task<IActionResult>
+        +GetAccounts(query: AccountListQueryDTO): Task<IActionResult>
+        +GetAllRoles(ct: CancellationToken): Task<IActionResult>
+        +GetActiveRoles(ct: CancellationToken): Task<IActionResult>
+        +GetAccountStatuses(ct: CancellationToken): Task<IActionResult>
+    }
+
+    package "Request DTOs" {
+        class CreateAccountRequest <<DTO>> {
+            +Email: string
+            +FullName: string
+            +Phone: string?
+            +RoleId: long
+        }
+
+        class UpdateAccountRequest <<DTO>> {
+            +Email: string?
+            +FullName: string?
+            +Phone: string?
+            +RoleId: long?
+        }
+
+        class ChangePasswordRequest <<DTO>> {
+            +CurrentPassword: string?
+            +NewPassword: string
+            +ConfirmPassword: string
+        }
+
+        class AccountListQueryDTO <<DTO>> {
+            +Search: string?
+            +RoleId: long?
+            +AccountStatus: int?
+            +PageIndex: int
+            +PageSize: int
+        }
+    }
+
+    package "Response DTOs" {
+        class CreateAccountResult <<DTO>> {
+            +AccountId: long
+            +Username: string
+            +Email: string
+            +FullName: string
+            +AccountStatus: string
+            +TemporaryPasswordSent: bool
+            +Message: string
+        }
+
+        class AccountDetailDto <<DTO>> {
+            +AccountId: long
+            +Username: string
+            +FullName: string
+            +Email: string?
+            +Phone: string?
+            +AccountStatus: string
+            +IsLocked: bool
+            +CreatedAt: DateTime
+            +LastLoginAt: DateTime?
+            +UpdatedAt: DateTime?
+            +Role: RoleDto?
+        }
+
+        class AccountDto <<DTO>> {
+            +AccountId: long
+            +Username: string
+            +FullName: string
+            +Email: string?
+            +Phone: string?
+            +AccountStatus: int
+            +IsLocked: bool
+            +CreatedAt: DateTime
+            +LastLoginAt: DateTime?
+            +Role: RoleDto?
+        }
+
+        class AccountListDTO <<DTO>> {
+            +AccountId: long
+            +FullName: string
+            +Phone: string?
+            +Email: string?
+            +RoleId: long
+            +RoleName: string
+            +AccountStatus: int
+            +AccountStatusName: string
+        }
+
+        class RoleDto <<DTO>> {
+            +RoleId: long
+            +RoleName: string
+            +RoleCode: string
+        }
+
+        class RoleDTO <<DTO>> {
+            +RoleId: long
+            +RoleName: string
+        }
+
+        class AccountStatusDTO <<DTO>> {
+            +ValueId: uint
+            +ValueName: string
+        }
+
+        class PasswordResetResult <<DTO>> {
+            +AccountId: long
+            +Username: string
+            +FullName: string
+            +Success: bool
+            +Message: string?
+        }
+
+        class PagedResultDTO<T> <<DTO>> {
+            +PageData: List<T>
+            +PageIndex: int
+            +PageSize: int
+            +TotalCount: int
+            +TotalPage: int
+        }
+    }
+
+    class "ApiResponse<T>" as ApiResponse <<Wrapper>> {
+        +Success: bool
+        +Code: int
+        +SubCode: int
+        +UserMessage: string?
+        +SystemMessage: string?
+        +ValidateInfo: IReadOnlyList<string>
+        +Data: T
+        +ServerTime: DateTimeOffset
+    }
+}
+
+' --- External stubs ---
+interface IAccountService <<interface>>
+
+' --- Relationships ---
+AccountController --> IAccountService : depends on
+
+AccountController ..> CreateAccountRequest : receives
+AccountController ..> UpdateAccountRequest : receives
+AccountController ..> ChangePasswordRequest : receives
+AccountController ..> AccountListQueryDTO : receives
+
+AccountController ..> CreateAccountResult : returns
+AccountController ..> AccountDetailDto : returns
+AccountController ..> AccountDto : returns
+AccountController ..> PasswordResetResult : returns
+AccountController ..> AccountListDTO : returns via paged result
+AccountController ..> RoleDTO : returns
+AccountController ..> AccountStatusDTO : returns
+
+AccountController ..> ApiResponse : wraps all responses
+AccountController ..> PagedResultDTO : wraps paged responses
+
+AccountDetailDto *-- RoleDto : contains role info
+AccountDto *-- RoleDto : contains role info
+
+@enduml

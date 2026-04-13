@@ -16,16 +16,13 @@ namespace Api.Controllers
     public class AccountController : ControllerBase
     {
         private readonly IAccountService _accountService;
-        private readonly IAccountActivityService _activityService;
         private readonly ILogger<AccountController> _logger;
 
         public AccountController(
             IAccountService accountService,
-            IAccountActivityService activityService,
             ILogger<AccountController> logger)
         {
             _accountService = accountService;
-            _activityService = activityService;
             _logger = logger;
         }
 
@@ -565,7 +562,7 @@ namespace Api.Controllers
             [FromQuery] AccountSubResourceQueryDTO query,
             CancellationToken ct = default)
         {
-            var result = await _activityService.GetAccountOrdersAsync(id, query, ct);
+            var result = await _accountService.GetAccountOrdersAsync(id, query, ct);
 
             return Ok(new ApiResponse<PagedResultDTO<AccountOrderSummaryDTO>>
             {
@@ -588,7 +585,7 @@ namespace Api.Controllers
             [FromQuery] AccountSubResourceQueryDTO query,
             CancellationToken ct = default)
         {
-            var result = await _activityService.GetAccountAuditLogsAsync(id, query, ct);
+            var result = await _accountService.GetAccountAuditLogsAsync(id, query, ct);
 
             return Ok(new ApiResponse<PagedResultDTO<AccountAuditLogDTO>>
             {
@@ -611,7 +608,7 @@ namespace Api.Controllers
             [FromQuery] AccountSubResourceQueryDTO query,
             CancellationToken ct = default)
         {
-            var result = await _activityService.GetAccountLoginActivityAsync(id, query, ct);
+            var result = await _accountService.GetAccountLoginActivityAsync(id, query, ct);
 
             return Ok(new ApiResponse<PagedResultDTO<AccountLoginActivityDTO>>
             {
@@ -634,7 +631,7 @@ namespace Api.Controllers
             [FromQuery] AccountSubResourceQueryDTO query,
             CancellationToken ct = default)
         {
-            var result = await _activityService.GetAccountServiceErrorsAsync(id, query, ct);
+            var result = await _accountService.GetAccountServiceErrorsAsync(id, query, ct);
 
             return Ok(new ApiResponse<PagedResultDTO<AccountServiceErrorDTO>>
             {
@@ -657,7 +654,7 @@ namespace Api.Controllers
             [FromQuery] AccountSubResourceQueryDTO query,
             CancellationToken ct = default)
         {
-            var result = await _activityService.GetAccountInventoryActivityAsync(id, query, ct);
+            var result = await _accountService.GetAccountInventoryActivityAsync(id, query, ct);
 
             return Ok(new ApiResponse<PagedResultDTO<AccountInventoryActivityDTO>>
             {

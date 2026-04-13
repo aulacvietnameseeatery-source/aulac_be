@@ -1,0 +1,109 @@
+@startuml
+title 2.18.2.1 View Notifications
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":User" as U
+participant ":NotificationListPage" as Client
+participant ":NotificationController" as Ctrl
+participant ":NotificationService" as Svc
+participant ":NotificationRepository" as Repo
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : Open notification panel
+
+' === Get Notifications ===
+Client ->> Ctrl : GET /api/notifications?skip=0&take=20&type=&unreadOnly=false
+activate Ctrl
+
+Ctrl ->> Ctrl : ExtractUserContext() from JWT claims
+Ctrl ->> Svc : GetNotificationsAsync(query: NotificationQueryDto, userPermissions, userId, ct)
+activate Svc
+
+Svc ->> Repo : GetByUserAsync(userPermissions, userId, query, ct)
+activate Repo
+
+Repo ->> DB : Query notifications visible to user\n(by permissions, user targeting, or broadcast)\nwith optional type and unread filters,\njoin read states for this user,\nordered by CreatedAt descending,\npaginated by skip/take
+activate DB
+DB -->> Repo : Return notification rows with read/ack state
+deactivate DB
+
+Repo ->> Repo : HydrateMetadata() on each item\n(deserialize MetadataJson to Dictionary)
+
+Repo -->> Svc : List<NotificationListItemDto>
+deactivate Repo
+
+Svc -->> Ctrl : List<NotificationListItemDto>
+deactivate Svc
+
+Ctrl -->> Client : 200 OK - ApiResponse<List<NotificationListItemDto>>
+deactivate Ctrl
+
+' === Get Unread Count ===
+Client ->> Ctrl : GET /api/notifications/unread-count
+activate Ctrl
+
+Ctrl ->> Ctrl : ExtractUserContext() from JWT claims
+Ctrl ->> Svc : GetUnreadCountAsync(userPermissions, userId, ct)
+activate Svc
+
+Svc ->> Repo : GetUnreadCountAsync(userPermissions, userId, ct)
+activate Repo
+
+Repo ->> DB : Count notifications visible to user\nthat have no read state or IsRead = false
+activate DB
+DB -->> Repo : Return unread count
+deactivate DB
+
+Repo -->> Svc : int (unread count)
+deactivate Repo
+
+Svc -->> Ctrl : int (unread count)
+deactivate Svc
+
+Ctrl -->> Client : 200 OK - ApiResponse<int>
+deactivate Ctrl
+
+' === Get Missed Notifications (after reconnect) ===
+
+opt#White User reconnects after SignalR disconnect
+    Client ->> Ctrl : GET /api/notifications/missed?after={lastSeenUtc}
+    activate Ctrl
+
+    Ctrl ->> Ctrl : ExtractUserContext() from JWT claims
+    Ctrl ->> Svc : GetMissedAsync(userPermissions, userId, afterUtc, ct)
+    activate Svc
+
+    Svc ->> Repo : GetMissedAsync(userPermissions, userId, afterUtc, ct)
+    activate Repo
+
+    Repo ->> DB : Query notifications visible to user\ncreated after the given timestamp,\nlimit 100, ordered by CreatedAt descending,\njoin read states for this user
+    activate DB
+    DB -->> Repo : Return missed notification rows
+    deactivate DB
+
+    Repo ->> Repo : HydrateMetadata() on each item
+
+    Repo -->> Svc : List<NotificationListItemDto>
+    deactivate Repo
+
+    Svc -->> Ctrl : List<NotificationListItemDto>
+    deactivate Svc
+
+    Ctrl -->> Client : 200 OK - ApiResponse<List<NotificationListItemDto>>
+    deactivate Ctrl
+end
+
+Client -->> U : Display notification list with\nread/unread states and badges
+
+deactivate U
+
+@enduml

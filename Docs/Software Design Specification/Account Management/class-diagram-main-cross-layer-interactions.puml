@@ -1,0 +1,93 @@
+@startuml
+title Account Management Module - Main Cross-Layer Interactions
+
+package "Presentation Layer" {
+    class AccountController <<Controller>> {
+        -_accountService: IAccountService
+        +CreateAccount(request, ct): Task<IActionResult>
+        +UpdateAccount(id, request, ct): Task<IActionResult>
+        +UpdateStatus(id, status, ct): Task<IActionResult>
+        +GetAccountDetail(id, ct): Task<IActionResult>
+        +ResetPassword(id, ct): Task<IActionResult>
+        +GetAccounts(query): Task<IActionResult>
+    }
+}
+
+package "Application Layer" {
+    interface IAccountService <<interface>> {
+        +CreateAccountAsync(request, ct): Task<CreateAccountResult>
+        +UpdateAccountAsync(accountId, request, requestingUserId, ct): Task<AccountDetailDto>
+        +UpdateAccountStatusAsync(accountId, newStatusCode, ct): Task<bool>
+        +GetAccountDetailAsync(accountId, ct): Task<AccountDetailDto?>
+        +ResetToDefaultPasswordAsync(accountId, ct): Task<PasswordResetResult>
+        +GetAccountsAsync(query): Task<PagedResultDTO<AccountListDTO>>
+        +GetAccountOrdersAsync(accountId, query, ct): Task<PagedResultDTO<AccountOrderSummaryDTO>>
+        +GetAccountAuditLogsAsync(accountId, query, ct): Task<PagedResultDTO<AccountAuditLogDTO>>
+        +GetAccountLoginActivityAsync(accountId, query, ct): Task<PagedResultDTO<AccountLoginActivityDTO>>
+    }
+
+    class AccountService <<Service>> {
+        -_accountRepository: IAccountRepository
+        -_roleRepository: IRoleRepository
+        -_passwordHasher: IPasswordHasher
+        -_passwordGenerator: IPasswordGenerator
+        -_usernameGenerator: IUsernameGenerator
+        -_lookupResolver: ILookupResolver
+        -_emailQueue: IEmailQueue
+        -_sessionRepository: IAuthSessionRepository
+    }
+}
+
+package "Persistence Layer" {
+    interface IAccountRepository <<interface>> {
+        +CreateAsync(account, ct): Task<StaffAccount>
+        +FindByIdAsync(userId, ct): Task<StaffAccount?>
+        +FindByIdWithRoleAsync(userId, ct): Task<StaffAccount?>
+        +UpdateAccountAsync(account, ct): Task
+        +GetAccountsAsync(query, ct): Task<PagedResultDTO<AccountListDTO>>
+        +GetAccountOrdersAsync(accountId, query, ct): Task<PagedResultDTO<AccountOrderSummaryDTO>>
+        +GetAccountAuditLogsAsync(accountId, query, ct): Task<PagedResultDTO<AccountAuditLogDTO>>
+        +GetAccountLoginActivityAsync(accountId, query, ct): Task<PagedResultDTO<AccountLoginActivityDTO>>
+    }
+
+    class AccountRepository <<Repository>> {
+        -_context: RestaurantMgmtContext
+    }
+
+    interface IRoleRepository <<interface>> {
+        +FindByIdAsync(roleId, ct): Task<Role?>
+    }
+}
+
+package "Domain Layer" {
+    class StaffAccount <<Entity>> {
+        +AccountId: long
+        +FullName: string
+        +Email: string?
+        +Username: string
+        +RoleId: long
+        +AccountStatusLvId: uint
+        +IsLocked: bool
+    }
+
+    class Role <<Entity>> {
+        +RoleId: long
+        +RoleCode: string
+        +RoleName: string
+    }
+}
+
+' --- Cross-layer relationships ---
+AccountController --> IAccountService : delegates business logic
+
+AccountService ..|> IAccountService : implements
+AccountService --> IAccountRepository : persists account data
+AccountService --> IRoleRepository : validates role existence
+
+AccountRepository ..|> IAccountRepository : implements
+AccountRepository ..> StaffAccount : queries and persists
+AccountRepository ..> Role : loads via navigation
+
+StaffAccount --> Role : belongs to
+
+@enduml

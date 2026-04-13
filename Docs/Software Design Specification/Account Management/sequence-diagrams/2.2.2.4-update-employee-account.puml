@@ -1,0 +1,106 @@
+@startuml
+title 2.2.2.4 Update Employee Account
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":Admin" as U
+participant ":AccountEditPage" as Client
+participant ":AccountController" as Ctrl
+participant ":AccountService" as Svc
+participant ":AccountRepository" as Repo
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : Modify account fields (email, fullName, phone, roleId) and submit
+
+activate Client
+
+Client ->> Ctrl : PUT /api/account/{id} { UpdateAccountRequest }
+activate Ctrl
+
+Ctrl ->> Ctrl : Extract requestingUserId from JWT claims
+
+Ctrl ->> Svc : UpdateAccountAsync(id, request: UpdateAccountRequest, requestingUserId, ct)
+activate Svc
+
+Svc ->> Repo : FindByIdWithRoleAsync(accountId: long, ct)
+activate Repo
+Repo ->> DB : Query staff account by ID; include Role and Permissions
+activate DB
+DB -->> Repo : Return staff account or null
+deactivate DB
+Repo -->> Svc : StaffAccount?
+deactivate Repo
+
+alt#White Account not found
+    Svc -->> Ctrl : throw NotFoundException("Account not found")
+    Ctrl -->> Client : 404 Not Found - ApiResponse { "Account not found." }
+    Client -->> U : Display account not found error
+else Account found
+    opt#White Email provided and different from current
+        Svc ->> Repo : EmailExistsAsync(emailNormalized: string, ct)
+        activate Repo
+        Repo ->> DB : Check if new email already exists
+        activate DB
+        DB -->> Repo : Return true/false
+        deactivate DB
+        Repo -->> Svc : bool
+        deactivate Repo
+
+        alt#White Email conflict
+            Svc -->> Ctrl : throw ConflictException("Email already registered")
+            Ctrl -->> Client : 409 Conflict - ApiResponse { "Email already registered." }
+            Client -->> U : Display email conflict error
+        end
+    end
+
+    opt#White RoleId provided and different from current
+        Svc ->> Repo : FindByIdWithRoleAsync(requestingUserId, ct)
+        activate Repo
+        Repo ->> DB : Query requesting user's account with role
+        activate DB
+        DB -->> Repo : Return requesting user's account
+        deactivate DB
+        Repo -->> Svc : StaffAccount (requesting user)
+        deactivate Repo
+
+        alt#White Requesting user is not ADMIN
+            Svc -->> Ctrl : throw ForbiddenException("Only administrators can change roles")
+            Ctrl -->> Client : 403 Forbidden
+            Client -->> U : Display role change forbidden error
+        else Requesting user is ADMIN
+            Svc ->> Svc : Validate new role exists via IRoleRepository.FindByIdAsync
+        end
+    end
+
+    Svc ->> Repo : UpdateAccountAsync(account: StaffAccount, ct)
+    activate Repo
+    Repo ->> DB : Update staff account record
+    activate DB
+    DB -->> Repo : Confirm update
+    deactivate DB
+    Repo -->> Svc : void
+    deactivate Repo
+
+    Svc ->> Svc : GetAccountDetailAsync(accountId) to return updated details
+
+    Svc -->> Ctrl : AccountDetailDto
+    deactivate Svc
+
+    Ctrl -->> Client : 200 OK - ApiResponse<AccountDetailDto>
+    deactivate Ctrl
+
+    Client -->> U : Display updated account detail
+end
+
+deactivate Client
+deactivate U
+
+@enduml

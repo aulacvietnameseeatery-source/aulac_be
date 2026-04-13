@@ -1,0 +1,65 @@
+@startuml
+title Account Management Module - Domain Layer Class Diagram
+
+package "Domain Layer" {
+
+    class StaffAccount <<Entity>> {
+        +AccountId: long
+        +FullName: string
+        +Phone: string?
+        +Email: string?
+        +RoleId: long
+        +CreatedAt: DateTime
+        +Username: string
+        +PasswordHash: string
+        +IsLocked: bool
+        +LastLoginAt: DateTime?
+        +RegisteredDeviceId: string?
+        +AccountStatusLvId: uint
+        +AuditLogs: ICollection<AuditLog>
+        +AuthSessions: ICollection<AuthSession>
+        +Orders: ICollection<Order>
+        +Role: Role
+    }
+
+    class Role <<Entity>> {
+        +RoleId: long
+        +RoleCode: string
+        +RoleName: string
+        +RoleStatusLvId: uint
+        +RoleStatusLv: LookupValue?
+        +StaffAccounts: ICollection<StaffAccount>
+        +Permissions: ICollection<Permission>
+    }
+
+    class Permission <<Entity>> {
+        +PermissionId: long
+        +PermissionCode: string
+        +PermissionName: string
+    }
+
+    class LookupValue <<Entity>> {
+        +ValueId: uint
+        +ValueCode: string
+        +ValueName: string
+        +TypeId: uint
+        +IsActive: bool
+        +DeletedAt: DateTime?
+    }
+
+    enum AccountStatusCode <<Enum>> {
+        ACTIVE
+        INACTIVE
+        LOCKED
+    }
+}
+
+' --- Relationships ---
+StaffAccount --> Role : belongs to
+StaffAccount ..> LookupValue : status resolved via AccountStatusLvId
+Role "1" *-- "0..*" StaffAccount : has many accounts
+Role "1" *-- "0..*" Permission : has many permissions
+Role ..> LookupValue : role status resolved via RoleStatusLvId
+AccountStatusCode ..> LookupValue : maps to lookup values
+
+@enduml

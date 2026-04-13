@@ -1,0 +1,83 @@
+@startuml
+title 2.2.2.5 Activate / Deactivate Employee Account
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":Admin" as U
+participant ":AccountDetailPage" as Client
+participant ":AccountController" as Ctrl
+participant ":AccountService" as Svc
+participant ":AccountRepository" as Repo
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : Click activate or deactivate button for employee account
+
+activate Client
+
+Client ->> Ctrl : PUT /api/account/{id}/status { "ACTIVE" | "INACTIVE" }
+activate Ctrl
+
+Ctrl ->> Ctrl : Parse status string to AccountStatusCode enum
+
+alt#White Invalid status code
+    Ctrl -->> Client : 400 Bad Request - ApiResponse { "Invalid status code" }
+    Client -->> U : Display invalid status error
+else Valid status code
+    Ctrl ->> Svc : UpdateAccountStatusAsync(id, statusCode: AccountStatusCode, ct)
+    activate Svc
+
+    Svc ->> Repo : FindByIdAsync(accountId: long, ct)
+    activate Repo
+    Repo ->> DB : Query staff account by ID
+    activate DB
+    DB -->> Repo : Return staff account or null
+    deactivate DB
+    Repo -->> Svc : StaffAccount?
+    deactivate Repo
+
+    alt#White Account not found
+        Svc -->> Ctrl : throw NotFoundException("Account not found")
+        Ctrl -->> Client : 404 Not Found - ApiResponse { "Account not found." }
+        Client -->> U : Display account not found error
+    else Account found
+        Svc ->> Svc : Resolve new status ID via ILookupResolver
+
+        alt#White Status is ACTIVE
+            Svc ->> Svc : Set IsLocked = false
+        else Status is LOCKED
+            Svc ->> Svc : Set IsLocked = true
+        else Status is INACTIVE
+            Svc ->> Svc : Revoke all active sessions via IAuthSessionRepository
+        end
+
+        Svc ->> Repo : UpdateAccountAsync(account: StaffAccount, ct)
+        activate Repo
+        Repo ->> DB : Update account status and lock flag
+        activate DB
+        DB -->> Repo : Confirm update
+        deactivate DB
+        Repo -->> Svc : void
+        deactivate Repo
+
+        Svc -->> Ctrl : true
+        deactivate Svc
+
+        Ctrl -->> Client : 200 OK - ApiResponse { "Account status updated" }
+        deactivate Ctrl
+
+        Client -->> U : Display status update confirmation
+    end
+end
+
+deactivate Client
+deactivate U
+
+@enduml
