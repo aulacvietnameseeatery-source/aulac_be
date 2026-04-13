@@ -1,0 +1,61 @@
+@startuml
+title 2.2.2.2 View Employee Account Detail
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":Admin" as U
+participant ":AccountDetailPage" as Client
+participant ":AccountController" as Ctrl
+participant ":AccountService" as Svc
+participant ":AccountRepository" as Repo
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : Click on employee row to view detail
+
+activate Client
+
+Client ->> Ctrl : GET /api/account/{id}/detail
+activate Ctrl
+
+Ctrl ->> Svc : GetAccountDetailAsync(id: long, ct)
+activate Svc
+
+Svc ->> Repo : FindByIdWithRoleAsync(userId: long, ct)
+activate Repo
+
+Repo ->> DB : Query staff account by ID; include Role and Permissions
+activate DB
+DB -->> Repo : Return staff account with role data or null
+deactivate DB
+
+Repo -->> Svc : StaffAccount? (with Role navigation loaded)
+deactivate Repo
+
+alt#White Account not found
+    Svc -->> Ctrl : null
+    Ctrl -->> Client : 404 Not Found - ApiResponse { "Account not found." }
+    Client -->> U : Display account not found error
+else Account found
+    Svc ->> Svc : Resolve AccountStatusCode from AccountStatusLvId via ILookupResolver
+    Svc ->> Svc : Map StaffAccount to AccountDetailDto with RoleDto
+    Svc -->> Ctrl : AccountDetailDto
+    deactivate Svc
+
+    Ctrl -->> Client : 200 OK - ApiResponse<AccountDetailDto>
+    deactivate Ctrl
+
+    Client -->> U : Display employee account detail with role and status info
+end
+
+deactivate Client
+deactivate U
+
+@enduml

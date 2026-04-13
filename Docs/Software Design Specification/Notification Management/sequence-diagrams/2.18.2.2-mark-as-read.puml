@@ -1,0 +1,108 @@
+@startuml
+title 2.18.2.2 Mark as Read
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":User" as U
+participant ":NotificationListPage" as Client
+participant ":NotificationController" as Ctrl
+participant ":NotificationService" as Svc
+participant ":NotificationRepository" as Repo
+participant ":Database" as DB
+
+activate U
+
+' === Mark Single Notification as Read ===
+U ->> Client : Click on a notification
+
+Client ->> Ctrl : POST /api/notifications/{id}/read
+activate Ctrl
+
+Ctrl ->> Ctrl : ExtractUserContext() from JWT claims
+Ctrl ->> Svc : MarkAsReadAsync(notificationId, userId, ct)
+activate Svc
+
+Svc ->> Repo : MarkAsReadAsync(notificationId, userId, ct)
+activate Repo
+
+Repo ->> DB : Find existing NotificationReadState\nfor this notification and user
+activate DB
+DB -->> Repo : Return read state or null
+deactivate DB
+
+alt#White Read state does not exist
+    Repo ->> DB : Insert new NotificationReadState\nwith IsRead=true, ReadAt=now
+    activate DB
+    DB -->> Repo : Confirm insert
+    deactivate DB
+else Read state exists but IsRead = false
+    Repo ->> DB : Update IsRead=true, ReadAt=now
+    activate DB
+    DB -->> Repo : Confirm update
+    deactivate DB
+else Already read
+    Repo -->> Svc : No action needed
+end
+
+Repo -->> Svc : Completed
+deactivate Repo
+
+Svc -->> Ctrl : Completed
+deactivate Svc
+
+Ctrl -->> Client : 200 OK - "Notification marked as read."
+deactivate Ctrl
+
+' === Mark All Notifications as Read ===
+U ->> Client : Click "Mark all as read"
+
+Client ->> Ctrl : POST /api/notifications/mark-all-read
+activate Ctrl
+
+Ctrl ->> Ctrl : ExtractUserContext() from JWT claims
+Ctrl ->> Svc : MarkAllReadAsync(userPermissions, userId, ct)
+activate Svc
+
+Svc ->> Repo : MarkAllReadAsync(userPermissions, userId, ct)
+activate Repo
+
+Repo ->> DB : Query IDs of all unread notifications\nvisible to this user
+activate DB
+DB -->> Repo : Return list of unread notification IDs
+deactivate DB
+
+alt#White No unread notifications found
+    Repo -->> Svc : No action needed
+else Unread notifications exist
+    Repo ->> DB : Fetch existing read states\nfor unread notification IDs and user
+    activate DB
+    DB -->> Repo : Return existing read states
+    deactivate DB
+
+    Repo ->> DB : Update existing unread states to IsRead=true,\nInsert new read states for notifications without one
+    activate DB
+    DB -->> Repo : Confirm batch save
+    deactivate DB
+
+    Repo -->> Svc : Completed
+end
+
+deactivate Repo
+
+Svc -->> Ctrl : Completed
+deactivate Svc
+
+Ctrl -->> Client : 200 OK - "All notifications marked as read."
+deactivate Ctrl
+
+Client -->> U : Update UI to reflect all notifications read
+
+deactivate U
+
+@enduml

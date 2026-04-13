@@ -1,0 +1,81 @@
+@startuml
+title 2.2.2.3 Create Employee Account
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":Admin" as U
+participant ":AccountCreatePage" as Client
+participant ":AccountController" as Ctrl
+participant ":AccountService" as Svc
+participant ":AccountRepository" as Repo
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : Fill in account form (email, fullName, phone, roleId) and submit
+
+activate Client
+
+Client ->> Ctrl : POST /api/account/create { CreateAccountRequest }
+activate Ctrl
+
+Ctrl ->> Svc : CreateAccountAsync(request: CreateAccountRequest, ct)
+activate Svc
+
+Svc ->> Repo : EmailExistsAsync(emailNormalized: string, ct)
+activate Repo
+Repo ->> DB : Check if email already exists in staff accounts
+activate DB
+DB -->> Repo : Return true/false
+deactivate DB
+Repo -->> Svc : bool
+deactivate Repo
+
+alt#White Email already exists
+    Svc -->> Ctrl : throw ConflictException("Email already registered")
+    Ctrl -->> Client : 409 Conflict - ApiResponse { "Email already registered." }
+    Client -->> U : Display email conflict error
+else Email is unique
+    Svc ->> Svc : Validate role exists via IRoleRepository.FindByIdAsync
+
+    alt#White Role not found
+        Svc -->> Ctrl : throw NotFoundException("Role not found")
+        Ctrl -->> Client : 404 Not Found - ApiResponse { "Role not found." }
+        Client -->> U : Display role not found error
+    else Role exists
+        Svc ->> Svc : Generate unique username via IUsernameGenerator from FullName
+        Svc ->> Svc : Generate temporary password via IPasswordGenerator
+        Svc ->> Svc : Hash password via IPasswordHasher
+        Svc ->> Svc : Resolve LOCKED status ID via ILookupResolver
+
+        Svc ->> Repo : CreateAsync(account: StaffAccount, ct)
+        activate Repo
+        Repo ->> DB : Insert new staff account with LOCKED status
+        activate DB
+        DB -->> Repo : Return created account with generated AccountId
+        deactivate DB
+        Repo -->> Svc : StaffAccount (persisted)
+        deactivate Repo
+
+        Svc ->> Svc : Queue account-created email with temp password via IEmailQueue
+
+        Svc -->> Ctrl : CreateAccountResult
+        deactivate Svc
+
+        Ctrl -->> Client : 201 Created - ApiResponse<CreateAccountResult>
+        deactivate Ctrl
+
+        Client -->> U : Display success with created account info
+    end
+end
+
+deactivate Client
+deactivate U
+
+@enduml

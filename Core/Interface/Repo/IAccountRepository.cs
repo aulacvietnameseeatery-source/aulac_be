@@ -135,4 +135,44 @@ public interface IAccountRepository
 	/// <returns>List of account statuses</returns>
 	Task<List<AccountStatusDTO>> GetAccountStatusesAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Gets paginated orders handled by a specific staff member.
+    /// </summary>
+    Task<PagedResultDTO<AccountOrderSummaryDTO>> GetAccountOrdersAsync(
+        long accountId,
+        AccountSubResourceQueryDTO query,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Gets paginated audit log entries for a specific staff member.
+    /// </summary>
+    Task<PagedResultDTO<AccountAuditLogDTO>> GetAccountAuditLogsAsync(
+        long accountId,
+        AccountSubResourceQueryDTO query,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Gets paginated login activity for a specific staff member.
+    /// </summary>
+    Task<PagedResultDTO<AccountLoginActivityDTO>> GetAccountLoginActivityAsync(
+        long accountId,
+        AccountSubResourceQueryDTO query,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Gets paginated service errors attributed to a specific staff member.
+    /// </summary>
+    Task<PagedResultDTO<AccountServiceErrorDTO>> GetAccountServiceErrorsAsync(
+        long accountId,
+        AccountSubResourceQueryDTO query,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Gets paginated inventory transactions created or approved by a specific staff member.
+    /// </summary>
+    Task<PagedResultDTO<AccountInventoryActivityDTO>> GetAccountInventoryActivityAsync(
+        long accountId,
+        AccountSubResourceQueryDTO query,
+        CancellationToken ct = default);
+
 }

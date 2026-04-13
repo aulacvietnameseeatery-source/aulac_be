@@ -642,6 +642,36 @@ else
 	public Task<List<AccountStatusDTO>> GetAccountStatusesAsync(CancellationToken cancellationToken = default)
 		=> _accountRepository.GetAccountStatusesAsync(cancellationToken);
 
+    public Task<PagedResultDTO<AccountOrderSummaryDTO>> GetAccountOrdersAsync(
+        long accountId,
+        AccountSubResourceQueryDTO query,
+        CancellationToken ct = default)
+        => _accountRepository.GetAccountOrdersAsync(accountId, query, ct);
+
+    public Task<PagedResultDTO<AccountAuditLogDTO>> GetAccountAuditLogsAsync(
+        long accountId,
+        AccountSubResourceQueryDTO query,
+        CancellationToken ct = default)
+        => _accountRepository.GetAccountAuditLogsAsync(accountId, query, ct);
+
+    public Task<PagedResultDTO<AccountLoginActivityDTO>> GetAccountLoginActivityAsync(
+        long accountId,
+        AccountSubResourceQueryDTO query,
+        CancellationToken ct = default)
+        => _accountRepository.GetAccountLoginActivityAsync(accountId, query, ct);
+
+    public Task<PagedResultDTO<AccountServiceErrorDTO>> GetAccountServiceErrorsAsync(
+        long accountId,
+        AccountSubResourceQueryDTO query,
+        CancellationToken ct = default)
+        => _accountRepository.GetAccountServiceErrorsAsync(accountId, query, ct);
+
+    public Task<PagedResultDTO<AccountInventoryActivityDTO>> GetAccountInventoryActivityAsync(
+        long accountId,
+        AccountSubResourceQueryDTO query,
+        CancellationToken ct = default)
+        => _accountRepository.GetAccountInventoryActivityAsync(accountId, query, ct);
+
 	#region Helper Methods
 
 	/// <summary>

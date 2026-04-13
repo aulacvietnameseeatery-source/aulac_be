@@ -1,0 +1,112 @@
+@startuml
+title Authentication Module - Presentation Layer
+
+package "Presentation Layer" {
+
+    class AuthController <<Controller>> {
+        -_authService: IAuthService
+        -_logger: ILogger<AuthController>
+        -_tokenService: ITokenService
+        -_isProduction: bool
+        +Login(request: LoginRequestDto, ct: CancellationToken): Task<IActionResult>
+        +RefreshToken(request: RefreshTokenRequestDto, ct: CancellationToken): Task<IActionResult>
+        +Logout(ct: CancellationToken): Task<IActionResult>
+        +LogoutAll(ct: CancellationToken): Task<IActionResult>
+        +ForgotPassword(request: ForgotPasswordRequestDto, ct: CancellationToken): Task<IActionResult>
+        +VerifyResetToken(request: VerifyResetTokenRequestDto, ct: CancellationToken): Task<IActionResult>
+        +ResetPassword(request: ResetPasswordRequestDto, ct: CancellationToken): Task<IActionResult>
+        -GetCurrentUserId(): long?
+        -GetCurrentSessionId(): long?
+        -TryGetSessionIdFromToken(): long?
+        -GetClientIpAddress(): string?
+    }
+
+    class AccountController <<Controller>> {
+        -_accountService: IAccountService
+        -_activityService: IAccountActivityService
+        -_logger: ILogger<AccountController>
+        +ChangePassword(request: ChangePasswordRequest, ct: CancellationToken): Task<IActionResult>
+    }
+
+    class LoginRequestDto <<DTO>> {
+        +Username: string
+        +Password: string
+    }
+
+    class RefreshTokenRequestDto <<DTO>> {
+        +AccessToken: string
+    }
+
+    class AuthResponseDto <<DTO>> {
+        +AccessToken: string
+        +ExpiresIn: int
+        +TokenType: string
+        +UserId: long
+        +Username: string
+        +Roles: IEnumerable<string>
+    }
+
+    class AuthErrorDto <<DTO>> {
+        +ErrorCode: string
+        +ErrorMessage: string
+    }
+
+    class ForgotPasswordRequestDto <<DTO>> {
+        +Email: string
+    }
+
+    class VerifyResetTokenRequestDto <<DTO>> {
+        +Token: string
+    }
+
+    class VerifyResetTokenResponseDto <<DTO>> {
+        +Valid: bool
+    }
+
+    class ResetPasswordRequestDto <<DTO>> {
+        +Token: string
+        +NewPassword: string
+    }
+
+    class ChangePasswordRequest <<DTO>> {
+        +CurrentPassword: string?
+        +NewPassword: string
+        +ConfirmPassword: string
+    }
+
+    class "ApiResponse<T>" as ApiResponse <<DTO>> {
+        +Success: bool
+        +Code: int
+        +SubCode: int
+        +UserMessage: string?
+        +SystemMessage: string?
+        +ValidateInfo: IReadOnlyList<string>
+        +Data: T
+        +ServerTime: DateTimeOffset
+    }
+}
+
+' --- External stubs ---
+class IAuthService <<interface>>
+class ITokenService <<interface>>
+class IAccountService <<interface>>
+
+' --- Relationships ---
+AuthController --> IAuthService : "uses for authentication"
+AuthController --> ITokenService : "uses for token parsing"
+AccountController --> IAccountService : "uses for password change"
+
+AuthController ..> LoginRequestDto : "receives"
+AuthController ..> RefreshTokenRequestDto : "receives"
+AuthController ..> ForgotPasswordRequestDto : "receives"
+AuthController ..> VerifyResetTokenRequestDto : "receives"
+AuthController ..> ResetPasswordRequestDto : "receives"
+AuthController ..> AuthResponseDto : "returns"
+AuthController ..> AuthErrorDto : "returns on error"
+AuthController ..> VerifyResetTokenResponseDto : "returns"
+AuthController ..> ApiResponse : "wraps all responses"
+
+AccountController ..> ChangePasswordRequest : "receives"
+AccountController ..> ApiResponse : "wraps all responses"
+
+@enduml

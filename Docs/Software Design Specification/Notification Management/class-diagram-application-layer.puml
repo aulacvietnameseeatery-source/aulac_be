@@ -1,0 +1,49 @@
+@startuml
+title Notification Management Module - Application Layer
+
+package "Application Layer" {
+
+    interface INotificationService <<interface>> {
+        +PublishAsync(request: PublishNotificationRequest, ct: CancellationToken) : Task
+        +GetNotificationsAsync(query: NotificationQueryDto, userPermissions: IEnumerable<string>, userId: long, ct: CancellationToken) : Task<List<NotificationListItemDto>>
+        +GetUnreadCountAsync(userPermissions: IEnumerable<string>, userId: long, ct: CancellationToken) : Task<int>
+        +GetMissedAsync(userPermissions: IEnumerable<string>, userId: long, afterUtc: DateTime?, ct: CancellationToken) : Task<List<NotificationListItemDto>>
+        +MarkAsReadAsync(notificationId: long, userId: long, ct: CancellationToken) : Task
+        +MarkAllReadAsync(userPermissions: IEnumerable<string>, userId: long, ct: CancellationToken) : Task
+        +AcknowledgeAsync(notificationId: long, userId: long, ct: CancellationToken) : Task
+        +GetPreferencesAsync(userId: long, ct: CancellationToken) : Task<List<NotificationPreferenceDto>>
+        +UpdatePreferencesAsync(userId: long, request: UpdateNotificationPreferencesRequest, ct: CancellationToken) : Task
+    }
+
+    class NotificationService <<Service>> {
+        -_notificationRepository : INotificationRepository
+        -_realtimePublisher : INotificationRealtimePublisher
+        -_logger : ILogger<NotificationService>
+        +PublishAsync(request: PublishNotificationRequest, ct: CancellationToken) : Task
+        +GetNotificationsAsync(query: NotificationQueryDto, userPermissions: IEnumerable<string>, userId: long, ct: CancellationToken) : Task<List<NotificationListItemDto>>
+        +GetUnreadCountAsync(userPermissions: IEnumerable<string>, userId: long, ct: CancellationToken) : Task<int>
+        +GetMissedAsync(userPermissions: IEnumerable<string>, userId: long, afterUtc: DateTime?, ct: CancellationToken) : Task<List<NotificationListItemDto>>
+        +MarkAsReadAsync(notificationId: long, userId: long, ct: CancellationToken) : Task
+        +MarkAllReadAsync(userPermissions: IEnumerable<string>, userId: long, ct: CancellationToken) : Task
+        +AcknowledgeAsync(notificationId: long, userId: long, ct: CancellationToken) : Task
+        +GetPreferencesAsync(userId: long, ct: CancellationToken) : Task<List<NotificationPreferenceDto>>
+        +UpdatePreferencesAsync(userId: long, request: UpdateNotificationPreferencesRequest, ct: CancellationToken) : Task
+    }
+
+    interface INotificationRealtimePublisher <<interface>> {
+        +PublishToPermissionsAsync(permissions: IEnumerable<string>, dto: NotificationDto, ct: CancellationToken) : Task
+        +PublishToUserAsync(userId: long, dto: NotificationDto, ct: CancellationToken) : Task
+        +PublishToAllAsync(dto: NotificationDto, ct: CancellationToken) : Task
+    }
+}
+
+' External stubs
+class INotificationRepository <<interface>>
+class NotificationRealtimePublisher <<Service>>
+
+NotificationService ..|> INotificationService : implements
+NotificationService --> INotificationRepository : uses for data access
+NotificationService --> INotificationRealtimePublisher : uses for real-time push
+NotificationRealtimePublisher ..|> INotificationRealtimePublisher : implements
+
+@enduml

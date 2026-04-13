@@ -1,0 +1,102 @@
+@startuml
+title Notification Management Module - Presentation Layer
+
+package "Presentation Layer" {
+
+    class NotificationController <<Controller>> {
+        -_notificationService : INotificationService
+        +GetNotifications(query: NotificationQueryDto, ct: CancellationToken) : Task<IActionResult>
+        +GetUnreadCount(ct: CancellationToken) : Task<IActionResult>
+        +GetMissed(after: DateTime?, ct: CancellationToken) : Task<IActionResult>
+        +MarkAsRead(id: long, ct: CancellationToken) : Task<IActionResult>
+        +MarkAllRead(ct: CancellationToken) : Task<IActionResult>
+        +Acknowledge(id: long, ct: CancellationToken) : Task<IActionResult>
+        +GetPreferences(ct: CancellationToken) : Task<IActionResult>
+        +UpdatePreferences(request: UpdateNotificationPreferencesRequest, ct: CancellationToken) : Task<IActionResult>
+        -ExtractUserContext() : (long userId, List<string> permissions)
+    }
+
+    class NotificationQueryDto <<DTO>> {
+        +Skip : int
+        +Take : int
+        +Type : string?
+        +UnreadOnly : bool
+    }
+
+    class NotificationListItemDto <<DTO>> {
+        +Id : long
+        +Type : string
+        +Title : string
+        +Body : string?
+        +Priority : string
+        +RequireAck : bool
+        +SoundKey : string?
+        +ActionUrl : string?
+        +EntityType : string?
+        +EntityId : string?
+        +Metadata : Dictionary<string, object>?
+        +CreatedAt : DateTime
+        +IsRead : bool
+        +IsAcknowledged : bool
+        +AcknowledgedAt : DateTime?
+        +HydrateMetadata() : void
+    }
+
+    class NotificationDto <<DTO>> {
+        +Id : long
+        +Type : string
+        +Title : string
+        +Body : string?
+        +Priority : string
+        +RequireAck : bool
+        +SoundKey : string?
+        +ActionUrl : string?
+        +EntityType : string?
+        +EntityId : string?
+        +Metadata : Dictionary<string, object>?
+        +CreatedAt : DateTime
+    }
+
+    class PublishNotificationRequest <<DTO>> {
+        +Type : string
+        +Title : string
+        +Body : string?
+        +Priority : string
+        +RequireAck : bool
+        +SoundKey : string?
+        +ActionUrl : string?
+        +EntityType : string?
+        +EntityId : string?
+        +Metadata : Dictionary<string, object>?
+        +TargetPermissions : List<string>
+        +TargetUserIds : List<long>
+    }
+
+    class NotificationPreferenceDto <<DTO>> {
+        +NotificationType : string
+        +IsEnabled : bool
+        +SoundEnabled : bool
+    }
+
+    class UpdateNotificationPreferencesRequest <<DTO>> {
+        +Preferences : List<NotificationPreferenceItemRequest>
+    }
+
+    class NotificationPreferenceItemRequest <<DTO>> {
+        +NotificationType : string
+        +IsEnabled : bool
+        +SoundEnabled : bool
+    }
+}
+
+' External stub
+class INotificationService <<interface>>
+
+NotificationController --> INotificationService : depends on for business logic
+NotificationController ..> NotificationQueryDto : receives as query parameter
+NotificationController ..> NotificationListItemDto : returns in response
+NotificationController ..> NotificationPreferenceDto : returns in response
+NotificationController ..> UpdateNotificationPreferencesRequest : receives as request body
+UpdateNotificationPreferencesRequest *-- "1..*" NotificationPreferenceItemRequest : contains items
+
+@enduml

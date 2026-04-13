@@ -1,0 +1,83 @@
+@startuml
+title Authentication Module - Persistence Layer
+
+package "Persistence Layer" {
+
+    interface IAuthSessionRepository <<interface>> {
+        +CreateSessionAsync(userId: long, tokenHash: string, expiresAt: DateTime, deviceInfo: string?, ipAddress: string?, ct: CancellationToken): Task<AuthSession>
+        +GetValidSessionAsync(sessionId: long, ct: CancellationToken): Task<AuthSession?>
+        +GetSessionByIdAsync(sessionId: long, ct: CancellationToken): Task<AuthSession?>
+        +ValidateRefreshTokenAsync(sessionId: long, tokenHash: string, ct: CancellationToken): Task<AuthSession?>
+        +RevokeSessionAsync(sessionId: long, ct: CancellationToken): Task<bool>
+        +RevokeAllUserSessionsAsync(userId: long, exceptSessionId: long?, ct: CancellationToken): Task<int>
+        +GetActiveSessionsAsync(userId: long, ct: CancellationToken): Task<IEnumerable<AuthSession>>
+        +RotateRefreshTokenAsync(sessionId: long, newTokenHash: string, newExpiresAt: DateTime, ct: CancellationToken): Task<AuthSession?>
+        +CleanupExpiredSessionsAsync(ct: CancellationToken): Task<int>
+    }
+
+    class AuthSessionRepository <<Repository>> {
+        -_context: RestaurantMgmtContext
+        +CreateSessionAsync(userId: long, tokenHash: string, expiresAt: DateTime, deviceInfo: string?, ipAddress: string?, ct: CancellationToken): Task<AuthSession>
+        +GetValidSessionAsync(sessionId: long, ct: CancellationToken): Task<AuthSession?>
+        +GetSessionByIdAsync(sessionId: long, ct: CancellationToken): Task<AuthSession?>
+        +ValidateRefreshTokenAsync(sessionId: long, tokenHash: string, ct: CancellationToken): Task<AuthSession?>
+        +RevokeSessionAsync(sessionId: long, ct: CancellationToken): Task<bool>
+        +RevokeAllUserSessionsAsync(userId: long, exceptSessionId: long?, ct: CancellationToken): Task<int>
+        +GetActiveSessionsAsync(userId: long, ct: CancellationToken): Task<IEnumerable<AuthSession>>
+        +RotateRefreshTokenAsync(sessionId: long, newTokenHash: string, newExpiresAt: DateTime, ct: CancellationToken): Task<AuthSession?>
+        +CleanupExpiredSessionsAsync(ct: CancellationToken): Task<int>
+    }
+
+    interface IAccountRepository <<interface>> {
+        +FindByUsernameAsync(username: string, ct: CancellationToken): Task<StaffAccount?>
+        +FindByEmailAsync(emailNormalized: string, ct: CancellationToken): Task<StaffAccount?>
+        +FindByIdAsync(userId: long, ct: CancellationToken): Task<StaffAccount?>
+        +FindByIdWithRoleAsync(userId: long, ct: CancellationToken): Task<StaffAccount?>
+        +UpdateLastLoginAsync(userId: long, loginTime: DateTime, ct: CancellationToken): Task
+        +UpdatePasswordAsync(userId: long, newPasswordHash: string, ct: CancellationToken): Task
+        +UpdateAccountAsync(account: StaffAccount, ct: CancellationToken): Task
+    }
+
+    class AccountRepository <<Repository>> {
+        -_context: RestaurantMgmtContext
+        +FindByUsernameAsync(username: string, ct: CancellationToken): Task<StaffAccount?>
+        +FindByEmailAsync(emailNormalized: string, ct: CancellationToken): Task<StaffAccount?>
+        +FindByIdAsync(userId: long, ct: CancellationToken): Task<StaffAccount?>
+        +FindByIdWithRoleAsync(userId: long, ct: CancellationToken): Task<StaffAccount?>
+        +UpdateLastLoginAsync(userId: long, loginTime: DateTime, ct: CancellationToken): Task
+        +UpdatePasswordAsync(userId: long, newPasswordHash: string, ct: CancellationToken): Task
+        +UpdateAccountAsync(account: StaffAccount, ct: CancellationToken): Task
+    }
+
+    interface ILoginActivityRepository <<interface>> {
+        +Add(entity: LoginActivity): void
+        +GetByStaffIdAsync(staffId: long, limit: int, ct: CancellationToken): Task<List<LoginActivity>>
+    }
+
+    class LoginActivityRepository <<Repository>> {
+        -_context: RestaurantMgmtContext
+        +Add(entity: LoginActivity): void
+        +GetByStaffIdAsync(staffId: long, limit: int, ct: CancellationToken): Task<List<LoginActivity>>
+    }
+}
+
+' --- External stubs ---
+class AuthSession <<Entity>>
+class StaffAccount <<Entity>>
+class LoginActivity <<Entity>>
+class RestaurantMgmtContext <<DbContext>>
+
+' --- Relationships ---
+AuthSessionRepository ..|> IAuthSessionRepository : "implements"
+AccountRepository ..|> IAccountRepository : "implements"
+LoginActivityRepository ..|> ILoginActivityRepository : "implements"
+
+AuthSessionRepository --> RestaurantMgmtContext : "uses for data access"
+AccountRepository --> RestaurantMgmtContext : "uses for data access"
+LoginActivityRepository --> RestaurantMgmtContext : "uses for data access"
+
+IAuthSessionRepository ..> AuthSession : "persists"
+IAccountRepository ..> StaffAccount : "persists"
+ILoginActivityRepository ..> LoginActivity : "persists"
+
+@enduml
