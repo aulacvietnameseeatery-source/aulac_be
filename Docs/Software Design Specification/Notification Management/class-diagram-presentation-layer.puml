@@ -16,6 +16,14 @@ package "Presentation Layer" {
         -ExtractUserContext() : (long userId, List<string> permissions)
     }
 
+    class RestaurantHub <<Hub>> {
+        +OnConnectedAsync() : Task
+        +JoinOrders() : Task
+        +JoinOrder(orderId: long) : Task
+        +LeaveOrders() : Task
+        +LeaveOrder(orderId: int) : Task
+    }
+
     class NotificationQueryDto <<DTO>> {
         +Skip : int
         +Take : int
@@ -91,12 +99,22 @@ package "Presentation Layer" {
 
 ' External stub
 class INotificationService <<interface>>
+class INotificationRealtimePublisher <<interface>>
+class Hub <<abstract>>
 
 NotificationController --> INotificationService : depends on for business logic
+RestaurantHub --|> Hub : extends SignalR base hub
+INotificationRealtimePublisher ..> RestaurantHub : publishes to hub groups
+INotificationRealtimePublisher ..> NotificationDto : pushes notification payload
 NotificationController ..> NotificationQueryDto : receives as query parameter
 NotificationController ..> NotificationListItemDto : returns in response
 NotificationController ..> NotificationPreferenceDto : returns in response
 NotificationController ..> UpdateNotificationPreferencesRequest : receives as request body
 UpdateNotificationPreferencesRequest *-- "1..*" NotificationPreferenceItemRequest : contains items
+INotificationService ..> PublishNotificationRequest : receives publish request from callers
+INotificationService ..> NotificationQueryDto : consumes query contract
+INotificationService ..> NotificationListItemDto : returns list item contract
+INotificationService ..> NotificationPreferenceDto : returns preference contract
+INotificationService ..> UpdateNotificationPreferencesRequest : consumes update contract
 
 @enduml

@@ -35,15 +35,37 @@ package "Application Layer" {
         +PublishToUserAsync(userId: long, dto: NotificationDto, ct: CancellationToken) : Task
         +PublishToAllAsync(dto: NotificationDto, ct: CancellationToken) : Task
     }
+
+    class NotificationRealtimePublisher <<Service>> {
+        -_hubContext : IHubContext<RestaurantHub>
+        +PublishToPermissionsAsync(permissions: IEnumerable<string>, dto: NotificationDto, ct: CancellationToken) : Task
+        +PublishToUserAsync(userId: long, dto: NotificationDto, ct: CancellationToken) : Task
+        +PublishToAllAsync(dto: NotificationDto, ct: CancellationToken) : Task
+    }
 }
 
 ' External stubs
 class INotificationRepository <<interface>>
-class NotificationRealtimePublisher <<Service>>
+class NotificationDto <<DTO>>
+class PublishNotificationRequest <<DTO>>
+class NotificationQueryDto <<DTO>>
+class NotificationListItemDto <<DTO>>
+class NotificationPreferenceDto <<DTO>>
+class UpdateNotificationPreferencesRequest <<DTO>>
+class RestaurantHub <<Hub>>
+class IHubContext<T> <<interface>>
 
 NotificationService ..|> INotificationService : implements
 NotificationService --> INotificationRepository : uses for data access
 NotificationService --> INotificationRealtimePublisher : uses for real-time push
 NotificationRealtimePublisher ..|> INotificationRealtimePublisher : implements
+NotificationRealtimePublisher ..> IHubContext<T> : uses hub context abstraction
+NotificationRealtimePublisher ..> RestaurantHub : targets hub for client groups
+INotificationRealtimePublisher ..> NotificationDto : publishes payload contract
+INotificationService ..> PublishNotificationRequest : consumes publish request
+INotificationService ..> NotificationQueryDto : consumes query contract
+INotificationService ..> NotificationListItemDto : returns list item contract
+INotificationService ..> NotificationPreferenceDto : returns preference contract
+INotificationService ..> UpdateNotificationPreferencesRequest : consumes update contract
 
 @enduml

@@ -5,6 +5,7 @@ using Core.Data;
 using Core.DTO.General;
 using Core.DTO.Inventory;
 using Core.Interface.Service.Entity;
+using Core.Interface.Service.Others;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
@@ -19,13 +20,16 @@ namespace Api.Controllers;
 public class InventoryController : ControllerBase
 {
     private readonly IInventoryService _inventoryService;
+    private readonly IInvoiceScanService _invoiceScanService;
     private readonly ILogger<InventoryController> _logger;
 
     public InventoryController(
         IInventoryService inventoryService,
+        IInvoiceScanService invoiceScanService,
         ILogger<InventoryController> logger)
     {
         _inventoryService = inventoryService;
+        _invoiceScanService = invoiceScanService;
         _logger = logger;
     }
 
@@ -252,6 +256,65 @@ public class InventoryController : ControllerBase
             Success = true,
             Code = 200,
             UserMessage = "Dashboard data retrieved successfully.",
+            Data = result,
+            ServerTime = DateTimeOffset.UtcNow
+        });
+    }
+
+    // ════════════════════════════════════════════════════════
+    // INVOICE SCAN
+    // ════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Scan an invoice/receipt image using LLM vision and return extracted data as JSON.
+    /// </summary>
+    [HttpPost("scan-invoice")]
+    [HasPermission(Permissions.CreateInventoryTx)]
+    [Consumes("multipart/form-data")]
+    [ProducesResponseType(typeof(ApiResponse<InvoiceScanResult>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ScanInvoice(
+        IFormFile image,
+        CancellationToken ct)
+    {
+        if (image == null || image.Length == 0)
+            return BadRequest(new ApiResponse<object>
+            {
+                Success = false,
+                Code = 400,
+                UserMessage = "An invoice image is required.",
+                ServerTime = DateTimeOffset.UtcNow
+            });
+
+        var allowedTypes = new[] { "image/jpeg", "image/png", "image/webp", "image/gif" };
+        if (!allowedTypes.Contains(image.ContentType?.ToLowerInvariant()))
+            return BadRequest(new ApiResponse<object>
+            {
+                Success = false,
+                Code = 400,
+                UserMessage = "Only JPEG, PNG, WebP and GIF images are supported.",
+                ServerTime = DateTimeOffset.UtcNow
+            });
+
+        var mediaInput = new MediaFileInput
+        {
+            Stream = image.OpenReadStream(),
+            FileName = image.FileName,
+            ContentType = image.ContentType!
+        };
+
+        var result = await _invoiceScanService.ScanInvoiceAsync(mediaInput, ct);
+
+        _logger.LogInformation(
+            "User {UserId} scanned invoice image ({FileName}, {Size} bytes) — success={Success}, tokens={Tokens}",
+            GetCurrentUserId(), image.FileName, image.Length, result.Success, result.TokensUsed);
+
+        return Ok(new ApiResponse<InvoiceScanResult>
+        {
+            Success = result.Success,
+            Code = result.Success ? 200 : 422,
+            UserMessage = result.Success
+                ? "Invoice scanned successfully."
+                : result.ErrorMessage ?? "Invoice scan failed.",
             Data = result,
             ServerTime = DateTimeOffset.UtcNow
         });
