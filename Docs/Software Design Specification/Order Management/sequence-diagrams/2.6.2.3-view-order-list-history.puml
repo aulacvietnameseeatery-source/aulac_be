@@ -1,0 +1,95 @@
+@startuml
+title 2.6.2.3 View Order List/History
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":Staff" as U
+participant ":OrderListPage" as Client
+participant ":OrderController" as Ctrl
+participant ":OrderService" as Svc
+participant ":ILookupResolver" as Lookup
+participant ":IOrderRepository" as OrderRepo
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : Open Order History page (with optional filters)
+activate Client
+
+par Fetch order list and status counts
+    Client ->> Ctrl : GET /api/orders/history?search=&pageIndex=1&pageSize=10&...
+    activate Ctrl
+
+    note right of Ctrl : [HasPermission(Permissions.ViewOrder)]
+    Ctrl ->> Svc : GetOrderHistoryAsync(OrderHistoryQueryDTO, ct)
+    activate Svc
+
+    Svc ->> OrderRepo : GetOrderHistoryAsync(query, ct)
+    activate OrderRepo
+    OrderRepo ->> DB : SELECT orders with filters, pagination, joins (table, staff, customer, items)
+    activate DB
+    DB -->> OrderRepo : List<OrderHistoryDTO>, totalCount
+    deactivate DB
+    OrderRepo -->> Svc : PagedResultDTO<OrderHistoryDTO>
+    deactivate OrderRepo
+
+    Svc -->> Ctrl : PagedResultDTO<OrderHistoryDTO>
+    deactivate Svc
+
+    Ctrl -->> Client : 200 OK (paged order history)
+    deactivate Ctrl
+also
+    Client ->> Ctrl : GET /api/orders/count
+    activate Ctrl
+
+    Ctrl ->> Svc : GetOrderStatusCountAsync(ct)
+    activate Svc
+
+    Svc ->> Lookup : GetIdAsync(OrderStatus, PENDING)
+    activate Lookup
+    Lookup -->> Svc : pendingId
+    deactivate Lookup
+
+    Svc ->> Lookup : GetIdAsync(OrderStatus, IN_PROGRESS)
+    activate Lookup
+    Lookup -->> Svc : inProgressId
+    deactivate Lookup
+
+    Svc ->> Lookup : GetIdAsync(OrderStatus, COMPLETED)
+    activate Lookup
+    Lookup -->> Svc : completedId
+    deactivate Lookup
+
+    Svc ->> Lookup : GetIdAsync(OrderStatus, CANCELLED)
+    activate Lookup
+    Lookup -->> Svc : cancelledId
+    deactivate Lookup
+
+    Svc ->> OrderRepo : GetOrderStatusCountAsync(pendingId, inProgressId, completedId, cancelledId, ct)
+    activate OrderRepo
+    OrderRepo ->> DB : SELECT COUNT grouped by status
+    activate DB
+    DB -->> OrderRepo : counts
+    deactivate DB
+    OrderRepo -->> Svc : OrderStatusCountDTO
+    deactivate OrderRepo
+
+    Svc -->> Ctrl : OrderStatusCountDTO
+    deactivate Svc
+
+    Ctrl -->> Client : 200 OK (OrderStatusCountDTO)
+    deactivate Ctrl
+end
+
+Client -->> U : Display order history list with status tabs
+
+deactivate Client
+deactivate U
+
+@enduml

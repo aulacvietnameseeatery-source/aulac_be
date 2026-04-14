@@ -1,0 +1,90 @@
+@startuml
+title 2.6.2.10 Cancel Order Item
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":Customer" as U
+participant ":QRMenuPage" as Client
+participant ":OrderController" as Ctrl
+participant ":OrderService" as Svc
+participant ":ILookupResolver" as Lookup
+participant ":IOrderRepository" as OrderRepo
+participant ":IOrderRealtimeService" as Realtime
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : Tap cancel on an order item (before kitchen starts)
+activate Client
+
+Client ->> Ctrl : PATCH /api/orders/items/{orderItemId}/cancel
+activate Ctrl
+
+Ctrl ->> Svc : CancelOrderItemAsync(orderItemId, ct)
+activate Svc
+
+Svc ->> Lookup : GetIdAsync(OrderItemStatus, CREATED)
+activate Lookup
+Lookup -->> Svc : createdStatusLvId
+deactivate Lookup
+
+Svc ->> Lookup : GetIdAsync(OrderItemStatus, CANCELLED)
+activate Lookup
+Lookup -->> Svc : cancelledStatusLvId
+deactivate Lookup
+
+Svc ->> OrderRepo : GetOrderItemAsync(orderItemId, ct)
+activate OrderRepo
+OrderRepo ->> DB : SELECT OrderItem with Order
+activate DB
+DB -->> OrderRepo : OrderItem
+deactivate DB
+OrderRepo -->> Svc : OrderItem
+deactivate OrderRepo
+
+alt#White Item not found
+    Svc -->> Ctrl : throw NotFoundException
+    Ctrl -->> Client : 404 Not Found
+    Client -->> U : Display "Item not found" error
+else Item found
+    alt#White Item status is NOT CREATED
+        Svc -->> Ctrl : throw InvalidOperationException("Only CREATED items can be cancelled")
+        Ctrl -->> Client : 400 Bad Request
+        Client -->> U : Display "Cannot cancel — item already in progress"
+    else Item status is CREATED
+        Svc ->> Svc : Set item.ItemStatusLvId = cancelledStatusLvId
+
+        Svc ->> OrderRepo : Save updated item (via context tracking + SaveChanges)
+        activate OrderRepo
+        OrderRepo ->> DB : UPDATE OrderItem SET ItemStatusLvId = cancelledStatusLvId
+        activate DB
+        DB -->> OrderRepo : done
+        deactivate DB
+        OrderRepo -->> Svc : done
+        deactivate OrderRepo
+
+        Svc ->> Realtime : OrderItemUpdatedAsync(OrderItemRealtimeDTO)
+        activate Realtime
+        Realtime -->> Svc : done
+        deactivate Realtime
+
+        Svc -->> Ctrl : (void - success)
+        deactivate Svc
+
+        Ctrl -->> Client : 200 OK
+        deactivate Ctrl
+
+        Client -->> U : Item removed from order display
+    end
+end
+
+deactivate Client
+deactivate U
+
+@enduml

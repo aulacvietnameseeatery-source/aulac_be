@@ -1,0 +1,321 @@
+@startuml
+title Order Management Module - Presentation Layer Class Diagram
+
+package "Presentation Layer" {
+
+    class OrderController <<Controller>> {
+        -_orderService : IOrderService
+        -_lookupResolver : ILookupResolver
+        -_logger : ILogger<OrderController>
+        +CreateOrder(dto: CreateOrderRequestDTO, ct: CancellationToken) : Task<IActionResult>
+        +CreateStaffOrder(request: CreateOrderRequest, ct: CancellationToken) : Task<IActionResult>
+        +GetOrderHistory(query: OrderHistoryQueryDTO, ct: CancellationToken) : Task<IActionResult>
+        +GetCustomerOrderById(orderId: long, ct: CancellationToken) : Task<IActionResult>
+        +GetOrderById(id: long, ct: CancellationToken) : Task<IActionResult>
+        +GetKitchenOrders(ct: CancellationToken) : Task<IActionResult>
+        +GetOrderStatusCount(ct: CancellationToken) : Task<IActionResult>
+        +UpdateOrderStatus(id: long, dto: UpdateOrderStatusDTO, ct: CancellationToken) : Task<IActionResult>
+        +UpdateOrderItemStatus(id: long, dto: UpdateOrderItemStatusDTO, ct: CancellationToken) : Task<IActionResult>
+        +AddItemsToOrder(orderId: long, dto: AddOrderItemsRequestDTO, ct: CancellationToken) : Task<IActionResult>
+        +AddStaffOrderItems(id: long, request: AddOrderItemsRequest, ct: CancellationToken) : Task<IActionResult>
+        +CancelOrderItem(orderItemId: long, ct: CancellationToken) : Task<IActionResult>
+    }
+
+    class PaymentController <<Controller>> {
+        -_paymentService : IPaymentService
+        -_logger : ILogger<PaymentController>
+        +GetPayments(query: PaymentListQueryDTO, ct: CancellationToken) : Task<IActionResult>
+        +ProcessPayment(dto: CreatePaymentDTO, ct: CancellationToken) : Task<IActionResult>
+    }
+
+    ' ── Request DTOs (QR / Customer flow) ──
+
+    class CreateOrderRequestDTO <<DTO>> {
+        +TableCode : string
+        +QrToken : string?
+        +Items : List<CreateOrderItemDTO>
+    }
+
+    class CreateOrderItemDTO <<DTO>> {
+        +DishId : long
+        +Quantity : int
+        +Price : decimal
+        +Note : string?
+    }
+
+    class AddOrderItemsRequestDTO <<DTO>> {
+        +Items : List<CreateOrderItemDTO>
+    }
+
+    ' ── Request DTOs (Staff flow) ──
+
+    class CreateOrderRequest <<DTO>> {
+        +TableId : long?
+        +Customer : OrderCustomerDto?
+        +Source : OrderSourceCode
+        +Items : List<CreateOrderItemDto>
+    }
+
+    class AddOrderItemsRequest <<DTO>> {
+        +Customer : OrderCustomerDto?
+        +Items : List<CreateOrderItemDto>
+    }
+
+    class CreateOrderItemDto <<DTO>> {
+        +DishId : long
+        +Quantity : int
+        +Note : string?
+    }
+
+    class OrderCustomerDto <<DTO>> {
+        +CustomerId : long?
+        +FullName : string?
+        +Phone : string?
+        +Email : string?
+    }
+
+    ' ── Status Update Request DTOs ──
+
+    class UpdateOrderStatusDTO <<DTO>> {
+        +Status : string
+    }
+
+    class UpdateOrderItemStatusDTO <<DTO>> {
+        +Status : string
+        +RejectReason : string?
+    }
+
+    ' ── Query DTOs ──
+
+    class OrderHistoryQueryDTO <<DTO>> {
+        +Search : string?
+        +PageIndex : int
+        +PageSize : int
+        +OrderStatusCode : OrderStatusCode?
+        +OrderStatusLvId : uint?
+        +FromDate : DateTime?
+        +ToDate : DateTime?
+    }
+
+    ' ── Payment Request DTOs ──
+
+    class CreatePaymentDTO <<DTO>> {
+        +OrderId : long
+        +ReceivedAmount : decimal
+        +PaymentMethod : string
+        +CouponIds : List<long>?
+        +PromotionId : long?
+        +Note : string?
+        +TipAmount : decimal?
+    }
+
+    class PaymentListQueryDTO <<DTO>> {
+        +Search : string?
+        +Method : PaymentMethodCode?
+        +FromDate : DateTime?
+        +ToDate : DateTime?
+        +PageIndex : int
+        +PageSize : int
+    }
+
+    ' ── Response DTOs ──
+
+    class CreateOrderResponseDTO <<DTO>> {
+        +OrderId : long
+        +TableId : long
+        +TableCode : string
+        +CustomerId : long
+        +TotalAmount : decimal
+        +OrderStatus : string
+        +CreatedAt : DateTime?
+    }
+
+    class OrderDetailDTO <<DTO>> {
+        +OrderId : long
+        +TableId : long?
+        +TableCode : string
+        +StaffId : long?
+        +StaffName : string
+        +CustomerId : long
+        +CustomerName : string?
+        +SubTotalAmount : decimal
+        +TotalAmount : decimal
+        +TaxAmount : decimal
+        +TaxId : long?
+        +TipAmount : decimal?
+        +OrderStatus : string
+        +Source : string
+        +CreatedAt : DateTime?
+        +UpdatedAt : DateTime?
+        +IsPaid : bool
+        +OrderItems : List<OrderItemI18nDTO>
+        +Promotions : List<OrderPromotionDTO>
+        +Coupons : List<OrderCouponDTO>
+        +Payments : List<OrderPaymentDTO>
+        +ItemCount : int
+    }
+
+    class OrderItemI18nDTO <<DTO>> {
+        +OrderItemId : long
+        +DishId : long
+        +CategoryId : long
+        +DishNameI18n : LookupValueTranslationDto
+        +Quantity : int
+        +Price : decimal
+        +ItemStatus : string
+        +RejectReason : string?
+        +Note : string?
+    }
+
+    class OrderPromotionDTO <<DTO>> {
+        +PromotionId : long
+        +PromotionName : string
+        +DiscountAmount : decimal
+    }
+
+    class OrderCouponDTO <<DTO>> {
+        +CouponId : long
+        +CouponCode : string
+        +DiscountAmount : decimal
+    }
+
+    class OrderPaymentDTO <<DTO>> {
+        +PaymentId : long
+        +ReceivedAmount : decimal
+        +ChangeAmount : decimal
+        +PaidAt : DateTime?
+        +Method : string
+    }
+
+    class OrderHistoryDTO <<DTO>> {
+        +OrderId : long
+        +TableId : long?
+        +TableCode : string
+        +StaffId : long?
+        +StaffName : string
+        +CustomerId : long
+        +CustomerName : string?
+        +TotalAmount : decimal
+        +TipAmount : decimal?
+        +OrderStatus : string
+        +Source : string
+        +CreatedAt : DateTime?
+        +UpdatedAt : DateTime?
+        +IsPaid : bool
+        +TaxAmount : decimal
+        +TaxId : long?
+        +OrderItems : List<OrderItemDTO>
+        +ItemCount : int
+    }
+
+    class OrderItemDTO <<DTO>> {
+        +OrderItemId : long
+        +DishId : long
+        +CategoryId : long
+        +DishName : string
+        +Quantity : int
+        +Price : decimal
+        +ItemStatus : string
+        +RejectReason : string?
+        +Note : string?
+    }
+
+    class OrderStatusCountDTO <<DTO>> {
+        +All : int
+        +Pending : int
+        +InProgress : int
+        +Completed : int
+        +Cancelled : int
+    }
+
+    class CustomerOrderHistoryDTO <<DTO>> {
+        +TableCode : string
+        +TotalItems : int
+        +EstimatedTotal : decimal
+        +TaxAmount : decimal
+        +Items : List<OrderItemDTO>
+    }
+
+    class KitchenOrderDTO <<DTO>> {
+        +OrderId : long
+        +TableCode : string
+        +OrderStatus : string
+        +CreatedAt : DateTime?
+        +Items : List<KitchenOrderItemDTO>
+    }
+
+    class KitchenOrderItemDTO <<DTO>> {
+        +OrderItemId : long
+        +DishName : string
+        +Quantity : int
+        +ItemStatus : string
+        +Note : string?
+        +RejectReason : string?
+    }
+
+    class PaymentListDTO <<DTO>> {
+        +PaymentId : long
+        +OrderId : long
+        +ReceivedAmount : decimal
+        +ChangeAmount : decimal
+        +FinalAmount : decimal
+        +Method : string
+        +PaidAt : DateTime?
+        +CustomerName : string?
+        +CustomerPhone : string?
+    }
+
+    ' ── Realtime DTOs ──
+
+    class OrderRealtimeDTO <<DTO>> {
+        +OrderId : long
+        +Status : string
+        +TableId : long?
+        +UpdatedAt : DateTime
+    }
+
+    class OrderItemRealtimeDTO <<DTO>> {
+        +OrderItemId : long
+        +OrderId : long
+        +Status : string
+        +UpdatedAt : DateTime
+    }
+}
+
+' ── Relationships ──
+
+OrderController ..> CreateOrderRequestDTO : receives QR order
+OrderController ..> CreateOrderRequest : receives staff order
+OrderController ..> AddOrderItemsRequestDTO : receives customer add-items
+OrderController ..> AddOrderItemsRequest : receives staff add-items
+OrderController ..> UpdateOrderStatusDTO : receives status update
+OrderController ..> UpdateOrderItemStatusDTO : receives item status update
+OrderController ..> OrderHistoryQueryDTO : receives history query
+OrderController ..> CreateOrderResponseDTO : returns on create
+OrderController ..> OrderDetailDTO : returns order detail
+OrderController ..> OrderHistoryDTO : returns history list
+OrderController ..> OrderStatusCountDTO : returns status counts
+OrderController ..> CustomerOrderHistoryDTO : returns customer order
+OrderController ..> KitchenOrderDTO : returns kitchen orders
+
+PaymentController ..> CreatePaymentDTO : receives payment request
+PaymentController ..> PaymentListQueryDTO : receives payment query
+PaymentController ..> PaymentListDTO : returns payment list
+
+CreateOrderRequestDTO *-- "1..*" CreateOrderItemDTO : contains items
+AddOrderItemsRequestDTO *-- "1..*" CreateOrderItemDTO : contains items
+CreateOrderRequest *-- "0..*" CreateOrderItemDto : contains items
+CreateOrderRequest *-- "0..1" OrderCustomerDto : contains customer
+AddOrderItemsRequest *-- "0..*" CreateOrderItemDto : contains items
+AddOrderItemsRequest *-- "0..1" OrderCustomerDto : contains customer
+
+OrderDetailDTO *-- "0..*" OrderItemI18nDTO : contains items
+OrderDetailDTO *-- "0..*" OrderPromotionDTO : contains promotions
+OrderDetailDTO *-- "0..*" OrderCouponDTO : contains coupons
+OrderDetailDTO *-- "0..*" OrderPaymentDTO : contains payments
+
+OrderHistoryDTO *-- "0..*" OrderItemDTO : contains items
+CustomerOrderHistoryDTO *-- "0..*" OrderItemDTO : contains items
+KitchenOrderDTO *-- "1..*" KitchenOrderItemDTO : contains items
+
+@enduml

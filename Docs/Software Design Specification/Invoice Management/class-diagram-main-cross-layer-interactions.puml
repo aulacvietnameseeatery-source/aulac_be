@@ -1,0 +1,97 @@
+@startuml
+title Invoice Management Module - Main Cross-Layer Interactions
+
+package "Presentation Layer" {
+    class InvoiceController <<Controller>> {
+        -_saleInvoiceService : ISaleInvoiceService
+        +GetSaleInvoiceList(query, ct) : Task<IActionResult>
+        +GetSaleInvoiceDetail(id, ct) : Task<IActionResult>
+    }
+}
+
+package "Application Layer" {
+    interface ISaleInvoiceService <<interface>> {
+        +GetSaleInvoiceDetailAsync(orderId, ct) : Task<SaleInvoiceDTO>
+        +GetSaleInvoiceListAsync(query, ct) : Task<PagedResultDTO<SaleInvoiceListDTO>>
+    }
+
+    class SaleInvoiceService <<Service>> {
+        -_saleInvoiceRepository : ISaleInvoiceRepository
+    }
+}
+
+package "Persistence Layer" {
+    interface ISaleInvoiceRepository <<interface>> {
+        +GetOrderForInvoiceAsync(orderId, ct) : Task<Order?>
+        +GetTotalDiscountAsync(orderId, ct) : Task<decimal>
+        +GetOrdersForInvoiceListAsync(query, ct) : Task<PagedResultDTO<SaleInvoiceListDTO>>
+    }
+
+    class SaleInvoiceRepository <<Repository>> {
+        -_context : RestaurantMgmtContext
+    }
+}
+
+package "Domain Layer" {
+    class Order <<Entity>> {
+        +OrderId : long
+        +TableId : long?
+        +StaffId : long?
+        +CustomerId : long
+        +SubTotalAmount : decimal
+        +TotalAmount : decimal
+        +TipAmount : decimal?
+        +OrderStatusLvId : uint
+        +SourceLvId : uint
+        +CreatedAt : DateTime?
+    }
+
+    class OrderItem <<Entity>> {
+        +OrderItemId : long
+        +OrderId : long
+        +DishId : long
+        +Quantity : int
+        +Price : decimal
+        +ItemStatusLvId : uint
+    }
+
+    class Payment <<Entity>> {
+        +PaymentId : long
+        +OrderId : long
+        +ReceivedAmount : decimal
+        +MethodLvId : uint
+    }
+
+    class OrderCoupon <<Entity>> {
+        +OrderCouponId : long
+        +OrderId : long
+        +DiscountAmount : decimal
+    }
+
+    class OrderPromotion <<Entity>> {
+        +OrderPromotionId : long
+        +OrderId : long
+        +DiscountAmount : decimal
+    }
+}
+
+' ── Cross-layer relationships ──
+
+InvoiceController --> ISaleInvoiceService : delegates invoice operations
+
+SaleInvoiceService ..|> ISaleInvoiceService : implements
+SaleInvoiceService --> ISaleInvoiceRepository : uses for invoice data retrieval
+
+SaleInvoiceRepository ..|> ISaleInvoiceRepository : implements
+SaleInvoiceRepository ..> Order : queries with eager loading
+SaleInvoiceRepository ..> OrderItem : queries items
+SaleInvoiceRepository ..> OrderCoupon : queries coupon discounts
+SaleInvoiceRepository ..> OrderPromotion : queries promotion discounts
+SaleInvoiceRepository ..> Payment : queries payment info
+
+Order *-- "1..*" OrderItem : contains items
+Order *-- "0..*" OrderCoupon : applied coupons
+Order *-- "0..*" OrderPromotion : applied promotions
+Order *-- "0..*" Payment : payments received
+
+@enduml
