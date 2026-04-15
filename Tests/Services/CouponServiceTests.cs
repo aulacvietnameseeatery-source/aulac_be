@@ -63,8 +63,7 @@ public class CouponServiceTests
         EndTime = DateTime.UtcNow.AddDays(2),
         DiscountValue = 10,
         MaxUsage = 100,
-        Type = "PERCENT",
-        CouponStatus = "ACTIVE"
+        Type = "PERCENT"
     };
 
     // Helper: tạo UpdateCouponRequest giả
@@ -77,8 +76,7 @@ public class CouponServiceTests
         EndTime = DateTime.UtcNow.AddDays(4),
         DiscountValue = 20,
         MaxUsage = 50,
-        Type = "PERCENT",
-        CouponStatus = "ACTIVE"
+        Type = "PERCENT"
     };
 
     [Fact]
