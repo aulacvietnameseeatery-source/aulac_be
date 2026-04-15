@@ -144,17 +144,17 @@ public class PublicReservationController : ControllerBase
         [FromQuery] string? token = null,
         CancellationToken cancellationToken = default)
     {
-        await _tableService.OccupyTableByCodeAsync(tableCode, token, cancellationToken);
+        var activeOrderId = await _tableService.OccupyTableByCodeAsync(tableCode, token, cancellationToken);
 
-        _logger.LogInformation("Table {TableCode} marked as occupied by customer", tableCode);
+        _logger.LogInformation("Table {TableCode} accessed by customer via QR, activeOrderId={ActiveOrderId}", tableCode, activeOrderId);
 
         return Ok(new ApiResponse<object>
         {
             Success = true,
             Code = 200,
-            UserMessage = "Table marked as occupied successfully.",
-            SystemMessage = "Table status updated",
-            Data = new { },
+            UserMessage = "Table accessed successfully.",
+            SystemMessage = "Table validated",
+            Data = new { activeOrderId },
             ServerTime = DateTimeOffset.UtcNow
         });
     }

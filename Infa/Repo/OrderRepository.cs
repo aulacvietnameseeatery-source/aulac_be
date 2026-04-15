@@ -552,6 +552,7 @@ public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, Can
             .Where(o => o.TableId == tableId &&
                         o.OrderStatusLv.ValueCode != OrderStatusCode.COMPLETED.ToString() &&
                         o.OrderStatusLv.ValueCode != OrderStatusCode.CANCELLED.ToString())
+            .OrderByDescending(o => o.OrderId)
             .FirstOrDefaultAsync(ct);
     }
 

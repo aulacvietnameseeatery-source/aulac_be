@@ -101,10 +101,10 @@ public interface ITableService
     Task DeleteTableMediaAsync(long tableId, long mediaId, CancellationToken ct = default);
 
     /// <summary>
-        /// Marks a table as occupied by table code. Used by customers via QR code.
-        /// Optionally validates the QR token when provided.
+        /// Validates a table for QR-scan access and returns the active order ID (if any).
+        /// Throws if the table is locked or deleted.
         /// </summary>
-    Task OccupyTableByCodeAsync(string tableCode, string? qrToken = null, CancellationToken ct = default);
+    Task<long?> OccupyTableByCodeAsync(string tableCode, string? qrToken = null, CancellationToken ct = default);
 
     // Lấy bàn trống theo khung giờ cụ thể 
     Task<List<TableSelectDto>> GetAvailableTablesByTimeAsync(DateTime targetTime, CancellationToken ct = default);
