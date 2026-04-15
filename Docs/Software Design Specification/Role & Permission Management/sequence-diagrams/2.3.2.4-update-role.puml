@@ -1,0 +1,157 @@
+@startuml
+title 2.3.2.4 Update Role
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":User" as U
+participant ":RoleEditPage" as Client
+participant ":RoleController" as Ctrl
+participant ":RoleService" as Svc
+participant ":RoleRepository" as Repo
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : Edit role name, toggle permissions, change status, submit
+activate Client
+
+Client ->> Ctrl : PUT /api/roles/{id} { UpdateRoleRequestDto }
+activate Ctrl
+
+Ctrl ->> Svc : UpdateRoleAsync(id : long, request : UpdateRoleRequestDto)
+activate Svc
+
+Svc ->> Repo : GetRoleWithPermissionsForUpdateAsync(roleId)
+activate Repo
+
+Repo ->> DB : Query role by ID with permissions and status (tracking enabled)
+activate DB
+DB -->> Repo : Return tracked role entity with permissions
+deactivate DB
+
+Repo -->> Svc : Role? (tracked, with Permissions and RoleStatusLv)
+deactivate Repo
+
+alt#White Role not found
+
+    Svc -->> Ctrl : throw KeyNotFoundException
+    deactivate Svc
+
+    Ctrl -->> Client : 404 Not Found ApiResponse
+    deactivate Ctrl
+
+    Client -->> U : Display role not found error
+    deactivate Client
+
+else Role found
+
+    activate Svc
+
+    Svc -->> Svc : Auto-generate new RoleCode from updated RoleName
+
+    alt#White New RoleCode differs from current and already exists for another role
+
+        Svc ->> Repo : RoleCodeExistsAsync(newRoleCode)
+        activate Repo
+
+        Repo ->> DB : Check if new role code already exists
+        activate DB
+        DB -->> Repo : Return true
+        deactivate DB
+
+        Repo -->> Svc : true
+        deactivate Repo
+
+        Svc -->> Ctrl : throw ConflictException
+        deactivate Svc
+
+        Ctrl -->> Client : 409 Conflict ApiResponse
+        deactivate Ctrl
+
+        Client -->> U : Display duplicate role code error
+        deactivate Client
+
+    else RoleCode is valid
+
+        activate Svc
+
+        Svc ->> Repo : GetRoleStatusIdAsync(statusCode based on IsActive)
+        activate Repo
+
+        Repo ->> DB : Query LookupValue for ROLE_STATUS with target ValueCode
+        activate DB
+        DB -->> Repo : Return status ValueId
+        deactivate DB
+
+        Repo -->> Svc : uint? (roleStatusId)
+        deactivate Repo
+
+        Svc ->> Repo : GetPermissionsByIdsAsync(permissionIds)
+        activate Repo
+
+        Repo ->> DB : Query permissions by list of IDs
+        activate DB
+        DB -->> Repo : Return list of matching permissions
+        deactivate DB
+
+        Repo -->> Svc : List<Permission>
+        deactivate Repo
+
+        alt#White Invalid permission IDs found
+
+            Svc -->> Ctrl : throw InvalidOperationException
+            deactivate Svc
+
+            Ctrl -->> Client : 400 Bad Request ApiResponse
+            deactivate Ctrl
+
+            Client -->> U : Display invalid permissions error
+            deactivate Client
+
+        else All permission IDs valid
+
+            activate Svc
+
+            Svc -->> Svc : Update RoleCode, RoleName, RoleStatusLvId on entity
+
+            Svc -->> Svc : Differential permission update — remove old, add new
+
+            Svc ->> Repo : UpdateAsync(existingRole)
+            activate Repo
+
+            Repo ->> DB : Update role record and permission join table
+            activate DB
+            DB -->> Repo : Confirm update
+            deactivate DB
+
+            Repo -->> Svc : Task completed
+            deactivate Repo
+
+            Svc ->> Svc : GetRoleDetailAsync(roleId)
+
+            Svc -->> Ctrl : RoleDetailDto
+            deactivate Svc
+
+            Ctrl -->> Ctrl : Wrap in ApiResponse<RoleDetailDto>
+
+            Ctrl -->> Client : 200 OK ApiResponse<RoleDetailDto>
+            deactivate Ctrl
+
+            Client -->> U : Display updated role detail
+            deactivate Client
+
+        end
+
+    end
+
+end
+
+deactivate U
+
+@enduml

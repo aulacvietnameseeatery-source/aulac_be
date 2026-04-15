@@ -162,7 +162,7 @@ Row 8 is the header row:
 | B | Module Name (e.g., `AUTHENTICATION`, `DISH`, `ORDER`) |
 | C | Method Name (e.g., `LoginAsync`) |
 | D | Sheet Name (must match the sheet tab name for this method) |
-| E | Description |
+| E | Description — **must be an English natural-language use case** describing who performs the action and what they accomplish (e.g., "Staff creates a new order by selecting items, table, and source, resolving the customer and calculating tax"). Do NOT use technical summaries like "Returns paged list" or Vietnamese text. |
 | F | Pre-Condition |
 
 Add one row per tested method, starting from row 9.
@@ -195,7 +195,7 @@ Row 11 is the header row:
 |-----|-------|-------|-------|-------|
 | 1 | `Code Module` | Module name | `Method` | Method name |
 | 2 | `Created By` | Developer name | `Executed By` | Tester name |
-| 3 | `Test requirement` | Description (merged C3:K3) | | |
+| 3 | `Test requirement` | English natural-language use case description (merged C3:K3). Same style as the MethodList Description column — describe who performs the action and what they accomplish. | | |
 | 4 | `Passed` | `Failed` | `Untested` | `N/A/B` counts |
 | 5 | Passed count | Failed count | Untested count | N, A, B counts → Total |
 
@@ -252,3 +252,4 @@ For each `[Fact]` test method in the C# file:
 - Every `[Fact]` MUST have `[Trait("Type", "...")]` and `[Trait("Method", "...")]`.
 - Test names MUST follow `{Method}_{Scenario}_{Expected}` convention.
 - Generate BOTH the C# test file AND the Markdown report instruction file.
+- All Description and Test requirement text MUST be written in **English natural language** describing a use case (actor + action + context). Never use Vietnamese or terse technical summaries.

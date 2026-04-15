@@ -1,0 +1,56 @@
+@startuml
+title 2.3.2.1 View Role List
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":User" as U
+participant ":RoleListPage" as Client
+participant ":RoleController" as Ctrl
+participant ":RoleService" as Svc
+participant ":RoleRepository" as Repo
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : Navigate to Role Management page
+activate Client
+
+Client ->> Ctrl : GET /api/roles?pageIndex=1&pageSize=20&search=
+activate Ctrl
+
+Ctrl ->> Svc : GetPagedAsync(query : PagedQuery)
+activate Svc
+
+Svc ->> Repo : GetPagedWithStaffCountAsync(pageIndex, pageSize, search)
+activate Repo
+
+Repo ->> DB : Query active roles filtered by search with staff count, ordered by RoleCode, paged
+activate DB
+DB -->> Repo : Return list of roles with staff accounts
+deactivate DB
+
+Repo -->> Svc : (List<Role>, totalCount)
+deactivate Repo
+
+Svc -->> Svc : Map Role entities to List<RoleListItemDto>
+
+Svc -->> Ctrl : (List<RoleListItemDto>, totalCount)
+deactivate Svc
+
+Ctrl -->> Ctrl : Wrap in PagedResult<RoleListItemDto> and ApiResponse
+
+Ctrl -->> Client : 200 OK ApiResponse<PagedResult<RoleListItemDto>>
+deactivate Ctrl
+
+Client -->> U : Display paginated role list with staff counts
+deactivate Client
+
+deactivate U
+
+@enduml

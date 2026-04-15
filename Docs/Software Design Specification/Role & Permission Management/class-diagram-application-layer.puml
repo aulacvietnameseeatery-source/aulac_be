@@ -1,0 +1,58 @@
+@startuml
+title Role & Permission Management Module - Application Layer Class Diagram
+
+package "Application Layer" {
+
+    interface IRoleService <<interface>> {
+        +GetPagedAsync(query : PagedQuery) : Task<(List<RoleListItemDto>, int)>
+        +GetRoleDetailAsync(roleId : long) : Task<RoleDetailDto>
+        +CreateRoleAsync(request : CreateRoleRequestDto) : Task<RoleDetailDto>
+        +UpdateRoleAsync(roleId : long, request : UpdateRoleRequestDto) : Task<RoleDetailDto>
+        +DeleteRoleAsync(roleId : long) : Task
+    }
+
+    class RoleService <<Service>> {
+        -_roleRepository : IRoleRepository
+        +GetPagedAsync(query : PagedQuery) : Task<(List<RoleListItemDto>, int)>
+        +GetRoleDetailAsync(roleId : long) : Task<RoleDetailDto>
+        +CreateRoleAsync(request : CreateRoleRequestDto) : Task<RoleDetailDto>
+        +UpdateRoleAsync(roleId : long, request : UpdateRoleRequestDto) : Task<RoleDetailDto>
+        +DeleteRoleAsync(roleId : long) : Task
+        -GetScreenDisplayName(screenCode : string) : string
+        -GetActionDisplayName(actionCode : string) : string
+        -GetScreenOrder(screenCode : string) : int
+        -GetActionOrder(actionCode : string) : int
+    }
+
+    RoleService ..|> IRoleService : implements
+}
+
+' --- External stubs ---
+class IRoleRepository <<interface>> {
+}
+
+class PagedQuery <<DTO>> {
+}
+
+class RoleListItemDto <<DTO>> {
+}
+
+class RoleDetailDto <<DTO>> {
+}
+
+class CreateRoleRequestDto <<DTO>> {
+}
+
+class UpdateRoleRequestDto <<DTO>> {
+}
+
+' --- Relationships ---
+RoleService --> IRoleRepository : depends on for data access
+
+RoleService ..> PagedQuery : receives paging criteria
+RoleService ..> CreateRoleRequestDto : receives create request
+RoleService ..> UpdateRoleRequestDto : receives update request
+RoleService ..> RoleListItemDto : produces list items
+RoleService ..> RoleDetailDto : produces role detail
+
+@enduml

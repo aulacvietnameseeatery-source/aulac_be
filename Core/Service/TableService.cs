@@ -26,6 +26,7 @@ public class TableService : ITableService
     private readonly IQrCodeGenerator _qrCodeGenerator;
     private readonly BaseUrlOptions _baseUrlOptions;
     private readonly INotificationService _notificationService;
+    private readonly IOrderRepository _orderRepository;
 
     /// <summary>
     /// Allowed status transitions — key: current code, value: set of permitted next codes.
@@ -51,7 +52,8 @@ public class TableService : ITableService
         IMediaRepository mediaRepository,
         IQrCodeGenerator qrCodeGenerator,
         IOptions<BaseUrlOptions> baseUrlOptions,
-        INotificationService notificationService)
+        INotificationService notificationService,
+        IOrderRepository orderRepository)
     {
         _tableRepository = tableRepository;
         _unitOfWork = unitOfWork;
@@ -62,6 +64,7 @@ public class TableService : ITableService
         _qrCodeGenerator = qrCodeGenerator;
         _baseUrlOptions = baseUrlOptions.Value;
         _notificationService = notificationService;
+        _orderRepository = orderRepository;
     }
 
     #region ── List / Select ──
@@ -547,26 +550,28 @@ public class TableService : ITableService
     #region ── Customer flow ──
 
     /// <inheritdoc />
-    public async Task OccupyTableByCodeAsync(string tableCode, string? qrToken = null, CancellationToken ct = default)
+    public async Task<long?> OccupyTableByCodeAsync(string tableCode, string? qrToken = null, CancellationToken ct = default)
     {
         var table = await _tableRepository.GetByCodeAsync(tableCode, ct)
               ?? throw new NotFoundException($"Table '{tableCode}' not found");
+
+        // Block deleted tables
+        if (table.IsDeleted)
+            throw new ConflictException($"Table '{tableCode}' is no longer available.");
 
         // Validate QR token if provided (QR scan flow)
         if (qrToken is not null && !string.Equals(table.QrToken, qrToken, StringComparison.Ordinal))
             throw new ValidationException("Invalid QR token. Please scan the QR code on the table again.");
 
-        // CHANGED: Only validate the table and QR token, don't lock the table yet
-        // The table will be locked when the first order is created (see OrderService.CreateOrderAsync)
-        
         var lockedLvId = await TableStatusCode.LOCKED.ToTableStatusIdAsync(_lookupResolver, ct);
 
-        // Only block if the table is LOCKED (for maintenance)
+        // Block if the table is LOCKED (maintenance)
         if (table.TableStatusLvId == lockedLvId)
             throw new ConflictException($"Table '{tableCode}' is under maintenance and cannot be used.");
 
-        // If the table is OCCUPIED or RESERVED, we still allow users to view the menu
-        // Multiple users can view the menu, but only the first one to order will lock the table
+        // Return the active order ID for this table (if any), so the customer can see staff-placed orders
+        var activeOrder = await _orderRepository.GetActiveOrderByTableAsync(table.TableId, ct);
+        return activeOrder?.OrderId;
     }
 
     #endregion

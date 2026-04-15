@@ -1,0 +1,86 @@
+@startuml
+title 2.3.2.2 View Role Detail
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":User" as U
+participant ":RoleDetailPage" as Client
+participant ":RoleController" as Ctrl
+participant ":RoleService" as Svc
+participant ":RoleRepository" as Repo
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : Click on a role to view details
+activate Client
+
+Client ->> Ctrl : GET /api/roles/{id}
+activate Ctrl
+
+Ctrl ->> Svc : GetRoleDetailAsync(id : long)
+activate Svc
+
+Svc ->> Repo : GetRoleWithPermissionsAsync(roleId)
+activate Repo
+
+Repo ->> DB : Query role by ID with permissions and status lookup
+activate DB
+DB -->> Repo : Return role entity with permissions and status
+deactivate DB
+
+Repo -->> Svc : Role? (with Permissions and RoleStatusLv)
+deactivate Repo
+
+alt#White Role not found
+
+    Svc -->> Ctrl : throw KeyNotFoundException
+    deactivate Svc
+
+    Ctrl -->> Client : 404 Not Found ApiResponse
+    deactivate Ctrl
+
+    Client -->> U : Display role not found error
+    deactivate Client
+
+else Role found
+
+    activate Svc
+
+    Svc ->> Repo : GetAllPermissionsAsync()
+    activate Repo
+
+    Repo ->> DB : Query all permissions ordered by ScreenCode and ActionCode
+    activate DB
+    DB -->> Repo : Return list of all permissions
+    deactivate DB
+
+    Repo -->> Svc : List<Permission>
+    deactivate Repo
+
+    Svc -->> Svc : Group permissions by ScreenCode, map to PermissionGroupDto with IsAssigned flags
+
+    Svc -->> Svc : Determine IsActive from RoleStatusLv.ValueCode
+
+    Svc -->> Ctrl : RoleDetailDto
+    deactivate Svc
+
+    Ctrl -->> Ctrl : Wrap in ApiResponse<RoleDetailDto>
+
+    Ctrl -->> Client : 200 OK ApiResponse<RoleDetailDto>
+    deactivate Ctrl
+
+    Client -->> U : Display role detail with permission groups
+    deactivate Client
+
+end
+
+deactivate U
+
+@enduml
