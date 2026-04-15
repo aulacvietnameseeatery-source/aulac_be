@@ -463,6 +463,75 @@ public class PublicReservationServiceTests
         result.First().IsAvailable.Should().BeTrue();
     }
 
+    /// <summary>
+    /// [Abnormal] Repository throws — exception propagates through service
+    /// Precondition: Repository throws an exception when fetching tables
+    /// Input: ReservedTime = 2 hours in future
+    /// Expected: Exception propagates unchanged
+    /// </summary>
+    [Fact]
+    [Trait("Type", "Abnormal")]
+    [Trait("Method", "GetAvailableTablesAsync")]
+    public async Task GetAvailableTablesAsync_WhenRepositoryThrows_PropagatesException()
+    {
+        // Arrange — repository failure (e.g., DB connection error)
+        SetupDefaultLookupBehavior();
+        SetupDefaultSystemSettings();
+
+        _tableRepoMock
+            .Setup(r => r.GetManualAvailableTablesAsync(true, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("Database connection failed"));
+
+        var service = CreateService();
+
+        // Act & Assert
+        await service.Invoking(s => s.GetAvailableTablesAsync(DateTime.UtcNow.AddHours(2)))
+            .Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*Database connection*");
+    }
+
+    /// <summary>
+    /// [Boundary] Table is RESERVED (near real-time window)
+    /// Precondition: DB returns 1 table with RESERVED status, reservation time within immediate window
+    /// Input: ReservedTime = 30 min in future (within immediateWindow)
+    /// Expected: IsAvailable = false for reserved table
+    /// </summary>
+    [Fact]
+    [Trait("Type", "Boundary")]
+    [Trait("Method", "GetAvailableTablesAsync")]
+    public async Task GetAvailableTablesAsync_WhenTableIsReserved_MarkedAsNotAvailable()
+    {
+        // Arrange — reserved table within immediate window boundary
+        SetupDefaultLookupBehavior();
+        SetupDefaultSystemSettings();
+
+        var reservedTable = MakeTable(1, "T001", 2, TABLE_RESERVED_ID);
+        _tableRepoMock
+            .Setup(r => r.GetManualAvailableTablesAsync(true, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<RestaurantTable> { reservedTable });
+
+        _reservationRepoMock
+            .Setup(r => r.GetTableReservationsForTimeAsync(
+                It.IsAny<long>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<int>(),
+                It.IsAny<uint>(),
+                It.IsAny<uint>(),
+                It.IsAny<uint>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Reservation>());
+
+        var service = CreateService();
+        var reservedTime = DateTime.UtcNow.AddMinutes(30); // within immediate window
+
+        // Act
+        var result = await service.GetAvailableTablesAsync(reservedTime);
+
+        // Assert — reserved table should be marked unavailable
+        result.Should().HaveCount(1);
+        result.First().IsAvailable.Should().BeFalse();
+    }
+
     // ═══════════════════════════════════════════════════════════════════════
     // TEST CASES - CreateReservationAsync
     // ═══════════════════════════════════════════════════════════════════════

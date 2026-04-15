@@ -1,0 +1,127 @@
+@startuml
+title 2.3.2.3 Create Role
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":User" as U
+participant ":RoleCreatePage" as Client
+participant ":RoleController" as Ctrl
+participant ":RoleService" as Svc
+participant ":RoleRepository" as Repo
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : Fill in role name, select permissions, submit
+activate Client
+
+Client ->> Ctrl : POST /api/roles { CreateRoleRequestDto }
+activate Ctrl
+
+Ctrl ->> Svc : CreateRoleAsync(request : CreateRoleRequestDto)
+activate Svc
+
+Svc -->> Svc : Auto-generate RoleCode from RoleName (uppercase, underscores)
+
+Svc ->> Repo : RoleCodeExistsAsync(roleCode)
+activate Repo
+
+Repo ->> DB : Check if role code already exists
+activate DB
+DB -->> Repo : Return true/false
+deactivate DB
+
+Repo -->> Svc : bool
+deactivate Repo
+
+alt#White Role code already exists
+
+    Svc -->> Ctrl : throw ConflictException
+    deactivate Svc
+
+    Ctrl -->> Client : 409 Conflict ApiResponse
+    deactivate Ctrl
+
+    Client -->> U : Display duplicate role code error
+    deactivate Client
+
+else Role code is unique
+
+    activate Svc
+
+    Svc ->> Repo : GetRoleStatusIdAsync("ACTIVE")
+    activate Repo
+
+    Repo ->> DB : Query LookupValue for ROLE_STATUS with ValueCode ACTIVE
+    activate DB
+    DB -->> Repo : Return status ValueId
+    deactivate DB
+
+    Repo -->> Svc : uint? (roleStatusId)
+    deactivate Repo
+
+    Svc ->> Repo : GetPermissionsByIdsAsync(permissionIds)
+    activate Repo
+
+    Repo ->> DB : Query permissions by list of IDs
+    activate DB
+    DB -->> Repo : Return list of matching permissions
+    deactivate DB
+
+    Repo -->> Svc : List<Permission>
+    deactivate Repo
+
+    alt#White Invalid permission IDs found
+
+        Svc -->> Ctrl : throw InvalidOperationException
+        deactivate Svc
+
+        Ctrl -->> Client : 400 Bad Request ApiResponse
+        deactivate Ctrl
+
+        Client -->> U : Display invalid permissions error
+        deactivate Client
+
+    else All permission IDs valid
+
+        activate Svc
+
+        Svc -->> Svc : Create new Role entity with code, name, status, and permissions
+
+        Svc ->> Repo : AddAsync(role : Role)
+        activate Repo
+
+        Repo ->> DB : Insert new role and attach permissions via join table
+        activate DB
+        DB -->> Repo : Return created role with generated ID
+        deactivate DB
+
+        Repo -->> Svc : Role (with RoleId)
+        deactivate Repo
+
+        Svc ->> Svc : GetRoleDetailAsync(createdRole.RoleId)
+
+        Svc -->> Ctrl : RoleDetailDto
+        deactivate Svc
+
+        Ctrl -->> Ctrl : Wrap in ApiResponse<RoleDetailDto>
+
+        Ctrl -->> Client : 201 Created ApiResponse<RoleDetailDto>
+        deactivate Ctrl
+
+        Client -->> U : Display newly created role detail
+        deactivate Client
+
+    end
+
+end
+
+deactivate U
+
+@enduml
