@@ -170,7 +170,7 @@ namespace Core.Service
                 FullName = string.IsNullOrWhiteSpace(request.FullName) ? null : request.FullName.Trim(),
                 Email = string.IsNullOrWhiteSpace(request.Email) ? null : request.Email.Trim(),
                 IsMember = request.IsMember,
-                LoyaltyPoints = request.LoyaltyPoints,
+                LoyaltyPoints = 0,
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -207,7 +207,6 @@ namespace Core.Service
             customer.FullName = string.IsNullOrWhiteSpace(request.FullName) ? null : request.FullName.Trim();
             customer.Email = string.IsNullOrWhiteSpace(request.Email) ? null : request.Email.Trim();
             customer.IsMember = request.IsMember;
-            customer.LoyaltyPoints = request.LoyaltyPoints;
 
             await _customerRepository.UpdateAsync(customer, ct);
 
