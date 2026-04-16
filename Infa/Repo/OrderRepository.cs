@@ -398,52 +398,6 @@ public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, Can
 		await _context.SaveChangesAsync(cancellationToken);
 	}
 
-	public async Task<CustomerOrderHistoryDTO> GetCustomerOrderHistoryAsync(string tableCode, CancellationToken cancellationToken = default)
-	{
-		// Include all orders created within the last 24 h to cover late-night sessions
-		var since = DateTime.UtcNow.AddHours(-24);
-
-		var orders = await _context.Orders
-			.Where(o => o.Table.TableCode == tableCode && o.CreatedAt >= since)
-			.Include(o => o.OrderStatusLv)
-			.Include(o => o.Table)
-			.Include(o => o.OrderItems)
-				.ThenInclude(oi => oi.Dish)
-			.Include(o => o.OrderItems)
-				.ThenInclude(oi => oi.ItemStatusLv)
-			.OrderByDescending(o => o.CreatedAt)
-			.ToListAsync(cancellationToken);
-
-		// Flatten all items from all orders (newest first)
-		var allItems = orders
-			.SelectMany(o => o.OrderItems.Select(oi => new OrderItemDTO
-			{
-				OrderItemId = oi.OrderItemId,
-				DishId      = oi.DishId,
-				CategoryId  = oi.Dish.CategoryId,
-				DishName    = oi.Dish.DishName,
-				Quantity    = oi.Quantity,
-				Price       = oi.Price,
-				ItemStatus  = oi.ItemStatusLv.ValueCode,
-				RejectReason = oi.RejectReason,
-				Note        = oi.Note
-			}))
-			.ToList();
-
-		// Exclude rejected and cancelled items from total calculations
-		var activeItems = allItems.Where(i => i.ItemStatus != "REJECTED" && i.ItemStatus != "CANCELLED").ToList();
-		var totalItems     = activeItems.Sum(i => i.Quantity);
-		var estimatedTotal = activeItems.Sum(i => i.Price * i.Quantity);
-
-		return new CustomerOrderHistoryDTO
-		{
-			TableCode      = tableCode,
-			TotalItems     = totalItems,
-			EstimatedTotal = estimatedTotal,
-			TaxAmount      = orders.Sum(o => o.TaxAmount),
-			Items          = allItems
-		};
-	}
 
 
     public async Task AddAsync(Order order, CancellationToken ct)
@@ -598,6 +552,7 @@ public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, Can
             .Where(o => o.TableId == tableId &&
                         o.OrderStatusLv.ValueCode != OrderStatusCode.COMPLETED.ToString() &&
                         o.OrderStatusLv.ValueCode != OrderStatusCode.CANCELLED.ToString())
+            .OrderByDescending(o => o.OrderId)
             .FirstOrDefaultAsync(ct);
     }
 

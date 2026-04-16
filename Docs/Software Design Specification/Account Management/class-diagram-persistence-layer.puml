@@ -1,0 +1,70 @@
+@startuml
+title Account Management Module - Persistence Layer Class Diagram
+
+package "Persistence Layer" {
+
+    interface IAccountRepository <<interface>> {
+        +CreateAsync(account: StaffAccount, ct: CancellationToken): Task<StaffAccount>
+        +EmailExistsAsync(emailNormalized: string, ct: CancellationToken): Task<bool>
+        +UsernameExistsAsync(username: string, ct: CancellationToken): Task<bool>
+        +UpdateAccountAsync(account: StaffAccount, ct: CancellationToken): Task
+        +FindByUsernameAsync(username: string, ct: CancellationToken): Task<StaffAccount?>
+        +FindByIdWithRoleAsync(userId: long, ct: CancellationToken): Task<StaffAccount?>
+        +FindByIdAsync(userId: long, ct: CancellationToken): Task<StaffAccount?>
+        +FindByEmailAsync(emailNormalized: string, ct: CancellationToken): Task<StaffAccount?>
+        +UpdateLastLoginAsync(userId: long, loginTime: DateTime, ct: CancellationToken): Task
+        +UpdatePasswordAsync(userId: long, newPasswordHash: string, ct: CancellationToken): Task
+        +GetAccountsAsync(query: AccountListQueryDTO, ct: CancellationToken): Task<PagedResultDTO<AccountListDTO>>
+        +GetAllRolesAsync(ct: CancellationToken): Task<List<RoleDTO>>
+        +GetActiveRolesAsync(ct: CancellationToken): Task<List<RoleDTO>>
+        +GetAccountStatusesAsync(ct: CancellationToken): Task<List<AccountStatusDTO>>
+        +GetAccountOrdersAsync(accountId: long, query: AccountSubResourceQueryDTO, ct: CancellationToken): Task<PagedResultDTO<AccountOrderSummaryDTO>>
+        +GetAccountAuditLogsAsync(accountId: long, query: AccountSubResourceQueryDTO, ct: CancellationToken): Task<PagedResultDTO<AccountAuditLogDTO>>
+        +GetAccountLoginActivityAsync(accountId: long, query: AccountSubResourceQueryDTO, ct: CancellationToken): Task<PagedResultDTO<AccountLoginActivityDTO>>
+        +GetAccountServiceErrorsAsync(accountId: long, query: AccountSubResourceQueryDTO, ct: CancellationToken): Task<PagedResultDTO<AccountServiceErrorDTO>>
+        +GetAccountInventoryActivityAsync(accountId: long, query: AccountSubResourceQueryDTO, ct: CancellationToken): Task<PagedResultDTO<AccountInventoryActivityDTO>>
+    }
+
+    class AccountRepository <<Repository>> {
+        -_context: RestaurantMgmtContext
+        +CreateAsync(account: StaffAccount, ct: CancellationToken): Task<StaffAccount>
+        +EmailExistsAsync(emailNormalized: string, ct: CancellationToken): Task<bool>
+        +UsernameExistsAsync(username: string, ct: CancellationToken): Task<bool>
+        +UpdateAccountAsync(account: StaffAccount, ct: CancellationToken): Task
+        +FindByUsernameAsync(username: string, ct: CancellationToken): Task<StaffAccount?>
+        +FindByIdWithRoleAsync(userId: long, ct: CancellationToken): Task<StaffAccount?>
+        +FindByIdAsync(userId: long, ct: CancellationToken): Task<StaffAccount?>
+        +FindByEmailAsync(emailNormalized: string, ct: CancellationToken): Task<StaffAccount?>
+        +UpdateLastLoginAsync(userId: long, loginTime: DateTime, ct: CancellationToken): Task
+        +UpdatePasswordAsync(userId: long, newPasswordHash: string, ct: CancellationToken): Task
+        +GetAccountsAsync(query: AccountListQueryDTO, ct: CancellationToken): Task<PagedResultDTO<AccountListDTO>>
+        +GetAllRolesAsync(ct: CancellationToken): Task<List<RoleDTO>>
+        +GetActiveRolesAsync(ct: CancellationToken): Task<List<RoleDTO>>
+        +GetAccountStatusesAsync(ct: CancellationToken): Task<List<AccountStatusDTO>>
+        +GetAccountOrdersAsync(accountId: long, query: AccountSubResourceQueryDTO, ct: CancellationToken): Task<PagedResultDTO<AccountOrderSummaryDTO>>
+        +GetAccountAuditLogsAsync(accountId: long, query: AccountSubResourceQueryDTO, ct: CancellationToken): Task<PagedResultDTO<AccountAuditLogDTO>>
+        +GetAccountLoginActivityAsync(accountId: long, query: AccountSubResourceQueryDTO, ct: CancellationToken): Task<PagedResultDTO<AccountLoginActivityDTO>>
+        +GetAccountServiceErrorsAsync(accountId: long, query: AccountSubResourceQueryDTO, ct: CancellationToken): Task<PagedResultDTO<AccountServiceErrorDTO>>
+        +GetAccountInventoryActivityAsync(accountId: long, query: AccountSubResourceQueryDTO, ct: CancellationToken): Task<PagedResultDTO<AccountInventoryActivityDTO>>
+    }
+
+    interface IRoleRepository <<interface>> {
+        +FindByIdAsync(roleId: long, ct: CancellationToken): Task<Role?>
+        +FindByCodeAsync(roleCode: string, ct: CancellationToken): Task<Role?>
+        +GetAllAsync(ct: CancellationToken): Task<List<Role>>
+    }
+
+}
+
+' --- External stubs ---
+class RestaurantMgmtContext <<DbContext>>
+class StaffAccount <<Entity>>
+class Role <<Entity>>
+
+' --- Relationships ---
+AccountRepository ..|> IAccountRepository : implements
+AccountRepository --> RestaurantMgmtContext : uses for data access
+AccountRepository ..> StaffAccount : queries and persists
+AccountRepository ..> Role : includes via navigation
+
+@enduml

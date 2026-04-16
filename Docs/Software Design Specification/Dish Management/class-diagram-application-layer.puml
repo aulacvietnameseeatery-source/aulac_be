@@ -1,0 +1,93 @@
+@startuml
+title Dish Management Module - Application Layer Class Diagram
+
+package "Application Layer" {
+
+    interface IDishService <<interface>> {
+        +GetDishByIdAsync(id: long, langCode: string?, ct: CancellationToken) : Task<DishDetailDto?>
+        +GetDishByIdAsync(dishId: long, ct: CancellationToken) : Task<DishDetailForActionsDto>
+        +GetDishesForAdminAsync(request: GetDishesRequest, ct: CancellationToken) : Task<(List<DishManagementDto>, int)>
+        +GetDishesForCustomerAsync(request: GetDishesRequest, ct: CancellationToken) : Task<(List<DishDisplayDto>, int)>
+        +CreateDishAsync(request: CreateDishRequest, staticImages: IReadOnlyList<MediaFileInput>, images360: IReadOnlyList<MediaFileInput>, video: MediaFileInput?, ct: CancellationToken) : Task<long>
+        +UpdateDishAsync(request: UpdateDishRequest, staticImages: IReadOnlyList<MediaFileInput>, images360: IReadOnlyList<MediaFileInput>, video: MediaFileInput?, removedMediaIds: IReadOnlyList<long>, ct: CancellationToken) : Task
+        +UpdateDishStatusAsync(dishId: long, newStatus: DishStatusCode, ct: CancellationToken) : Task<DishStatusDto>
+        +GetAllCategoriesAsync(ct: CancellationToken) : Task<List<string>>
+        +GetDishStatusesAsync(ct: CancellationToken) : Task<List<DishStatusDto>>
+        +GetActiveDishStatusesAsync() : Task<List<ActiveDishStatusDto>>
+        +GetAllDishCategoriesAsync() : Task<List<DishCategorySimpleDto>>
+        +GetAllActiveTagsAsync() : Task<List<DishTagDto>>
+        +GetPosDishesAsync(active: bool) : Task<List<DishPosResponseDto>>
+    }
+
+    class DishService <<Service>> {
+        -_dishRepository : IDishRepository
+        -_lookupResolver : ILookupResolver
+        -_dishI18nService : IDishI18nService
+        -_mediaRepo : IMediaRepository
+        -_uow : IUnitOfWork
+        -_fileStorage : IFileStorage
+        -_systemSettingService : ISystemSettingService
+        +GetDishByIdAsync(id: long, langCode: string?, ct: CancellationToken) : Task<DishDetailDto?>
+        +GetDishByIdAsync(dishId: long, ct: CancellationToken) : Task<DishDetailForActionsDto>
+        +GetDishesForAdminAsync(request: GetDishesRequest, ct: CancellationToken) : Task<(List<DishManagementDto>, int)>
+        +GetDishesForCustomerAsync(request: GetDishesRequest, ct: CancellationToken) : Task<(List<DishDisplayDto>, int)>
+        +CreateDishAsync(request: CreateDishRequest, staticImages: IReadOnlyList<MediaFileInput>, images360: IReadOnlyList<MediaFileInput>, video: MediaFileInput?, ct: CancellationToken) : Task<long>
+        +UpdateDishAsync(request: UpdateDishRequest, staticImages: IReadOnlyList<MediaFileInput>, images360: IReadOnlyList<MediaFileInput>, video: MediaFileInput?, removedMediaIds: IReadOnlyList<long>, ct: CancellationToken) : Task
+        +UpdateDishStatusAsync(dishId: long, newStatus: DishStatusCode, ct: CancellationToken) : Task<DishStatusDto>
+        +GetAllCategoriesAsync(ct: CancellationToken) : Task<List<string>>
+        +GetDishStatusesAsync(ct: CancellationToken) : Task<List<DishStatusDto>>
+        +GetActiveDishStatusesAsync() : Task<List<ActiveDishStatusDto>>
+        +GetAllDishCategoriesAsync() : Task<List<DishCategorySimpleDto>>
+        +GetAllActiveTagsAsync() : Task<List<DishTagDto>>
+        +GetPosDishesAsync(active: bool) : Task<List<DishPosResponseDto>>
+    }
+
+    interface IDishCategoryService <<interface>> {
+        +GetAllCategoriesAsync(query: DishCategoryListQueryDTO, ct: CancellationToken) : Task<PagedResultDTO<DishCategoryDto>>
+        +GetCategoryByIdAsync(id: long, ct: CancellationToken) : Task<DishCategoryDto?>
+        +CreateCategoryAsync(request: CreateDishCategoryRequest, ct: CancellationToken) : Task<DishCategoryDto>
+        +UpdateCategoryAsync(id: long, request: UpdateDishCategoryRequest, ct: CancellationToken) : Task<DishCategoryDto>
+        +ToggleCategoryStatusAsync(id: long, isDisabled: bool, ct: CancellationToken) : Task<DishCategoryDto>
+    }
+
+    class DishCategoryService <<Service>> {
+        -_dishCategoryRepository : IDishCategoryRepository
+        -_i18nService : Ii18nService
+        +GetAllCategoriesAsync(query: DishCategoryListQueryDTO, ct: CancellationToken) : Task<PagedResultDTO<DishCategoryDto>>
+        +GetCategoryByIdAsync(id: long, ct: CancellationToken) : Task<DishCategoryDto?>
+        +CreateCategoryAsync(request: CreateDishCategoryRequest, ct: CancellationToken) : Task<DishCategoryDto>
+        +UpdateCategoryAsync(id: long, request: UpdateDishCategoryRequest, ct: CancellationToken) : Task<DishCategoryDto>
+        +ToggleCategoryStatusAsync(id: long, isDisabled: bool, ct: CancellationToken) : Task<DishCategoryDto>
+        -MapToDto(category: DishCategory) : DishCategoryDto
+    }
+
+}
+
+' ── External stubs ──
+class IDishRepository <<interface>>
+class IDishCategoryRepository <<interface>>
+class IMediaRepository <<interface>>
+class IUnitOfWork <<interface>>
+class ILookupResolver <<interface>>
+class IDishI18nService <<interface>>
+class IFileStorage <<interface>>
+class ISystemSettingService <<interface>>
+class Ii18nService <<interface>>
+
+' ── Relationships ──
+
+DishService ..|> IDishService : implements
+DishCategoryService ..|> IDishCategoryService : implements
+
+DishService --> IDishRepository : uses for dish data access
+DishService --> IMediaRepository : uses for media persistence
+DishService --> IUnitOfWork : uses for transactions
+DishService --> ILookupResolver : resolves status codes
+DishService --> IDishI18nService : delegates i18n text management
+DishService --> IFileStorage : uses for file upload/removal
+DishService --> ISystemSettingService : reads system configuration
+
+DishCategoryService --> IDishCategoryRepository : uses for category data access
+DishCategoryService --> Ii18nService : delegates i18n text creation
+
+@enduml

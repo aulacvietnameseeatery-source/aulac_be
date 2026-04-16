@@ -1,0 +1,70 @@
+@startuml
+title Role & Permission Management Module - Main Cross-Layer Interactions
+
+package "Presentation Layer" {
+    class RoleController <<Controller>> {
+        -_roleService : IRoleService
+        -_logger : ILogger<RoleController>
+        +GetRoles(query : PagedQuery) : Task<IActionResult>
+        +GetRoleDetail(id : long) : Task<IActionResult>
+        +CreateRole(request : CreateRoleRequestDto) : Task<IActionResult>
+        +UpdateRole(id : long, request : UpdateRoleRequestDto) : Task<IActionResult>
+        +DeleteRole(id : long) : Task<IActionResult>
+    }
+}
+
+package "Application Layer" {
+    interface IRoleService <<interface>> {
+        +GetPagedAsync(query : PagedQuery) : Task<(List<RoleListItemDto>, int)>
+        +GetRoleDetailAsync(roleId : long) : Task<RoleDetailDto>
+        +CreateRoleAsync(request : CreateRoleRequestDto) : Task<RoleDetailDto>
+        +UpdateRoleAsync(roleId : long, request : UpdateRoleRequestDto) : Task<RoleDetailDto>
+        +DeleteRoleAsync(roleId : long) : Task
+    }
+
+    class RoleService <<Service>> {
+        -_roleRepository : IRoleRepository
+    }
+
+    RoleService ..|> IRoleService : implements
+}
+
+package "Persistence Layer" {
+    interface IRoleRepository <<interface>> {
+        +GetPagedWithStaffCountAsync(pageIndex : int, pageSize : int, search : string?) : Task<(List<Role>, int)>
+        +GetRoleWithPermissionsAsync(roleId : long, ct : CancellationToken) : Task<Role?>
+        +AddAsync(role : Role, ct : CancellationToken) : Task<Role>
+        +UpdateAsync(role : Role) : Task
+    }
+
+    class RoleRepository <<Repository>> {
+        -_context : RestaurantMgmtContext
+    }
+
+    RoleRepository ..|> IRoleRepository : implements
+}
+
+package "Domain Layer" {
+    class Role <<Entity>> {
+        +RoleId : long
+        +RoleCode : string
+        +RoleName : string
+        +RoleStatusLvId : uint
+    }
+
+    class Permission <<Entity>> {
+        +PermissionId : long
+        +ScreenCode : string
+        +ActionCode : string
+    }
+
+    Role "1" *-- "0..*" Permission : contains permissions
+}
+
+' --- Cross-layer relationships ---
+RoleController --> IRoleService : delegates business logic to
+RoleService --> IRoleRepository : delegates data access to
+RoleRepository ..> Role : queries and persists
+RoleRepository ..> Permission : queries permissions
+
+@enduml

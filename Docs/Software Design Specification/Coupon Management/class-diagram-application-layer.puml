@@ -1,0 +1,61 @@
+@startuml
+title Coupon Management - Application Layer Class Diagram
+skinparam Linetype ortho
+
+package "Application Layer" {
+
+    interface ICouponService <<interface>> {
+        +GetCouponsAsync(customerId: long?, ct: CancellationToken): Task<List<CouponDTO>>
+        +GetAllCouponsAsync(query: CouponListQueryDTO, ct: CancellationToken): Task<PagedResultDTO<CouponDTO>>
+        +GetCouponDetailAsync(id: long, ct: CancellationToken): Task<CouponDetailDto>
+        +CreateCouponAsync(request: CreateCouponRequest, ct: CancellationToken): Task<CouponDTO>
+        +UpdateCouponAsync(id: long, request: UpdateCouponRequest, ct: CancellationToken): Task<CouponDTO>
+        +DeleteCouponAsync(id: long, ct: CancellationToken): Task
+        +DisableCouponAsync(id: long, ct: CancellationToken): Task
+        +ActivateCouponAsync(id: long, ct: CancellationToken): Task
+    }
+
+    class CouponService <<Service>> {
+        -_couponRepository: ICouponRepository
+        -_lookupResolver: ILookupResolver
+        +GetCouponsAsync(customerId: long?, ct: CancellationToken): Task<List<CouponDTO>>
+        +GetAllCouponsAsync(query: CouponListQueryDTO, ct: CancellationToken): Task<PagedResultDTO<CouponDTO>>
+        +GetCouponDetailAsync(id: long, ct: CancellationToken): Task<CouponDetailDto>
+        +CreateCouponAsync(request: CreateCouponRequest, ct: CancellationToken): Task<CouponDTO>
+        +UpdateCouponAsync(id: long, request: UpdateCouponRequest, ct: CancellationToken): Task<CouponDTO>
+        +DeleteCouponAsync(id: long, ct: CancellationToken): Task
+        +DisableCouponAsync(id: long, ct: CancellationToken): Task
+        +ActivateCouponAsync(id: long, ct: CancellationToken): Task
+        -CalculateStatus(start: DateTime, end: DateTime): CouponStatusCode
+    }
+
+    interface ILookupResolver <<interface>> {
+        +GetIdAsync(typeId: ushort, valueCode: string, ct: CancellationToken): Task<uint>
+    }
+
+    CouponService ..|> ICouponService : implements
+}
+
+' External type stubs
+interface ICouponRepository <<interface>>
+class CreateCouponRequest <<DTO>>
+class UpdateCouponRequest <<DTO>>
+class CouponListQueryDTO <<DTO>>
+class CouponDTO <<DTO>>
+class CouponDetailDto <<DTO>>
+class "PagedResultDTO<CouponDTO>" as PagedResultDTO <<DTO>>
+enum CouponStatusCode <<Enum>>
+
+' ── Dependencies ──
+
+CouponService --> ICouponRepository : uses for persistence
+CouponService --> ILookupResolver : resolves lookup codes to IDs
+
+CouponService ..> CreateCouponRequest : consumes
+CouponService ..> UpdateCouponRequest : consumes
+CouponService ..> CouponListQueryDTO : consumes
+CouponService ..> CouponDTO : produces
+CouponService ..> CouponDetailDto : produces
+CouponService ..> PagedResultDTO : produces
+CouponService ..> CouponStatusCode : uses for status calculation
+@enduml

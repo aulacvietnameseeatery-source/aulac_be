@@ -1,0 +1,66 @@
+@startuml
+title System Settings Management Module - Persistence Layer Class Diagram
+
+package "Persistence Layer" {
+
+    interface ISystemSettingRepository <<interface>> {
+        +GetByKeyAsync(settingKey: string, ct: CancellationToken) : Task<SystemSetting?>
+        +GetAllAsync(ct: CancellationToken) : Task<IEnumerable<SystemSetting>>
+        +GetAllNonSensitiveAsync(ct: CancellationToken) : Task<IEnumerable<SystemSetting>>
+        +GetByGroupPrefixAsync(groupPrefix: string, ct: CancellationToken) : Task<IEnumerable<SystemSetting>>
+        +SaveAsync(setting: SystemSetting, ct: CancellationToken) : Task
+        +DeleteAsync(settingKey: string, ct: CancellationToken) : Task<bool>
+        +ExistsAsync(settingKey: string, ct: CancellationToken) : Task<bool>
+    }
+
+    class SystemSettingRepository <<Repository>> {
+        -_context : RestaurantMgmtContext
+        +SystemSettingRepository(context: RestaurantMgmtContext)
+        +GetByKeyAsync(settingKey: string, ct: CancellationToken) : Task<SystemSetting?>
+        +GetAllAsync(ct: CancellationToken) : Task<IEnumerable<SystemSetting>>
+        +GetAllNonSensitiveAsync(ct: CancellationToken) : Task<IEnumerable<SystemSetting>>
+        +GetByGroupPrefixAsync(groupPrefix: string, ct: CancellationToken) : Task<IEnumerable<SystemSetting>>
+        +SaveAsync(setting: SystemSetting, ct: CancellationToken) : Task
+        +DeleteAsync(settingKey: string, ct: CancellationToken) : Task<bool>
+        +ExistsAsync(settingKey: string, ct: CancellationToken) : Task<bool>
+    }
+
+    interface IEmailTemplateRepository <<interface>> {
+        +GetByIdAsync(id: long, ct: CancellationToken) : Task<EmailTemplate?>
+        +GetByCodeAsync(code: string, ct: CancellationToken) : Task<EmailTemplate?>
+        +GetAllAsync(ct: CancellationToken) : Task<List<EmailTemplate>>
+        +CreateAsync(template: EmailTemplate, ct: CancellationToken) : Task<EmailTemplate>
+        +UpdateAsync(template: EmailTemplate, ct: CancellationToken) : Task<bool>
+        +DeleteAsync(id: long, ct: CancellationToken) : Task<bool>
+    }
+
+    class EmailTemplateRepository <<Repository>> {
+        -_context : RestaurantMgmtContext
+        +EmailTemplateRepository(context: RestaurantMgmtContext)
+        +GetByIdAsync(id: long, ct: CancellationToken) : Task<EmailTemplate?>
+        +GetByCodeAsync(code: string, ct: CancellationToken) : Task<EmailTemplate?>
+        +GetAllAsync(ct: CancellationToken) : Task<List<EmailTemplate>>
+        +CreateAsync(template: EmailTemplate, ct: CancellationToken) : Task<EmailTemplate>
+        +UpdateAsync(template: EmailTemplate, ct: CancellationToken) : Task<bool>
+        +DeleteAsync(id: long, ct: CancellationToken) : Task<bool>
+    }
+}
+
+SystemSettingRepository ..|> ISystemSettingRepository : implements
+EmailTemplateRepository ..|> IEmailTemplateRepository : implements
+
+class RestaurantMgmtContext <<DbContext>> {
+}
+
+class SystemSetting <<Entity>> {
+}
+
+class EmailTemplate <<Entity>> {
+}
+
+SystemSettingRepository --> RestaurantMgmtContext : uses for persistence
+EmailTemplateRepository --> RestaurantMgmtContext : uses for persistence
+SystemSettingRepository ..> SystemSetting : queries and persists
+EmailTemplateRepository ..> EmailTemplate : queries and persists
+
+@enduml

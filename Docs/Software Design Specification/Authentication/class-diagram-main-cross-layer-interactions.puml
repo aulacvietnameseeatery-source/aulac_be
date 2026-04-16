@@ -1,0 +1,143 @@
+@startuml
+title Authentication Module - Main Cross-Layer Interactions
+
+package "Presentation Layer" {
+    class AuthController <<Controller>> {
+        -_authService: IAuthService
+        -_tokenService: ITokenService
+        +Login(...): Task<IActionResult>
+        +RefreshToken(...): Task<IActionResult>
+        +Logout(...): Task<IActionResult>
+        +LogoutAll(...): Task<IActionResult>
+        +ForgotPassword(...): Task<IActionResult>
+        +VerifyResetToken(...): Task<IActionResult>
+        +ResetPassword(...): Task<IActionResult>
+    }
+
+    class AccountController <<Controller>> {
+        -_accountService: IAccountService
+        +ChangePassword(...): Task<IActionResult>
+    }
+}
+
+package "Application Layer" {
+    interface IAuthService <<interface>> {
+        +LoginAsync(...): Task<AuthResult>
+        +RefreshTokenAsync(...): Task<AuthResult>
+        +LogoutAsync(...): Task<bool>
+        +LogoutAllAsync(...): Task<int>
+        +ValidateSessionAsync(...): Task<bool>
+        +RequestPasswordResetAsync(...): Task
+        +VerifyPasswordResetTokenAsync(...): Task<bool>
+        +ResetPasswordAsync(...): Task
+    }
+
+    class AuthService <<Service>> {
+        -_tokenService: ITokenService
+        -_sessionRepository: IAuthSessionRepository
+        -_accountRepository: IAccountRepository
+        -_passwordHasher: IPasswordHasher
+        -_tokenStore: IPasswordResetTokenStore
+        -_emailQueue: IEmailQueue
+    }
+
+    interface ITokenService <<interface>> {
+        +GenerateAccessToken(...): string
+        +GenerateRefreshToken(): string
+        +HashToken(token: string): string
+        +GetPrincipalFromExpiredToken(token: string): ClaimsPrincipal?
+    }
+
+    interface IPasswordHasher <<interface>> {
+        +HashPassword(password: string): string
+        +VerifyPassword(password: string, hashedPassword: string): bool
+    }
+
+    interface IPasswordResetTokenStore <<interface>> {
+        +StoreAsync(...): Task
+        +GetByTokenHashAsync(...): Task<PasswordResetTokenRecord?>
+        +ConsumeAsync(...): Task
+    }
+
+    interface IAccountService <<interface>> {
+        +ChangePasswordForSelfAsync(...): Task<bool>
+    }
+
+    class AccountService <<Service>> {
+        -_accountRepository: IAccountRepository
+        -_passwordHasher: IPasswordHasher
+    }
+}
+
+package "Persistence Layer" {
+    interface IAuthSessionRepository <<interface>> {
+        +CreateSessionAsync(...): Task<AuthSession>
+        +ValidateRefreshTokenAsync(...): Task<AuthSession?>
+        +RevokeSessionAsync(...): Task<bool>
+        +RevokeAllUserSessionsAsync(...): Task<int>
+        +RotateRefreshTokenAsync(...): Task<AuthSession?>
+    }
+
+    class AuthSessionRepository <<Repository>> {
+        -_context: RestaurantMgmtContext
+    }
+
+    interface IAccountRepository <<interface>> {
+        +FindByUsernameAsync(...): Task<StaffAccount?>
+        +FindByEmailAsync(...): Task<StaffAccount?>
+        +FindByIdWithRoleAsync(...): Task<StaffAccount?>
+        +UpdateLastLoginAsync(...): Task
+        +UpdatePasswordAsync(...): Task
+    }
+
+    class AccountRepository <<Repository>> {
+        -_context: RestaurantMgmtContext
+    }
+}
+
+package "Domain Layer" {
+    class StaffAccount <<Entity>> {
+        +AccountId: long
+        +Username: string
+        +PasswordHash: string
+        +IsLocked: bool
+    }
+
+    class AuthSession <<Entity>> {
+        +SessionId: long
+        +UserId: long
+        +TokenHash: string
+        +Revoked: bool?
+    }
+
+    class Role <<Entity>> {
+        +RoleId: long
+        +RoleCode: string
+    }
+}
+
+' --- Realization ---
+AuthService ..|> IAuthService : "implements"
+AccountService ..|> IAccountService : "implements"
+AuthSessionRepository ..|> IAuthSessionRepository : "implements"
+AccountRepository ..|> IAccountRepository : "implements"
+
+' --- Cross-layer dependencies ---
+AuthController --> IAuthService : "delegates auth flows"
+AuthController --> ITokenService : "parses expired tokens"
+AccountController --> IAccountService : "delegates password change"
+
+AuthService --> ITokenService : "generates and verifies tokens"
+AuthService --> IPasswordHasher : "verifies credentials"
+AuthService --> IPasswordResetTokenStore : "manages reset tokens"
+AuthService --> IAuthSessionRepository : "manages sessions"
+AuthService --> IAccountRepository : "looks up accounts"
+
+AccountService --> IAccountRepository : "updates password"
+AccountService --> IPasswordHasher : "hashes new password"
+
+IAuthSessionRepository ..> AuthSession : "persists"
+IAccountRepository ..> StaffAccount : "persists"
+StaffAccount --> Role : "has role"
+
+@enduml

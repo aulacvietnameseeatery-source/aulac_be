@@ -1,0 +1,196 @@
+@startuml
+title Table Management Module - Presentation Layer Class Diagram
+
+package "Presentation Layer" {
+
+    class TableController <<Controller>> {
+        -_tableService : ITableService
+        +GetTables(request: GetTableManagementRequest, ct: CancellationToken) : Task<IActionResult>
+        +GetTablesForSelect(ct: CancellationToken) : Task<IActionResult>
+        +GetTable(id: long, ct: CancellationToken) : Task<IActionResult>
+        +CreateTable(request: CreateTableFormRequest, ct: CancellationToken) : Task<IActionResult>
+        +UpdateTable(id: long, request: UpdateTableFormRequest, ct: CancellationToken) : Task<IActionResult>
+        +DeleteTable(id: long, ct: CancellationToken) : Task<IActionResult>
+        +UpdateTableStatus(id: long, request: UpdateTableStatusRequest, ct: CancellationToken) : Task<IActionResult>
+        +BulkOnline(request: BulkOnlineRequest, ct: CancellationToken) : Task<IActionResult>
+        +RegenerateQrCode(id: long, ct: CancellationToken) : Task<IActionResult>
+        +UploadTableMedia(id: long, files: List<IFormFile>, ct: CancellationToken) : Task<IActionResult>
+        +DeleteTableMedia(id: long, mediaId: long, ct: CancellationToken) : Task<IActionResult>
+        +GetAvailableTables(targetTime: DateTime, ct: CancellationToken) : Task<IActionResult>
+    }
+
+    class CreateTableFormRequest <<DTO>> {
+        +TableCode : string
+        +Capacity : int
+        +IsOnline : bool
+        +StatusLvId : uint
+        +TypeLvId : uint
+        +ZoneLvId : uint
+        +Images : List<IFormFile>
+    }
+
+    class UpdateTableFormRequest <<DTO>> {
+        +TableCode : string?
+        +Capacity : int?
+        +IsOnline : bool?
+        +StatusLvId : uint?
+        +TypeLvId : uint?
+        +ZoneLvId : uint?
+        +Images : List<IFormFile>
+        +RemovedImageIds : string?
+        +ParseRemovedImageIds() : List<long>
+    }
+
+    class GetTableManagementRequest <<DTO>> {
+        +PageIndex : int
+        +PageSize : int
+        +Search : string?
+        +ZoneId : uint?
+        +TypeId : uint?
+        +StatusId : uint?
+        +IsOnline : bool?
+        +TargetTime : DateTime?
+    }
+
+    class CreateTableRequest <<DTO>> {
+        +TableCode : string
+        +Capacity : int
+        +IsOnline : bool
+        +StatusLvId : uint
+        +TypeLvId : uint
+        +ZoneLvId : uint
+    }
+
+    class UpdateTableRequest <<DTO>> {
+        +TableCode : string?
+        +Capacity : int?
+        +IsOnline : bool?
+        +StatusLvId : uint?
+        +TypeLvId : uint?
+        +ZoneLvId : uint?
+    }
+
+    class UpdateTableStatusRequest <<DTO>> {
+        +StatusLvId : uint
+    }
+
+    class BulkOnlineRequest <<DTO>> {
+        +ZoneId : uint
+        +IsOnline : bool
+    }
+
+    class TableManagementDto <<DTO>> {
+        +TableId : long
+        +TableCode : string
+        +Capacity : int
+        +IsOnline : bool
+        +StatusId : uint
+        +StatusCode : string
+        +StatusName : string
+        +TypeId : uint
+        +TypeName : string
+        +ZoneId : uint
+        +ZoneName : string
+        +QrCodeUrl : string?
+        +QrCodeImageUrl : string?
+        +Images : List<TableMediaDto>
+    }
+
+    class TableDetailDto <<DTO>> {
+        +Images : List<TableMediaDto>
+        +ActiveOrdersCount : int
+        +HasErrors : bool
+        +UpcomingReservations : List<UpcomingReservationDto>
+    }
+
+    class TableSelectDto <<DTO>> {
+        +TableId : long
+        +TableCode : string
+        +Capacity : int
+        +ZoneId : uint
+        +ZoneName : string
+        +StatusCode : string
+        +TableType : string
+        +HasActiveOrder : bool
+        +ActiveOrderId : long?
+        +UpcomingReservationTime : DateTime?
+    }
+
+    class QrCodeDto <<DTO>> {
+        +QrCodeUrl : string?
+        +QrCodeImageUrl : string?
+    }
+
+    class TableMediaDto <<DTO>> {
+        +MediaId : long
+        +Url : string
+        +IsPrimary : bool
+    }
+
+    class UpcomingReservationDto <<DTO>> {
+        +ReservationId : long
+        +GuestName : string
+        +Pax : int
+        +ReservedTime : DateTime
+        +StatusCode : string
+    }
+
+    class DeleteTableConflictData <<DTO>> {
+        +ActiveOrders : int
+        +UpcomingReservations : int
+    }
+
+    class LookupValueI18nDto <<DTO>> {
+        +ValueId : uint
+        +ValueCode : string
+        +SortOrder : short
+        +I18n : LookupValueTranslationDto
+        +DescriptionI18n : LookupValueTranslationDto?
+    }
+
+    class CreateLookupValueRequest <<DTO>> {
+        +ValueName : string
+        +ValueCode : string?
+        +SortOrder : short?
+        +I18n : LookupI18nMap?
+        +DescriptionI18n : LookupI18nMap?
+    }
+
+    class UpdateLookupValueRequest <<DTO>> {
+        +ValueName : string?
+        +SortOrder : short?
+        +I18n : LookupI18nMap?
+        +DescriptionI18n : LookupI18nMap?
+    }
+
+}
+
+' ── External stubs ──
+class ITableService <<interface>>
+
+' ── Relationships ──
+
+TableDetailDto --|> TableManagementDto : inherits
+
+TableController --> ITableService : depends on
+
+TableController ..> CreateTableFormRequest : receives
+TableController ..> UpdateTableFormRequest : receives
+TableController ..> GetTableManagementRequest : receives
+TableController ..> UpdateTableStatusRequest : receives
+TableController ..> BulkOnlineRequest : receives
+
+TableController ..> CreateTableRequest : maps to
+TableController ..> UpdateTableRequest : maps to
+
+TableController ..> TableManagementDto : returns
+TableController ..> TableDetailDto : returns
+TableController ..> TableSelectDto : returns
+TableController ..> QrCodeDto : returns
+TableController ..> LookupValueI18nDto : returns
+TableController ..> TableMediaDto : returns
+
+TableManagementDto *-- "0..*" TableMediaDto : contains images
+TableDetailDto *-- "0..*" UpcomingReservationDto : contains reservations
+
+@enduml

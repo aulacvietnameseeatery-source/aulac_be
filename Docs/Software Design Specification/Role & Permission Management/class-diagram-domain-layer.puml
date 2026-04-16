@@ -1,0 +1,45 @@
+@startuml
+title Role & Permission Management Module - Domain Layer Class Diagram
+
+package "Domain Layer" {
+
+    class Role <<Entity>> {
+        +RoleId : long
+        +RoleCode : string
+        +RoleName : string
+        +RoleStatusLvId : uint
+        +StaffAccounts : ICollection<StaffAccount>
+        +RoleStatusLv : LookupValue?
+        +Permissions : ICollection<Permission>
+    }
+
+    class Permission <<Entity>> {
+        +PermissionId : long
+        +ScreenCode : string
+        +ActionCode : string
+        +Roles : ICollection<Role>
+    }
+
+    enum RoleStatusCode <<Enum>> {
+        ACTIVE
+        INACTIVE
+    }
+}
+
+package "Cross-Module Entities" <<Rectangle>> {
+
+    class StaffAccount <<Entity>> {
+        +RoleId : long?
+    }
+
+    class LookupValue <<Entity>> {
+        +ValueId : uint
+        +ValueCode : string
+    }
+}
+
+Role "0..*" -- "0..*" Permission : assigns permissions to roles
+StaffAccount "0..*" --> "1" Role : belongs to role via RoleId
+Role "0..*" --> "0..1" LookupValue : references status via RoleStatusLvId
+
+@enduml

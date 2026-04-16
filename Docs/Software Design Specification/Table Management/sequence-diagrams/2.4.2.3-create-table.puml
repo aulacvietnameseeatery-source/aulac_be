@@ -1,0 +1,93 @@
+@startuml
+title 2.4.2.3 Create Table
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":User" as U
+participant ":TableCreatePage" as Client
+participant ":TableController" as Ctrl
+participant ":TableService" as Svc
+participant ":TableRepository" as Repo
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : Fill in table form and submit (multipart/form-data)
+activate Client
+
+Client ->> Ctrl : POST /api/tables (CreateTableFormRequest with optional images)
+activate Ctrl
+
+Ctrl ->> Ctrl : Map CreateTableFormRequest to CreateTableRequest + MapFiles(images)
+
+Ctrl ->> Svc : CreateTableAsync(CreateTableRequest, List<MediaFileInput>, ct)
+activate Svc
+
+Svc ->> Svc : Validate table code is not blank and capacity > 0
+
+Svc ->> Repo : TableCodeExistsAsync(tableCode, ct)
+activate Repo
+Repo ->> DB : Check if table code already exists
+activate DB
+DB -->> Repo : Return true/false
+deactivate DB
+Repo -->> Svc : bool
+deactivate Repo
+
+alt#White Table code already exists
+    Svc -->> Ctrl : throw ConflictException
+    Ctrl -->> Client : 409 Conflict
+    Client -->> U : Display duplicate code error
+else Table code is unique
+    Svc ->> Svc : ValidateLookupAsync for StatusLvId, TypeLvId, ZoneLvId
+
+    Svc ->> Svc : Build RestaurantTable entity with QrToken
+
+    Svc ->> Repo : BeginTransactionAsync via IUnitOfWork
+    activate Repo
+
+    Svc ->> Repo : Add(RestaurantTable)
+    Repo ->> DB : Insert new table row
+    activate DB
+    DB -->> Repo : Return inserted table with generated TableId
+    deactivate DB
+
+    Svc ->> Svc : SaveQrImageAsync — generate QR PNG, save to file storage, create MediaAsset, link to table
+
+    opt#White Images provided
+        Svc ->> Svc : SaveTableImagesAsync — upload images, create MediaAssets, create TableMedium links
+    end
+
+    Svc ->> Repo : CommitAsync via IUnitOfWork
+    deactivate Repo
+
+    Svc ->> Repo : GetByIdWithDetailsAsync(tableId, ct)
+    activate Repo
+    Repo ->> DB : Query newly created table with all includes
+    activate DB
+    DB -->> Repo : Return table with details
+    deactivate DB
+    Repo -->> Svc : RestaurantTable
+    deactivate Repo
+
+    Svc ->> Svc : MapToDetailDto
+
+    Svc -->> Ctrl : TableDetailDto
+    deactivate Svc
+
+    Ctrl -->> Client : 201 Created — ApiResponse<TableDetailDto>
+    deactivate Ctrl
+
+    Client -->> U : Display newly created table
+end
+
+deactivate Client
+deactivate U
+
+@enduml

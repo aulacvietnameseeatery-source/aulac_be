@@ -1,0 +1,91 @@
+@startuml
+title 2.4.2.5 Delete Table
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":User" as U
+participant ":TableListPage" as Client
+participant ":TableController" as Ctrl
+participant ":TableService" as Svc
+participant ":TableRepository" as Repo
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : Click delete on a table row and confirm
+activate Client
+
+Client ->> Ctrl : DELETE /api/tables/{id}
+activate Ctrl
+
+Ctrl ->> Svc : DeleteTableAsync(id, ct)
+activate Svc
+
+Svc ->> Repo : GetByIdAsync(id, ct)
+activate Repo
+Repo ->> DB : Query table by ID
+activate DB
+DB -->> Repo : Return table entity or null
+deactivate DB
+Repo -->> Svc : RestaurantTable or null
+deactivate Repo
+
+alt#White Table not found
+    Svc -->> Ctrl : throw NotFoundException
+    Ctrl -->> Client : 404 Not Found
+    Client -->> U : Display error message
+else Table found
+    Svc ->> Repo : CountActiveOrdersAsync(id, ct)
+    activate Repo
+    Repo ->> DB : Count active orders (PENDING, IN_PROGRESS) for this table
+    activate DB
+    DB -->> Repo : Return count
+    deactivate DB
+    Repo -->> Svc : int activeOrders
+    deactivate Repo
+
+    Svc ->> Repo : CountUpcomingReservationsAsync(id, ct)
+    activate Repo
+    Repo ->> DB : Count upcoming reservations (PENDING, CONFIRMED) for this table
+    activate DB
+    DB -->> Repo : Return count
+    deactivate DB
+    Repo -->> Svc : int upcomingReservations
+    deactivate Repo
+
+    alt#White Has active orders or upcoming reservations
+        Svc -->> Ctrl : throw ConflictException
+        Ctrl -->> Client : 409 Conflict — Cannot delete table with active orders/reservations
+        Client -->> U : Display conflict error
+    else No conflicts
+        Svc ->> Svc : Set IsDeleted = true, UpdatedAt = now
+
+        Svc ->> Repo : SaveChangesAsync via IUnitOfWork
+        activate Repo
+        Repo ->> DB : Update table with soft-delete flag
+        activate DB
+        DB -->> Repo : Confirm update
+        deactivate DB
+        Repo -->> Svc : Done
+        deactivate Repo
+
+        Svc -->> Ctrl : (void)
+        deactivate Svc
+
+        Ctrl -->> Client : 204 No Content
+        deactivate Ctrl
+
+        Client -->> U : Remove table from list, display success
+    end
+end
+
+deactivate Client
+deactivate U
+
+@enduml

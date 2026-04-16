@@ -130,6 +130,9 @@ builder.Services.Configure<FileStorageOptions>(
 builder.Services.Configure<GoogleTranslateOptions>(
     builder.Configuration.GetSection("GoogleTranslate"));
 
+builder.Services.Configure<LlmVisionOptions>(
+    builder.Configuration.GetSection("LlmVision"));
+
 builder.Services.Configure<AttendanceOptions>(
     builder.Configuration.GetSection("Attendance"));
 
@@ -263,7 +266,6 @@ builder.Services.AddAuthorization(options =>
 builder.Services.AddScoped<ISystemSettingService, SystemSettingService>();
 builder.Services.AddScoped<ILoyaltyService, LoyaltyService>();
 builder.Services.AddScoped<IAccountService, AccountService>();
-builder.Services.AddScoped<IAccountActivityService, AccountActivityService>();
 // Forgot password token store uses cache
 builder.Services.AddSingleton<IPasswordResetTokenStore, CachePasswordResetTokenStore>();
 
@@ -300,6 +302,7 @@ builder.Services.AddScoped<IShiftSettingsProvider, ShiftSettingsProvider>();
 builder.Services.AddScoped<IAttendanceService, AttendanceService>();
 
 builder.Services.AddHttpClient<ITranslationService, GoogleTranslationService>();
+builder.Services.AddHttpClient<IInvoiceScanService, InvoiceScanService>();
 builder.Services.AddScoped<IIngredientService, IngredientService>();
 builder.Services.AddScoped<IInventoryService, InventoryService>();
 builder.Services.AddScoped<IEmailTemplateService, EmailTemplateService>();

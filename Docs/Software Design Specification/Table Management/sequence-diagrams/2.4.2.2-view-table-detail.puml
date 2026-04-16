@@ -1,0 +1,59 @@
+@startuml
+title 2.4.2.2 View Table Detail
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":User" as U
+participant ":TableDetailPage" as Client
+participant ":TableController" as Ctrl
+participant ":TableService" as Svc
+participant ":TableRepository" as Repo
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : Click on a table row to view detail
+activate Client
+
+Client ->> Ctrl : GET /api/tables/{id}
+activate Ctrl
+
+Ctrl ->> Svc : GetTableByIdAsync(id, ct)
+activate Svc
+
+Svc ->> Repo : GetByIdWithDetailsAsync(id, ct)
+activate Repo
+
+Repo ->> DB : Query table by ID with includes (Status, Type, Zone, Media, QR image, Orders, Reservations, ServiceErrors)
+activate DB
+DB -->> Repo : Return table entity with all navigations
+deactivate DB
+
+Repo -->> Svc : RestaurantTable or null
+deactivate Repo
+
+alt#White Table not found
+    Svc -->> Ctrl : throw NotFoundException
+    Ctrl -->> Client : 404 Not Found
+    Client -->> U : Display error message
+else Table found
+    Svc ->> Svc : MapToDetailDto (compute active orders count, upcoming reservations, media URLs)
+    Svc -->> Ctrl : TableDetailDto
+    deactivate Svc
+
+    Ctrl -->> Client : 200 OK — ApiResponse<TableDetailDto>
+    deactivate Ctrl
+
+    Client -->> U : Display table detail with images, QR code, orders, reservations
+end
+
+deactivate Client
+deactivate U
+
+@enduml

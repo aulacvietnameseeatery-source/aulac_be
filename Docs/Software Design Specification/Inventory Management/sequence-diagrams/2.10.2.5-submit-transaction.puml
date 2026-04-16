@@ -1,0 +1,106 @@
+@startuml
+autonumber
+title 2.10.2.5 Submit Transaction
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+actor ":User" as U
+participant ":SubmitTransactionPage" as Client
+participant ":InventoryController" as Ctrl
+participant ":InventoryService" as Svc
+participant ":IInventoryRepository" as Repo
+participant ":IUnitOfWork" as UoW
+participant ":INotificationService" as NS
+participant ":Database" as DB
+
+activate U
+U ->> Client : Submit inventory transaction
+activate Client
+Client ->> Ctrl : POST /api/inventory/transactions/{id}/submit\n(SubmitTransactionRequest)
+activate Ctrl
+Ctrl ->> Ctrl : GetCurrentUserId()
+Ctrl ->> Svc : SubmitTransactionAsync(id, request, userId, ct)
+activate Svc
+
+Svc ->> Repo : GetTransactionByIdAsync(id, ct)
+activate Repo
+Repo ->> DB : Query transaction with related details
+activate DB
+DB -->> Repo : Return transaction entity
+deactivate DB
+Repo -->> Svc : entity
+deactivate Repo
+
+alt#White Transaction not found
+    Svc -->> Ctrl : throw KeyNotFoundException
+    Ctrl -->> Client : 404 ApiResponse (Transaction not found)
+end
+
+Svc ->> Svc : Resolve DRAFT status ID via ILookupResolver
+
+alt#White Status is not DRAFT
+    Svc -->> Ctrl : throw InvalidOperationException
+    Ctrl -->> Client : 400 ApiResponse (Only DRAFT transactions can be submitted)
+end
+
+opt#White TypeLvId == OUT
+    Svc ->> Svc : ValidateExportReasonScopingAsync(entity, ct)
+    alt#White Export reason not valid for item category
+        Svc -->> Ctrl : throw InvalidOperationException
+        Ctrl -->> Client : 400 ApiResponse (Invalid export reason for category)
+    end
+end
+
+Svc ->> Svc : Set StatusLvId = PENDING_APPROVAL\nSet SubmittedAt = UtcNow
+
+Svc ->> UoW : BeginTransactionAsync(ct)
+activate UoW
+UoW -->> Svc : OK
+deactivate UoW
+
+opt#White MediaIds provided in request
+    loop Each MediaId (skip duplicates)
+        Svc ->> Svc : Add InventoryTransactionMedium
+    end
+end
+
+Svc ->> Repo : UpdateTransactionAsync(entity, ct)
+activate Repo
+Repo ->> DB : Update transaction status, submitted time, and media links
+activate DB
+DB -->> Repo : OK
+deactivate DB
+Repo -->> Svc : OK
+deactivate Repo
+
+Svc ->> UoW : CommitAsync(ct)
+activate UoW
+UoW -->> Svc : OK
+deactivate UoW
+
+Svc ->> NS : PublishAsync(INVENTORY_TX_SUBMITTED\n→ targets: staff with ApproveInventoryTx permission)
+activate NS
+NS -->> Svc : OK
+deactivate NS
+
+Svc ->> Repo : GetTransactionByIdAsync(id, ct)
+activate Repo
+Repo ->> DB : Query submitted transaction with related details
+activate DB
+DB -->> Repo : entity
+deactivate DB
+Repo -->> Svc : entity
+deactivate Repo
+Svc ->> Svc : MapToDetailDto(entity)
+
+Svc -->> Ctrl : InventoryTransactionDetailDto
+deactivate Svc
+Ctrl -->> Client : 200 ApiResponse<InventoryTransactionDetailDto>
+deactivate Ctrl
+Client -->> U : Display submitted transaction detail
+deactivate Client
+deactivate U
+
+@enduml

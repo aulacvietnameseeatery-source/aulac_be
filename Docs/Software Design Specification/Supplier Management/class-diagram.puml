@@ -1,0 +1,233 @@
+@startuml
+title Supplier Management Module - Specification Class Diagram
+left to right direction
+
+' ══════════════════════════════════════════════════════════════
+'  PRESENTATION LAYER
+' ══════════════════════════════════════════════════════════════
+
+package "Presentation Layer" {
+
+    class SupplierController <<Controller>> {
+        -_supplierService: ISupplierService
+        -_logger: ILogger<SupplierController>
+        +GetAllSuppliers(query: SupplierListQueryDTO): IActionResult
+        +GetSupplierById(id: long): IActionResult
+        +CreateSupplier(request: CreateSupplierRequest): IActionResult
+        +UpdateSupplier(id: long, request: UpdateSupplierRequest): IActionResult
+        +DeleteSupplier(id: long): IActionResult
+    }
+
+    ' ── Request DTOs ──
+
+    class CreateSupplierRequest <<DTO>> {
+        +SupplierName: string
+        +Phone: string?
+        +Email: string?
+        +Address: string?
+        +TaxCode: string?
+        +IngredientIds: List<long>
+    }
+
+    class UpdateSupplierRequest <<DTO>> {
+        +SupplierName: string
+        +Phone: string?
+        +Email: string?
+        +Address: string?
+        +TaxCode: string?
+        +IngredientIds: List<long>
+    }
+
+    class SupplierListQueryDTO <<DTO>> {
+        +Search: string?
+        +PageIndex: int
+        +PageSize: int
+    }
+
+    ' ── Response DTOs ──
+
+    class SupplierDto <<DTO>> {
+        +SupplierId: long
+        +SupplierName: string
+        +Phone: string?
+        +Email: string?
+        +Address: string?
+        +TaxCode: string?
+    }
+
+    class SupplierDetailDto <<DTO>> {
+        +SupplierId: long
+        +SupplierName: string
+        +Phone: string?
+        +Email: string?
+        +Address: string?
+        +TaxCode: string?
+        +Ingredients: List<IngredientDTO>
+    }
+
+    class IngredientDTO <<DTO>> {
+        +IngredientId: long
+        +IngredientName: string
+        +UnitLvId: uint
+    }
+
+    class "PagedResultDTO<T>" as PagedResultDTO <<DTO>> {
+        +PageData: List<T>
+        +PageIndex: int
+        +PageSize: int
+        +TotalCount: int
+        +TotalPage: int
+    }
+
+    class "ApiResponse<T>" as ApiResponse <<DTO>> {
+        +Success: bool
+        +Code: int
+        +SubCode: int
+        +UserMessage: string?
+        +SystemMessage: string?
+        +Data: T
+        +ServerTime: DateTimeOffset
+    }
+}
+
+' ══════════════════════════════════════════════════════════════
+'  APPLICATION LAYER
+' ══════════════════════════════════════════════════════════════
+
+package "Application Layer" {
+
+    interface ISupplierService <<interface>> {
+        +GetAllSuppliersAsync(query: SupplierListQueryDTO, ct: CancellationToken): Task<PagedResultDTO<SupplierDto>>
+        +GetSupplierDetailAsync(id: long, ct: CancellationToken): Task<SupplierDetailDto>
+        +CreateSupplierAsync(request: CreateSupplierRequest, ct: CancellationToken): Task<SupplierDto>
+        +UpdateSupplierAsync(id: long, request: UpdateSupplierRequest, ct: CancellationToken): Task<SupplierDto>
+        +DeleteSupplierAsync(id: long, ct: CancellationToken): Task<bool>
+    }
+
+    class SupplierService <<Service>> {
+        -_supplierRepository: ISupplierRepository
+        -_logger: ILogger<SupplierService>
+        +GetAllSuppliersAsync(query: SupplierListQueryDTO, ct: CancellationToken): Task<PagedResultDTO<SupplierDto>>
+        +GetSupplierDetailAsync(id: long, ct: CancellationToken): Task<SupplierDetailDto>
+        +CreateSupplierAsync(request: CreateSupplierRequest, ct: CancellationToken): Task<SupplierDto>
+        +UpdateSupplierAsync(id: long, request: UpdateSupplierRequest, ct: CancellationToken): Task<SupplierDto>
+        +DeleteSupplierAsync(id: long, ct: CancellationToken): Task<bool>
+        -MapToDto(supplier: Supplier): SupplierDto
+    }
+
+    SupplierService ..|> ISupplierService : implements
+}
+
+' ══════════════════════════════════════════════════════════════
+'  PERSISTENCE LAYER
+' ══════════════════════════════════════════════════════════════
+
+package "Persistence Layer" {
+
+    interface ISupplierRepository <<interface>> {
+        +GetAllSuppliersAsync(query: SupplierListQueryDTO, ct: CancellationToken): Task<PagedResultDTO<SupplierDto>>
+        +GetByIdAsync(id: long, ct: CancellationToken): Task<Supplier?>
+        +GetByIdWithIngredientsAsync(id: long, ct: CancellationToken): Task<Supplier?>
+        +CreateAsync(supplier: Supplier, ct: CancellationToken): Task<Supplier>
+        +UpdateAsync(supplier: Supplier, ct: CancellationToken): Task<Supplier>
+        +DeleteAsync(id: long, ct: CancellationToken): Task<bool>
+        +ExistsByNameAsync(name: string, excludeId: long?, ct: CancellationToken): Task<bool>
+        +HasDependenciesAsync(id: long, ct: CancellationToken): Task<bool>
+        +UpdateSupplierIngredientsAsync(supplierId: long, ingredientIds: List<long>, ct: CancellationToken): Task
+    }
+
+    class SupplierRepository <<Repository>> {
+        -_context: RestaurantMgmtContext
+        +GetAllSuppliersAsync(query: SupplierListQueryDTO, ct: CancellationToken): Task<PagedResultDTO<SupplierDto>>
+        +GetByIdAsync(id: long, ct: CancellationToken): Task<Supplier?>
+        +GetByIdWithIngredientsAsync(id: long, ct: CancellationToken): Task<Supplier?>
+        +CreateAsync(supplier: Supplier, ct: CancellationToken): Task<Supplier>
+        +UpdateAsync(supplier: Supplier, ct: CancellationToken): Task<Supplier>
+        +DeleteAsync(id: long, ct: CancellationToken): Task<bool>
+        +ExistsByNameAsync(name: string, excludeId: long?, ct: CancellationToken): Task<bool>
+        +HasDependenciesAsync(id: long, ct: CancellationToken): Task<bool>
+        +UpdateSupplierIngredientsAsync(supplierId: long, ingredientIds: List<long>, ct: CancellationToken): Task
+    }
+
+    class RestaurantMgmtContext <<DbContext>> {
+        +Suppliers: DbSet<Supplier>
+        +IngredientSuppliers: DbSet<IngredientSupplier>
+        +InventoryTransactions: DbSet<InventoryTransaction>
+    }
+
+    SupplierRepository ..|> ISupplierRepository : implements
+}
+
+' ══════════════════════════════════════════════════════════════
+'  DOMAIN LAYER
+' ══════════════════════════════════════════════════════════════
+
+package "Domain Layer" {
+
+    class Supplier <<Entity>> {
+        +SupplierId: long
+        +SupplierName: string
+        +Phone: string?
+        +Email: string?
+        +Address: string?
+        +TaxCode: string?
+    }
+
+    class IngredientSupplier <<Entity>> {
+        +IngredientSupplierId: long
+        +SupplierId: long?
+        +IngredientId: long?
+        +CreatedAt: DateTime?
+    }
+
+    class Ingredient <<Entity>> {
+        +IngredientId: long
+        +IngredientName: string
+        +UnitLvId: uint
+    }
+
+    class InventoryTransaction <<Entity>> {
+        +TransactionId: long
+        +SupplierId: long?
+    }
+}
+
+' ══════════════════════════════════════════════════════════════
+'  RELATIONSHIPS
+' ══════════════════════════════════════════════════════════════
+
+' --- Presentation → Application ---
+SupplierController --> ISupplierService : uses
+
+' --- Presentation → DTOs ---
+SupplierController ..> CreateSupplierRequest : receives
+SupplierController ..> UpdateSupplierRequest : receives
+SupplierController ..> SupplierListQueryDTO : receives
+SupplierController ..> SupplierDto : returns
+SupplierController ..> SupplierDetailDto : returns
+SupplierController ..> PagedResultDTO : returns
+SupplierController ..> ApiResponse : wraps response
+
+SupplierDetailDto *-- "0..*" IngredientDTO : contains
+
+' --- Application → Persistence ---
+SupplierService --> ISupplierRepository : uses
+
+' --- Application → DTOs ---
+SupplierService ..> SupplierDto : produces
+SupplierService ..> SupplierDetailDto : produces
+SupplierService ..> CreateSupplierRequest : consumes
+SupplierService ..> UpdateSupplierRequest : consumes
+
+' --- Persistence → DbContext ---
+SupplierRepository --> RestaurantMgmtContext : uses
+
+' --- Persistence → Domain ---
+ISupplierRepository ..> Supplier : persists
+ISupplierRepository ..> IngredientSupplier : manages relationships
+
+' --- Domain relationships ---
+Supplier "1" *-- "0..*" IngredientSupplier : supplies
+Supplier "1" o-- "0..*" InventoryTransaction : referenced in
+IngredientSupplier "0..*" --> "1" Ingredient : links to
+@enduml

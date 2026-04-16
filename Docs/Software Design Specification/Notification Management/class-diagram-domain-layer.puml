@@ -1,0 +1,89 @@
+@startuml
+title Notification Management Module - Domain Layer
+
+package "Domain Layer" {
+
+    class Notification <<Entity>> {
+        +NotificationId : long
+        +Type : string
+        +Title : string
+        +Body : string?
+        +Priority : string
+        +RequireAck : bool
+        +SoundKey : string?
+        +ActionUrl : string?
+        +EntityType : string?
+        +EntityId : string?
+        +MetadataJson : string?
+        +TargetPermissions : string?
+        +TargetUserIds : string?
+        +CreatedAt : DateTime
+        +ReadStates : ICollection<NotificationReadState>
+    }
+
+    class NotificationReadState <<Entity>> {
+        +NotificationReadStateId : long
+        +NotificationId : long
+        +UserId : long
+        +IsRead : bool
+        +IsAcknowledged : bool
+        +ReadAt : DateTime?
+        +AcknowledgedAt : DateTime?
+        +CreatedAt : DateTime
+        +Notification : Notification
+    }
+
+    class NotificationPreference <<Entity>> {
+        +NotificationPreferenceId : long
+        +UserId : long
+        +NotificationType : string
+        +IsEnabled : bool
+        +SoundEnabled : bool
+        +CreatedAt : DateTime
+        +UpdatedAt : DateTime
+    }
+
+    enum NotificationType <<Enum>> {
+        NEW_ORDER
+        ORDER_CANCELLED
+        ORDER_ITEM_READY
+        ORDER_ITEM_REJECTED
+        ALL_ITEMS_READY
+        PAYMENT_COMPLETED
+        RESERVATION_CREATED
+        RESERVATION_STATUS_CHANGED
+        RESERVATION_REMINDER
+        TABLE_STATUS_CHANGED
+        LOW_STOCK_ALERT
+        DISH_OUT_OF_STOCK
+        SHIFT_ASSIGNED
+        SHIFT_NO_SHOW
+        SHIFT_SWAP_REQUEST
+        SHIFT_MISSING_PUNCH
+        ATTENDANCE_ALERT
+        SYSTEM_ALERT
+        ORDER_STATUS_CHANGED
+        PAYMENT_REQUEST
+        ORDER_ITEMS_ADDED
+        ORDER_ITEM_CANCELLED
+        INVENTORY_TX_SUBMITTED
+        INVENTORY_TX_APPROVED
+        INVENTORY_TX_REJECTED
+    }
+
+    enum NotificationPriority <<Enum>> {
+        Low
+        Normal
+        High
+        Critical
+    }
+}
+
+Notification *-- "0..*" NotificationReadState : owns read states
+NotificationReadState --> "1" Notification : belongs to
+
+Notification ..> NotificationType : Type field references
+Notification ..> NotificationPriority : Priority field references
+NotificationPreference ..> NotificationType : NotificationType field references
+
+@enduml

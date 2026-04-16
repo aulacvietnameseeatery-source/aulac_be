@@ -1,0 +1,169 @@
+@startuml
+title Authentication Module - Application Layer
+
+package "Application Layer" {
+
+    interface IAuthService <<interface>> {
+        +LoginAsync(request: LoginRequest, deviceInfo: string?, ipAddress: string?, ct: CancellationToken): Task<AuthResult>
+        +RefreshTokenAsync(request: RefreshTokenRequest, ct: CancellationToken): Task<AuthResult>
+        +LogoutAsync(sessionId: long, ct: CancellationToken): Task<bool>
+        +LogoutAllAsync(userId: long, currentSessionId: long?, ct: CancellationToken): Task<int>
+        +ValidateSessionAsync(sessionId: long, ct: CancellationToken): Task<bool>
+        +RequestPasswordResetAsync(email: string, ip: string?, userAgent: string?, ct: CancellationToken): Task
+        +VerifyPasswordResetTokenAsync(token: string, ct: CancellationToken): Task<bool>
+        +ResetPasswordAsync(token: string, newPassword: string, ct: CancellationToken): Task
+    }
+
+    class AuthService <<Service>> {
+        -_tokenService: ITokenService
+        -_sessionRepository: IAuthSessionRepository
+        -_accountRepository: IAccountRepository
+        -_passwordHasher: IPasswordHasher
+        -_tokenStore: IPasswordResetTokenStore
+        -_emailQueue: IEmailQueue
+        -_emailTemplateService: IEmailTemplateService
+        -_lookupResolver: ILookupResolver
+        -_forgotOpt: ForgotPasswordRulesOptions
+        -_baseUrl: BaseUrlOptions
+        -_logger: ILogger<AuthService>
+        +LoginAsync(request: LoginRequest, deviceInfo: string?, ipAddress: string?, ct: CancellationToken): Task<AuthResult>
+        +RefreshTokenAsync(request: RefreshTokenRequest, ct: CancellationToken): Task<AuthResult>
+        +LogoutAsync(sessionId: long, ct: CancellationToken): Task<bool>
+        +LogoutAllAsync(userId: long, currentSessionId: long?, ct: CancellationToken): Task<int>
+        +ValidateSessionAsync(sessionId: long, ct: CancellationToken): Task<bool>
+        +RequestPasswordResetAsync(email: string, ip: string?, userAgent: string?, ct: CancellationToken): Task
+        +VerifyPasswordResetTokenAsync(token: string, ct: CancellationToken): Task<bool>
+        +ResetPasswordAsync(token: string, newPassword: string, ct: CancellationToken): Task
+        -GenerateSecurePasswordResetToken(tokenLengthBytes: int): string
+        -HashPasswordResetToken(token: string): string
+    }
+
+    interface ITokenService <<interface>> {
+        +GenerateAccessToken(userId: long, username: string, sessionId: long, roles: IEnumerable<string>, permissions: IEnumerable<string>?): string
+        +GenerateRefreshToken(): string
+        +HashToken(token: string): string
+        +VerifyToken(rawToken: string, hashedToken: string): bool
+        +GetPrincipalFromExpiredToken(token: string): ClaimsPrincipal?
+        +AccessTokenLifetime: TimeSpan
+        +RefreshTokenLifetime: TimeSpan
+    }
+
+    interface IPasswordHasher <<interface>> {
+        +HashPassword(password: string): string
+        +VerifyPassword(password: string, hashedPassword: string): bool
+    }
+
+    interface IPasswordResetTokenStore <<interface>> {
+        +StoreAsync(record: PasswordResetTokenRecord, ttl: TimeSpan, ct: CancellationToken): Task
+        +GetByTokenHashAsync(tokenHash: string, ct: CancellationToken): Task<PasswordResetTokenRecord?>
+        +ConsumeAsync(tokenHash: string, ct: CancellationToken): Task
+        +InvalidateUserAsync(userId: long, ct: CancellationToken): Task
+    }
+
+    class JwtTokenService <<Service>> {
+        -_jwtSettings: JwtSettings
+        -_signingKey: SymmetricSecurityKey
+        +GenerateAccessToken(userId: long, username: string, sessionId: long, roles: IEnumerable<string>, permissions: IEnumerable<string>?): string
+        +GenerateRefreshToken(): string
+        +HashToken(token: string): string
+        +VerifyToken(rawToken: string, hashedToken: string): bool
+        +GetPrincipalFromExpiredToken(token: string): ClaimsPrincipal?
+        +AccessTokenLifetime: TimeSpan
+        +RefreshTokenLifetime: TimeSpan
+    }
+
+    class BcryptPasswordHasher <<Service>> {
+        -WorkFactor: int = 12
+        +HashPassword(password: string): string
+        +VerifyPassword(password: string, hashedPassword: string): bool
+    }
+
+    class CachePasswordResetTokenStore <<Service>> {
+        -_cache: ICacheService
+        +StoreAsync(record: PasswordResetTokenRecord, ttl: TimeSpan, ct: CancellationToken): Task
+        +GetByTokenHashAsync(tokenHash: string, ct: CancellationToken): Task<PasswordResetTokenRecord?>
+        +ConsumeAsync(tokenHash: string, ct: CancellationToken): Task
+        +InvalidateUserAsync(userId: long, ct: CancellationToken): Task
+    }
+
+    interface IAccountService <<interface>> {
+        +ChangePasswordForSelfAsync(accountId: long, currentPassword: string?, newPassword: string, ct: CancellationToken): Task<bool>
+        +ChangePasswordAsync(accountId: long, newPassword: string, ct: CancellationToken): Task
+    }
+
+    class AccountService <<Service>> {
+        -_accountRepository: IAccountRepository
+        -_passwordHasher: IPasswordHasher
+        -_lookupResolver: ILookupResolver
+        -_logger: ILogger<AccountService>
+        +ChangePasswordForSelfAsync(accountId: long, currentPassword: string?, newPassword: string, ct: CancellationToken): Task<bool>
+        +ChangePasswordAsync(accountId: long, newPassword: string, ct: CancellationToken): Task
+    }
+}
+
+' --- Internal DTOs used by services ---
+class LoginRequest <<DTO>> {
+    +Username: string
+    +Password: string
+}
+
+class RefreshTokenRequest <<DTO>> {
+    +AccessToken: string
+    +RefreshToken: string
+}
+
+class AuthResult <<DTO>> {
+    +Success: bool
+    +AccessToken: string?
+    +RefreshToken: string?
+    +ExpiresIn: int
+    +SessionId: long?
+    +UserId: long?
+    +Username: string?
+    +Roles: IEnumerable<string>?
+    +ErrorCode: string?
+    +ErrorMessage: string?
+    +RequirePasswordChange: bool
+    +{static} Failed(errorCode: string, errorMessage: string): AuthResult
+    +{static} Succeeded(...): AuthResult
+    +{static} PasswordChangeRequired(...): AuthResult
+}
+
+class PasswordResetTokenRecord <<DTO>> {
+    +UserId: long
+    +EmailNormalized: string
+    +TokenHash: string
+    +ExpiresAt: DateTimeOffset
+    +IssuedAt: DateTimeOffset
+}
+
+' --- External stubs ---
+class IAuthSessionRepository <<interface>>
+class IAccountRepository <<interface>>
+class IEmailQueue <<interface>>
+class IEmailTemplateService <<interface>>
+
+' --- Relationships ---
+AuthService ..|> IAuthService : "implements"
+AccountService ..|> IAccountService : "implements"
+JwtTokenService ..|> ITokenService : "implements"
+BcryptPasswordHasher ..|> IPasswordHasher : "implements"
+CachePasswordResetTokenStore ..|> IPasswordResetTokenStore : "implements"
+
+AuthService --> ITokenService : "generates tokens"
+AuthService --> IAuthSessionRepository : "manages sessions"
+AuthService --> IAccountRepository : "looks up accounts"
+AuthService --> IPasswordHasher : "verifies passwords"
+AuthService --> IPasswordResetTokenStore : "stores reset tokens"
+AuthService --> IEmailQueue : "queues reset emails"
+AuthService --> IEmailTemplateService : "loads email templates"
+
+AuthService ..> LoginRequest : "consumes"
+AuthService ..> RefreshTokenRequest : "consumes"
+AuthService ..> AuthResult : "produces"
+AuthService ..> PasswordResetTokenRecord : "creates and reads"
+
+AccountService --> IAccountRepository : "updates password"
+AccountService --> IPasswordHasher : "hashes passwords"
+
+@enduml

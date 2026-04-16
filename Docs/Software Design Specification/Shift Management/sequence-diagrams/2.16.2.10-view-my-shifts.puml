@@ -1,0 +1,41 @@
+@startuml
+autonumber
+title 2.16.2.10 View My Shifts
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+actor ":User" as U
+participant ":MyShiftsPage" as Client
+participant ":ShiftController" as Ctrl
+participant ":ShiftAssignmentService" as Svc
+participant ":IShiftAssignmentRepository" as ARepo
+participant ":Database" as DB
+
+activate U
+U ->> Client : Open my shifts page
+activate Client
+Client ->> Ctrl : GET /api/shifts/my-shifts?filters
+activate Ctrl
+Ctrl ->> Svc : GetMyShiftsAsync(staffId, request, ct)
+activate Svc
+
+Svc ->> ARepo : GetAssignmentsAsync(request)
+activate ARepo
+ARepo ->> DB : Query own shift assignments joined with\ntemplate, staff, status, and attendance\napplying filters and paging
+activate DB
+DB -->> ARepo : Return paginated assignment list with total count
+deactivate DB
+ARepo -->> Svc : (Items, TotalCount)
+deactivate ARepo
+
+Svc -->> Ctrl : (List<ShiftAssignmentDetailDto>, TotalCount)
+deactivate Svc
+Ctrl -->> Client : 200 OK PagedResult<ShiftAssignmentDetailDto>
+deactivate Ctrl
+Client -->> U : Display my shifts list
+deactivate Client
+deactivate U
+
+@enduml

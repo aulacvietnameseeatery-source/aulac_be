@@ -1,0 +1,156 @@
+@startuml
+title System Settings Management Module - Presentation Layer Class Diagram
+
+package "Presentation Layer" {
+
+    class SystemSettingController <<Controller>> {
+        -_systemSettingService : ISystemSettingService
+        -_logger : ILogger<SystemSettingController>
+        -_restaurantOptions : RestaurantOptions
+        +SystemSettingController(systemSettingService: ISystemSettingService, logger: ILogger, restaurantOptions: IOptions<RestaurantOptions>)
+        +GetAllNonSensitive(ct: CancellationToken) : Task<IActionResult>
+        +GetByKey(key: string, ct: CancellationToken) : Task<IActionResult>
+        +CreateSetting(request: CreateSystemSettingDto, ct: CancellationToken) : Task<IActionResult>
+        +UpdateStringSetting(key: string, request: UpdateSettingValueDto, ct: CancellationToken) : Task<IActionResult>
+        +UpdateIntSetting(key: string, value: long, ct: CancellationToken) : Task<IActionResult>
+        +UpdateBoolSetting(key: string, value: bool, ct: CancellationToken) : Task<IActionResult>
+        +DeleteSetting(key: string, ct: CancellationToken) : Task<IActionResult>
+        +ClearCache(key: string) : Task<IActionResult>
+        +UploadLogo(file: IFormFile, ct: CancellationToken) : Task<IActionResult>
+        +UploadFile(file: IFormFile, ct: CancellationToken) : Task<IActionResult>
+        +GetAllGrouped(ct: CancellationToken) : Task<IActionResult>
+        +GetGroup(group: string, ct: CancellationToken) : Task<IActionResult>
+        +GetPublicGroup(group: string, ct: CancellationToken) : Task<IActionResult>
+        +GetPublicTimezone() : IActionResult
+        +BulkUpdateGroup(group: string, request: BulkUpdateGroupDto, ct: CancellationToken) : Task<IActionResult>
+    }
+
+    class EmailTemplateController <<Controller>> {
+        -_service : IEmailTemplateService
+        +EmailTemplateController(service: IEmailTemplateService)
+        +GetAll(ct: CancellationToken) : Task<ActionResult<List<EmailTemplateDto>>>
+        +GetByCode(code: string, ct: CancellationToken) : Task<ActionResult<EmailTemplateDto>>
+        +Create(request: CreateEmailTemplateRequest, ct: CancellationToken) : Task<ActionResult<EmailTemplateDto>>
+        +Update(id: long, request: UpdateEmailTemplateRequest, ct: CancellationToken) : Task<ActionResult<EmailTemplateDto>>
+        +Delete(id: long, ct: CancellationToken) : Task<ActionResult>
+    }
+
+    package "System Setting DTOs" {
+
+        class SystemSettingDto <<DTO>> {
+            +SettingKey : string
+            +ValueType : string
+            +Value : object?
+            +Description : string?
+            +IsSensitive : bool
+            +UpdatedAt : DateTime
+        }
+
+        class CreateSystemSettingDto <<DTO>> {
+            +Key : string
+            +SettingName : string?
+            +ValueType : string
+            +Value : string
+            +Description : string?
+            +IsSensitive : bool
+        }
+
+        class UpdateSettingValueDto <<DTO>> {
+            +Value : string
+            +Description : string?
+        }
+
+        class SystemSettingDetailDto <<DTO>> {
+            +SettingKey : string
+            +SettingName : string?
+            +Group : string
+            +ValueType : string
+            +Value : object?
+            +PublicUrl : string?
+            +Description : string?
+            +IsSensitive : bool
+            +UpdatedAt : DateTime
+        }
+
+        class SystemSettingGroupDto <<DTO>> {
+            +GroupName : string
+            +Settings : List<SystemSettingDetailDto>
+        }
+
+        class BulkUpdateSettingItemDto <<DTO>> {
+            +Key : string
+            +SettingName : string?
+            +Value : string
+            +Description : string?
+        }
+
+        class BulkUpdateGroupDto <<DTO>> {
+            +Items : List<BulkUpdateSettingItemDto>
+        }
+
+        class SaveSystemSettingDto <<DTO>> {
+            +SettingKey : string
+            +ValueType : string
+            +ValueString : string?
+            +ValueInt : long?
+            +ValueDecimal : decimal?
+            +ValueBool : bool?
+            +ValueJson : string?
+            +Description : string?
+            +IsSensitive : bool
+        }
+    }
+
+    package "Email Template DTOs" {
+
+        class EmailTemplateDto <<DTO>> {
+            +TemplateId : long
+            +TemplateCode : string
+            +TemplateName : string
+            +Subject : string
+            +BodyHtml : string
+            +Description : string?
+            +CreatedAt : DateTime
+            +UpdatedAt : DateTime?
+        }
+
+        class CreateEmailTemplateRequest <<DTO>> {
+            +TemplateCode : string
+            +TemplateName : string
+            +Subject : string
+            +BodyHtml : string
+            +Description : string?
+        }
+
+        class UpdateEmailTemplateRequest <<DTO>> {
+            +TemplateName : string
+            +Subject : string
+            +BodyHtml : string
+            +Description : string?
+        }
+    }
+}
+
+SystemSettingController ..> CreateSystemSettingDto : receives as request body
+SystemSettingController ..> UpdateSettingValueDto : receives as request body
+SystemSettingController ..> BulkUpdateGroupDto : receives as request body
+SystemSettingController ..> SystemSettingDetailDto : returns in response
+SystemSettingController ..> SystemSettingGroupDto : returns in response
+
+EmailTemplateController ..> CreateEmailTemplateRequest : receives as request body
+EmailTemplateController ..> UpdateEmailTemplateRequest : receives as request body
+EmailTemplateController ..> EmailTemplateDto : returns in response
+
+SystemSettingGroupDto *-- SystemSettingDetailDto : contains settings
+BulkUpdateGroupDto *-- BulkUpdateSettingItemDto : contains items
+
+class ISystemSettingService <<interface>> {
+}
+
+class IEmailTemplateService <<interface>> {
+}
+
+SystemSettingController --> ISystemSettingService : depends on for business logic
+EmailTemplateController --> IEmailTemplateService : depends on for business logic
+
+@enduml

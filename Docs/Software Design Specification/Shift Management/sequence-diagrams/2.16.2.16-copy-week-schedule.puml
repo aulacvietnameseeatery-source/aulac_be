@@ -1,0 +1,98 @@
+@startuml
+autonumber
+title 2.16.2.16 Copy Week Schedule
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+actor ":User" as U
+participant ":CopyWeekSchedulePage" as Client
+participant ":ShiftController" as Ctrl
+participant ":ShiftAssignmentService" as Svc
+participant ":IShiftAssignmentRepository" as ARepo
+participant ":ILookupResolver" as Lookup
+participant ":IShiftLiveRealtimePublisher" as RT
+participant ":IUnitOfWork" as UoW
+participant ":Database" as DB
+
+activate U
+U ->> Client : Submit copy week schedule form
+activate Client
+Client ->> Ctrl : POST /api/shifts/assignments/copy-week\n(CopyWeekRequest)
+activate Ctrl
+Ctrl ->> Svc : CopyWeekAsync(request, staffId, ct)
+activate Svc
+
+alt#White Source or target week start is not Monday
+    Svc -->> Ctrl : throw ValidationException
+    Ctrl -->> Client : 400
+    Client -->> U : Display validation error
+end
+
+Svc ->> ARepo : GetWeekAssignmentsAsync(sourceWeekStart)
+activate ARepo
+ARepo ->> DB : Query active assignments for the source week\n(seven days from start date)
+activate DB
+DB -->> ARepo : Return assignment list for the week
+deactivate DB
+ARepo -->> Svc : sourceAssignments
+deactivate ARepo
+
+alt#White No source assignments found
+    Svc -->> Ctrl : throw NotFoundException
+    Ctrl -->> Client : 404
+    Client -->> U : Display not found error
+end
+
+Svc ->> Lookup : ToShiftAssignmentStatusIdAsync(DRAFT or ASSIGNED)
+activate Lookup
+Lookup -->> Svc : uint statusLvId
+deactivate Lookup
+
+loop For each source assignment
+    Svc ->> ARepo : GetAlreadyAssignedStaffIdsAsync(templateId, targetDate, [staffId])
+    activate ARepo
+    ARepo -->> Svc : already assigned (skip if found)
+    deactivate ARepo
+    Svc ->> ARepo : HasOverlappingAssignmentAsync(staffId, targetDate, newStart, newEnd)
+    activate ARepo
+    ARepo -->> Svc : bool (skip if true)
+    deactivate ARepo
+end
+
+alt#White No assignments could be copied
+    Svc -->> Ctrl : throw ConflictException
+    Ctrl -->> Client : 409
+    Client -->> U : Display conflict error
+end
+
+Svc ->> ARepo : AddRange(newEntities)
+Svc ->> UoW : SaveChangesAsync()
+activate UoW
+UoW ->> DB : Insert copied assignment records for the target week
+activate DB
+DB -->> UoW : OK
+deactivate DB
+UoW -->> Svc : OK
+deactivate UoW
+
+Svc ->> ARepo : GetByIdsWithDetailsAsync(newIds)
+activate ARepo
+ARepo -->> Svc : List<ShiftAssignment>
+deactivate ARepo
+
+Svc ->> RT : PublishBoardChangedAsync(assignments_copied)
+activate RT
+RT -->> Svc : OK
+deactivate RT
+
+Svc -->> Ctrl : List<ShiftAssignmentListDto>
+deactivate Svc
+Ctrl -->> Client : 201 Created ApiResponse
+deactivate Ctrl
+Client -->> U : Display copied schedule
+deactivate Client
+deactivate U
+
+@enduml

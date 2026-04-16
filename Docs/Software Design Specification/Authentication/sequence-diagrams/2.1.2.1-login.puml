@@ -1,0 +1,132 @@
+@startuml
+title 2.1.2.1 - Login
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+actor ":User" as U
+participant ":LoginPage" as Client
+participant ":AuthController" as Ctrl
+participant ":AuthService" as Svc
+participant ":ITokenService" as TokenSvc
+participant ":IAccountRepository" as AcctRepo
+participant ":IAuthSessionRepository" as SessRepo
+participant ":Database" as DB
+
+autonumber
+
+activate U
+
+U ->> Client : Enter username/email and password
+activate Client
+
+Client ->> Ctrl : POST /api/auth/login\n(LoginRequestDto)
+activate Ctrl
+
+Ctrl ->> Svc : LoginAsync(LoginRequest, deviceInfo, ipAddress)
+activate Svc
+
+Svc ->> AcctRepo : FindByUsernameAsync(username)
+activate AcctRepo
+AcctRepo ->> DB : Query staff account by username with role and permissions
+activate DB
+DB -->> AcctRepo : Return account or null
+deactivate DB
+deactivate AcctRepo
+
+alt#White Account not found by username
+    Svc ->> AcctRepo : FindByEmailAsync(emailNormalized)
+    activate AcctRepo
+    AcctRepo ->> DB : Query staff account by normalized email with role and permissions
+    activate DB
+    DB -->> AcctRepo : Return account or null
+    deactivate DB
+    deactivate AcctRepo
+end
+
+alt#White Account not found
+    Svc -->> Ctrl : AuthResult.Failed("INVALID_CREDENTIALS")
+    Ctrl -->> Client : 401 Unauthorized (AuthErrorDto)
+    Client -->> U : Display "Invalid username or password"
+else Account found
+    Svc ->> Svc : VerifyPassword(password, account.PasswordHash)
+
+    alt#White Password incorrect
+        Svc -->> Ctrl : AuthResult.Failed("INVALID_CREDENTIALS")
+        Ctrl -->> Client : 401 Unauthorized (AuthErrorDto)
+        Client -->> U : Display "Invalid username or password"
+    else Password correct
+
+        alt#White Account is INACTIVE
+            Svc -->> Ctrl : AuthResult.Failed("ACCOUNT_DEACTIVATED")
+            Ctrl -->> Client : 401 Unauthorized (AuthErrorDto)
+            Client -->> U : Display "Account deactivated"
+        else Account is LOCKED (first-time login)
+            Svc ->> SessRepo : CreateSessionAsync(accountId, tempTokenHash, 15min expiry)
+            activate SessRepo
+            SessRepo ->> DB : Insert temporary auth session
+            activate DB
+            DB -->> SessRepo : Return created session
+            deactivate DB
+            deactivate SessRepo
+
+            Svc ->> TokenSvc : GenerateAccessToken(userId, username, sessionId, roles, permissions)
+            activate TokenSvc
+            TokenSvc -->> Svc : Return temporary access token
+            deactivate TokenSvc
+
+            Svc -->> Ctrl : AuthResult.PasswordChangeRequired(tempAccessToken, ...)
+            Ctrl -->> Client : 200 OK (AuthResponseDto + SubCode=1, PASSWORD_CHANGE_REQUIRED)
+            Client -->> U : Redirect to Change Password page
+        else Account is ACTIVE (normal login)
+            Svc ->> TokenSvc : GenerateRefreshToken()
+            activate TokenSvc
+            TokenSvc -->> Svc : Return refresh token
+            deactivate TokenSvc
+
+            Svc ->> TokenSvc : HashToken(refreshToken)
+            activate TokenSvc
+            TokenSvc -->> Svc : Return hashed token
+            deactivate TokenSvc
+
+            Svc ->> SessRepo : CreateSessionAsync(accountId, tokenHash, expiresAt, deviceInfo, ipAddress)
+            activate SessRepo
+            SessRepo ->> DB : Insert new auth session
+            activate DB
+            DB -->> SessRepo : Return created session
+            deactivate DB
+            deactivate SessRepo
+
+            Svc ->> TokenSvc : GenerateAccessToken(userId, username, sessionId, roles, permissions)
+            activate TokenSvc
+            TokenSvc -->> Svc : Return JWT access token
+            deactivate TokenSvc
+
+            Svc ->> AcctRepo : UpdateLastLoginAsync(accountId, DateTime.UtcNow)
+            activate AcctRepo
+            AcctRepo ->> DB : Update last login timestamp
+            activate DB
+            DB -->> AcctRepo : Confirm update
+            deactivate DB
+            deactivate AcctRepo
+
+            Svc -->> Ctrl : AuthResult.Succeeded(accessToken, refreshToken, ...)
+            deactivate Svc
+
+            Ctrl ->> Ctrl : Set refresh_token HttpOnly cookie
+
+            Ctrl -->> Client : 200 OK (AuthResponseDto with AccessToken, UserId, Username, Roles)
+            deactivate Ctrl
+
+            Client -->> U : Display dashboard / redirect to home
+        end
+    end
+end
+
+deactivate Client
+deactivate U
+
+@enduml

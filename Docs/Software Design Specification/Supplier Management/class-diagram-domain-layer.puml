@@ -1,0 +1,42 @@
+@startuml
+title Supplier Management - Domain Layer Class Diagram
+
+
+package "Domain Layer" {
+
+    class Supplier <<Entity>> {
+        +SupplierId: long
+        +SupplierName: string
+        +Phone: string?
+        +Email: string?
+        +Address: string?
+        +TaxCode: string?
+    }
+
+    class IngredientSupplier <<Entity>> {
+        +IngredientSupplierId: long
+        +SupplierId: long?
+        +IngredientId: long?
+        +CreatedAt: DateTime?
+    }
+
+    class Ingredient <<Entity>> {
+        +IngredientId: long
+        +IngredientName: string
+        +UnitLvId: uint
+    }
+
+    class InventoryTransaction <<Entity>> {
+        +TransactionId: long
+        +SupplierId: long?
+    }
+}
+
+' ── Domain Relationships ──
+
+Supplier "1" *-- "0..*" IngredientSupplier : supplies
+Supplier "1" o-- "0..*" InventoryTransaction : referenced in
+
+IngredientSupplier "0..*" --> "1" Ingredient : links to
+IngredientSupplier "0..*" --> "1" Supplier : links to
+@enduml

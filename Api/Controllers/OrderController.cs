@@ -218,30 +218,6 @@ namespace Api.Controllers
 
 
 	/// <summary>
-	/// Returns all orders placed at a given table today, grouped as rounds.
-	/// PUBLIC – no authentication required (called from the customer QR menu).
-	/// </summary>
-	/// <param name="tableCode">The table code from the QR URL, e.g. T1</param>
-	[HttpGet("customer/table/{tableCode}")]
-	[ProducesResponseType(typeof(ApiResponse<CustomerOrderHistoryDTO>), StatusCodes.Status200OK)]
-	public async Task<IActionResult> GetCustomerOrderHistory(
-		string tableCode,
-		CancellationToken cancellationToken = default)
-	{
-		var result = await _orderService.GetCustomerOrderHistoryAsync(tableCode, cancellationToken);
-
-		return Ok(new ApiResponse<CustomerOrderHistoryDTO>
-		{
-			Success = true,
-			Code = 200,
-			SubCode = 0,
-			UserMessage = "Customer order history retrieved successfully",
-			Data = result,
-			ServerTime = DateTimeOffset.Now
-		});
-	}
-
-	/// <summary>
 	/// Returns all items for a specific order (customer-facing history panel).
 	/// PUBLIC – no authentication required.
 	/// </summary>

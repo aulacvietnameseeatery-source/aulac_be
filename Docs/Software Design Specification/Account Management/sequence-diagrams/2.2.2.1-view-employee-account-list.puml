@@ -1,0 +1,52 @@
+@startuml
+title 2.2.2.1 View Employee Account List
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":Admin" as U
+participant ":AccountListPage" as Client
+participant ":AccountController" as Ctrl
+participant ":AccountService" as Svc
+participant ":AccountRepository" as Repo
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : Open employee account list page
+
+activate Client
+
+Client ->> Ctrl : GET /api/account/staff?search=&roleId=&accountStatus=&pageIndex=1&pageSize=10
+activate Ctrl
+
+Ctrl ->> Svc : GetAccountsAsync(query: AccountListQueryDTO)
+activate Svc
+
+Svc ->> Repo : GetAccountsAsync(query: AccountListQueryDTO)
+activate Repo
+
+Repo ->> DB : Query staff accounts with optional search, role, and status filters; include Role; apply pagination
+activate DB
+DB -->> Repo : Return paged list of staff accounts with role names
+deactivate DB
+
+Repo -->> Svc : PagedResultDTO<AccountListDTO>
+deactivate Repo
+
+Svc -->> Ctrl : PagedResultDTO<AccountListDTO>
+deactivate Svc
+
+Ctrl -->> Client : 200 OK - ApiResponse<PagedResultDTO<AccountListDTO>>
+deactivate Ctrl
+
+Client -->> U : Display paginated employee account list
+deactivate Client
+deactivate U
+
+@enduml

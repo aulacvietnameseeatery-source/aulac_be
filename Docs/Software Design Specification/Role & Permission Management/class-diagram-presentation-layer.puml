@@ -1,0 +1,110 @@
+@startuml
+title Role & Permission Management Module - Presentation Layer Class Diagram
+
+package "Presentation Layer" {
+
+    class RoleController <<Controller>> {
+        -_roleService : IRoleService
+        -_logger : ILogger<RoleController>
+        +GetRoles(query : PagedQuery) : Task<IActionResult>
+        +GetRoleDetail(id : long) : Task<IActionResult>
+        +CreateRole(request : CreateRoleRequestDto) : Task<IActionResult>
+        +UpdateRole(id : long, request : UpdateRoleRequestDto) : Task<IActionResult>
+        +DeleteRole(id : long) : Task<IActionResult>
+    }
+
+    package "Request DTOs" {
+
+        class PagedQuery <<DTO>> {
+            +PageIndex : int
+            +PageSize : int
+            +Search : string?
+        }
+
+        class CreateRoleRequestDto <<DTO>> {
+            +RoleName : string
+            +IsActive : bool
+            +PermissionIds : List<long>
+        }
+
+        class UpdateRoleRequestDto <<DTO>> {
+            +RoleName : string
+            +IsActive : bool
+            +PermissionIds : List<long>
+        }
+    }
+
+    package "Response DTOs" {
+
+        class "ApiResponse<T>" as ApiResponse <<DTO>> {
+            +Success : bool
+            +Code : int
+            +SubCode : int
+            +UserMessage : string?
+            +SystemMessage : string?
+            +ValidateInfo : IReadOnlyList<string>
+            +Data : T
+            +GetLastData : bool
+            +ServerTime : DateTimeOffset
+        }
+
+        class "PagedResult<T>" as PagedResult <<DTO>> {
+            +PageData : List<T>
+            +PageIndex : int
+            +PageSize : int
+            +TotalCount : int
+            +TotalPage : int
+        }
+
+        class RoleListItemDto <<DTO>> {
+            +RoleId : long
+            +RoleCode : string
+            +RoleName : string
+            +StaffCount : int
+        }
+
+        class RoleDetailDto <<DTO>> {
+            +RoleId : long
+            +RoleCode : string
+            +RoleName : string
+            +RoleStatusLvId : uint
+            +IsActive : bool
+            +PermissionGroups : List<PermissionGroupDto>
+        }
+
+        class PermissionGroupDto <<DTO>> {
+            +ScreenCode : string
+            +DisplayName : string
+            +Permissions : List<PermissionItemDto>
+        }
+
+        class PermissionItemDto <<DTO>> {
+            +PermissionId : long
+            +ScreenCode : string
+            +ActionCode : string
+            +DisplayName : string
+            +IsAssigned : bool
+        }
+    }
+}
+
+' --- External stub ---
+class IRoleService <<interface>> {
+}
+
+' --- Relationships ---
+RoleController --> IRoleService : depends on for business logic
+
+RoleController ..> PagedQuery : receives as query parameter
+RoleController ..> CreateRoleRequestDto : receives in request body
+RoleController ..> UpdateRoleRequestDto : receives in request body
+
+RoleController ..> ApiResponse : wraps response in
+RoleController ..> PagedResult : wraps paged data in
+RoleController ..> RoleListItemDto : returns list of
+RoleController ..> RoleDetailDto : returns detail as
+
+RoleDetailDto *-- "0..*" PermissionGroupDto : contains permission groups
+PermissionGroupDto *-- "1..*" PermissionItemDto : contains permission items
+
+@enduml

@@ -1,0 +1,65 @@
+@startuml
+title 2.18.2.3 Acknowledge Notification
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":User" as U
+participant ":NotificationListPage" as Client
+participant ":NotificationController" as Ctrl
+participant ":NotificationService" as Svc
+participant ":NotificationRepository" as Repo
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : Click "Acknowledge" on a\nhigh-priority notification (RequireAck=true)
+
+Client ->> Ctrl : POST /api/notifications/{id}/ack
+activate Ctrl
+
+Ctrl ->> Ctrl : ExtractUserContext() from JWT claims
+Ctrl ->> Svc : AcknowledgeAsync(notificationId, userId, ct)
+activate Svc
+
+Svc ->> Repo : AcknowledgeAsync(notificationId, userId, ct)
+activate Repo
+
+Repo ->> DB : Find existing NotificationReadState\nfor this notification and user
+activate DB
+DB -->> Repo : Return read state or null
+deactivate DB
+
+alt#White Read state does not exist
+    Repo ->> DB : Insert new NotificationReadState with\nIsRead=true, ReadAt=now,\nIsAcknowledged=true, AcknowledgedAt=now
+    activate DB
+    DB -->> Repo : Confirm insert
+    deactivate DB
+else Read state exists but IsAcknowledged = false
+    Repo ->> DB : Update IsAcknowledged=true, AcknowledgedAt=now\n(also set IsRead=true if not already)
+    activate DB
+    DB -->> Repo : Confirm update
+    deactivate DB
+else Already acknowledged
+    Repo -->> Svc : No action needed
+end
+
+Repo -->> Svc : Completed
+deactivate Repo
+
+Svc -->> Ctrl : Completed
+deactivate Svc
+
+Ctrl -->> Client : 200 OK - "Notification acknowledged."
+deactivate Ctrl
+
+Client -->> U : Update notification to show\nacknowledged state
+
+deactivate U
+
+@enduml

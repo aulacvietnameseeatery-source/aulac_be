@@ -1,0 +1,87 @@
+@startuml
+title Account Management Module - Application Layer Class Diagram
+
+package "Application Layer" {
+
+    interface IAccountService <<interface>> {
+        +CreateAccountAsync(request: CreateAccountRequest, ct: CancellationToken): Task<CreateAccountResult>
+        +UpdateAccountAsync(accountId: long, request: UpdateAccountRequest, requestingUserId: long, ct: CancellationToken): Task<AccountDetailDto>
+        +UpdateAccountStatusAsync(accountId: long, newStatusCode: AccountStatusCode, ct: CancellationToken): Task<bool>
+        +GetAccountDetailAsync(accountId: long, ct: CancellationToken): Task<AccountDetailDto?>
+        +ResetToDefaultPasswordAsync(accountId: long, ct: CancellationToken): Task<PasswordResetResult>
+        +ChangePasswordAsync(accountId: long, newPassword: string, ct: CancellationToken): Task
+        +ChangePasswordForSelfAsync(accountId: long, currentPassword: string?, newPassword: string, ct: CancellationToken): Task<bool>
+        +GetAccountByIdAsync(accountId: long, includeRole: bool, ct: CancellationToken): Task<AccountDto?>
+        +IsAccountActiveAsync(accountId: long, ct: CancellationToken): Task<bool>
+        +GetAccountsAsync(query: AccountListQueryDTO): Task<PagedResultDTO<AccountListDTO>>
+        +GetAllRolesAsync(ct: CancellationToken): Task<List<RoleDTO>>
+        +GetActiveRolesAsync(ct: CancellationToken): Task<List<RoleDTO>>
+        +GetAccountStatusesAsync(ct: CancellationToken): Task<List<AccountStatusDTO>>
+        +GetAccountOrdersAsync(accountId: long, query: AccountSubResourceQueryDTO, ct: CancellationToken): Task<PagedResultDTO<AccountOrderSummaryDTO>>
+        +GetAccountAuditLogsAsync(accountId: long, query: AccountSubResourceQueryDTO, ct: CancellationToken): Task<PagedResultDTO<AccountAuditLogDTO>>
+        +GetAccountLoginActivityAsync(accountId: long, query: AccountSubResourceQueryDTO, ct: CancellationToken): Task<PagedResultDTO<AccountLoginActivityDTO>>
+        +GetAccountServiceErrorsAsync(accountId: long, query: AccountSubResourceQueryDTO, ct: CancellationToken): Task<PagedResultDTO<AccountServiceErrorDTO>>
+        +GetAccountInventoryActivityAsync(accountId: long, query: AccountSubResourceQueryDTO, ct: CancellationToken): Task<PagedResultDTO<AccountInventoryActivityDTO>>
+    }
+
+    class AccountService <<Service>> {
+        -_accountRepository: IAccountRepository
+        -_roleRepository: IRoleRepository
+        -_passwordHasher: IPasswordHasher
+        -_passwordGenerator: IPasswordGenerator
+        -_usernameGenerator: IUsernameGenerator
+        -_systemSettingService: ISystemSettingService
+        -_lookupResolver: ILookupResolver
+        -_emailQueue: IEmailQueue
+        -_emailTemplateService: IEmailTemplateService
+        -_sessionRepository: IAuthSessionRepository
+        -_logger: ILogger<AccountService>
+        +CreateAccountAsync(request: CreateAccountRequest, ct: CancellationToken): Task<CreateAccountResult>
+        +UpdateAccountAsync(accountId: long, request: UpdateAccountRequest, requestingUserId: long, ct: CancellationToken): Task<AccountDetailDto>
+        +UpdateAccountStatusAsync(accountId: long, newStatusCode: AccountStatusCode, ct: CancellationToken): Task<bool>
+        +GetAccountDetailAsync(accountId: long, ct: CancellationToken): Task<AccountDetailDto?>
+        +ResetToDefaultPasswordAsync(accountId: long, ct: CancellationToken): Task<PasswordResetResult>
+        +ChangePasswordAsync(accountId: long, newPassword: string, ct: CancellationToken): Task
+        +ChangePasswordForSelfAsync(accountId: long, currentPassword: string?, newPassword: string, ct: CancellationToken): Task<bool>
+        +GetAccountByIdAsync(accountId: long, includeRole: bool, ct: CancellationToken): Task<AccountDto?>
+        +IsAccountActiveAsync(accountId: long, ct: CancellationToken): Task<bool>
+        +GetAccountsAsync(query: AccountListQueryDTO): Task<PagedResultDTO<AccountListDTO>>
+        +GetAllRolesAsync(ct: CancellationToken): Task<List<RoleDTO>>
+        +GetActiveRolesAsync(ct: CancellationToken): Task<List<RoleDTO>>
+        +GetAccountStatusesAsync(ct: CancellationToken): Task<List<AccountStatusDTO>>
+        +GetAccountOrdersAsync(accountId: long, query: AccountSubResourceQueryDTO, ct: CancellationToken): Task<PagedResultDTO<AccountOrderSummaryDTO>>
+        +GetAccountAuditLogsAsync(accountId: long, query: AccountSubResourceQueryDTO, ct: CancellationToken): Task<PagedResultDTO<AccountAuditLogDTO>>
+        +GetAccountLoginActivityAsync(accountId: long, query: AccountSubResourceQueryDTO, ct: CancellationToken): Task<PagedResultDTO<AccountLoginActivityDTO>>
+        +GetAccountServiceErrorsAsync(accountId: long, query: AccountSubResourceQueryDTO, ct: CancellationToken): Task<PagedResultDTO<AccountServiceErrorDTO>>
+        +GetAccountInventoryActivityAsync(accountId: long, query: AccountSubResourceQueryDTO, ct: CancellationToken): Task<PagedResultDTO<AccountInventoryActivityDTO>>
+        -GetAccountStatusCodeAsync(statusLvId: uint, ct: CancellationToken): Task<string>
+    }
+}
+
+' --- External stubs (dependencies from other layers) ---
+interface IAccountRepository <<interface>>
+interface IRoleRepository <<interface>>
+interface IAuthSessionRepository <<interface>>
+interface IPasswordHasher <<interface>>
+interface IPasswordGenerator <<interface>>
+interface IUsernameGenerator <<interface>>
+interface ISystemSettingService <<interface>>
+interface ILookupResolver <<interface>>
+interface IEmailQueue <<interface>>
+interface IEmailTemplateService <<interface>>
+
+' --- Relationships ---
+AccountService ..|> IAccountService : implements
+
+AccountService --> IAccountRepository : persists accounts
+AccountService --> IRoleRepository : validates roles
+AccountService --> IPasswordHasher : hashes passwords
+AccountService --> IPasswordGenerator : generates temp passwords
+AccountService --> IUsernameGenerator : generates usernames
+AccountService --> ISystemSettingService : reads default password
+AccountService --> ILookupResolver : resolves status codes
+AccountService --> IEmailQueue : queues notification emails
+AccountService --> IEmailTemplateService : loads email templates
+AccountService --> IAuthSessionRepository : revokes sessions on deactivation
+
+@enduml

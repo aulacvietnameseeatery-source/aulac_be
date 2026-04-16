@@ -1,0 +1,45 @@
+@startuml
+autonumber
+title 2.16.2.1 View Shift Template List
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+actor ":User" as U
+participant ":ShiftTemplateListPage" as Client
+participant ":ShiftController" as Ctrl
+participant ":ShiftTemplateService" as Svc
+participant ":IShiftTemplateRepository" as Repo
+participant ":Database" as DB
+
+activate U
+U ->> Client : Open shift template list page
+activate Client
+Client ->> Ctrl : GET /api/shifts/templates?isActive={bool}
+activate Ctrl
+Ctrl ->> Svc : GetAllAsync(isActive, ct)
+activate Svc
+
+alt#White isActive is true
+    Svc ->> Repo : GetAllActiveAsync()
+else isActive is false or null
+    Svc ->> Repo : GetAllAsync()
+end
+activate Repo
+Repo ->> DB : Query all shift templates\nwith optional active filter
+activate DB
+DB -->> Repo : Return list of shift templates
+deactivate DB
+Repo -->> Svc : List<ShiftTemplate>
+deactivate Repo
+
+Svc -->> Ctrl : List<ShiftTemplateListDto>
+deactivate Svc
+Ctrl -->> Client : 200 OK ApiResponse<List<ShiftTemplateListDto>>
+deactivate Ctrl
+Client -->> U : Display shift template list
+deactivate Client
+deactivate U
+
+@enduml

@@ -613,9 +613,6 @@ public class OrderService : IOrderService
     }
 
 
-    public Task<CustomerOrderHistoryDTO> GetCustomerOrderHistoryAsync(string tableCode, CancellationToken cancellationToken = default)
-        => _orderRepository.GetCustomerOrderHistoryAsync(tableCode, cancellationToken);
-
     public Task<CustomerOrderHistoryDTO> GetCustomerOrderByIdAsync(long orderId, CancellationToken cancellationToken = default)
         => _orderRepository.GetCustomerOrderByIdAsync(orderId, cancellationToken);
 
@@ -710,21 +707,77 @@ public class OrderService : IOrderService
             var lockedLvId = await TableStatusCode.LOCKED.ToTableStatusIdAsync(_lookupResolver, cancellationToken);
             var reservedLvId = await TableStatusCode.RESERVED.ToTableStatusIdAsync(_lookupResolver, cancellationToken);
 
-            // Block if table is LOCKED (maintenance)
+            // Block if table is LOCKED (maintenance) or deleted
             if (table.TableStatusLvId == lockedLvId)
                 throw new InvalidOperationException($"Table '{request.TableCode}' is under maintenance and cannot be used.");
 
-            // CRITICAL: Only allow creating NEW orders when table is AVAILABLE or RESERVED
-            // If table is already OCCUPIED, it means someone else is using it
+            if (table.IsDeleted)
+                throw new InvalidOperationException($"Table '{request.TableCode}' is no longer available.");
+
+            // If table is OCCUPIED, find the existing active order and add items to it
             if (table.TableStatusLvId == occupiedLvId)
             {
-                // Check if there's an active order for this table
-                var activeOrderCount = await _tableRepository.CountActiveOrdersAsync(table.TableId, cancellationToken);
-                if (activeOrderCount > 0)
+                var existingOrder = await _orderRepository.GetActiveOrderByTableAsync(table.TableId, cancellationToken);
+                if (existingOrder != null)
                 {
-                    throw new ConflictException($"Table '{request.TableCode}' is already occupied by another customer. Please choose another table or add items to your existing order.");
+                    var createdItemLvIdForExisting = await OrderItemStatusCode.CREATED.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
+                    var completedOrderLvId = await OrderStatusCode.COMPLETED.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+                    var cancelledOrderLvId = await OrderStatusCode.CANCELLED.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+                    var pendingOrderLvId2 = await OrderStatusCode.PENDING.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+
+                    var additionalItems = request.Items.Select(i => new OrderItem
+                    {
+                        DishId = i.DishId,
+                        Quantity = i.Quantity,
+                        Price = i.Price,
+                        Note = i.Note,
+                        ItemStatus = 1,
+                        ItemStatusLvId = createdItemLvIdForExisting,
+                    }).ToList();
+
+                    await _orderRepository.AddItemsToOrderAsync(existingOrder.OrderId, additionalItems, completedOrderLvId, cancelledOrderLvId, pendingOrderLvId2, cancellationToken);
+                    await ApplyTaxToOrderAsync(existingOrder, cancellationToken);
+                    await _uow.CommitAsync(cancellationToken);
+
+                    await _realtime.OrderCreatedAsync(new OrderRealtimeDTO
+                    {
+                        OrderId = existingOrder.OrderId,
+                        Status = OrderStatusCode.PENDING.ToString(),
+                        TableId = table.TableId,
+                        UpdatedAt = DateTime.UtcNow
+                    });
+
+                    await PublishShiftLiveOrderEventAsync("customer_order_created", existingOrder.OrderId, null, cancellationToken);
+
+                    await _notificationService.PublishAsync(new PublishNotificationRequest
+                    {
+                        Type = nameof(NotificationType.NEW_ORDER),
+                        Priority = nameof(NotificationPriority.High),
+                        SoundKey = "notification_high",
+                        ActionUrl = "/dashboard/kitchen",
+                        EntityType = "Order",
+                        EntityId = existingOrder.OrderId.ToString(),
+                        Metadata = new Dictionary<string, object>
+                        {
+                            ["orderId"] = existingOrder.OrderId.ToString(),
+                            ["itemCount"] = request.Items.Count.ToString(),
+                            ["tableCode"] = table.TableCode
+                        },
+                        TargetPermissions = new List<string> { Permissions.UpdateOrderItemStatus }
+                    }, cancellationToken);
+
+                    return new CreateOrderResponseDTO
+                    {
+                        OrderId = existingOrder.OrderId,
+                        TableId = table.TableId,
+                        TableCode = table.TableCode,
+                        CustomerId = existingOrder.CustomerId,
+                        TotalAmount = existingOrder.TotalAmount,
+                        OrderStatus = "PENDING",
+                        CreatedAt = existingOrder.CreatedAt,
+                    };
                 }
-                // If no active orders but status is OCCUPIED (edge case), allow order creation
+                // If no active orders but status is OCCUPIED (edge case), fall through to create new order
             }
 
             // Change status to OCCUPIED if currently AVAILABLE or RESERVED

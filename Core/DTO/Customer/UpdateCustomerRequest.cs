@@ -5,7 +5,7 @@ namespace Core.DTO.Customer;
 public class UpdateCustomerRequest
 {
     [Required(ErrorMessage = "Phone number is required")]
-    [MaxLength(20, ErrorMessage = "Phone cannot exceed 20 characters")]
+    [StringLength(13, MinimumLength = 10, ErrorMessage = "Phone number must be between 10 and 13 characters")]
     [RegularExpression(@"^\d+$", ErrorMessage = "Phone number must contain only digits")]
     public string Phone { get; set; } = null!;
 
@@ -17,7 +17,4 @@ public class UpdateCustomerRequest
     public string? Email { get; set; }
 
     public bool IsMember { get; set; } = false;
-
-    [Range(0, int.MaxValue, ErrorMessage = "Loyalty points cannot be negative")]
-    public int LoyaltyPoints { get; set; } = 0;
 }

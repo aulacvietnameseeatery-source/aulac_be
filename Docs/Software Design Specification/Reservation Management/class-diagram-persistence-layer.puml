@@ -1,0 +1,66 @@
+@startuml
+title Reservation Management Module - Persistence Layer Class Diagram
+
+package "Persistence Layer" {
+
+    interface IReservationRepository <<interface>> {
+        +CreateAsync(reservation: Reservation, ct: CancellationToken) : Task<Reservation>
+        +GetByIdAsync(reservationId: long, ct: CancellationToken) : Task<Reservation?>
+        +GetByIdWithTablesAsync(id: long, ct: CancellationToken) : Task<Reservation?>
+        +GetByIdWithFullDetailsAsync(reservationId: long, ct: CancellationToken) : Task<Reservation?>
+        +GetReservationsAsync(request: GetReservationsRequest, ct: CancellationToken) : Task<(List<ReservationManagementDto>, int)>
+        +GetReservationStatusesAsync(ct: CancellationToken) : Task<List<LookupValue>>
+        +GetTableReservationsForTimeAsync(tableId: long, reservedTime: DateTime, durationMinutes: int, cancelledStatusId: uint, noShowStatusId: uint, completedStatusId: uint, ct: CancellationToken) : Task<List<Reservation>>
+        +UpdateAsync(reservation: Reservation, ct: CancellationToken) : Task
+        +DeleteAsync(reservation: Reservation, ct: CancellationToken) : Task
+    }
+
+    class ReservationRepository <<Repository>> {
+        -_context : RestaurantMgmtContext
+        +CreateAsync(reservation: Reservation, ct: CancellationToken) : Task<Reservation>
+        +GetByIdAsync(reservationId: long, ct: CancellationToken) : Task<Reservation?>
+        +GetByIdWithTablesAsync(id: long, ct: CancellationToken) : Task<Reservation?>
+        +GetByIdWithFullDetailsAsync(reservationId: long, ct: CancellationToken) : Task<Reservation?>
+        +GetReservationsAsync(request: GetReservationsRequest, ct: CancellationToken) : Task<(List<ReservationManagementDto>, int)>
+        +GetReservationStatusesAsync(ct: CancellationToken) : Task<List<LookupValue>>
+        +GetTableReservationsForTimeAsync(tableId: long, reservedTime: DateTime, durationMinutes: int, cancelledStatusId: uint, noShowStatusId: uint, completedStatusId: uint, ct: CancellationToken) : Task<List<Reservation>>
+        +UpdateAsync(reservation: Reservation, ct: CancellationToken) : Task
+        +DeleteAsync(reservation: Reservation, ct: CancellationToken) : Task
+    }
+
+    interface ITableRepository <<interface>> {
+        +GetManualAvailableTablesAsync(isOnline: bool?, ct: CancellationToken) : Task<List<RestaurantTable>>
+        +GetAvailableTablesAsync(ct: CancellationToken) : Task<List<RestaurantTable>>
+        +GetByIdAsync(tableId: long, ct: CancellationToken) : Task<RestaurantTable?>
+        +LockTablesForUpdateAsync(tableIds: IEnumerable<long>, ct: CancellationToken) : Task
+    }
+
+    interface IUnitOfWork <<interface>> {
+        +BeginTransactionAsync(ct: CancellationToken) : Task
+        +CommitAsync(ct: CancellationToken) : Task
+        +RollbackAsync(ct: CancellationToken) : Task
+        +SaveChangesAsync(ct: CancellationToken) : Task
+    }
+
+}
+
+' ── External stubs ──
+class RestaurantMgmtContext <<DbContext>>
+class Reservation <<Entity>>
+class RestaurantTable <<Entity>>
+class LookupValue <<Entity>>
+class ReservationManagementDto <<DTO>>
+class GetReservationsRequest <<DTO>>
+
+' ── Relationships ──
+
+ReservationRepository ..|> IReservationRepository : implements
+ReservationRepository --> RestaurantMgmtContext : uses for data access
+ReservationRepository ..> Reservation : queries and persists
+ReservationRepository ..> RestaurantTable : joins for table assignment
+ReservationRepository ..> LookupValue : reads status and source lookups
+ReservationRepository ..> ReservationManagementDto : projects to list DTO
+
+IUnitOfWork ..> RestaurantMgmtContext : coordinates transactions
+
+@enduml

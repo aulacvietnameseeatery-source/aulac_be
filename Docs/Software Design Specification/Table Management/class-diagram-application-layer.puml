@@ -1,0 +1,91 @@
+@startuml
+title Table Management Module - Application Layer Class Diagram
+
+package "Application Layer" {
+
+    interface ITableService <<interface>> {
+        +GetTablesForManagementAsync(request: GetTableManagementRequest, ct: CancellationToken) : Task<(List<TableManagementDto>, int)>
+        +GetTablesForSelectAsync(ct: CancellationToken) : Task<List<TableSelectDto>>
+        +GetTableByIdAsync(id: long, ct: CancellationToken) : Task<TableDetailDto>
+        +CreateTableAsync(request: CreateTableRequest, images: IReadOnlyList<MediaFileInput>, ct: CancellationToken) : Task<TableDetailDto>
+        +UpdateTableAsync(id: long, request: UpdateTableRequest, images: IReadOnlyList<MediaFileInput>, removedImageIds: IReadOnlyList<long>, ct: CancellationToken) : Task<TableDetailDto>
+        +DeleteTableAsync(id: long, ct: CancellationToken) : Task
+        +UpdateStatusAsync(id: long, request: UpdateTableStatusRequest, ct: CancellationToken) : Task<TableManagementDto>
+        +GetZonesAsync(ct: CancellationToken) : Task<List<LookupValueI18nDto>>
+        +GetTableTypesAsync(ct: CancellationToken) : Task<List<LookupValueI18nDto>>
+        +CreateZoneAsync(request: CreateLookupValueRequest, ct: CancellationToken) : Task<LookupValueI18nDto>
+        +CreateTableTypeAsync(request: CreateLookupValueRequest, ct: CancellationToken) : Task<LookupValueI18nDto>
+        +UpdateZoneAsync(valueId: uint, request: UpdateLookupValueRequest, ct: CancellationToken) : Task<LookupValueI18nDto>
+        +UpdateTableTypeAsync(valueId: uint, request: UpdateLookupValueRequest, ct: CancellationToken) : Task<LookupValueI18nDto>
+        +DeleteZoneAsync(valueId: uint, ct: CancellationToken) : Task
+        +DeleteTableTypeAsync(valueId: uint, ct: CancellationToken) : Task
+        +BulkSetOnlineAsync(request: BulkOnlineRequest, ct: CancellationToken) : Task<int>
+        +RegenerateQrCodeAsync(tableId: long, ct: CancellationToken) : Task<QrCodeDto>
+        +UploadTableMediaAsync(tableId: long, files: List<MediaFileInput>, ct: CancellationToken) : Task<List<TableMediaDto>>
+        +DeleteTableMediaAsync(tableId: long, mediaId: long, ct: CancellationToken) : Task
+    }
+
+    class TableService <<Service>> {
+        -_tableRepository : ITableRepository
+        -_unitOfWork : IUnitOfWork
+        -_lookupResolver : ILookupResolver
+        -_lookupService : ILookupService
+        -_fileStorage : IFileStorage
+        -_mediaRepository : IMediaRepository
+        -_qrCodeGenerator : IQrCodeGenerator
+        -_baseUrlOptions : BaseUrlOptions
+        -_notificationService : INotificationService
+        -AllowedTransitions : Dictionary<string, HashSet<string>> {static}
+        +GetTablesForManagementAsync(request: GetTableManagementRequest, ct: CancellationToken) : Task<(List<TableManagementDto>, int)>
+        +GetTablesForSelectAsync(ct: CancellationToken) : Task<List<TableSelectDto>>
+        +GetTableByIdAsync(id: long, ct: CancellationToken) : Task<TableDetailDto>
+        +CreateTableAsync(request: CreateTableRequest, images: IReadOnlyList<MediaFileInput>, ct: CancellationToken) : Task<TableDetailDto>
+        +UpdateTableAsync(id: long, request: UpdateTableRequest, images: IReadOnlyList<MediaFileInput>, removedImageIds: IReadOnlyList<long>, ct: CancellationToken) : Task<TableDetailDto>
+        +DeleteTableAsync(id: long, ct: CancellationToken) : Task
+        +UpdateStatusAsync(id: long, request: UpdateTableStatusRequest, ct: CancellationToken) : Task<TableManagementDto>
+        +GetZonesAsync(ct: CancellationToken) : Task<List<LookupValueI18nDto>>
+        +GetTableTypesAsync(ct: CancellationToken) : Task<List<LookupValueI18nDto>>
+        +CreateZoneAsync(request: CreateLookupValueRequest, ct: CancellationToken) : Task<LookupValueI18nDto>
+        +CreateTableTypeAsync(request: CreateLookupValueRequest, ct: CancellationToken) : Task<LookupValueI18nDto>
+        +UpdateZoneAsync(valueId: uint, request: UpdateLookupValueRequest, ct: CancellationToken) : Task<LookupValueI18nDto>
+        +UpdateTableTypeAsync(valueId: uint, request: UpdateLookupValueRequest, ct: CancellationToken) : Task<LookupValueI18nDto>
+        +DeleteZoneAsync(valueId: uint, ct: CancellationToken) : Task
+        +DeleteTableTypeAsync(valueId: uint, ct: CancellationToken) : Task
+        +BulkSetOnlineAsync(request: BulkOnlineRequest, ct: CancellationToken) : Task<int>
+        +RegenerateQrCodeAsync(tableId: long, ct: CancellationToken) : Task<QrCodeDto>
+        +UploadTableMediaAsync(tableId: long, files: List<MediaFileInput>, ct: CancellationToken) : Task<List<TableMediaDto>>
+        +DeleteTableMediaAsync(tableId: long, mediaId: long, ct: CancellationToken) : Task
+        -BuildQrCodeUrl(tableCode: string, qrToken: string) : string
+        -SaveQrImageAsync(tableId: long, tableCode: string, qrToken: string, ct: CancellationToken) : Task<string>
+        -SaveTableImagesAsync(tableId: long, images: IReadOnlyList<MediaFileInput>, savedPaths: List<string>, ct: CancellationToken) : Task
+        -ValidateLookupAsync(valueId: uint, typeId: ushort, label: string, ct: CancellationToken) : Task
+        -MapToManagementDto(table: RestaurantTable) : TableManagementDto
+        -MapToDetailDto(table: RestaurantTable) : TableDetailDto
+    }
+
+}
+
+' ── External stubs ──
+class ITableRepository <<interface>>
+class IUnitOfWork <<interface>>
+class ILookupResolver <<interface>>
+class ILookupService <<interface>>
+class IFileStorage <<interface>>
+class IMediaRepository <<interface>>
+class IQrCodeGenerator <<interface>>
+class INotificationService <<interface>>
+
+' ── Relationships ──
+
+TableService ..|> ITableService : implements
+
+TableService --> ITableRepository : uses for data access
+TableService --> IUnitOfWork : uses for transactions
+TableService --> ILookupResolver : uses for lookup resolution
+TableService --> ILookupService : delegates zone/type CRUD
+TableService --> IFileStorage : uses for file operations
+TableService --> IMediaRepository : uses for media persistence
+TableService --> IQrCodeGenerator : uses for QR generation
+TableService --> INotificationService : uses for notifications
+
+@enduml

@@ -1,0 +1,147 @@
+@startuml
+title Dish Management Module - Main Cross-Layer Interactions
+
+package "Presentation Layer" {
+    class DishController <<Controller>> {
+        -_dishService : IDishService
+        +GetDishById(id, lang, ct) : Task<IActionResult>
+        +GetDishesForAdmin(request, ct) : Task<IActionResult>
+        +GetMenuForCustomer(request, ct) : Task<IActionResult>
+        +CreateDish(request, ct) : Task<IActionResult>
+        +UpdateDish(id, request, ct) : Task<IActionResult>
+        +UpdateDishStatus(id, request, ct) : Task<IActionResult>
+        +GetDishForActions(id, ct) : Task<IActionResult>
+    }
+
+    class DishCategoryController <<Controller>> {
+        -_dishCategoryService : IDishCategoryService
+        +GetAllCategories(query, ct) : Task<IActionResult>
+        +GetCategoryById(id, ct) : Task<IActionResult>
+        +CreateCategory(request, ct) : Task<IActionResult>
+        +UpdateCategory(id, request, ct) : Task<IActionResult>
+        +ToggleCategoryStatus(id, isDisabled, ct) : Task<IActionResult>
+    }
+}
+
+package "Application Layer" {
+    interface IDishService <<interface>> {
+        +GetDishByIdAsync(id, langCode, ct) : Task<DishDetailDto?>
+        +GetDishByIdAsync(dishId, ct) : Task<DishDetailForActionsDto>
+        +GetDishesForAdminAsync(request, ct) : Task<(List<DishManagementDto>, int)>
+        +GetDishesForCustomerAsync(request, ct) : Task<(List<DishDisplayDto>, int)>
+        +CreateDishAsync(request, staticImages, images360, video, ct) : Task<long>
+        +UpdateDishAsync(request, staticImages, images360, video, removedIds, ct) : Task
+        +UpdateDishStatusAsync(dishId, newStatus, ct) : Task<DishStatusDto>
+    }
+
+    class DishService <<Service>> {
+        -_dishRepository : IDishRepository
+        -_mediaRepo : IMediaRepository
+        -_uow : IUnitOfWork
+        -_lookupResolver : ILookupResolver
+        -_dishI18nService : IDishI18nService
+        -_fileStorage : IFileStorage
+    }
+
+    interface IDishCategoryService <<interface>> {
+        +GetAllCategoriesAsync(query, ct) : Task<PagedResultDTO<DishCategoryDto>>
+        +GetCategoryByIdAsync(id, ct) : Task<DishCategoryDto?>
+        +CreateCategoryAsync(request, ct) : Task<DishCategoryDto>
+        +UpdateCategoryAsync(id, request, ct) : Task<DishCategoryDto>
+        +ToggleCategoryStatusAsync(id, isDisabled, ct) : Task<DishCategoryDto>
+    }
+
+    class DishCategoryService <<Service>> {
+        -_dishCategoryRepository : IDishCategoryRepository
+        -_i18nService : Ii18nService
+    }
+}
+
+package "Persistence Layer" {
+    interface IDishRepository <<interface>> {
+        +GetDishByIdAsync(dishId, ct) : Task<Dish?>
+        +GetDishesAsync(request, ct) : Task<(List<Dish>, int)>
+        +AddAsync(dish, ct) : Task
+        +UpdateStatusAsync(dishId, statusLvId, ct) : Task
+        +GetAllActiveTagsAsync() : Task<List<LookupValue>>
+        +GetAllDishCategoriesAsync() : Task<List<DishCategory>>
+    }
+
+    class DishRepository <<Repository>> {
+        -_context : RestaurantMgmtContext
+    }
+
+    interface IDishCategoryRepository <<interface>> {
+        +GetAllCategoriesAsync(query, ct) : Task<PagedResultDTO<DishCategoryDto>>
+        +GetByIdAsync(id, ct) : Task<DishCategory?>
+        +CreateAsync(category, ct) : Task<DishCategory>
+        +UpdateAsync(category, ct) : Task<DishCategory>
+    }
+
+    class DishCategoryRepository <<Repository>> {
+        -_context : RestaurantMgmtContext
+    }
+
+    interface IUnitOfWork <<interface>> {
+        +BeginTransactionAsync(ct) : Task
+        +CommitAsync(ct) : Task
+        +SaveChangesAsync(ct) : Task
+    }
+}
+
+package "Domain Layer" {
+    class Dish <<Entity>> {
+        +DishId : long
+        +DishName : string
+        +Price : decimal
+        +CategoryId : long
+        +DishStatusLvId : uint
+        +IsOnline : bool?
+        +ChefRecommended : bool?
+    }
+
+    class DishCategory <<Entity>> {
+        +CategoryId : long
+        +CategoryName : string
+        +DisPlayOrder : int
+        +IsDisabled : bool
+    }
+
+    class DishMedium <<Entity>> {
+        +DishId : long
+        +MediaId : long
+        +IsPrimary : bool?
+    }
+
+    enum DishStatusCode <<enum>> {
+        AVAILABLE
+        OUT_OF_STOCK
+        HIDDEN
+    }
+}
+
+' ── Cross-layer relationships ──
+
+DishController --> IDishService : delegates dish operations
+DishCategoryController --> IDishCategoryService : delegates category operations
+
+DishService ..|> IDishService : implements
+DishCategoryService ..|> IDishCategoryService : implements
+
+DishService --> IDishRepository : uses for dish data access
+DishService --> IUnitOfWork : uses for transactions
+
+DishCategoryService --> IDishCategoryRepository : uses for category data access
+
+DishRepository ..|> IDishRepository : implements
+DishCategoryRepository ..|> IDishCategoryRepository : implements
+
+DishRepository ..> Dish : queries and persists
+DishRepository ..> DishMedium : manages media join records
+DishCategoryRepository ..> DishCategory : queries and persists
+
+Dish --> "1" DishCategory : belongs to
+Dish --> "1" DishStatusCode : status
+DishCategory "1" o-- "0..*" Dish : groups dishes
+
+@enduml

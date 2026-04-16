@@ -1,0 +1,62 @@
+@startuml
+title Authentication Module - Domain Layer
+
+package "Domain Layer" {
+
+    class StaffAccount <<Entity>> {
+        +AccountId: long
+        +FullName: string
+        +Phone: string?
+        +Email: string?
+        +RoleId: long
+        +Username: string
+        +PasswordHash: string
+        +IsLocked: bool
+        +AccountStatusLvId: uint
+        +LastLoginAt: DateTime?
+        +CreatedAt: DateTime
+        +RegisteredDeviceId: string?
+    }
+
+    class AuthSession <<Entity>> {
+        +SessionId: long
+        +UserId: long
+        +TokenHash: string
+        +ExpiresAt: DateTime
+        +CreatedAt: DateTime?
+        +Revoked: bool?
+        +DeviceInfo: string?
+        +IpAddress: string?
+    }
+
+    class LoginActivity <<Entity>> {
+        +LoginActivityId: long
+        +StaffId: long
+        +SessionId: long?
+        +EventType: string
+        +DeviceInfo: string?
+        +IpAddress: string?
+        +OccurredAt: DateTime
+    }
+
+    class Role <<Entity>> {
+        +RoleId: long
+        +RoleCode: string
+        +RoleName: string
+        +RoleStatusLvId: uint
+    }
+
+    class Permission <<Entity>> {
+        +ScreenCode: string
+        +ActionCode: string
+    }
+}
+
+' --- Relationships ---
+StaffAccount --> Role : "belongs to" "1"
+StaffAccount *-- "0..*" AuthSession : "owns sessions"
+StaffAccount *-- "0..*" LoginActivity : "has login history"
+Role *-- "0..*" Permission : "grants permissions"
+LoginActivity --> "0..1" AuthSession : "optionally linked to session"
+
+@enduml

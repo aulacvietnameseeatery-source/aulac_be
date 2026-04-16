@@ -1,0 +1,69 @@
+@startuml
+title Reservation Management Module - Domain Layer Class Diagram
+
+package "Domain Layer" {
+
+    enum ReservationStatusCode <<enum>> {
+        PENDING
+        CONFIRMED
+        CHECKED_IN
+        COMPLETED
+        CANCELLED
+        NO_SHOW
+    }
+
+    class Reservation <<Entity>> {
+        +ReservationId : long
+        +CustomerId : long?
+        +CustomerName : string
+        +Phone : string
+        +Email : string?
+        +PartySize : int
+        +ReservedTime : DateTime
+        +CreatedAt : DateTime?
+        +SourceLvId : uint
+        +Notes : string?
+        +ReservationStatusLvId : uint
+    }
+
+    class RestaurantTable <<Entity>> {
+        +TableId : long
+        +TableCode : string
+        +Capacity : int
+        +TableStatusLvId : uint
+        +TableTypeLvId : uint
+        +ZoneLvId : uint
+        +IsOnline : bool?
+    }
+
+    class Customer <<Entity>> {
+        +CustomerId : long
+        +FullName : string
+        +Phone : string
+        +Email : string?
+        +LoyaltyPoints : int
+    }
+
+    class LookupValue <<Entity>> {
+        +ValueId : uint
+        +TypeId : ushort
+        +ValueCode : string
+        +ValueName : string
+        +SortOrder : short
+        +IsActive : bool?
+    }
+
+}
+
+' ── Relationships ──
+
+Reservation --> "0..1" Customer : placed by
+Reservation --> "1" LookupValue : reservation status (ReservationStatusLvId)
+Reservation --> "1" LookupValue : source (SourceLvId)
+Reservation "0..*" o-- "0..*" RestaurantTable : assigned tables
+
+RestaurantTable --> "1" LookupValue : table status (TableStatusLvId)
+RestaurantTable --> "1" LookupValue : table type (TableTypeLvId)
+RestaurantTable --> "1" LookupValue : zone (ZoneLvId)
+
+@enduml

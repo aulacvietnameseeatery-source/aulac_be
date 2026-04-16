@@ -1,0 +1,281 @@
+@startuml "Coupon Management Module - Specification Class Diagram"
+
+!theme plain
+skinparam linetype ortho
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam shadowing false
+
+title Coupon Management Module — Specification Class Diagram
+
+' ============================================================
+'  PRESENTATION LAYER
+' ============================================================
+package "Presentation Layer" <<Rectangle>> {
+
+    class CouponController <<Controller>> {
+        - _couponService : ICouponService
+        - _logger : ILogger<CouponController>
+        + GetCoupons(customerId: long?, ct: CancellationToken) : Task<IActionResult>
+        + GetAllCoupons(query: CouponListQueryDTO, ct: CancellationToken) : Task<IActionResult>
+        + GetCouponById(id: long, ct: CancellationToken) : Task<IActionResult>
+        + CreateCoupon(request: CreateCouponRequest, ct: CancellationToken) : Task<IActionResult>
+        + UpdateCoupon(id: long, request: UpdateCouponRequest, ct: CancellationToken) : Task<IActionResult>
+        + DeleteCoupon(id: long, ct: CancellationToken) : Task<IActionResult>
+        + DisableCoupon(id: long, ct: CancellationToken) : Task<IActionResult>
+        + ActivateCoupon(id: long, ct: CancellationToken) : Task<IActionResult>
+    }
+
+    class ApiResponse<T> <<DTO>> {
+        + Success : bool
+        + Code : int
+        + SubCode : int
+        + UserMessage : string?
+        + SystemMessage : string?
+        + ValidateInfo : IReadOnlyList<string>
+        + Data : T
+        + ServerTime : DateTimeOffset
+    }
+
+    class CreateCouponRequest <<DTO>> {
+        + CouponCode : string
+        + CouponName : string
+        + Description : string?
+        + StartTime : DateTime
+        + EndTime : DateTime
+        + DiscountValue : decimal
+        + MaxUsage : int?
+        + Type : string
+    }
+
+    class UpdateCouponRequest <<DTO>> {
+        + CouponCode : string
+        + CouponName : string
+        + Description : string?
+        + StartTime : DateTime
+        + EndTime : DateTime
+        + DiscountValue : decimal
+        + MaxUsage : int?
+        + Type : string
+    }
+
+    class CouponListQueryDTO <<DTO>> {
+        + Search : string?
+        + PageIndex : int
+        + PageSize : int
+    }
+
+    class CouponDTO <<DTO>> {
+        + CouponId : long
+        + CouponCode : string
+        + CouponName : string
+        + CustomerId : long?
+        + CustomerName : string?
+        + StartTime : DateTime
+        + EndTime : DateTime
+        + DiscountValue : decimal
+        + MaxUsage : int?
+        + UsedCount : int?
+        + Type : string
+        + CouponStatus : string
+    }
+
+    class CouponDetailDto <<DTO>> {
+        + CouponId : long
+        + CouponCode : string
+        + CouponName : string
+        + Description : string?
+        + StartTime : DateTime
+        + EndTime : DateTime
+        + DiscountValue : decimal
+        + MaxUsage : int?
+        + UsedCount : int?
+        + Type : string
+        + CouponStatus : string
+        + CreatedAt : DateTime?
+    }
+
+    class "PagedResultDTO<T>" as PagedResultDTO <<DTO>> {
+        + PageData : List<T>
+        + PageIndex : int
+        + PageSize : int
+        + TotalCount : int
+        + TotalPage : int
+    }
+}
+
+' ============================================================
+'  APPLICATION LAYER
+' ============================================================
+package "Application Layer" <<Rectangle>> {
+
+    interface ICouponService <<interface>> {
+        + GetCouponsAsync(customerId: long?, ct: CancellationToken) : Task<List<CouponDTO>>
+        + GetAllCouponsAsync(query: CouponListQueryDTO, ct: CancellationToken) : Task<PagedResultDTO<CouponDTO>>
+        + GetCouponDetailAsync(id: long, ct: CancellationToken) : Task<CouponDetailDto>
+        + CreateCouponAsync(request: CreateCouponRequest, ct: CancellationToken) : Task<CouponDTO>
+        + UpdateCouponAsync(id: long, request: UpdateCouponRequest, ct: CancellationToken) : Task<CouponDTO>
+        + DeleteCouponAsync(id: long, ct: CancellationToken) : Task
+        + DisableCouponAsync(id: long, ct: CancellationToken) : Task
+        + ActivateCouponAsync(id: long, ct: CancellationToken) : Task
+    }
+
+    class CouponService <<Service>> {
+        - _couponRepository : ICouponRepository
+        - _lookupResolver : ILookupResolver
+        + GetCouponsAsync(customerId: long?, ct: CancellationToken) : Task<List<CouponDTO>>
+        + GetAllCouponsAsync(query: CouponListQueryDTO, ct: CancellationToken) : Task<PagedResultDTO<CouponDTO>>
+        + GetCouponDetailAsync(id: long, ct: CancellationToken) : Task<CouponDetailDto>
+        + CreateCouponAsync(request: CreateCouponRequest, ct: CancellationToken) : Task<CouponDTO>
+        + UpdateCouponAsync(id: long, request: UpdateCouponRequest, ct: CancellationToken) : Task<CouponDTO>
+        + DeleteCouponAsync(id: long, ct: CancellationToken) : Task
+        + DisableCouponAsync(id: long, ct: CancellationToken) : Task
+        + ActivateCouponAsync(id: long, ct: CancellationToken) : Task
+        - CalculateStatus(start: DateTime, end: DateTime) : CouponStatusCode
+    }
+
+    interface ILookupResolver <<interface>> {
+        + GetIdAsync(typeId: ushort, valueCode: string, ct: CancellationToken) : Task<uint>
+    }
+}
+
+' ============================================================
+'  PERSISTENCE LAYER
+' ============================================================
+package "Persistence Layer" <<Rectangle>> {
+
+    interface ICouponRepository <<interface>> {
+        + GetActiveCouponsAsync(now: DateTime, ct: CancellationToken) : Task<List<Coupon>>
+        + GetAllCouponsAsync(query: CouponListQueryDTO, ct: CancellationToken) : Task<PagedResultDTO<CouponDTO>>
+        + GetByIdAsync(id: long, ct: CancellationToken) : Task<Coupon?>
+        + GetByCodeAsync(code: string, ct: CancellationToken) : Task<Coupon?>
+        + CreateAsync(coupon: Coupon, ct: CancellationToken) : Task<Coupon>
+        + UpdateAsync(coupon: Coupon, ct: CancellationToken) : Task<Coupon>
+        + DeleteAsync(id: long, ct: CancellationToken) : Task<bool>
+    }
+
+    class CouponRepository <<Repository>> {
+        - _context : RestaurantMgmtContext
+        + GetActiveCouponsAsync(now: DateTime, ct: CancellationToken) : Task<List<Coupon>>
+        + GetAllCouponsAsync(query: CouponListQueryDTO, ct: CancellationToken) : Task<PagedResultDTO<CouponDTO>>
+        + GetByIdAsync(id: long, ct: CancellationToken) : Task<Coupon?>
+        + GetByCodeAsync(code: string, ct: CancellationToken) : Task<Coupon?>
+        + CreateAsync(coupon: Coupon, ct: CancellationToken) : Task<Coupon>
+        + UpdateAsync(coupon: Coupon, ct: CancellationToken) : Task<Coupon>
+        + DeleteAsync(id: long, ct: CancellationToken) : Task<bool>
+    }
+
+    class RestaurantMgmtContext <<DbContext>> {
+        + Coupons : DbSet<Coupon>
+    }
+}
+
+' ============================================================
+'  DOMAIN LAYER
+' ============================================================
+package "Domain Layer" <<Rectangle>> {
+
+    class Coupon <<Entity>> {
+        + CouponId : long
+        + CustomerId : long?
+        + CouponCode : string
+        + CouponName : string
+        + Description : string?
+        + StartTime : DateTime
+        + EndTime : DateTime
+        + DiscountValue : decimal
+        + MaxUsage : int?
+        + UsedCount : int?
+        + CreatedAt : DateTime?
+        + TypeLvId : uint
+        + CouponStatusLvId : uint
+    }
+
+    class OrderCoupon <<Entity>> {
+        + OrderCouponId : long
+        + OrderId : long
+        + CouponId : long
+        + DiscountAmount : decimal
+        + AppliedAt : DateTime?
+    }
+
+    class LookupValue <<Entity>> {
+        + ValueId : uint
+        + TypeId : ushort
+        + ValueCode : string
+        + ValueName : string
+        + SortOrder : short
+        + IsActive : bool?
+    }
+
+    class Customer <<Entity>> {
+        + CustomerId : long
+        + FullName : string
+    }
+
+    class Order <<Entity>> {
+        + OrderId : long
+    }
+
+    enum CouponStatusCode <<Enum>> {
+        ACTIVE
+        DISABLED
+        SCHEDULED
+        EXPIRED
+    }
+
+    enum CouponTypeCode <<Enum>> {
+        FIXED_AMOUNT
+        PERCENT
+    }
+}
+
+' ============================================================
+'  RELATIONSHIPS
+' ============================================================
+
+' --- Presentation → Application (dependency via injection) ---
+CouponController --> ICouponService : uses
+
+' --- Presentation → DTOs (dependency) ---
+CouponController ..> CreateCouponRequest : receives
+CouponController ..> UpdateCouponRequest : receives
+CouponController ..> CouponListQueryDTO : receives
+CouponController ..> CouponDTO : returns
+CouponController ..> CouponDetailDto : returns
+CouponController ..> PagedResultDTO : returns
+CouponController ..> ApiResponse : wraps response
+
+' --- Application: realization ---
+CouponService ..|> ICouponService
+
+' --- Application → Persistence (dependency via injection) ---
+CouponService --> ICouponRepository : uses
+CouponService --> ILookupResolver : uses
+
+' --- Application → DTOs (dependency) ---
+CouponService ..> CouponDTO : creates
+CouponService ..> CouponDetailDto : creates
+CouponService ..> CreateCouponRequest : consumes
+CouponService ..> UpdateCouponRequest : consumes
+CouponService ..> CouponStatusCode : uses
+
+' --- Persistence: realization ---
+CouponRepository ..|> ICouponRepository
+
+' --- Persistence → DbContext ---
+CouponRepository --> RestaurantMgmtContext : uses
+
+' --- Persistence → Domain ---
+ICouponRepository ..> Coupon : manages
+
+' --- Domain: entity relationships ---
+Coupon *-- "0..*" OrderCoupon : owns
+Coupon --> "1" LookupValue : TypeLv\n(CouponType)
+Coupon --> "1" LookupValue : CouponStatusLv\n(CouponStatus)
+Coupon --> "0..1" Customer : belongs to
+
+OrderCoupon --> "1" Order : applied to
+OrderCoupon --> "1" Coupon : references
+
+@enduml

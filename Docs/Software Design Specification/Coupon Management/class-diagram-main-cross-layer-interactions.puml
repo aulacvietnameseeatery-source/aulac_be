@@ -1,0 +1,99 @@
+@startuml
+title Coupon Management - Main Cross-Layer Interactions
+
+
+package "Presentation Layer" {
+    class CouponController <<Controller>> {
+        -_couponService: ICouponService
+        -_logger: ILogger<CouponController>
+        +GetCoupons(customerId: long?): IActionResult
+        +GetAllCoupons(query: CouponListQueryDTO): IActionResult
+        +GetCouponById(id: long): IActionResult
+        +CreateCoupon(request: CreateCouponRequest): IActionResult
+        +UpdateCoupon(id: long, request: UpdateCouponRequest): IActionResult
+        +DeleteCoupon(id: long): IActionResult
+        +DisableCoupon(id: long): IActionResult
+        +ActivateCoupon(id: long): IActionResult
+    }
+}
+
+package "Application Layer" {
+    interface ICouponService <<interface>> {
+        +GetCouponsAsync(customerId: long?, ct: CancellationToken): Task<List<CouponDTO>>
+        +GetAllCouponsAsync(query: CouponListQueryDTO, ct: CancellationToken): Task<PagedResultDTO<CouponDTO>>
+        +GetCouponDetailAsync(id: long, ct: CancellationToken): Task<CouponDetailDto>
+        +CreateCouponAsync(request: CreateCouponRequest, ct: CancellationToken): Task<CouponDTO>
+        +UpdateCouponAsync(id: long, request: UpdateCouponRequest, ct: CancellationToken): Task<CouponDTO>
+        +DeleteCouponAsync(id: long, ct: CancellationToken): Task
+        +DisableCouponAsync(id: long, ct: CancellationToken): Task
+        +ActivateCouponAsync(id: long, ct: CancellationToken): Task
+    }
+
+    class CouponService <<Service>> {
+        -_couponRepository: ICouponRepository
+        -_lookupResolver: ILookupResolver
+        -CalculateStatus(start: DateTime, end: DateTime): CouponStatusCode
+    }
+
+    interface ILookupResolver <<interface>> {
+        +GetIdAsync(typeId: ushort, valueCode: string, ct: CancellationToken): Task<uint>
+    }
+
+    CouponService ..|> ICouponService : implements
+}
+
+package "Persistence Layer" {
+    interface ICouponRepository <<interface>> {
+        +GetActiveCouponsAsync(now: DateTime, ct: CancellationToken): Task<List<Coupon>>
+        +GetAllCouponsAsync(query: CouponListQueryDTO, ct: CancellationToken): Task<PagedResultDTO<CouponDTO>>
+        +GetByIdAsync(id: long, ct: CancellationToken): Task<Coupon?>
+        +GetByCodeAsync(code: string, ct: CancellationToken): Task<Coupon?>
+        +CreateAsync(coupon: Coupon, ct: CancellationToken): Task<Coupon>
+        +UpdateAsync(coupon: Coupon, ct: CancellationToken): Task<Coupon>
+        +DeleteAsync(id: long, ct: CancellationToken): Task<bool>
+    }
+
+    class CouponRepository <<Repository>> {
+        -_context: RestaurantMgmtContext
+    }
+
+    CouponRepository ..|> ICouponRepository : implements
+}
+
+package "Domain Layer" {
+    class Coupon <<Entity>> {
+        +CouponId: long
+        +CouponCode: string
+        +CouponName: string
+        +DiscountValue: decimal
+        +StartTime: DateTime
+        +EndTime: DateTime
+        +TypeLvId: uint
+        +CouponStatusLvId: uint
+    }
+
+    class OrderCoupon <<Entity>> {
+        +OrderCouponId: long
+        +OrderId: long
+        +CouponId: long
+        +DiscountAmount: decimal
+    }
+
+    class LookupValue <<Entity>> {
+        +ValueId: uint
+        +ValueCode: string
+        +ValueName: string
+    }
+
+    Coupon "1" *-- "0..*" OrderCoupon : owns
+    Coupon "0..*" --> "1" LookupValue : TypeLv / CouponStatusLv
+}
+
+' Cross-layer relationships
+CouponController --> ICouponService : uses for coupon operations
+
+CouponService --> ICouponRepository : uses for persistence
+CouponService --> ILookupResolver : resolves lookup codes to IDs
+
+CouponRepository ..> Coupon : persists
+@enduml

@@ -728,107 +728,68 @@ Each output file must contain **only raw PlantUML syntax** with `@startuml` / `@
 
 Keep output headers minimal unless the user explicitly requests extra layout directives.
 
-### Class Diagram Example (Main Cross-Layer Interaction)
+## Diagram
 
-```plantuml
-@startuml
-title Shift Management - Main Cross-Layer Interactions
+\```mermaid
+{diagram code}
+\```
 
-package "Presentation Layer" {
-    class ShiftController <<Controller>> {
-        -_templateService: IShiftTemplateService
-        -_assignmentService: IShiftAssignmentService
-        +GetTemplates(isActive: bool?): IActionResult
-        +CreateAssignment(request: CreateShiftAssignmentRequest): IActionResult
-        +CheckIn(id: long): IActionResult
-    }
-}
-
-package "Application Layer" {
-    interface IShiftTemplateService <<interface>> {
-        +GetAllAsync(isActive: bool?): Task<List<ShiftTemplateListDto>>
-        +CreateAsync(request: CreateShiftTemplateRequest, staffId: long): Task<ShiftTemplateDetailDto>
-    }
-
-    class ShiftTemplateService <<Service>> {
-        -_templateRepo: IShiftTemplateRepository
-        -_unitOfWork: IUnitOfWork
-    }
-
-    ShiftTemplateService ..|> IShiftTemplateService : implements
-}
-
-package "Persistence Layer" {
-    interface IShiftTemplateRepository <<interface>> {
-        +GetAllActiveAsync(): Task<List<ShiftTemplate>>
-        +GetByIdAsync(id: long): Task<ShiftTemplate?>
-    }
-
-    class ShiftTemplateRepository <<Repository>> {
-        -_context: AuLacDbContext
-    }
-
-    interface IUnitOfWork <<interface>> {
-        +SaveChangesAsync(): Task
-        +CommitAsync(): Task
-    }
-
-    ShiftTemplateRepository ..|> IShiftTemplateRepository : implements
-}
-
-package "Domain Layer" {
-    class ShiftTemplate <<Entity>> {
-        +ShiftTemplateId: long
-        +TemplateName: string
-    }
-
-    class ShiftAssignment <<Entity>> {
-        +ShiftAssignmentId: long
-        +WorkDate: DateOnly
-    }
-
-    ShiftTemplate "1" *-- "0..*" ShiftAssignment : contains assignments
-}
-
-ShiftController --> IShiftTemplateService : uses for template operations
-ShiftTemplateService --> IShiftTemplateRepository : uses for persistence
-ShiftTemplateService --> IUnitOfWork : coordinates transactions
-ShiftTemplateRepository ..> ShiftTemplate : persists
-@enduml
+## Notes
+- Any assumptions, simplifications, or design decisions.
 ```
 
-### Sequence Diagram Example
+## PlantUML Sequence Diagram Conventions
 
-```plantuml
-@startuml
-autonumber
-actor Client
-participant "ShiftController" as Ctrl
-participant "ShiftTemplateService" as Svc
-participant "IShiftTemplateRepository" as Repo
-database "Database" as DB
+All `.puml` sequence diagrams **must** follow these rules:
 
-Client -> Ctrl : GET /api/shifts/templates
-activate Ctrl
-Ctrl -> Svc : GetAllAsync(isActive)
-activate Svc
-Svc -> Repo : GetAllActiveAsync()
-activate Repo
-Repo -> DB : SELECT * FROM shift_template
-activate DB
-DB --> Repo : List<ShiftTemplate>
-deactivate DB
-Repo --> Svc : List<ShiftTemplate>
-deactivate Repo
-Svc --> Ctrl : List<ShiftTemplateListDto>
-deactivate Svc
-Ctrl --> Client : 200 OK ApiResponse
-deactivate Ctrl
-@enduml
-```
-
----
-
+1. **Skinparam** — always include at the top:
+   ```plantuml
+   skinparam maxMessageSize 250
+   skinparam sequence {
+       ParticipantBackgroundColor #ffffff
+       ActorBackgroundColor #ffffff
+   }
+   ```
+   `skinparam maxMessageSize 250` ensures long message labels wrap automatically instead of stretching the diagram horizontally.
+2. **Alt/Opt blocks** — always use `alt#White` and `opt#White` (white background):
+   ```plantuml
+   alt#White condition description
+       ...
+   end
+   ```
+3. **Database as participant** — use `participant` keyword, not `database`:
+   ```plantuml
+   participant ":Database" as DB
+   ```
+4. **Participant naming** — all participants (including actor and database) use the `":"` prefix convention, and the FE participant must be a specific page name ending with `Page` (do not use placeholders):
+   ```plantuml
+   actor ":User" as U
+   participant ":ShiftTemplateListPage" as Client
+   participant ":ShiftController" as Ctrl
+   participant ":Database" as DB
+   ```
+5. **Page return to User** — every sequence must end with a return arrow from page participant back to User:
+   ```plantuml
+   Client -->> U : Display result
+   ```
+6. **Natural language for Repository→Database** — messages from repository to database (and back) must use natural language descriptions, not SQL or code:
+   ```plantuml
+   Repo ->> DB : Query all shift templates with optional active filter
+   DB -->> Repo : Return list of shift templates
+   ```
+   Use code names (method signatures, DTO names) only for service-to-service or controller-to-service interactions.
+7. **User lives through entire sequence** — activate the User actor at the start and deactivate at the end:
+   ```plantuml
+   activate U
+   ...
+   deactivate U
+   ```
+8. **Arrow heads** — always use `->>` (open arrowhead) for calls and `-->>` for returns:
+   ```plantuml
+   Client ->> Ctrl : GET /api/...
+   Ctrl -->> Client : 200 OK
+   ```
+9. **No notes** — do NOT use `note right of`, `note left of`, `note over`, or any other PlantUML `note` element in sequence diagrams. All context must be conveyed through message labels, participant names, and alt/opt block descriptions only.
 # Common Mistakes to Avoid
 
 **Class Diagrams:**
@@ -854,6 +815,7 @@ deactivate Ctrl
 - Including framework internals or unrelated modules
 
 **Sequence Diagrams:**
+- Using `note` elements (note right of, note left of, note over) — forbidden
 - Missing return messages in sequence diagrams
 - No error flow in sequence diagrams
 - Too many participants (> 7) in a single diagram
@@ -865,9 +827,8 @@ deactivate Ctrl
 
 - DO NOT modify any source code. This agent is **read-only** for application code.
 - DO NOT invent classes, methods, or properties that don't exist in the codebase — diagram only what is actually implemented.
+- DO NOT produce diagrams without validating them first via the validator tool.
 - ONLY create files inside `Docs/Software Design Specification/{module-name}/`.
 - ONLY create `.puml` files for diagrams. Do not create `.md` diagram files or `.mermaid` files.
 - Keep diagrams focused on a single module. Cross-module relationships should be noted but not fully expanded.
 - Use consistent naming: class names match the C# class names exactly.
-- For class diagrams, relationship labels must be human-readable natural language and should explain the dependency purpose.
-- Do NOT use custom skinparam colors or theme overrides that change background colors.

@@ -1,0 +1,51 @@
+@startuml
+title Notification Management Module - Persistence Layer
+
+package "Persistence Layer" {
+
+    interface INotificationRepository <<interface>> {
+        +AddAsync(notification: Notification, ct: CancellationToken) : Task
+        +GetByUserAsync(userPermissions: IEnumerable<string>, userId: long, query: NotificationQueryDto, ct: CancellationToken) : Task<List<NotificationListItemDto>>
+        +GetUnreadCountAsync(userPermissions: IEnumerable<string>, userId: long, ct: CancellationToken) : Task<int>
+        +GetMissedAsync(userPermissions: IEnumerable<string>, userId: long, afterUtc: DateTime?, ct: CancellationToken) : Task<List<NotificationListItemDto>>
+        +MarkAsReadAsync(notificationId: long, userId: long, ct: CancellationToken) : Task
+        +MarkAllReadAsync(userPermissions: IEnumerable<string>, userId: long, ct: CancellationToken) : Task
+        +AcknowledgeAsync(notificationId: long, userId: long, ct: CancellationToken) : Task
+        +GetPreferencesAsync(userId: long, ct: CancellationToken) : Task<List<NotificationPreference>>
+        +UpsertPreferencesAsync(userId: long, preferences: List<NotificationPreference>, ct: CancellationToken) : Task
+        +GetDisabledTypesAsync(userId: long, ct: CancellationToken) : Task<HashSet<string>>
+    }
+
+    class NotificationRepository <<Repository>> {
+        -_context : RestaurantMgmtContext
+        +AddAsync(notification: Notification, ct: CancellationToken) : Task
+        +GetByUserAsync(userPermissions: IEnumerable<string>, userId: long, query: NotificationQueryDto, ct: CancellationToken) : Task<List<NotificationListItemDto>>
+        +GetUnreadCountAsync(userPermissions: IEnumerable<string>, userId: long, ct: CancellationToken) : Task<int>
+        +GetMissedAsync(userPermissions: IEnumerable<string>, userId: long, afterUtc: DateTime?, ct: CancellationToken) : Task<List<NotificationListItemDto>>
+        +MarkAsReadAsync(notificationId: long, userId: long, ct: CancellationToken) : Task
+        +MarkAllReadAsync(userPermissions: IEnumerable<string>, userId: long, ct: CancellationToken) : Task
+        +AcknowledgeAsync(notificationId: long, userId: long, ct: CancellationToken) : Task
+        +GetPreferencesAsync(userId: long, ct: CancellationToken) : Task<List<NotificationPreference>>
+        +UpsertPreferencesAsync(userId: long, preferences: List<NotificationPreference>, ct: CancellationToken) : Task
+        +GetDisabledTypesAsync(userId: long, ct: CancellationToken) : Task<HashSet<string>>
+        -BuildUserNotificationQuery(permissions: List<string>, userId: long) : IQueryable<Notification>
+    }
+}
+
+' External stubs
+class RestaurantMgmtContext <<DbContext>>
+class Notification <<Entity>>
+class NotificationReadState <<Entity>>
+class NotificationPreference <<Entity>>
+class NotificationListItemDto <<DTO>>
+class NotificationQueryDto <<DTO>>
+
+NotificationRepository ..|> INotificationRepository : implements
+NotificationRepository --> RestaurantMgmtContext : uses for persistence
+NotificationRepository ..> Notification : queries and persists
+NotificationRepository ..> NotificationReadState : queries and persists
+NotificationRepository ..> NotificationPreference : queries and persists
+NotificationRepository ..> NotificationListItemDto : projects into
+NotificationRepository ..> NotificationQueryDto : receives query parameters
+
+@enduml

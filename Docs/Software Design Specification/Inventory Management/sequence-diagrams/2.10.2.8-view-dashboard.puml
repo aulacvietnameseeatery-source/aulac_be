@@ -1,0 +1,53 @@
+@startuml
+autonumber
+title 2.10.2.8 View Dashboard
+skinparam sequence {
+	ParticipantBackgroundColor #ffffff
+	ActorBackgroundColor #ffffff
+}
+
+actor ":User" as U
+participant ":InventoryDashboardPage" as Client
+participant ":InventoryController" as Ctrl
+participant ":InventoryService" as Svc
+participant ":IInventoryRepository" as Repo
+participant ":Database" as DB
+
+activate U
+U ->> Client : Open inventory dashboard page
+activate Client
+Client ->> Ctrl : GET /api/inventory/dashboard
+activate Ctrl
+Ctrl ->> Svc : GetDashboardAsync(ct)
+activate Svc
+
+Svc ->> Repo : GetDashboardAsync(ct)
+activate Repo
+
+Repo ->> DB : Query dashboard summary counts for total ingredients, low stock, out of stock, and pending transactions
+activate DB
+DB -->> Repo : Return summary counts
+deactivate DB
+
+Repo ->> DB : Query top low stock items with ingredient, current stock, category, and unit information
+activate DB
+DB -->> Repo : Return low stock item list
+deactivate DB
+
+Repo ->> DB : Query top recent inventory transactions with type, status, creator, and items
+activate DB
+DB -->> Repo : Return recent transaction list
+deactivate DB
+
+Repo -->> Svc : InventoryDashboardDto
+deactivate Repo
+
+Svc -->> Ctrl : InventoryDashboardDto
+deactivate Svc
+Ctrl -->> Client : 200 ApiResponse<InventoryDashboardDto>
+deactivate Ctrl
+Client -->> U : Display inventory dashboard
+deactivate Client
+deactivate U
+
+@enduml
