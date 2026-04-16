@@ -1,0 +1,120 @@
+@startuml
+title System Settings Management Module - Main Cross-Layer Interactions
+
+package "Presentation Layer" {
+
+    class SystemSettingController <<Controller>> {
+        -_systemSettingService : ISystemSettingService
+        -_logger : ILogger<SystemSettingController>
+        +GetAllNonSensitive(ct) : Task<IActionResult>
+        +GetByKey(key, ct) : Task<IActionResult>
+        +CreateSetting(request, ct) : Task<IActionResult>
+        +UpdateStringSetting(key, request, ct) : Task<IActionResult>
+        +DeleteSetting(key, ct) : Task<IActionResult>
+        +GetAllGrouped(ct) : Task<IActionResult>
+        +GetGroup(group, ct) : Task<IActionResult>
+        +BulkUpdateGroup(group, request, ct) : Task<IActionResult>
+    }
+
+    class EmailTemplateController <<Controller>> {
+        -_service : IEmailTemplateService
+        +GetAll(ct) : Task<ActionResult>
+        +GetByCode(code, ct) : Task<ActionResult>
+        +Create(request, ct) : Task<ActionResult>
+        +Update(id, request, ct) : Task<ActionResult>
+        +Delete(id, ct) : Task<ActionResult>
+    }
+}
+
+package "Application Layer" {
+
+    interface ISystemSettingService <<interface>> {
+        +GetStringAsync(key, defaultValue, ct) : Task<string?>
+        +SetStringAsync(key, value, description, isSensitive, updatedBy, ct) : Task
+        +CreateSettingAsync(key, settingName, valueType, value, description, isSensitive, updatedBy, ct) : Task
+        +DeleteAsync(key, ct) : Task<bool>
+        +GetAllNonSensitiveAsync(ct) : Task<Dictionary<string, object?>>
+        +GetAllGroupedAsync(ct) : Task<Dictionary<string, List<SystemSettingDetailDto>>>
+        +GetGroupAsync(group, ct) : Task<List<SystemSettingDetailDto>>
+        +BulkUpdateGroupAsync(group, items, updatedBy, ct) : Task
+        +ClearCacheAsync(key) : Task
+    }
+
+    class SystemSettingService <<Service>> {
+        -_repository : ISystemSettingRepository
+        -_cacheService : ICacheService
+        -_fileStorage : IFileStorage
+    }
+
+    interface IEmailTemplateService <<interface>> {
+        +GetByCodeAsync(code, ct) : Task<EmailTemplateDto?>
+        +GetAllAsync(ct) : Task<List<EmailTemplateDto>>
+        +CreateAsync(request, ct) : Task<EmailTemplateDto>
+        +UpdateAsync(id, request, ct) : Task<EmailTemplateDto>
+        +DeleteAsync(id, ct) : Task<bool>
+    }
+
+    class EmailTemplateService <<Service>> {
+        -_repository : IEmailTemplateRepository
+    }
+}
+
+package "Persistence Layer" {
+
+    interface ISystemSettingRepository <<interface>> {
+        +GetByKeyAsync(settingKey, ct) : Task<SystemSetting?>
+        +GetAllAsync(ct) : Task<IEnumerable<SystemSetting>>
+        +GetAllNonSensitiveAsync(ct) : Task<IEnumerable<SystemSetting>>
+        +GetByGroupPrefixAsync(groupPrefix, ct) : Task<IEnumerable<SystemSetting>>
+        +SaveAsync(setting, ct) : Task
+        +DeleteAsync(settingKey, ct) : Task<bool>
+    }
+
+    class SystemSettingRepository <<Repository>> {
+        -_context : RestaurantMgmtContext
+    }
+
+    interface IEmailTemplateRepository <<interface>> {
+        +GetByIdAsync(id, ct) : Task<EmailTemplate?>
+        +GetByCodeAsync(code, ct) : Task<EmailTemplate?>
+        +GetAllAsync(ct) : Task<List<EmailTemplate>>
+        +CreateAsync(template, ct) : Task<EmailTemplate>
+        +UpdateAsync(template, ct) : Task<bool>
+        +DeleteAsync(id, ct) : Task<bool>
+    }
+
+    class EmailTemplateRepository <<Repository>> {
+        -_context : RestaurantMgmtContext
+    }
+}
+
+package "Domain Layer" {
+
+    class SystemSetting <<Entity>> {
+        +SettingId : uint
+        +SettingKey : string
+        +ValueType : string
+    }
+
+    class EmailTemplate <<Entity>> {
+        +TemplateId : long
+        +TemplateCode : string
+        +TemplateName : string
+    }
+}
+
+' Realization relationships
+SystemSettingService ..|> ISystemSettingService : implements
+EmailTemplateService ..|> IEmailTemplateService : implements
+SystemSettingRepository ..|> ISystemSettingRepository : implements
+EmailTemplateRepository ..|> IEmailTemplateRepository : implements
+
+' Cross-layer dependencies
+SystemSettingController --> ISystemSettingService : depends on for business logic
+EmailTemplateController --> IEmailTemplateService : depends on for business logic
+SystemSettingService --> ISystemSettingRepository : uses for data access
+EmailTemplateService --> IEmailTemplateRepository : uses for data access
+SystemSettingRepository ..> SystemSetting : queries and persists
+EmailTemplateRepository ..> EmailTemplate : queries and persists
+
+@enduml

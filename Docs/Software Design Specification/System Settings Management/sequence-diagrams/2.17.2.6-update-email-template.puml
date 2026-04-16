@@ -1,0 +1,73 @@
+@startuml
+title 2.17.2.6 - Update Email Template
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":User" as U
+participant ":EmailTemplateFormPage" as Client
+participant ":EmailTemplateController" as Ctrl
+participant ":EmailTemplateService" as Svc
+participant ":EmailTemplateRepository" as Repo
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : Edit template name, subject, body HTML and submit
+activate Client
+
+Client ->> Ctrl : PUT /api/EmailTemplate/{id}\n{ UpdateEmailTemplateRequest }
+activate Ctrl
+
+Ctrl ->> Svc : UpdateAsync(id, request, ct)
+activate Svc
+
+Svc ->> Repo : GetByIdAsync(id, ct)
+activate Repo
+
+Repo ->> DB : Find email template by id
+activate DB
+DB -->> Repo : Return EmailTemplate or null
+deactivate DB
+
+Repo -->> Svc : EmailTemplate?
+deactivate Repo
+
+alt#White Template not found
+    Svc -->> Ctrl : throw KeyNotFoundException
+    Ctrl -->> Client : 404 Not Found
+    Client -->> U : Display error message
+else Template found
+    Svc ->> Svc : Update template fields from request
+
+    Svc ->> Repo : UpdateAsync(EmailTemplate, ct)
+    activate Repo
+
+    Repo ->> DB : Update email template record
+    activate DB
+    DB -->> Repo : Confirm update
+    deactivate DB
+
+    Repo -->> Svc : true
+    deactivate Repo
+
+    Svc ->> Svc : MapToDto(EmailTemplate)
+
+    Svc -->> Ctrl : EmailTemplateDto
+    deactivate Svc
+
+    Ctrl -->> Client : 200 OK with EmailTemplateDto
+    deactivate Ctrl
+
+    Client -->> U : Display updated template
+end
+
+deactivate Client
+deactivate U
+
+@enduml

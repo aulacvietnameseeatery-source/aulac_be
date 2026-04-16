@@ -1,0 +1,68 @@
+@startuml
+title 2.17.2.7 - Delete Email Template
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":User" as U
+participant ":EmailTemplateListPage" as Client
+participant ":EmailTemplateController" as Ctrl
+participant ":EmailTemplateService" as Svc
+participant ":EmailTemplateRepository" as Repo
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : Click delete on a template
+activate Client
+
+Client ->> Ctrl : DELETE /api/EmailTemplate/{id}
+activate Ctrl
+
+Ctrl ->> Svc : DeleteAsync(id, ct)
+activate Svc
+
+Svc ->> Repo : DeleteAsync(id, ct)
+activate Repo
+
+Repo ->> DB : Find email template by id
+activate DB
+DB -->> Repo : Return EmailTemplate or null
+deactivate DB
+
+alt#White Template not found
+    Repo -->> Svc : false
+    deactivate Repo
+
+    Svc -->> Ctrl : false
+    deactivate Svc
+
+    Ctrl -->> Client : 404 Not Found
+    Client -->> U : Display template not found message
+else Template found
+    Repo ->> DB : Delete email template record
+    activate DB
+    DB -->> Repo : Confirm deletion
+    deactivate DB
+
+    Repo -->> Svc : true
+    deactivate Repo
+
+    Svc -->> Ctrl : true
+    deactivate Svc
+
+    Ctrl -->> Client : 204 No Content
+    deactivate Ctrl
+
+    Client -->> U : Display deletion success and refresh list
+end
+
+deactivate Client
+deactivate U
+
+@enduml

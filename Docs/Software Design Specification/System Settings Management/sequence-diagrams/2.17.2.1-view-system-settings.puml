@@ -1,0 +1,56 @@
+@startuml
+title 2.17.2.1 - View System Settings
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":User" as U
+participant ":SystemSettingsPage" as Client
+participant ":SystemSettingController" as Ctrl
+participant ":SystemSettingService" as Svc
+participant ":SystemSettingRepository" as Repo
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : Navigate to System Settings page
+activate Client
+
+Client ->> Ctrl : GET /api/system-settings/grouped
+activate Ctrl
+
+Ctrl ->> Svc : GetAllGroupedAsync(ct)
+activate Svc
+
+Svc ->> Repo : GetAllAsync(ct)
+activate Repo
+
+Repo ->> DB : Query all system settings ordered by key
+activate DB
+DB -->> Repo : Return list of SystemSetting entities
+deactivate DB
+
+Repo -->> Svc : IEnumerable<SystemSetting>
+deactivate Repo
+
+Svc -->> Ctrl : Dictionary<string, List<SystemSettingDetailDto>>
+deactivate Svc
+
+alt#White Success
+    Ctrl -->> Client : 200 OK with grouped settings data
+else Error occurred
+    Ctrl -->> Client : 500 Internal Server Error
+end
+
+deactivate Ctrl
+
+Client -->> U : Display grouped system settings
+deactivate Client
+deactivate U
+
+@enduml

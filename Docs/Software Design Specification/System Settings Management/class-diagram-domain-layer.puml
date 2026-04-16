@@ -1,0 +1,44 @@
+@startuml
+title System Settings Management Module - Domain Layer Class Diagram
+
+package "Domain Layer" {
+
+    class SystemSetting <<Entity>> {
+        +SettingId : uint
+        +SettingKey : string
+        +SettingName : string?
+        +ValueType : string
+        +ValueString : string?
+        +ValueInt : long?
+        +ValueDecimal : decimal?
+        +ValueBool : bool?
+        +ValueJson : string?
+        +Description : string?
+        +IsSensitive : bool
+        +UpdatedAt : DateTime
+        +UpdatedBy : long?
+        +UpdatedByNavigation : StaffAccount?
+    }
+
+    class EmailTemplate <<Entity>> {
+        +TemplateId : long
+        +TemplateCode : string
+        +TemplateName : string
+        +Subject : string
+        +BodyHtml : string
+        +Description : string?
+        +CreatedAt : DateTime
+        +UpdatedAt : DateTime?
+    }
+}
+
+package "Cross-Module Entities" <<Rectangle>> {
+
+    class StaffAccount <<Entity>> {
+        +StaffAccountId : long
+    }
+}
+
+SystemSetting "0..*" --> "0..1" StaffAccount : updated by via UpdatedBy
+
+@enduml

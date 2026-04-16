@@ -1,0 +1,55 @@
+@startuml
+title 2.17.2.5 - Create Email Template
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":User" as U
+participant ":EmailTemplateFormPage" as Client
+participant ":EmailTemplateController" as Ctrl
+participant ":EmailTemplateService" as Svc
+participant ":EmailTemplateRepository" as Repo
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : Fill in template code, name, subject, body HTML and submit
+activate Client
+
+Client ->> Ctrl : POST /api/EmailTemplate\n{ CreateEmailTemplateRequest }
+activate Ctrl
+
+Ctrl ->> Svc : CreateAsync(request, ct)
+activate Svc
+
+Svc ->> Svc : Map CreateEmailTemplateRequest to EmailTemplate entity
+
+Svc ->> Repo : CreateAsync(EmailTemplate, ct)
+activate Repo
+
+Repo ->> DB : Insert new email template record
+activate DB
+DB -->> Repo : Return persisted EmailTemplate with generated TemplateId
+deactivate DB
+
+Repo -->> Svc : EmailTemplate
+deactivate Repo
+
+Svc ->> Svc : MapToDto(EmailTemplate)
+
+Svc -->> Ctrl : EmailTemplateDto
+deactivate Svc
+
+Ctrl -->> Client : 201 Created with EmailTemplateDto
+deactivate Ctrl
+
+Client -->> U : Display success confirmation and created template
+deactivate Client
+deactivate U
+
+@enduml
