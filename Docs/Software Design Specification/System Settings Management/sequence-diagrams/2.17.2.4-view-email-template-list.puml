@@ -1,0 +1,53 @@
+@startuml
+title 2.17.2.4 - View Email Template List
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":User" as U
+participant ":EmailTemplateListPage" as Client
+participant ":EmailTemplateController" as Ctrl
+participant ":EmailTemplateService" as Svc
+participant ":EmailTemplateRepository" as Repo
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : Navigate to Email Templates page
+activate Client
+
+Client ->> Ctrl : GET /api/EmailTemplate
+activate Ctrl
+
+Ctrl ->> Svc : GetAllAsync(ct)
+activate Svc
+
+Svc ->> Repo : GetAllAsync(ct)
+activate Repo
+
+Repo ->> DB : Query all email templates
+activate DB
+DB -->> Repo : Return list of EmailTemplate entities
+deactivate DB
+
+Repo -->> Svc : List<EmailTemplate>
+deactivate Repo
+
+Svc ->> Svc : MapToDto for each template
+
+Svc -->> Ctrl : List<EmailTemplateDto>
+deactivate Svc
+
+Ctrl -->> Client : 200 OK with list of EmailTemplateDto
+deactivate Ctrl
+
+Client -->> U : Display email template list
+deactivate Client
+deactivate U
+
+@enduml

@@ -370,6 +370,8 @@ Api/appsettings.json
 /Docs/*
 !/Docs/Software Design Specification/
 !/Docs/Software Design Specification/**
+!/Docs/Unit Test Instructions/
+!/Docs/Unit Test Instructions/**
 /Api/wwwroot/uploads
 
 .idea 

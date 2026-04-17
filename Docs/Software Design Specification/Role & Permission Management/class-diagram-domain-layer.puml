@@ -38,8 +38,8 @@ package "Cross-Module Entities" <<Rectangle>> {
     }
 }
 
-Role "1" *-- "0..*" Permission : contains permissions
-Role "1" o-- "0..*" StaffAccount : has assigned staff
-Role "1" --> "0..1" LookupValue : references status via RoleStatusLvId
+Role "0..*" -- "0..*" Permission : assigns permissions to roles
+StaffAccount "0..*" --> "1" Role : belongs to role via RoleId
+Role "0..*" --> "0..1" LookupValue : references status via RoleStatusLvId
 
 @enduml

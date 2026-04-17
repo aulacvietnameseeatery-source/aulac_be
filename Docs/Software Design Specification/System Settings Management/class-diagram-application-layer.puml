@@ -1,0 +1,120 @@
+@startuml
+title System Settings Management Module - Application Layer Class Diagram
+
+package "Application Layer" {
+
+    interface ISystemSettingService <<interface>> {
+        +GetStringAsync(key: string, defaultValue: string?, ct: CancellationToken) : Task<string?>
+        +GetIntAsync(key: string, defaultValue: long?, ct: CancellationToken) : Task<long?>
+        +GetDecimalAsync(key: string, defaultValue: decimal?, ct: CancellationToken) : Task<decimal?>
+        +GetBoolAsync(key: string, defaultValue: bool?, ct: CancellationToken) : Task<bool?>
+        +GetJsonAsync<T>(key: string, defaultValue: T?, ct: CancellationToken) : Task<T?>
+        +SetStringAsync(key: string, value: string, description: string?, isSensitive: bool, updatedBy: long?, ct: CancellationToken) : Task
+        +SetIntAsync(key: string, value: long, description: string?, isSensitive: bool, updatedBy: long?, ct: CancellationToken) : Task
+        +SetDecimalAsync(key: string, value: decimal, description: string?, isSensitive: bool, updatedBy: long?, ct: CancellationToken) : Task
+        +SetBoolAsync(key: string, value: bool, description: string?, isSensitive: bool, updatedBy: long?, ct: CancellationToken) : Task
+        +SetJsonAsync<T>(key: string, value: T, description: string?, isSensitive: bool, updatedBy: long?, ct: CancellationToken) : Task
+        +CreateSettingAsync(key: string, settingName: string?, valueType: string, value: string, description: string?, isSensitive: bool, updatedBy: long?, ct: CancellationToken) : Task
+        +DeleteAsync(key: string, ct: CancellationToken) : Task<bool>
+        +GetAllNonSensitiveAsync(ct: CancellationToken) : Task<Dictionary<string, object?>>
+        +GetAllGroupedAsync(ct: CancellationToken) : Task<Dictionary<string, List<SystemSettingDetailDto>>>
+        +GetGroupAsync(group: string, ct: CancellationToken) : Task<List<SystemSettingDetailDto>>
+        +GetPublicGroupAsync(group: string, ct: CancellationToken) : Task<List<SystemSettingDetailDto>>
+        +BulkUpdateGroupAsync(group: string, items: List<BulkUpdateSettingItemDto>, updatedBy: long?, ct: CancellationToken) : Task
+        +ClearCacheAsync(key: string) : Task
+        +ClearAllCacheAsync() : Task
+        +UploadStoreLogoAsync(stream: Stream, fileName: string, contentType: string, ct: CancellationToken) : Task<FileUploadResult>
+        +UploadStoreFileAsync(stream: Stream, fileName: string, contentType: string, ct: CancellationToken) : Task<FileUploadResult>
+    }
+
+    class SystemSettingService <<Service>> {
+        -_repository : ISystemSettingRepository
+        -_cacheService : ICacheService
+        -_fileStorage : IFileStorage
+        +SystemSettingService(repository: ISystemSettingRepository, cacheService: ICacheService, fileStorage: IFileStorage)
+        +GetStringAsync(key: string, defaultValue: string?, ct: CancellationToken) : Task<string?>
+        +GetIntAsync(key: string, defaultValue: long?, ct: CancellationToken) : Task<long?>
+        +GetDecimalAsync(key: string, defaultValue: decimal?, ct: CancellationToken) : Task<decimal?>
+        +GetBoolAsync(key: string, defaultValue: bool?, ct: CancellationToken) : Task<bool?>
+        +GetJsonAsync<T>(key: string, defaultValue: T?, ct: CancellationToken) : Task<T?>
+        +SetStringAsync(key: string, value: string, description: string?, isSensitive: bool, updatedBy: long?, ct: CancellationToken) : Task
+        +SetIntAsync(key: string, value: long, description: string?, isSensitive: bool, updatedBy: long?, ct: CancellationToken) : Task
+        +SetDecimalAsync(key: string, value: decimal, description: string?, isSensitive: bool, updatedBy: long?, ct: CancellationToken) : Task
+        +SetBoolAsync(key: string, value: bool, description: string?, isSensitive: bool, updatedBy: long?, ct: CancellationToken) : Task
+        +SetJsonAsync<T>(key: string, value: T, description: string?, isSensitive: bool, updatedBy: long?, ct: CancellationToken) : Task
+        +CreateSettingAsync(key: string, settingName: string?, valueType: string, value: string, description: string?, isSensitive: bool, updatedBy: long?, ct: CancellationToken) : Task
+        +DeleteAsync(key: string, ct: CancellationToken) : Task<bool>
+        +GetAllNonSensitiveAsync(ct: CancellationToken) : Task<Dictionary<string, object?>>
+        +GetAllGroupedAsync(ct: CancellationToken) : Task<Dictionary<string, List<SystemSettingDetailDto>>>
+        +GetGroupAsync(group: string, ct: CancellationToken) : Task<List<SystemSettingDetailDto>>
+        +GetPublicGroupAsync(group: string, ct: CancellationToken) : Task<List<SystemSettingDetailDto>>
+        +BulkUpdateGroupAsync(group: string, items: List<BulkUpdateSettingItemDto>, updatedBy: long?, ct: CancellationToken) : Task
+        +ClearCacheAsync(key: string) : Task
+        +ClearAllCacheAsync() : Task
+        +UploadStoreLogoAsync(stream: Stream, fileName: string, contentType: string, ct: CancellationToken) : Task<FileUploadResult>
+        +UploadStoreFileAsync(stream: Stream, fileName: string, contentType: string, ct: CancellationToken) : Task<FileUploadResult>
+        -GetSettingWithCacheAsync(key: string, ct: CancellationToken) : Task<SystemSetting?>
+    }
+
+    interface IEmailTemplateService <<interface>> {
+        +GetByCodeAsync(code: string, ct: CancellationToken) : Task<EmailTemplateDto?>
+        +GetAllAsync(ct: CancellationToken) : Task<List<EmailTemplateDto>>
+        +CreateAsync(request: CreateEmailTemplateRequest, ct: CancellationToken) : Task<EmailTemplateDto>
+        +UpdateAsync(id: long, request: UpdateEmailTemplateRequest, ct: CancellationToken) : Task<EmailTemplateDto>
+        +DeleteAsync(id: long, ct: CancellationToken) : Task<bool>
+    }
+
+    class EmailTemplateService <<Service>> {
+        -_repository : IEmailTemplateRepository
+        +EmailTemplateService(repository: IEmailTemplateRepository)
+        +GetByCodeAsync(code: string, ct: CancellationToken) : Task<EmailTemplateDto?>
+        +GetAllAsync(ct: CancellationToken) : Task<List<EmailTemplateDto>>
+        +CreateAsync(request: CreateEmailTemplateRequest, ct: CancellationToken) : Task<EmailTemplateDto>
+        +UpdateAsync(id: long, request: UpdateEmailTemplateRequest, ct: CancellationToken) : Task<EmailTemplateDto>
+        +DeleteAsync(id: long, ct: CancellationToken) : Task<bool>
+        -MapToDto(template: EmailTemplate) : EmailTemplateDto
+    }
+}
+
+SystemSettingService ..|> ISystemSettingService : implements
+EmailTemplateService ..|> IEmailTemplateService : implements
+
+class ISystemSettingRepository <<interface>> {
+}
+
+class IEmailTemplateRepository <<interface>> {
+}
+
+class ICacheService <<interface>> {
+}
+
+class IFileStorage <<interface>> {
+}
+
+SystemSettingService --> ISystemSettingRepository : uses for data access
+SystemSettingService --> ICacheService : uses for caching
+SystemSettingService --> IFileStorage : uses for file uploads
+EmailTemplateService --> IEmailTemplateRepository : uses for data access
+
+SystemSettingService ..> SystemSettingDetailDto : produces
+SystemSettingService ..> BulkUpdateSettingItemDto : consumes
+EmailTemplateService ..> EmailTemplateDto : produces
+EmailTemplateService ..> CreateEmailTemplateRequest : consumes
+EmailTemplateService ..> UpdateEmailTemplateRequest : consumes
+
+class SystemSettingDetailDto <<DTO>> {
+}
+
+class BulkUpdateSettingItemDto <<DTO>> {
+}
+
+class EmailTemplateDto <<DTO>> {
+}
+
+class CreateEmailTemplateRequest <<DTO>> {
+}
+
+class UpdateEmailTemplateRequest <<DTO>> {
+}
+
+@enduml

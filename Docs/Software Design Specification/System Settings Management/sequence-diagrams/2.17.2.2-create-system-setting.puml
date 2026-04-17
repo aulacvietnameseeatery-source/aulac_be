@@ -1,0 +1,70 @@
+@startuml
+title 2.17.2.2 - Create System Setting
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":User" as U
+participant ":SystemSettingsPage" as Client
+participant ":SystemSettingController" as Ctrl
+participant ":SystemSettingService" as Svc
+participant ":SystemSettingRepository" as Repo
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : Fill in setting key, value type, value, and submit
+activate Client
+
+Client ->> Ctrl : POST /api/system-settings\n{ CreateSystemSettingDto }
+activate Ctrl
+
+Ctrl ->> Svc : CreateSettingAsync(key, settingName, valueType, value, description, isSensitive, updatedBy, ct)
+activate Svc
+
+Svc ->> Repo : SaveAsync(SystemSetting, ct)
+activate Repo
+
+Repo ->> DB : Check if setting key already exists
+activate DB
+DB -->> Repo : Return existing or null
+deactivate DB
+
+alt#White Setting key does not exist
+    Repo ->> DB : Insert new system setting record
+    activate DB
+    DB -->> Repo : Confirm insert
+    deactivate DB
+else Setting key already exists
+    Repo ->> DB : Update existing system setting record
+    activate DB
+    DB -->> Repo : Confirm update
+    deactivate DB
+end
+
+Repo -->> Svc : void
+deactivate Repo
+
+Svc ->> Svc : ClearCacheAsync(key)
+
+Svc -->> Ctrl : void
+deactivate Svc
+
+alt#White Success
+    Ctrl -->> Client : 200 OK with created setting data
+else Error occurred
+    Ctrl -->> Client : 500 Internal Server Error
+end
+
+deactivate Ctrl
+
+Client -->> U : Display success confirmation
+deactivate Client
+deactivate U
+
+@enduml
