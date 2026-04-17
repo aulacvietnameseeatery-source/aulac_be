@@ -1,0 +1,58 @@
+@startuml
+title 2.6.2.5 View Order Detail
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":Staff" as U
+participant ":OrderDetailPage" as Client
+participant ":OrderController" as Ctrl
+participant ":OrderService" as Svc
+participant ":IOrderRepository" as OrderRepo
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : Click on an order row to view details
+activate Client
+
+Client ->> Ctrl : GET /api/orders/{id}
+activate Ctrl
+
+note right of Ctrl : [HasPermission(Permissions.ViewOrder)]
+
+Ctrl ->> Svc : GetOrderByIdAsync(orderId, ct)
+activate Svc
+
+Svc ->> OrderRepo : GetOrderByIdAsync(orderId, ct)
+activate OrderRepo
+OrderRepo ->> DB : SELECT order with joins (Table, Staff, Customer, OrderItems+Dish, Promotions, Coupons, Payments, Tax)
+activate DB
+DB -->> OrderRepo : OrderDetailDTO
+deactivate DB
+OrderRepo -->> Svc : OrderDetailDTO
+deactivate OrderRepo
+
+alt#White Order not found
+    Svc -->> Ctrl : throw NotFoundException
+    Ctrl -->> Client : 404 Not Found
+    Client -->> U : Display "Order not found" message
+else Order found
+    Svc -->> Ctrl : OrderDetailDTO
+    deactivate Svc
+
+    Ctrl -->> Client : 200 OK (OrderDetailDTO)
+    deactivate Ctrl
+
+    Client -->> U : Display full order detail (items with i18n names, promotions, coupons, payments, totals, status, staff, table)
+end
+
+deactivate Client
+deactivate U
+
+@enduml

@@ -1,0 +1,56 @@
+@startuml
+title 2.6.2.4 View Customer Order History
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":Customer" as U
+participant ":QRMenuPage" as Client
+participant ":OrderController" as Ctrl
+participant ":OrderService" as Svc
+participant ":IOrderRepository" as OrderRepo
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : Open current order panel (from QR session)
+activate Client
+
+Client ->> Ctrl : GET /api/orders/{orderId}/customer
+activate Ctrl
+
+Ctrl ->> Svc : GetCustomerOrderByIdAsync(orderId, ct)
+activate Svc
+
+Svc ->> OrderRepo : GetCustomerOrderByIdAsync(orderId, ct)
+activate OrderRepo
+OrderRepo ->> DB : SELECT order with items, table info (join Dish for name/price)
+activate DB
+DB -->> OrderRepo : CustomerOrderHistoryDTO
+deactivate DB
+OrderRepo -->> Svc : CustomerOrderHistoryDTO
+deactivate OrderRepo
+
+alt#White Order not found
+    Svc -->> Ctrl : throw NotFoundException
+    Ctrl -->> Client : 404 Not Found
+    Client -->> U : Display "Order not found" message
+else Order found
+    Svc -->> Ctrl : CustomerOrderHistoryDTO
+    deactivate Svc
+
+    Ctrl -->> Client : 200 OK (CustomerOrderHistoryDTO)
+    deactivate Ctrl
+
+    Client -->> U : Display table code, items list, estimated total, tax amount
+end
+
+deactivate Client
+deactivate U
+
+@enduml

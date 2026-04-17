@@ -1,0 +1,60 @@
+@startuml
+title Role & Permission Management - Persistence Layer Class Diagram
+
+
+package "Persistence Layer" {
+
+    interface IRoleRepository <<interface>> {
+        +FindByIdAsync(roleId: long, ct: CancellationToken): Task<Role?>
+        +FindByCodeAsync(roleCode: string, ct: CancellationToken): Task<Role?>
+        +GetAllAsync(ct: CancellationToken): Task<List<Role>>
+        +GetPagedWithStaffCountAsync(pageIndex: int, pageSize: int, search: string?): Task<(List<Role>, int)>
+        +GetRoleWithPermissionsAsync(roleId: long, ct: CancellationToken): Task<Role?>
+        +GetRoleWithPermissionsForUpdateAsync(roleId: long, ct: CancellationToken): Task<Role?>
+        +GetAllPermissionsAsync(ct: CancellationToken): Task<List<Permission>>
+        +GetPermissionsByIdsAsync(permissionIds: List<long>, ct: CancellationToken): Task<List<Permission>>
+        +AddAsync(role: Role, ct: CancellationToken): Task<Role>
+        +UpdateAsync(role: Role): Task
+        +DeleteAsync(role: Role): Task
+        +GetRoleStatusIdAsync(statusCode: string): Task<uint?>
+        +HasStaffAssignedAsync(roleId: long, ct: CancellationToken): Task<bool>
+        +RoleCodeExistsAsync(roleCode: string, ct: CancellationToken): Task<bool>
+    }
+
+    class RoleRepository <<Repository>> {
+        -_context: RestaurantMgmtContext
+        +FindByIdAsync(roleId: long, ct: CancellationToken): Task<Role?>
+        +FindByCodeAsync(roleCode: string, ct: CancellationToken): Task<Role?>
+        +GetAllAsync(ct: CancellationToken): Task<List<Role>>
+        +GetPagedWithStaffCountAsync(pageIndex: int, pageSize: int, search: string?): Task<(List<Role>, int)>
+        +GetRoleWithPermissionsAsync(roleId: long, ct: CancellationToken): Task<Role?>
+        +GetRoleWithPermissionsForUpdateAsync(roleId: long, ct: CancellationToken): Task<Role?>
+        +GetAllPermissionsAsync(ct: CancellationToken): Task<List<Permission>>
+        +GetPermissionsByIdsAsync(permissionIds: List<long>, ct: CancellationToken): Task<List<Permission>>
+        +AddAsync(role: Role, ct: CancellationToken): Task<Role>
+        +UpdateAsync(role: Role): Task
+        +DeleteAsync(role: Role): Task
+        +GetRoleStatusIdAsync(statusCode: string): Task<uint?>
+        +HasStaffAssignedAsync(roleId: long, ct: CancellationToken): Task<bool>
+        +RoleCodeExistsAsync(roleCode: string, ct: CancellationToken): Task<bool>
+    }
+
+    RoleRepository ..|> IRoleRepository : implements
+}
+
+' External type stubs
+class Role <<Entity>>
+class Permission <<Entity>>
+class StaffAccount <<Entity>>
+class LookupValue <<Entity>>
+class RestaurantMgmtContext <<DbContext>>
+
+' ── Dependencies ──
+
+RoleRepository --> RestaurantMgmtContext : uses EF Core context
+
+IRoleRepository ..> Role : persists
+IRoleRepository ..> Permission : queries / manages many-to-many
+IRoleRepository ..> StaffAccount : checks staff assignment
+IRoleRepository ..> LookupValue : resolves role status
+@enduml

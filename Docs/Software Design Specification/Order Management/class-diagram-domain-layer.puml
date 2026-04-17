@@ -1,0 +1,165 @@
+@startuml
+title Order Management Module - Domain Layer Class Diagram
+
+package "Domain Layer" {
+
+    enum OrderStatusCode <<enum>> {
+        PENDING
+        IN_PROGRESS
+        COMPLETED
+        CANCELLED
+    }
+
+    enum OrderItemStatusCode <<enum>> {
+        CREATED
+        IN_PROGRESS
+        READY
+        SERVED
+        REJECTED
+        CANCELLED
+    }
+
+    enum OrderSourceCode <<enum>> {
+        DINE_IN
+        TAKEAWAY
+        DELIVERY
+    }
+
+    enum PaymentMethodCode <<enum>> {
+        CASH
+        CARD
+        QR
+    }
+
+    class Order <<Entity>> {
+        +OrderId : long
+        +TableId : long?
+        +StaffId : long?
+        +CustomerId : long
+        +SubTotalAmount : decimal
+        +TotalAmount : decimal
+        +TipAmount : decimal?
+        +TaxId : long?
+        +TaxAmount : decimal
+        +SourceLvId : uint
+        +OrderStatusLvId : uint
+        +CreatedAt : DateTime?
+        +UpdatedAt : DateTime?
+    }
+
+    class OrderItem <<Entity>> {
+        +OrderItemId : long
+        +OrderId : long
+        +DishId : long
+        +Quantity : int
+        +Price : decimal
+        +ItemStatus : byte
+        +ItemStatusLvId : uint
+        +RejectReason : string?
+        +Note : string?
+    }
+
+    class OrderCoupon <<Entity>> {
+        +OrderCouponId : long
+        +OrderId : long
+        +CouponId : long
+        +DiscountAmount : decimal
+        +AppliedAt : DateTime?
+    }
+
+    class OrderPromotion <<Entity>> {
+        +OrderPromotionId : long
+        +OrderId : long
+        +PromotionId : long
+        +DiscountAmount : decimal
+        +AppliedAt : DateTime?
+    }
+
+    class Payment <<Entity>> {
+        +PaymentId : long
+        +OrderId : long
+        +ReceivedAmount : decimal
+        +ChangeAmount : decimal
+        +PaidAt : DateTime?
+        +MethodLvId : uint
+    }
+
+    class Customer <<Entity>> {
+        +CustomerId : long
+        +FullName : string
+        +Phone : string
+        +Email : string?
+        +LoyaltyPoints : int
+    }
+
+    class RestaurantTable <<Entity>> {
+        +TableId : long
+        +TableCode : string
+        +Capacity : int
+        +TableStatusLvId : uint
+    }
+
+    class StaffAccount <<Entity>> {
+        +StaffId : long
+        +FullName : string
+    }
+
+    class Dish <<Entity>> {
+        +DishId : long
+        +DishName : string
+        +Price : decimal
+    }
+
+    class Tax <<Entity>> {
+        +TaxId : long
+        +TaxName : string
+        +TaxRate : decimal
+        +IsDefault : bool
+    }
+
+    class Coupon <<Entity>> {
+        +CouponId : long
+        +CouponCode : string
+        +DiscountType : string
+        +DiscountValue : decimal
+    }
+
+    class Promotion <<Entity>> {
+        +PromotionId : long
+        +PromotionName : string
+        +DiscountType : string
+        +DiscountValue : decimal
+    }
+
+    class LookupValue <<Entity>> {
+        +ValueId : uint
+        +TypeId : ushort
+        +ValueCode : string
+        +ValueName : string
+        +SortOrder : short
+        +IsActive : bool?
+    }
+}
+
+' ── Relationships ──
+
+Order *-- "1..*" OrderItem : contains items
+Order *-- "0..*" OrderCoupon : applied coupons
+Order *-- "0..*" OrderPromotion : applied promotions
+Order *-- "0..*" Payment : payments received
+
+Order --> "1" Customer : placed by
+Order --> "0..1" RestaurantTable : served at
+Order --> "0..1" StaffAccount : handled by
+Order --> "0..1" Tax : tax applied
+Order --> "1" LookupValue : order status (OrderStatusLvId)
+Order --> "1" LookupValue : source (SourceLvId)
+
+OrderItem --> "1" Dish : references dish
+OrderItem --> "1" LookupValue : item status (ItemStatusLvId)
+
+OrderCoupon --> "1" Coupon : references coupon
+OrderPromotion --> "1" Promotion : references promotion
+Payment --> "1" LookupValue : payment method (MethodLvId)
+
+@enduml

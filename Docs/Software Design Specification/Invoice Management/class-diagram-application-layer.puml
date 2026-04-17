@@ -1,0 +1,27 @@
+@startuml
+title Invoice Management Module - Application Layer Class Diagram
+
+package "Application Layer" {
+
+    interface ISaleInvoiceService <<interface>> {
+        +GetSaleInvoiceDetailAsync(orderId: long, ct: CancellationToken) : Task<SaleInvoiceDTO>
+        +GetSaleInvoiceListAsync(query: SaleInvoiceListQueryDTO, ct: CancellationToken) : Task<PagedResultDTO<SaleInvoiceListDTO>>
+    }
+
+    class SaleInvoiceService <<Service>> {
+        -_saleInvoiceRepository : ISaleInvoiceRepository
+        +GetSaleInvoiceDetailAsync(orderId: long, ct: CancellationToken) : Task<SaleInvoiceDTO>
+        +GetSaleInvoiceListAsync(query: SaleInvoiceListQueryDTO, ct: CancellationToken) : Task<PagedResultDTO<SaleInvoiceListDTO>>
+    }
+}
+
+' ── External stubs ──
+class ISaleInvoiceRepository <<interface>>
+
+' ── Relationships ──
+
+SaleInvoiceService ..|> ISaleInvoiceService : implements
+
+SaleInvoiceService --> ISaleInvoiceRepository : uses for invoice data retrieval
+
+@enduml

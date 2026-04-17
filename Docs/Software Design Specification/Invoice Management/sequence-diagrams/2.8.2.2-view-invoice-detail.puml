@@ -1,0 +1,83 @@
+@startuml
+title 2.8.2.2 View Invoice Detail
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":Staff" as U
+participant ":InvoiceDetailPage" as Client
+participant ":InvoiceController" as Ctrl
+participant ":SaleInvoiceService" as Svc
+participant ":ISaleInvoiceRepository" as Repo
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : Click on an invoice row to view details
+activate Client
+
+Client ->> Ctrl : GET /api/invoices/{id}
+activate Ctrl
+
+note right of Ctrl : [HasPermission(Permissions.ViewOrder)]
+
+Ctrl ->> Svc : GetSaleInvoiceDetailAsync(orderId, ct)
+activate Svc
+
+Svc ->> Repo : GetOrderForInvoiceAsync(orderId, ct)
+activate Repo
+Repo ->> DB : SELECT order with includes\n(SourceLv, Table, Staff, Customer,\nPayments+MethodLv, OrderItems+Dish+ItemStatusLv)
+activate DB
+DB -->> Repo : Order? (with navigation properties)
+deactivate DB
+Repo -->> Svc : Order?
+deactivate Repo
+
+alt#White Order not found
+    Svc -->> Ctrl : throw NotFoundException("Order with id {orderId} was not found.")
+    Ctrl -->> Client : 404 Not Found
+    Client -->> U : Display "Invoice not found" message
+else Order found
+
+    Svc ->> Repo : GetTotalDiscountAsync(orderId, ct)
+    activate Repo
+    Repo ->> DB : SELECT SUM(DiscountAmount) FROM OrderPromotions\nUNION SELECT SUM(DiscountAmount) FROM OrderCoupons\nWHERE OrderId = orderId
+    activate DB
+    DB -->> Repo : totalDiscount (promotions + coupons)
+    deactivate DB
+    Repo -->> Svc : decimal (total discount)
+    deactivate Repo
+
+    note right of Svc
+        Build SaleInvoiceDTO:
+        - InvoiceCode = "#INV" + OrderId.ToString("D4")
+        - OrderType from SourceLv.ValueName
+        - TableCode, StaffName, CustomerName, CustomerPhone
+        - IsPaid = order.Payments.Any()
+        - PaymentMethod = first payment's MethodLv.ValueName
+        - Items = OrderItems (excluding REJECTED/CANCELLED)
+          mapped to SaleInvoiceItemDTO
+        - SubTotal = order.SubTotalAmount or sum of items
+        - DiscountAmount = total from promotions + coupons
+        - TipAmount = order.TipAmount
+        - TotalAmount = order.TotalAmount
+    end note
+
+    Svc -->> Ctrl : SaleInvoiceDTO
+    deactivate Svc
+
+    Ctrl -->> Client : 200 OK (SaleInvoiceDTO)
+    deactivate Ctrl
+
+    Client -->> U : Display full invoice detail\n(InvoiceCode, OrderType, TableCode, StaffName,\nCustomer info, Items list with prices,\nSubTotal, DiscountAmount, TipAmount, TotalAmount,\nPayment status and method)
+end
+
+deactivate Client
+deactivate U
+
+@enduml

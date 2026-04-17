@@ -1,0 +1,75 @@
+@startuml
+title 2.6.2.6 View Kitchen Orders
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":Kitchen Staff" as U
+participant ":KitchenDisplayPage" as Client
+participant ":OrderController" as Ctrl
+participant ":OrderService" as Svc
+participant ":ILookupResolver" as Lookup
+participant ":IOrderRepository" as OrderRepo
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : Open Kitchen Display Screen
+activate Client
+
+Client ->> Ctrl : GET /api/orders/kitchen
+activate Ctrl
+
+note right of Ctrl : [HasPermission(Permissions.ViewOrder)]
+
+Ctrl ->> Svc : GetKitchenOrdersAsync(ct)
+activate Svc
+
+Svc ->> Lookup : GetIdAsync(OrderStatus, PENDING)
+activate Lookup
+Lookup -->> Svc : pendingStatusId
+deactivate Lookup
+
+Svc ->> Lookup : GetIdAsync(OrderStatus, IN_PROGRESS)
+activate Lookup
+Lookup -->> Svc : inProgressStatusId
+deactivate Lookup
+
+Svc ->> Lookup : GetIdAsync(OrderStatus, COMPLETED)
+activate Lookup
+Lookup -->> Svc : completedStatusId
+deactivate Lookup
+
+Svc ->> Lookup : GetIdAsync(OrderStatus, CANCELLED)
+activate Lookup
+Lookup -->> Svc : cancelledStatusId
+deactivate Lookup
+
+Svc ->> OrderRepo : GetKitchenOrdersAsync(pendingStatusId, inProgressStatusId, completedStatusId, cancelledStatusId, ct)
+activate OrderRepo
+OrderRepo ->> DB : SELECT active orders (PENDING + IN_PROGRESS) with items, table code, item statuses
+activate DB
+DB -->> OrderRepo : List<KitchenOrderDTO>
+deactivate DB
+OrderRepo -->> Svc : List<KitchenOrderDTO>
+deactivate OrderRepo
+
+Svc -->> Ctrl : List<KitchenOrderDTO>
+deactivate Svc
+
+Ctrl -->> Client : 200 OK (List<KitchenOrderDTO>)
+deactivate Ctrl
+
+Client -->> U : Display kitchen order board (orders grouped by table, items with statuses)
+
+note over Client : Real-time updates via SignalR\n(OrderCreated, OrderUpdated, OrderItemUpdated events)
+
+deactivate Client
+deactivate U
+
+@enduml
