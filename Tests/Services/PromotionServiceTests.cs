@@ -451,6 +451,104 @@ public class PromotionServiceTests
         ), It.IsAny<CancellationToken>()), Times.Once);
     }
 
+    [Fact]
+    [Trait("Type", "Boundary")]
+    [Trait("Method", "CreatePromotionAsync")]
+    public async Task CreatePromotionAsync_WhenPercentIs100_CreatesSuccessfully()
+    {
+        // Arrange — max boundary: 100% discount
+        SetupLookupResolver();
+        var request = MakePromotionDto(promoCode: "MAX100", promoName: "Full Discount", discountValue: 100m, type: PromotionTypeCode.PERCENT);
+        _promoRepoMock.Setup(r => r.AddAsync(It.IsAny<Promotion>(), It.IsAny<CancellationToken>()))
+                      .Returns(Task.CompletedTask);
+        _promoRepoMock.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))
+                      .Returns(Task.CompletedTask);
+        var service = CreateService();
+
+        // Act
+        var result = await service.CreatePromotionAsync(request, CancellationToken.None);
+
+        // Assert — Verify DiscountValue=100 (max boundary) is accepted
+        _promoRepoMock.Verify(r => r.AddAsync(It.Is<Promotion>(p =>
+            p.DiscountValue == 100m
+        ), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    [Trait("Type", "Boundary")]
+    [Trait("Method", "CreatePromotionAsync")]
+    public async Task CreatePromotionAsync_WhenPercentIs1_CreatesSuccessfully()
+    {
+        // Arrange — min valid boundary: 1% discount
+        SetupLookupResolver();
+        var request = MakePromotionDto(promoCode: "MIN1", promoName: "1% Promo", discountValue: 1m, type: PromotionTypeCode.PERCENT);
+        _promoRepoMock.Setup(r => r.AddAsync(It.IsAny<Promotion>(), It.IsAny<CancellationToken>()))
+                      .Returns(Task.CompletedTask);
+        _promoRepoMock.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))
+                      .Returns(Task.CompletedTask);
+        var service = CreateService();
+
+        // Act
+        var result = await service.CreatePromotionAsync(request, CancellationToken.None);
+
+        // Assert — Verify DiscountValue=1 (min boundary) is accepted
+        _promoRepoMock.Verify(r => r.AddAsync(It.Is<Promotion>(p =>
+            p.DiscountValue == 1m
+        ), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    [Trait("Type", "Boundary")]
+    [Trait("Method", "CreatePromotionAsync")]
+    public async Task CreatePromotionAsync_WhenStartTimeEqualsEndTime_ThrowsInvalidOperation()
+    {
+        // Arrange — boundary: StartTime == EndTime should throw
+        var now = DateTime.UtcNow.AddDays(5);
+        var request = MakePromotionDto(start: now, end: now);
+        var service = CreateService();
+
+        // Act
+        Func<Task> act = () => service.CreatePromotionAsync(request, CancellationToken.None);
+
+        // Assert — Verify StartTime == EndTime is rejected
+        await act.Should().ThrowAsync<InvalidOperationException>()
+                 .WithMessage("*EndTime must be greater than StartTime*");
+    }
+
+    [Fact]
+    [Trait("Type", "Boundary")]
+    [Trait("Method", "CreatePromotionAsync")]
+    public async Task CreatePromotionAsync_WhenPromoCodeIsWhitespace_ThrowsInvalidOperation()
+    {
+        // Arrange — whitespace-only PromoCode
+        var request = MakePromotionDto(promoCode: "   ");
+        var service = CreateService();
+
+        // Act
+        Func<Task> act = () => service.CreatePromotionAsync(request, CancellationToken.None);
+
+        // Assert — Verify whitespace PromoCode is rejected
+        await act.Should().ThrowAsync<InvalidOperationException>()
+                 .WithMessage("*PromoCode*required*");
+    }
+
+    [Fact]
+    [Trait("Type", "Abnormal")]
+    [Trait("Method", "CreatePromotionAsync")]
+    public async Task CreatePromotionAsync_WhenFixedAmountIsNegative_ThrowsInvalidOperation()
+    {
+        // Arrange — negative discount for FIXED_AMOUNT
+        var request = MakePromotionDto(discountValue: -10m, type: PromotionTypeCode.FIXED_AMOUNT);
+        var service = CreateService();
+
+        // Act
+        Func<Task> act = () => service.CreatePromotionAsync(request, CancellationToken.None);
+
+        // Assert — Verify negative DiscountValue is rejected
+        await act.Should().ThrowAsync<InvalidOperationException>()
+                 .WithMessage("*DiscountValue must be greater than 0*");
+    }
+
     #endregion
 
     // ══════════════════════════════════════════════════════════════════

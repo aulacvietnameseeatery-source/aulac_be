@@ -573,6 +573,100 @@ public class PaymentServiceTests : IDisposable
         payment.ChangeAmount.Should().Be(0m);
     }
 
+    [Fact]
+    [Trait("Type", "Normal")]
+    [Trait("Method", "ProcessPaymentAsync")]
+    public async Task ProcessPaymentAsync_WhenCardPayment_UsesCardMethodId()
+    {
+        // Arrange
+        await SeedOrderAsync(orderId: 12, customerId: 12);
+        var dto = new CreatePaymentDTO
+        {
+            OrderId = 12,
+            ReceivedAmount = 200m,
+            PaymentMethod = "CARD"
+        };
+        var service = CreateService();
+
+        // Act
+        await service.ProcessPaymentAsync(dto);
+
+        // Assert — Verify CARD method ID is stored (CashMethodId + 1 per setup)
+        var payment = await _context.Payments.FirstAsync(p => p.OrderId == 12);
+        payment.MethodLvId.Should().Be(CashMethodId + 1);
+    }
+
+    [Fact]
+    [Trait("Type", "Boundary")]
+    [Trait("Method", "ProcessPaymentAsync")]
+    public async Task ProcessPaymentAsync_WhenTaxAmountIncluded_AddsTaxToFinal()
+    {
+        // Arrange — order with tax = 20
+        await SeedOrderAsync(orderId: 13, customerId: 13, taxAmount: 20m);
+        var dto = new CreatePaymentDTO
+        {
+            OrderId = 13,
+            ReceivedAmount = 220m, // subtotal 200 + tax 20
+            PaymentMethod = "CASH"
+        };
+        var service = CreateService();
+
+        // Act
+        await service.ProcessPaymentAsync(dto);
+
+        // Assert — Verify final includes tax
+        var order = await _context.Orders.FirstAsync(o => o.OrderId == 13);
+        order.TotalAmount.Should().Be(220m); // 200 subtotal + 20 tax
+    }
+
+    [Fact]
+    [Trait("Type", "Boundary")]
+    [Trait("Method", "ProcessPaymentAsync")]
+    public async Task ProcessPaymentAsync_WhenTipAmountIsZero_FinalEqualsSubtotalPlusTax()
+    {
+        // Arrange — explicit TipAmount = 0
+        await SeedOrderAsync(orderId: 14, customerId: 14);
+        var dto = new CreatePaymentDTO
+        {
+            OrderId = 14,
+            ReceivedAmount = 200m,
+            PaymentMethod = "CASH",
+            TipAmount = 0m
+        };
+        var service = CreateService();
+
+        // Act
+        await service.ProcessPaymentAsync(dto);
+
+        // Assert — Verify zero tip does not affect final amount
+        var order = await _context.Orders.FirstAsync(o => o.OrderId == 14);
+        order.TotalAmount.Should().Be(200m); // subtotal only, no tip, no tax
+        order.TipAmount.Should().Be(0m);
+    }
+
+    [Fact]
+    [Trait("Type", "Boundary")]
+    [Trait("Method", "ProcessPaymentAsync")]
+    public async Task ProcessPaymentAsync_WhenLoyaltyDisabled_DoesNotAwardPoints()
+    {
+        // Arrange — loyalty explicitly disabled (default in constructor)
+        await SeedOrderAsync(orderId: 15, customerId: 15);
+        var dto = new CreatePaymentDTO
+        {
+            OrderId = 15,
+            ReceivedAmount = 200m,
+            PaymentMethod = "CASH"
+        };
+        var service = CreateService();
+
+        // Act
+        await service.ProcessPaymentAsync(dto);
+
+        // Assert — Verify no loyalty points when disabled
+        var customer = await _context.Customers.FirstAsync(c => c.CustomerId == 15);
+        customer.LoyaltyPoints.Should().Be(0);
+    }
+
     #endregion
 
     // ══════════════════════════════════════════════════════════════════

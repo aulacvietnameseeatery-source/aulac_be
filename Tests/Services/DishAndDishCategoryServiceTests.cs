@@ -359,6 +359,16 @@ public class DishAndDishCategoryServiceTests
         result.DishName.Should().Be("Pho Bo");
         result.StatusCode.Should().Be(DishStatusCode.OUT_OF_STOCK);
         result.StatusId.Should().Be(11u);
+
+        // Verify log message: LogInformation on successful status update
+        _dishLoggerMock.Verify(
+            x => x.Log(
+                LogLevel.Information,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("1")),
+                null,
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
     }
 
     [Fact]
@@ -377,6 +387,16 @@ public class DishAndDishCategoryServiceTests
         // Assert
         await act.Should().ThrowAsync<KeyNotFoundException>()
             .WithMessage("*999*not found*");
+
+        // Verify log message: LogWarning when dish not found
+        _dishLoggerMock.Verify(
+            x => x.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("999")),
+                null,
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
     }
 
     [Fact]
@@ -398,6 +418,16 @@ public class DishAndDishCategoryServiceTests
         // Assert
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*Failed to update dish status*");
+
+        // Verify log message: LogError when exception occurs during status update
+        _dishLoggerMock.Verify(
+            x => x.Log(
+                LogLevel.Error,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("1")),
+                It.IsAny<Exception>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
     }
 
     [Fact]
@@ -1184,6 +1214,65 @@ public class DishAndDishCategoryServiceTests
         result.PageData.Should().BeEmpty();
     }
 
+    [Fact]
+    [Trait("Type", "Normal")]
+    [Trait("Method", "GetAllCategoriesAsync_Category")]
+    public async Task GetAllCategoriesAsync_Category_WhenSearchProvided_PassesQueryToRepo()
+    {
+        // Arrange
+        var pagedResult = new PagedResultDTO<DishCategoryDto>
+        {
+            PageData = new List<DishCategoryDto>
+            {
+                new() { CategoryId = 1, CategoryName = "Soup" }
+            },
+            PageIndex = 1,
+            PageSize = 10,
+            TotalCount = 1
+        };
+        var query = new DishCategoryListQueryDTO { PageIndex = 1, PageSize = 10, Search = "Soup" };
+        _dishCategoryRepoMock.Setup(r => r.GetAllCategoriesAsync(query, It.IsAny<CancellationToken>())).ReturnsAsync(pagedResult);
+
+        var service = CreateCategoryService();
+
+        // Act
+        var result = await service.GetAllCategoriesAsync(query);
+
+        // Assert
+        result.TotalCount.Should().Be(1);
+        result.PageData.Should().HaveCount(1);
+        _dishCategoryRepoMock.Verify(r => r.GetAllCategoriesAsync(query, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    [Trait("Type", "Boundary")]
+    [Trait("Method", "GetAllCategoriesAsync_Category")]
+    public async Task GetAllCategoriesAsync_Category_WhenFilterByDisabled_PassesFilterToRepo()
+    {
+        // Arrange
+        var pagedResult = new PagedResultDTO<DishCategoryDto>
+        {
+            PageData = new List<DishCategoryDto>
+            {
+                new() { CategoryId = 3, CategoryName = "Old Menu", IsDisabled = true }
+            },
+            PageIndex = 1,
+            PageSize = 10,
+            TotalCount = 1
+        };
+        var query = new DishCategoryListQueryDTO { PageIndex = 1, PageSize = 10, IsDisabled = true };
+        _dishCategoryRepoMock.Setup(r => r.GetAllCategoriesAsync(query, It.IsAny<CancellationToken>())).ReturnsAsync(pagedResult);
+
+        var service = CreateCategoryService();
+
+        // Act
+        var result = await service.GetAllCategoriesAsync(query);
+
+        // Assert
+        result.TotalCount.Should().Be(1);
+        result.PageData.Should().OnlyContain(c => c.IsDisabled == true);
+    }
+
     #endregion
 
     // ══════════════════════════════════════════════════════════════════════
@@ -1258,6 +1347,26 @@ public class DishAndDishCategoryServiceTests
         result.NameI18n.Fr.Should().Be("Soup");
     }
 
+    [Fact]
+    [Trait("Type", "Boundary")]
+    [Trait("Method", "GetCategoryByIdAsync")]
+    public async Task GetCategoryByIdAsync_WhenCategoryIsDisabled_ReturnsIsDisabledTrue()
+    {
+        // Arrange
+        var category = MakeDishCategory(1, "Soup", isDisabled: true);
+        _dishCategoryRepoMock.Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(category);
+
+        var service = CreateCategoryService();
+
+        // Act
+        var result = await service.GetCategoryByIdAsync(1);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.IsDisabled.Should().BeTrue();
+        result.CategoryId.Should().Be(1);
+    }
+
     #endregion
 
     // ══════════════════════════════════════════════════════════════════════
@@ -1298,6 +1407,16 @@ public class DishAndDishCategoryServiceTests
             c.DescriptionTextId == 201 &&
             c.DisPlayOrder == 4
         ), It.IsAny<CancellationToken>()), Times.Once);
+
+        // Verify log message: LogInformation on successful category creation
+        _catLoggerMock.Verify(
+            x => x.Log(
+                LogLevel.Information,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("Appetizer")),
+                null,
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
     }
 
     [Fact]
@@ -1317,6 +1436,16 @@ public class DishAndDishCategoryServiceTests
         // Assert
         await act.Should().ThrowAsync<ConflictException>()
             .WithMessage("*Soup*already exists*");
+
+        // Verify log message: LogWarning when duplicate name
+        _catLoggerMock.Verify(
+            x => x.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("Soup")),
+                null,
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
     }
 
     [Fact]
@@ -1357,6 +1486,43 @@ public class DishAndDishCategoryServiceTests
         result.Should().NotBeNull();
         _dishCategoryRepoMock.Verify(r => r.CreateAsync(It.Is<DishCategory>(c =>
             c.DescriptionTextId == null
+        ), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    [Trait("Type", "Boundary")]
+    [Trait("Method", "CreateCategoryAsync")]
+    public async Task CreateCategoryAsync_WhenIsDisabledTrue_CreatesDisabledCategory()
+    {
+        // Arrange
+        var request = new CreateDishCategoryRequest
+        {
+            I18n = new Dictionary<string, CategoryI18nDto>
+            {
+                ["en"] = new() { Name = "Seasonal", Description = "Seasonal menu" }
+            },
+            IsDisabled = true
+        };
+        var createdCategory = MakeDishCategory(11, "Seasonal", isDisabled: true);
+
+        _dishCategoryRepoMock.Setup(r => r.ExistsByNameAsync("Seasonal", null, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        _i18nServiceMock.Setup(s => s.CreateAsync(It.IsAny<string>(), "Dish Category Name", "en", It.IsAny<Dictionary<string, string>>(), It.IsAny<CancellationToken>())).ReturnsAsync(400L);
+        _i18nServiceMock.Setup(s => s.CreateAsync(It.IsAny<string>(), "Dish Category Description", "en", It.IsAny<Dictionary<string, string>>(), It.IsAny<CancellationToken>())).ReturnsAsync(401L);
+        _dishCategoryRepoMock.Setup(r => r.GetMaxDisplayOrderAsync(It.IsAny<CancellationToken>())).ReturnsAsync(5);
+        _dishCategoryRepoMock.Setup(r => r.CreateAsync(It.IsAny<DishCategory>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(createdCategory);
+        _dishCategoryRepoMock.Setup(r => r.GetByIdAsync(11, It.IsAny<CancellationToken>())).ReturnsAsync(createdCategory);
+
+        var service = CreateCategoryService();
+
+        // Act
+        var result = await service.CreateCategoryAsync(request);
+
+        // Assert
+        result.Should().NotBeNull();
+        _dishCategoryRepoMock.Verify(r => r.CreateAsync(It.Is<DishCategory>(c =>
+            c.IsDisabled == true &&
+            c.DisPlayOrder == 6
         ), It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -1416,6 +1582,16 @@ public class DishAndDishCategoryServiceTests
         // Assert
         await act.Should().ThrowAsync<KeyNotFoundException>()
             .WithMessage("*999*not found*");
+
+        // Verify log message: LogWarning when category not found for update
+        _catLoggerMock.Verify(
+            x => x.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("999")),
+                null,
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
     }
 
     [Fact]
@@ -1438,6 +1614,16 @@ public class DishAndDishCategoryServiceTests
         // Assert
         await act.Should().ThrowAsync<ConflictException>()
             .WithMessage("*Appetizer*already exists*");
+
+        // Verify log message: LogWarning when name conflict on update
+        _catLoggerMock.Verify(
+            x => x.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("Appetizer")),
+                null,
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
     }
 
     [Fact]
@@ -1478,6 +1664,44 @@ public class DishAndDishCategoryServiceTests
         existingCategory.DescriptionTextId.Should().Be(501L);
     }
 
+    [Fact]
+    [Trait("Type", "Boundary")]
+    [Trait("Method", "UpdateCategoryAsync")]
+    public async Task UpdateCategoryAsync_WhenNoDescription_SkipsDescriptionI18nCreation()
+    {
+        // Arrange
+        var existingCategory = MakeDishCategory(1, "Soup");
+        var request = new UpdateDishCategoryRequest
+        {
+            I18n = new Dictionary<string, CategoryI18nDto>
+            {
+                ["en"] = new() { Name = "Soup Updated", Description = null }
+            },
+            IsDisabled = false
+        };
+        var updatedCategory = MakeDishCategory(1, "Soup Updated");
+
+        _dishCategoryRepoMock.SetupSequence(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existingCategory)
+            .ReturnsAsync(updatedCategory);
+        _dishCategoryRepoMock.Setup(r => r.ExistsByNameAsync("Soup Updated", 1L, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        _i18nServiceMock.Setup(s => s.UpdateStringsAsync(200, It.IsAny<Dictionary<string, string>>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _dishCategoryRepoMock.Setup(r => r.UpdateAsync(It.IsAny<DishCategory>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(updatedCategory);
+
+        var service = CreateCategoryService();
+
+        // Act
+        var result = await service.UpdateCategoryAsync(1, request);
+
+        // Assert
+        result.Should().NotBeNull();
+        // Description i18n should NOT be created since no description provided
+        _i18nServiceMock.Verify(s => s.CreateAsync(
+            It.IsAny<string>(), "Dish Category Description", "en",
+            It.IsAny<Dictionary<string, string>>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     #endregion
 
     // ══════════════════════════════════════════════════════════════════════
@@ -1506,6 +1730,16 @@ public class DishAndDishCategoryServiceTests
         result.Should().NotBeNull();
         category.IsDisabled.Should().BeFalse();
         _dishCategoryRepoMock.Verify(r => r.UpdateAsync(category, It.IsAny<CancellationToken>()), Times.Once);
+
+        // Verify log message: LogInformation on successful toggle
+        _catLoggerMock.Verify(
+            x => x.Log(
+                LogLevel.Information,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("Toggled")),
+                null,
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
     }
 
     [Fact]
@@ -1545,6 +1779,16 @@ public class DishAndDishCategoryServiceTests
         // Assert
         await act.Should().ThrowAsync<KeyNotFoundException>()
             .WithMessage("*999*not found*");
+
+        // Verify log message: LogWarning when category not found for toggle
+        _catLoggerMock.Verify(
+            x => x.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("999")),
+                null,
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
     }
 
     [Fact]
