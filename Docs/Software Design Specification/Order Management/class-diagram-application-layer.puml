@@ -1,0 +1,159 @@
+@startuml
+title Order Management Module - Application Layer Class Diagram
+
+package "Application Layer" {
+
+    interface IOrderService <<interface>> {
+        +CreateOrderAsync(request: CreateOrderRequestDTO, ct: CancellationToken) : Task<CreateOrderResponseDTO>
+        +CreateOrderAsync(staffId: long, request: CreateOrderRequest, ct: CancellationToken) : Task<long>
+        +GetOrderHistoryAsync(query: OrderHistoryQueryDTO, ct: CancellationToken) : Task<PagedResultDTO<OrderHistoryDTO>>
+        +GetCustomerOrderByIdAsync(orderId: long, ct: CancellationToken) : Task<CustomerOrderHistoryDTO>
+        +GetOrderByIdAsync(orderId: long, ct: CancellationToken) : Task<OrderDetailDTO>
+        +GetOrderStatusCountAsync(ct: CancellationToken) : Task<OrderStatusCountDTO>
+        +GetKitchenOrdersAsync(ct: CancellationToken) : Task<List<KitchenOrderDTO>>
+        +UpdateOrderStatusAsync(orderId: long, newStatus: OrderStatusCode, ct: CancellationToken) : Task
+        +UpdateOrderItemStatusAsync(orderItemId: long, newStatusLvId: uint, rejectReason: string?, ct: CancellationToken) : Task
+        +AddItemsToOrderAsync(orderId: long, request: AddOrderItemsRequestDTO, ct: CancellationToken) : Task
+        +AddItemsAsync(orderId: long, request: AddOrderItemsRequest, ct: CancellationToken) : Task
+        +CancelOrderItemAsync(orderItemId: long, ct: CancellationToken) : Task
+        +GetRecentOrdersAsync(userId: long, roles: List<string>, limit: int, ct: CancellationToken) : Task<List<RecentOrderDTO>>
+    }
+
+    class OrderService <<Service>> {
+        -_orderRepository : IOrderRepository
+        -_tableRepository : ITableRepository
+        -_lookupResolver : ILookupResolver
+        -_dishRepository : IDishRepository
+        -_customerService : ICustomerService
+        -_uow : IUnitOfWork
+        -_notificationService : INotificationService
+        -_realtime : IOrderRealtimeService
+        -_shiftLiveRealtimePublisher : IShiftLiveRealtimePublisher
+        -_taxRepository : ITaxRepository
+        +CreateOrderAsync(request: CreateOrderRequestDTO, ct: CancellationToken) : Task<CreateOrderResponseDTO>
+        +CreateOrderAsync(staffId: long, request: CreateOrderRequest, ct: CancellationToken) : Task<long>
+        +GetOrderHistoryAsync(query: OrderHistoryQueryDTO, ct: CancellationToken) : Task<PagedResultDTO<OrderHistoryDTO>>
+        +GetCustomerOrderByIdAsync(orderId: long, ct: CancellationToken) : Task<CustomerOrderHistoryDTO>
+        +GetOrderByIdAsync(orderId: long, ct: CancellationToken) : Task<OrderDetailDTO>
+        +GetOrderStatusCountAsync(ct: CancellationToken) : Task<OrderStatusCountDTO>
+        +GetKitchenOrdersAsync(ct: CancellationToken) : Task<List<KitchenOrderDTO>>
+        +UpdateOrderStatusAsync(orderId: long, newStatus: OrderStatusCode, ct: CancellationToken) : Task
+        +UpdateOrderItemStatusAsync(orderItemId: long, newStatusLvId: uint, rejectReason: string?, ct: CancellationToken) : Task
+        +AddItemsToOrderAsync(orderId: long, request: AddOrderItemsRequestDTO, ct: CancellationToken) : Task
+        +AddItemsAsync(orderId: long, request: AddOrderItemsRequest, ct: CancellationToken) : Task
+        +CancelOrderItemAsync(orderItemId: long, ct: CancellationToken) : Task
+        +GetRecentOrdersAsync(userId: long, roles: List<string>, limit: int, ct: CancellationToken) : Task<List<RecentOrderDTO>>
+        -PublishShiftLiveOrderEventAsync(eventType: string, orderId: long, staffId: long?, ct: CancellationToken) : Task
+        -ApplyTaxToOrderAsync(order: Order, ct: CancellationToken) : Task
+    }
+
+    interface IPaymentService <<interface>> {
+        +ProcessPaymentAsync(dto: CreatePaymentDTO, ct: CancellationToken) : Task
+        +GetPaymentsAsync(query: PaymentListQueryDTO, ct: CancellationToken) : Task<PagedResultDTO<PaymentListDTO>>
+    }
+
+    class PaymentService <<Service>> {
+        -_context : RestaurantMgmtContext
+        -_lookupResolver : ILookupResolver
+        -_unitOfWork : IUnitOfWork
+        -_systemSettingService : ISystemSettingService
+        -_notificationService : INotificationService
+        -_shiftLiveRealtimePublisher : IShiftLiveRealtimePublisher
+        -_paymentRepository : IPaymentRepository
+        -_orderRealtime : IOrderRealtimeService
+        +ProcessPaymentAsync(dto: CreatePaymentDTO, ct: CancellationToken) : Task
+        +GetPaymentsAsync(query: PaymentListQueryDTO, ct: CancellationToken) : Task<PagedResultDTO<PaymentListDTO>>
+        -CalculateDiscountAmount(discountType: string, discountValue: decimal, baseAmount: decimal) : decimal
+        -ResolveLoyaltyPolicyAsync(ct: CancellationToken) : Task<(bool, decimal)>
+        -CalculateLoyaltyPoints(finalAmount: decimal, pointBaseAmount: decimal) : int
+    }
+
+    interface IOrderRealtimeService <<interface>> {
+        +OrderCreatedAsync(data: OrderRealtimeDTO) : Task
+        +OrderUpdatedAsync(data: OrderRealtimeDTO) : Task
+        +OrderItemUpdatedAsync(data: OrderItemRealtimeDTO) : Task
+        +OrderPaidAsync(orderId: long) : Task
+    }
+
+    class OrderRealtimeService <<Service>> {
+        -_hub : IHubContext<RestaurantHub>
+        +OrderCreatedAsync(data: OrderRealtimeDTO) : Task
+        +OrderUpdatedAsync(data: OrderRealtimeDTO) : Task
+        +OrderItemUpdatedAsync(data: OrderItemRealtimeDTO) : Task
+        +OrderPaidAsync(orderId: long) : Task
+    }
+
+    interface INotificationService <<interface>> {
+        +PublishAsync(request: PublishNotificationRequest, ct: CancellationToken) : Task
+        +GetNotificationsAsync(query: NotificationQueryDto, userPermissions: IEnumerable<string>, userId: long, ct: CancellationToken) : Task<List<NotificationListItemDto>>
+        +GetUnreadCountAsync(userPermissions: IEnumerable<string>, userId: long, ct: CancellationToken) : Task<int>
+        +GetMissedAsync(userPermissions: IEnumerable<string>, userId: long, afterUtc: DateTime?, ct: CancellationToken) : Task<List<NotificationListItemDto>>
+        +MarkAsReadAsync(notificationId: long, userId: long, ct: CancellationToken) : Task
+        +MarkAllReadAsync(userPermissions: IEnumerable<string>, userId: long, ct: CancellationToken) : Task
+        +AcknowledgeAsync(notificationId: long, userId: long, ct: CancellationToken) : Task
+        +GetPreferencesAsync(userId: long, ct: CancellationToken) : Task<List<NotificationPreferenceDto>>
+        +UpdatePreferencesAsync(userId: long, request: UpdateNotificationPreferencesRequest, ct: CancellationToken) : Task
+    }
+
+    class NotificationService <<Service>> {
+        -_notificationRepository : INotificationRepository
+        -_realtimePublisher : INotificationRealtimePublisher
+        -_logger : ILogger<NotificationService>
+        +PublishAsync(request: PublishNotificationRequest, ct: CancellationToken) : Task
+        +GetNotificationsAsync(query: NotificationQueryDto, userPermissions: IEnumerable<string>, userId: long, ct: CancellationToken) : Task<List<NotificationListItemDto>>
+        +GetUnreadCountAsync(userPermissions: IEnumerable<string>, userId: long, ct: CancellationToken) : Task<int>
+        +GetMissedAsync(userPermissions: IEnumerable<string>, userId: long, afterUtc: DateTime?, ct: CancellationToken) : Task<List<NotificationListItemDto>>
+        +MarkAsReadAsync(notificationId: long, userId: long, ct: CancellationToken) : Task
+        +MarkAllReadAsync(userPermissions: IEnumerable<string>, userId: long, ct: CancellationToken) : Task
+        +AcknowledgeAsync(notificationId: long, userId: long, ct: CancellationToken) : Task
+        +GetPreferencesAsync(userId: long, ct: CancellationToken) : Task<List<NotificationPreferenceDto>>
+        +UpdatePreferencesAsync(userId: long, request: UpdateNotificationPreferencesRequest, ct: CancellationToken) : Task
+    }
+}
+
+' ── External stubs ──
+class IOrderRepository <<interface>>
+class ITableRepository <<interface>>
+class IDishRepository <<interface>>
+class IPaymentRepository <<interface>>
+class ITaxRepository <<interface>>
+class IUnitOfWork <<interface>>
+class ILookupResolver <<interface>>
+class ICustomerService <<interface>>
+class INotificationRepository <<interface>>
+class INotificationRealtimePublisher <<interface>>
+class IShiftLiveRealtimePublisher <<interface>>
+class ISystemSettingService <<interface>>
+class RestaurantMgmtContext <<DbContext>>
+
+' ── Relationships ──
+
+OrderService ..|> IOrderService : implements
+PaymentService ..|> IPaymentService : implements
+OrderRealtimeService ..|> IOrderRealtimeService : implements
+NotificationService ..|> INotificationService : implements
+
+OrderService --> IOrderRepository : uses for order persistence
+OrderService --> ITableRepository : uses for table operations
+OrderService --> IDishRepository : uses for dish validation
+OrderService --> ITaxRepository : uses for tax calculation
+OrderService --> IUnitOfWork : uses for transactions
+OrderService --> ILookupResolver : resolves status and source codes
+OrderService --> ICustomerService : resolves or creates customer
+OrderService --> INotificationService : publishes order notifications
+OrderService --> IOrderRealtimeService : pushes real-time order events
+OrderService --> IShiftLiveRealtimePublisher : publishes shift live events
+
+PaymentService --> IPaymentRepository : uses for payment persistence
+PaymentService --> IUnitOfWork : uses for transactions
+PaymentService --> ILookupResolver : resolves payment method codes
+PaymentService --> ISystemSettingService : reads loyalty policy settings
+PaymentService --> INotificationService : publishes payment notifications
+PaymentService --> IShiftLiveRealtimePublisher : publishes shift live events
+PaymentService --> IOrderRealtimeService : notifies order paid event
+PaymentService --> RestaurantMgmtContext : direct data access for payment processing
+
+NotificationService --> INotificationRepository : persists notifications
+NotificationService --> INotificationRealtimePublisher : publishes real-time notifications
+
+@enduml

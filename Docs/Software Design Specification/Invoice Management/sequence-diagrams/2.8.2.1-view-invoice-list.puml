@@ -1,0 +1,58 @@
+@startuml
+title 2.8.2.1 View Invoice List
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":Staff" as U
+participant ":InvoiceListPage" as Client
+participant ":InvoiceController" as Ctrl
+participant ":SaleInvoiceService" as Svc
+participant ":ISaleInvoiceRepository" as Repo
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : Open Invoice List page (with optional filters)
+activate Client
+
+Client ->> Ctrl : GET /api/invoices?search=&pageIndex=1&pageSize=10&fromDate=&toDate=&orderStatusCode=
+activate Ctrl
+
+note right of Ctrl : [HasPermission(Permissions.ViewOrder)]
+
+Ctrl ->> Svc : GetSaleInvoiceListAsync(SaleInvoiceListQueryDTO, ct)
+activate Svc
+
+Svc ->> Repo : GetOrdersForInvoiceListAsync(query, ct)
+activate Repo
+
+Repo ->> DB : SELECT orders with joins\n(OrderStatusLv, Table, Staff, Customer, Payments+MethodLv, OrderItems, OrderPromotions, OrderCoupons)\nAPPLY filters (search, fromDate, toDate, orderStatusCode)\nORDER BY CreatedAt DESC\nSKIP/TAKE pagination
+activate DB
+DB -->> Repo : List<SaleInvoiceListDTO>, totalCount
+deactivate DB
+
+note right of Repo
+    InvoiceCode = "#INV" + OrderId.ToString("D4")
+    PaymentMethod = first payment's MethodLv.ValueName or "-"
+end note
+
+Repo -->> Svc : PagedResultDTO<SaleInvoiceListDTO>
+deactivate Repo
+
+Svc -->> Ctrl : PagedResultDTO<SaleInvoiceListDTO>
+deactivate Svc
+
+Ctrl -->> Client : 200 OK { PageData, PageIndex, PageSize, TotalCount }
+deactivate Ctrl
+
+Client -->> U : Display invoice list table\n(InvoiceCode, CreatedAt, TableCode, StaffName,\nCustomerName, TotalAmount, TipAmount, OrderStatus, PaymentMethod)
+deactivate Client
+deactivate U
+
+@enduml

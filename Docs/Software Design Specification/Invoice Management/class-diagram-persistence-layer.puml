@@ -1,0 +1,49 @@
+@startuml
+title Invoice Management Module - Persistence Layer Class Diagram
+
+package "Persistence Layer" {
+
+    interface ISaleInvoiceRepository <<interface>> {
+        +GetOrderForInvoiceAsync(orderId: long, ct: CancellationToken) : Task<Order?>
+        +GetTotalDiscountAsync(orderId: long, ct: CancellationToken) : Task<decimal>
+        +GetOrdersForInvoiceListAsync(query: SaleInvoiceListQueryDTO, ct: CancellationToken) : Task<PagedResultDTO<SaleInvoiceListDTO>>
+    }
+
+    class SaleInvoiceRepository <<Repository>> {
+        -_context : RestaurantMgmtContext
+        +GetOrderForInvoiceAsync(orderId: long, ct: CancellationToken) : Task<Order?>
+        +GetTotalDiscountAsync(orderId: long, ct: CancellationToken) : Task<decimal>
+        +GetOrdersForInvoiceListAsync(query: SaleInvoiceListQueryDTO, ct: CancellationToken) : Task<PagedResultDTO<SaleInvoiceListDTO>>
+    }
+
+    class RestaurantMgmtContext <<DbContext>> {
+        +Orders : DbSet<Order>
+        +OrderItems : DbSet<OrderItem>
+        +OrderCoupons : DbSet<OrderCoupon>
+        +OrderPromotions : DbSet<OrderPromotion>
+        +Payments : DbSet<Payment>
+        +RestaurantTables : DbSet<RestaurantTable>
+        +Customers : DbSet<Customer>
+        +Dishes : DbSet<Dish>
+        +LookupValues : DbSet<LookupValue>
+    }
+}
+
+' ── External stubs ──
+class Order <<Entity>>
+class OrderItem <<Entity>>
+class OrderCoupon <<Entity>>
+class OrderPromotion <<Entity>>
+class Payment <<Entity>>
+
+' ── Relationships ──
+
+SaleInvoiceRepository ..|> ISaleInvoiceRepository : implements
+
+SaleInvoiceRepository --> RestaurantMgmtContext : uses
+
+ISaleInvoiceRepository ..> Order : queries with includes (Table, Staff, Customer, Payments, OrderItems+Dish)
+ISaleInvoiceRepository ..> OrderCoupon : queries discount amounts
+ISaleInvoiceRepository ..> OrderPromotion : queries discount amounts
+
+@enduml

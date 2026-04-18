@@ -1,0 +1,91 @@
+@startuml
+title Invoice Management Module - Presentation Layer Class Diagram
+
+package "Presentation Layer" {
+
+    class InvoiceController <<Controller>> {
+        -_saleInvoiceService : ISaleInvoiceService
+        +GetSaleInvoiceList(query: SaleInvoiceListQueryDTO, ct: CancellationToken) : Task<IActionResult>
+        +GetSaleInvoiceDetail(id: long, ct: CancellationToken) : Task<IActionResult>
+    }
+
+    ' ── Query DTOs ──
+
+    class SaleInvoiceListQueryDTO <<DTO>> {
+        +Search : string?
+        +PageIndex : int
+        +PageSize : int
+        +FromDate : DateTime?
+        +ToDate : DateTime?
+        +OrderStatusCode : string?
+    }
+
+    ' ── Response DTOs ──
+
+    class SaleInvoiceListDTO <<DTO>> {
+        +OrderId : long
+        +InvoiceCode : string
+        +CreatedAt : DateTime?
+        +TableCode : string
+        +StaffName : string
+        +CustomerName : string
+        +TotalAmount : decimal
+        +TipAmount : decimal?
+        +OrderStatus : string
+        +PaymentMethod : string
+    }
+
+    class SaleInvoiceDTO <<DTO>> {
+        +OrderId : long
+        +InvoiceCode : string
+        +CreatedAt : DateTime?
+        +RestaurantName : string
+        +RestaurantAddress : string
+        +RestaurantPhone : string
+        +OrderType : string
+        +TableCode : string
+        +StaffName : string
+        +CustomerName : string
+        +CustomerPhone : string
+        +SubTotal : decimal
+        +DiscountAmount : decimal
+        +TipAmount : decimal
+        +TotalAmount : decimal
+        +IsPaid : bool
+        +PaymentMethod : string
+        +Items : List<SaleInvoiceItemDTO>
+    }
+
+    class SaleInvoiceItemDTO <<DTO>> {
+        +OrderItemId : long
+        +Quantity : int
+        +ItemName : string
+        +ItemPrice : decimal
+        +Amount : decimal
+        +Note : string?
+    }
+
+    class "PagedResultDTO<T>" as PagedResultDTO <<DTO>> {
+        +PageData : List<T>
+        +PageIndex : int
+        +PageSize : int
+        +TotalCount : int
+        +TotalPage : int
+    }
+}
+
+' ── External stubs ──
+class ISaleInvoiceService <<interface>>
+
+' ── Relationships ──
+
+InvoiceController --> ISaleInvoiceService : uses
+
+InvoiceController ..> SaleInvoiceListQueryDTO : receives
+InvoiceController ..> SaleInvoiceListDTO : returns
+InvoiceController ..> SaleInvoiceDTO : returns
+InvoiceController ..> PagedResultDTO : paginates results
+
+SaleInvoiceDTO *-- "0..*" SaleInvoiceItemDTO : contains items
+
+@enduml
