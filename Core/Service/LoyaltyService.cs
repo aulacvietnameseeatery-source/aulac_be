@@ -5,8 +5,6 @@ using Core.Extensions;
 using Core.Interface.Repo;
 using Core.Interface.Service.Entity;
 using Core.Interface.Service.Loyalty;
-using Infa.Data;
-using Microsoft.EntityFrameworkCore;
 using LookupTypeEnum = Core.Enum.LookupType;
 
 namespace Infa.Service;
@@ -19,18 +17,18 @@ public class LoyaltyService : ILoyaltyService
     private const int CouponCodeLength = 8;
     private const int CouponValidityDays = 30;
 
-    private readonly RestaurantMgmtContext _context;
+    private readonly ILoyaltyRepository _loyaltyRepository;
     private readonly ILookupResolver _lookupResolver;
     private readonly ISystemSettingService _systemSettingService;
     private readonly IUnitOfWork _unitOfWork;
 
     public LoyaltyService(
-        RestaurantMgmtContext context,
+        ILoyaltyRepository loyaltyRepository,
         ILookupResolver lookupResolver,
         ISystemSettingService systemSettingService,
         IUnitOfWork unitOfWork)
     {
-        _context = context;
+        _loyaltyRepository = loyaltyRepository;
         _lookupResolver = lookupResolver;
         _systemSettingService = systemSettingService;
         _unitOfWork = unitOfWork;
@@ -60,8 +58,7 @@ public class LoyaltyService : ILoyaltyService
             throw new InvalidOperationException($"Minimum redemption is {minRedemptionPoints} points.");
         }
 
-        var customer = await _context.Customers
-            .FirstOrDefaultAsync(c => c.CustomerId == request.CustomerId, ct)
+        var customer = await _loyaltyRepository.GetCustomerByIdAsync(request.CustomerId, ct)
             ?? throw new KeyNotFoundException($"Customer {request.CustomerId} not found.");
 
         var currentPoints = customer.LoyaltyPoints ?? 0;
@@ -100,7 +97,7 @@ public class LoyaltyService : ILoyaltyService
         try
         {
             customer.LoyaltyPoints = currentPoints - request.Points;
-            _context.Coupons.Add(coupon);
+            await _loyaltyRepository.AddCouponAsync(coupon, ct);
 
             await _unitOfWork.SaveChangesAsync(ct);
             await _unitOfWork.CommitAsync(ct);
@@ -127,20 +124,14 @@ public class LoyaltyService : ILoyaltyService
 
     public async Task<List<LoyaltyCouponHistoryDto>> GetCustomerCouponsAsync(long customerId, CancellationToken ct = default)
     {
-        var customerExists = await _context.Customers.AnyAsync(c => c.CustomerId == customerId, ct);
+        var customerExists = await _loyaltyRepository.CustomerExistsAsync(customerId, ct);
         if (!customerExists)
         {
             throw new KeyNotFoundException($"Customer {customerId} not found.");
         }
 
         var now = DateTime.UtcNow;
-        var coupons = await _context.Coupons
-            .AsNoTracking()
-            .Include(c => c.CouponStatusLv)
-            .Where(c => c.CustomerId == customerId)
-            .OrderByDescending(c => c.CreatedAt ?? c.StartTime)
-            .ThenByDescending(c => c.CouponId)
-            .ToListAsync(ct);
+        var coupons = await _loyaltyRepository.GetCustomerCouponsAsync(customerId, ct);
 
         return coupons.Select(c => new LoyaltyCouponHistoryDto
         {
@@ -165,7 +156,7 @@ public class LoyaltyService : ILoyaltyService
         for (var attempt = 0; attempt < 20; attempt++)
         {
             var code = $"LP-{GenerateRandomCode(CouponCodeLength)}";
-            var exists = await _context.Coupons.AnyAsync(c => c.CouponCode == code, ct);
+            var exists = await _loyaltyRepository.CouponCodeExistsAsync(code, ct);
             if (!exists)
             {
                 return code;

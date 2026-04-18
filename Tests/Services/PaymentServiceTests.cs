@@ -64,6 +64,7 @@ public class PaymentServiceTests : IDisposable
         SetupLookupResolver();
         SetupUnitOfWork();
         SetupSystemSettings(loyaltyEnabled: false);
+        SetupPaymentRepository();
     }
 
     public void Dispose()
@@ -74,7 +75,6 @@ public class PaymentServiceTests : IDisposable
 
     // ── Factory ──
     private PaymentService CreateService() => new(
-        _context,
         _lookupResolverMock.Object,
         _unitOfWorkMock.Object,
         _systemSettingMock.Object,
@@ -150,6 +150,47 @@ public class PaymentServiceTests : IDisposable
                 "loyalty.point_base_amount", null, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(pointBase);
         }
+    }
+
+    private void SetupPaymentRepository()
+    {
+        _paymentRepoMock
+            .Setup(r => r.GetOrderForPaymentAsync(It.IsAny<long>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((long orderId, CancellationToken ct) => _context.Orders
+                .Include(o => o.Payments)
+                .Include(o => o.Customer)
+                .Include(o => o.OrderItems)
+                    .ThenInclude(oi => oi.Dish)
+                .Include(o => o.OrderCoupons)
+                .Include(o => o.OrderPromotions)
+                .FirstOrDefault(o => o.OrderId == orderId));
+
+        _paymentRepoMock
+            .Setup(r => r.GetCouponWithTypeAsync(It.IsAny<long>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((long couponId, CancellationToken ct) => _context.Coupons
+                .Include(c => c.TypeLv)
+                .FirstOrDefault(c => c.CouponId == couponId));
+
+        _paymentRepoMock
+            .Setup(r => r.GetActivePromotionsAsync(It.IsAny<uint>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((uint activePromotionStatusId, DateTime now, CancellationToken ct) => _context.Promotions
+                .Include(p => p.TypeLv)
+                .Include(p => p.PromotionRules)
+                .Include(p => p.PromotionTargets)
+                .Where(p => p.PromotionStatusLvId == activePromotionStatusId)
+                .Where(p => now >= p.StartTime && now <= p.EndTime)
+                .Where(p => !p.MaxUsage.HasValue || (p.UsedCount ?? 0) < p.MaxUsage.Value)
+                .ToList());
+
+        _paymentRepoMock
+            .Setup(r => r.GetTableByIdAsync(It.IsAny<long>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((long tableId, CancellationToken ct) => _context.RestaurantTables
+                .FirstOrDefault(t => t.TableId == tableId));
+
+        _paymentRepoMock
+            .Setup(r => r.AddPaymentAsync(It.IsAny<Payment>(), It.IsAny<CancellationToken>()))
+            .Callback((Payment payment, CancellationToken ct) => _context.Payments.Add(payment))
+            .Returns(Task.CompletedTask);
     }
 
     // ── Data Seeding ──
