@@ -1,0 +1,77 @@
+@startuml
+title 2.5.2.1 Check Reservation Availability
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":Customer" as U
+participant ":ReservationPage" as Client
+participant ":PublicReservationController" as Ctrl
+participant ":PublicReservationService" as Svc
+participant ":ITableRepository" as TableRepo
+participant ":IReservationRepository" as ResRepo
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : Enter party size and reserved time
+activate Client
+
+Client ->> Ctrl : POST /api/public/reservations/fit\n(ReservationFitCheckRequest)
+activate Ctrl
+
+Ctrl ->> Svc : CheckReservationFitAsync(request, ct)
+activate Svc
+
+alt#White Party size <= 0
+    Svc -->> Ctrl : ReservationFitCheckResponse { CanBookOnline = false }
+    Ctrl -->> Client : 200 OK (CanBookOnline = false)
+    Client -->> U : Display "Party size is invalid"
+else#White Party size valid
+
+    Svc ->> Svc : FindCandidateTablesAsync(reservedTime, partySize, ct)
+
+    Svc ->> TableRepo : GetManualAvailableTablesAsync(isOnline: true, ct)
+    activate TableRepo
+    TableRepo ->> DB : Query online tables not deleted and not locked
+    activate DB
+    DB -->> TableRepo : Return list of online tables
+    deactivate DB
+    TableRepo -->> Svc : List<RestaurantTable>
+    deactivate TableRepo
+
+    loop#White For each candidate table
+        Svc ->> ResRepo : GetTableReservationsForTimeAsync(tableId, reservedTime, duration, ...)
+        activate ResRepo
+        ResRepo ->> DB : Query existing reservations overlapping the time window
+        activate DB
+        DB -->> ResRepo : Return conflicting reservations
+        deactivate DB
+        ResRepo -->> Svc : List<Reservation> conflicts
+        deactivate ResRepo
+    end
+
+    Svc ->> Svc : ReservationTableSelectionUtil.FindBestFitTables(available, partySize)
+
+    alt#White Candidate tables found
+        Svc -->> Ctrl : ReservationFitCheckResponse { CanBookOnline = true }
+        deactivate Svc
+        Ctrl -->> Client : 200 OK (CanBookOnline = true)
+        deactivate Ctrl
+        Client -->> U : Display "Online reservation is available"
+    else#White No suitable tables
+        Svc -->> Ctrl : ReservationFitCheckResponse { CanBookOnline = false }
+        Ctrl -->> Client : 200 OK (CanBookOnline = false)
+        Client -->> U : Display "No suitable online table arrangement found"
+    end
+end
+
+deactivate Client
+deactivate U
+
+@enduml

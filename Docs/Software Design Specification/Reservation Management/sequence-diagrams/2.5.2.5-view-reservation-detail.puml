@@ -1,0 +1,58 @@
+@startuml
+title 2.5.2.5 View Reservation Detail
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":Staff" as U
+participant ":ReservationDetailPage" as Client
+participant ":ReservationController" as Ctrl
+participant ":AdminReservationService" as Svc
+participant ":IReservationRepository" as ResRepo
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : Click on a reservation row
+activate Client
+
+Client ->> Ctrl : GET /api/reservations/{id}\n(reservationId)
+activate Ctrl
+
+Ctrl ->> Svc : GetReservationDetailAsync(id, ct)
+activate Svc
+
+Svc ->> ResRepo : GetByIdWithFullDetailsAsync(reservationId, ct)
+activate ResRepo
+ResRepo ->> DB : Query reservation with tables, status lookup, and source lookup
+activate DB
+DB -->> ResRepo : Return reservation with full details
+deactivate DB
+ResRepo -->> Svc : Reservation (with Tables, ReservationStatusLv, SourceLv)
+deactivate ResRepo
+
+alt#White Reservation not found
+    Svc -->> Ctrl : throw KeyNotFoundException
+    Ctrl -->> Client : 404 Not Found
+    Client -->> U : Display "Reservation not found"
+else#White Reservation found
+    Svc ->> Svc : Map Reservation entity to ReservationDetailDto
+
+    Svc -->> Ctrl : ReservationDetailDto
+    deactivate Svc
+
+    Ctrl -->> Client : 200 OK (ReservationDetailDto)
+    deactivate Ctrl
+
+    Client -->> U : Display reservation details with assigned tables
+end
+
+deactivate Client
+deactivate U
+
+@enduml

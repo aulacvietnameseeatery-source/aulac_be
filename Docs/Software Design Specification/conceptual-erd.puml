@@ -1,0 +1,723 @@
+@startuml conceptual-erd
+title Âu Lạc Restaurant — Conceptual Entity-Relationship Diagram
+skinparam linetype ortho
+skinparam dpi 200
+skinparam defaultFontSize 11
+skinparam padding 2
+skinparam nodesep 60
+skinparam ranksep 50
+hide circle
+
+' ============================================================
+'  COLOR LEGEND
+' ============================================================
+' ============================================================
+'  CORE DOMAIN
+' ============================================================
+
+entity "Customer" as customer <<core>> {
+    * customerId : long <<PK>>
+    --
+    fullName : string
+    phone : string
+    email : string
+    isMember : boolean
+    loyaltyPoints : int
+    createdAt : datetime
+}
+
+entity "DishCategory" as dish_category <<core>> {
+    * categoryId : long <<PK>>
+    --
+    categoryName : string
+    description : string
+    displayOrder : int
+    isDisabled : boolean
+}
+
+entity "Dish" as dish <<core>> {
+    * dishId : long <<PK>>
+    --
+    categoryId : long <<FK>>
+    dishName : string
+    price : decimal
+    description : string
+    slogan : string
+    note : string
+    calories : int
+    shortDescription : string
+    displayOrder : int
+    chefRecommended : boolean
+    prepTimeMinutes : int
+    cookTimeMinutes : int
+    isOnline : boolean
+    dishStatusLvId : uint <<FK>>
+    createdAt : datetime
+}
+
+entity "RestaurantTable" as restaurant_table <<core>> {
+    * tableId : long <<PK>>
+    --
+    tableCode : string
+    capacity : int
+    tableStatusLvId : uint <<FK>>
+    tableTypeLvId : uint <<FK>>
+    zoneLvId : uint <<FK>>
+    isOnline : boolean
+    qrToken : string
+    isDeleted : boolean
+    createdAt : datetime
+    updatedAt : datetime
+}
+
+entity "Reservation" as reservation <<core>> {
+    * reservationId : long <<PK>>
+    --
+    customerId : long <<FK>>
+    customerName : string
+    phone : string
+    email : string
+    partySize : int
+    reservedTime : datetime
+    reservationStatusLvId : uint <<FK>>
+    sourceLvId : uint <<FK>>
+    notes : string
+    createdAt : datetime
+}
+
+entity "ReservationTable" as reservation_table <<core>> {
+    * reservationId : long <<PK, FK>>
+    * tableId : long <<PK, FK>>
+}
+
+' ============================================================
+'  ORDER & PAYMENT
+' ============================================================
+
+entity "Order" as order <<order>> {
+    * orderId : long <<PK>>
+    --
+    tableId : long <<FK>>
+    staffId : long <<FK>>
+    customerId : long <<FK>>
+    orderStatusLvId : uint <<FK>>
+    sourceLvId : uint <<FK>>
+    taxId : long <<FK>>
+    totalAmount : decimal
+    subTotalAmount : decimal
+    tipAmount : decimal
+    taxAmount : decimal
+    createdAt : datetime
+    updatedAt : datetime
+}
+
+entity "OrderItem" as order_item <<order>> {
+    * orderItemId : long <<PK>>
+    --
+    orderId : long <<FK>>
+    dishId : long <<FK>>
+    quantity : int
+    price : decimal
+    itemStatusLvId : uint <<FK>>
+    rejectReason : string
+    note : string
+}
+
+entity "Payment" as payment <<order>> {
+    * paymentId : long <<PK>>
+    --
+    orderId : long <<FK>>
+    methodLvId : uint <<FK>>
+    receivedAmount : decimal
+    changeAmount : decimal
+    paidAt : datetime
+}
+
+entity "Tax" as tax <<order>> {
+    * taxId : long <<PK>>
+    --
+    taxName : string
+    taxRate : decimal
+    taxType : string
+    isActive : boolean
+    isDefault : boolean
+    createdAt : datetime
+}
+
+entity "OrderCoupon" as order_coupon <<order>> {
+    * orderCouponId : long <<PK>>
+    --
+    orderId : long <<FK>>
+    couponId : long <<FK>>
+    discountAmount : decimal
+    appliedAt : datetime
+}
+
+entity "OrderPromotion" as order_promotion <<order>> {
+    * orderPromotionId : long <<PK>>
+    --
+    orderId : long <<FK>>
+    promotionId : long <<FK>>
+    discountAmount : decimal
+    appliedAt : datetime
+}
+
+' ============================================================
+'  INVENTORY & SUPPLY CHAIN
+' ============================================================
+
+entity "Supplier" as supplier <<inventory>> {
+    * supplierId : long <<PK>>
+    --
+    supplierName : string
+    phone : string
+    email : string
+    address : string
+    taxCode : string
+}
+
+entity "Ingredient" as ingredient <<inventory>> {
+    * ingredientId : long <<PK>>
+    --
+    ingredientName : string
+    unitLvId : uint <<FK>>
+    typeLvId : uint <<FK>>
+    categoryLvId : uint <<FK>>
+    imageId : long <<FK>>
+}
+
+entity "CurrentStock" as current_stock <<inventory>> {
+    * ingredientId : long <<PK, FK>>
+    --
+    quantityOnHand : decimal
+    minStockLevel : decimal
+    lastUpdatedAt : datetime
+}
+
+entity "IngredientSupplier" as ingredient_supplier <<inventory>> {
+    * ingredientSupplierId : long <<PK>>
+    --
+    supplierId : long <<FK>>
+    ingredientId : long <<FK>>
+    createdAt : datetime
+}
+
+entity "Recipe" as recipe <<inventory>> {
+    * dishId : long <<PK, FK>>
+    * ingredientId : long <<PK, FK>>
+    --
+    quantity : decimal
+    unit : string
+    note : string
+}
+
+entity "InventoryTransaction" as inv_transaction <<inventory>> {
+    * transactionId : long <<PK>>
+    --
+    transactionCode : string
+    createdBy : long <<FK>>
+    approvedBy : long <<FK>>
+    typeLvId : uint <<FK>>
+    statusLvId : uint <<FK>>
+    supplierId : long <<FK>>
+    exportReasonLvId : uint <<FK>>
+    stockCheckAreaNote : string
+    note : string
+    createdAt : datetime
+    submittedAt : datetime
+    approvedAt : datetime
+}
+
+entity "InventoryTransactionItem" as inv_txn_item <<inventory>> {
+    * transactionItemId : long <<PK>>
+    --
+    transactionId : long <<FK>>
+    ingredientId : long <<FK>>
+    quantity : decimal
+    unitLvId : uint <<FK>>
+    unitPrice : decimal
+    systemQuantity : decimal
+    actualQuantity : decimal
+    varianceReasonLvId : uint <<FK>>
+    note : string
+}
+
+' ============================================================
+'  STAFF, AUTH & AUDIT
+' ============================================================
+
+entity "StaffAccount" as staff <<staff>> {
+    * accountId : long <<PK>>
+    --
+    fullName : string
+    phone : string
+    email : string
+    username : string
+    passwordHash : string
+    roleId : long <<FK>>
+    accountStatusLvId : uint <<FK>>
+    isLocked : boolean
+    lastLoginAt : datetime
+    createdAt : datetime
+}
+
+entity "Role" as role <<staff>> {
+    * roleId : long <<PK>>
+    --
+    roleCode : string
+    roleName : string
+    roleStatusLvId : uint <<FK>>
+}
+
+entity "Permission" as permission <<staff>> {
+    * permissionId : long <<PK>>
+    --
+    screenCode : string
+    actionCode : string
+}
+
+entity "RolePermission" as role_permission <<staff>> {
+    * roleId : long <<PK, FK>>
+    * permissionId : long <<PK, FK>>
+}
+
+entity "AuthSession" as auth_session <<staff>> {
+    * sessionId : long <<PK>>
+    --
+    userId : long <<FK>>
+    tokenHash : string
+    expiresAt : datetime
+    revoked : boolean
+    deviceInfo : string
+    ipAddress : string
+    createdAt : datetime
+}
+
+entity "LoginActivity" as login_activity <<staff>> {
+    * loginActivityId : long <<PK>>
+    --
+    staffId : long <<FK>>
+    sessionId : long <<FK>>
+    eventType : string
+    deviceInfo : string
+    ipAddress : string
+    occurredAt : datetime
+}
+
+entity "AuditLog" as audit_log <<staff>> {
+    * logId : long <<PK>>
+    --
+    staffId : long <<FK>>
+    actionCode : string
+    targetTable : string
+    targetId : string
+    createdAt : datetime
+}
+
+entity "ServiceError" as service_error <<staff>> {
+    * errorId : long <<PK>>
+    --
+    staffId : long <<FK>>
+    orderId : long <<FK>>
+    orderItemId : long <<FK>>
+    tableId : long <<FK>>
+    categoryId : long <<FK>>
+    severityLvId : uint <<FK>>
+    description : string
+    penaltyAmount : decimal
+    isResolved : boolean
+    resolvedBy : long <<FK>>
+    resolvedAt : datetime
+    createdAt : datetime
+}
+
+entity "ServiceErrorCategory" as service_error_cat <<staff>> {
+    * categoryId : long <<PK>>
+    --
+    categoryCode : string
+    categoryName : string
+    description : string
+}
+
+' ============================================================
+'  PROMOTION & COUPON
+' ============================================================
+
+entity "Promotion" as promotion <<promo>> {
+    * promotionId : long <<PK>>
+    --
+    promoCode : string
+    promoName : string
+    description : string
+    typeLvId : uint <<FK>>
+    promotionStatusLvId : uint <<FK>>
+    discountValue : decimal
+    maxUsage : int
+    usedCount : int
+    startTime : datetime
+    endTime : datetime
+    createdAt : datetime
+}
+
+entity "PromotionRule" as promo_rule <<promo>> {
+    * ruleId : long <<PK>>
+    --
+    promotionId : long <<FK>>
+    minOrderValue : decimal
+    minQuantity : int
+    requiredDishId : long <<FK>>
+    requiredCategoryId : long <<FK>>
+}
+
+entity "PromotionTarget" as promo_target <<promo>> {
+    * targetId : long <<PK>>
+    --
+    promotionId : long <<FK>>
+    dishId : long <<FK>>
+    categoryId : long <<FK>>
+}
+
+entity "Coupon" as coupon <<promo>> {
+    * couponId : long <<PK>>
+    --
+    customerId : long <<FK>>
+    couponCode : string
+    couponName : string
+    description : string
+    typeLvId : uint <<FK>>
+    couponStatusLvId : uint <<FK>>
+    discountValue : decimal
+    maxUsage : int
+    usedCount : int
+    startTime : datetime
+    endTime : datetime
+    createdAt : datetime
+}
+
+' ============================================================
+'  SHIFT & ATTENDANCE
+' ============================================================
+
+entity "ShiftTemplate" as shift_template <<shift>> {
+    * shiftTemplateId : long <<PK>>
+    --
+    templateName : string
+    defaultStartTime : time
+    defaultEndTime : time
+    description : string
+    bufferBeforeMinutes : int
+    bufferAfterMinutes : int
+    isActive : boolean
+    createdBy : long <<FK>>
+    createdAt : datetime
+}
+
+entity "ShiftAssignment" as shift_assignment <<shift>> {
+    * shiftAssignmentId : long <<PK>>
+    --
+    shiftTemplateId : long <<FK>>
+    staffId : long <<FK>>
+    workDate : date
+    plannedStartAt : datetime
+    plannedEndAt : datetime
+    assignmentStatusLvId : uint <<FK>>
+    isActive : boolean
+    tags : string
+    notes : string
+    assignedBy : long <<FK>>
+    assignedAt : datetime
+}
+
+entity "AttendanceRecord" as attendance <<shift>> {
+    * attendanceId : long <<PK>>
+    --
+    shiftAssignmentId : long <<FK>>
+    attendanceStatusLvId : uint <<FK>>
+    actualCheckInAt : datetime
+    actualCheckOutAt : datetime
+    lateMinutes : int
+    earlyLeaveMinutes : int
+    workedMinutes : int
+    isManualAdjustment : boolean
+    adjustmentReason : string
+    reviewedBy : long <<FK>>
+    reviewedAt : datetime
+}
+
+entity "TimeLog" as time_log <<shift>> {
+    * timeLogId : long <<PK>>
+    --
+    attendanceRecordId : long <<FK>>
+    punchInTime : datetime
+    punchOutTime : datetime
+    gpsLocationIn : string
+    gpsLocationOut : string
+    deviceIdIn : string
+    deviceIdOut : string
+    validationStatus : string
+    punchDurationMinutes : int
+}
+
+' ============================================================
+'  NOTIFICATION
+' ============================================================
+
+entity "Notification" as notification <<notification>> {
+    * notificationId : long <<PK>>
+    --
+    type : string
+    title : string
+    body : string
+    priority : string
+    requireAck : boolean
+    soundKey : string
+    actionUrl : string
+    entityType : string
+    entityId : string
+    metadataJson : string
+    targetPermissions : string
+    targetUserIds : string
+    createdAt : datetime
+}
+
+entity "NotificationReadState" as notif_read <<notification>> {
+    * notificationReadStateId : long <<PK>>
+    --
+    notificationId : long <<FK>>
+    userId : long
+    isRead : boolean
+    isAcknowledged : boolean
+    readAt : datetime
+    acknowledgedAt : datetime
+}
+
+entity "NotificationPreference" as notif_pref <<notification>> {
+    * notificationPreferenceId : long <<PK>>
+    --
+    userId : long
+    notificationType : string
+    isEnabled : boolean
+    soundEnabled : boolean
+}
+
+' ============================================================
+'  INFRASTRUCTURE
+' ============================================================
+
+entity "LookupType" as lookup_type <<infra>> {
+    * typeId : ushort <<PK>>
+    --
+    typeCode : string
+    typeName : string
+    description : string
+    isConfigurable : boolean
+    isSystem : boolean
+}
+
+entity "LookupValue" as lookup_value <<infra>> {
+    * valueId : uint <<PK>>
+    --
+    typeId : ushort <<FK>>
+    valueCode : string
+    valueName : string
+    sortOrder : int
+    isActive : boolean
+    meta : string
+    isSystem : boolean
+    locked : boolean
+}
+
+entity "MediaAsset" as media <<infra>> {
+    * mediaId : long <<PK>>
+    --
+    url : string
+    mimeType : string
+    width : int
+    height : int
+    durationSec : int
+    mediaTypeLvId : uint <<FK>>
+    createdAt : datetime
+}
+
+entity "DishMedium" as dish_medium <<infra>> {
+    * dishId : long <<PK, FK>>
+    * mediaId : long <<PK, FK>>
+    --
+    isPrimary : boolean
+}
+
+entity "DishTag" as dish_tag <<infra>> {
+    * dishTagId : long <<PK>>
+    --
+    dishId : long <<FK>>
+    tagId : uint <<FK>>
+}
+
+entity "TableMedium" as table_medium <<infra>> {
+    * tableId : long <<PK, FK>>
+    * mediaId : long <<PK, FK>>
+    --
+    isPrimary : boolean
+}
+
+entity "InventoryTransactionMedium" as inv_txn_medium <<infra>> {
+    * transactionId : long <<PK, FK>>
+    * mediaId : long <<PK, FK>>
+    --
+    isPrimary : boolean
+}
+
+entity "I18nLanguage" as i18n_lang <<infra>> {
+    * langCode : string <<PK>>
+    --
+    langName : string
+    isActive : boolean
+}
+
+entity "I18nText" as i18n_text <<infra>> {
+    * textId : long <<PK>>
+    --
+    textKey : string
+    sourceLangCode : string <<FK>>
+    sourceText : string
+    context : string
+}
+
+entity "I18nTranslation" as i18n_trans <<infra>> {
+    * textId : long <<PK, FK>>
+    * langCode : string <<PK, FK>>
+    --
+    translatedText : string
+    updatedAt : datetime
+}
+
+entity "SystemSetting" as sys_setting <<infra>> {
+    * settingId : uint <<PK>>
+    --
+    settingKey : string
+    settingName : string
+    valueType : string
+    valueString : string
+    valueInt : int
+    valueDecimal : decimal
+    valueBool : boolean
+    valueJson : string
+    description : string
+    isSensitive : boolean
+    updatedBy : long <<FK>>
+}
+
+entity "EmailTemplate" as email_template <<infra>> {
+    * templateId : long <<PK>>
+    --
+    templateCode : string
+    templateName : string
+    subject : string
+    bodyHtml : string
+    description : string
+}
+
+' ============================================================
+'  RELATIONSHIPS — Core Domain
+' ============================================================
+
+dish_category ||--|{ dish : "classifies"
+customer      ||--o{ reservation : "makes"
+customer      ||--o{ order : "places"
+customer      ||--o{ coupon : "owns"
+
+reservation   ||--|{ reservation_table : ""
+restaurant_table ||--o{ reservation_table : ""
+
+' ============================================================
+'  RELATIONSHIPS — Order & Payment
+' ============================================================
+
+order          ||--|{ order_item : "contains"
+order          ||--o{ payment : "paid by"
+order          ||--o{ order_coupon : ""
+order          ||--o{ order_promotion : ""
+order_item    }o--|| dish : "references"
+restaurant_table ||--o{ order : "served at"
+staff          |o--o{ order : "handles"
+tax            ||--o{ order : "applied to"
+coupon         ||--o{ order_coupon : ""
+promotion      ||--o{ order_promotion : ""
+
+' ============================================================
+'  RELATIONSHIPS — Inventory & Supply Chain
+' ============================================================
+
+dish              ||--o{ recipe : ""
+ingredient        ||--o{ recipe : ""
+ingredient        ||--|| current_stock : "tracks"
+ingredient        ||--o{ ingredient_supplier : ""
+supplier          ||--o{ ingredient_supplier : ""
+supplier          ||--o{ inv_transaction : "supplies"
+
+inv_transaction   ||--|{ inv_txn_item : "contains"
+ingredient        ||--o{ inv_txn_item : "references"
+staff             |o--o{ inv_transaction : "created by"
+
+' ============================================================
+'  RELATIONSHIPS — Staff, Auth & Audit
+' ============================================================
+
+role             ||--|{ staff : "assigned to"
+role             ||--|{ role_permission : ""
+permission       ||--|{ role_permission : ""
+staff            ||--o{ auth_session : "authenticates"
+staff            ||--o{ login_activity : "logs"
+auth_session     ||--o{ login_activity : ""
+staff            ||--o{ audit_log : "audited"
+staff            |o--o{ service_error : "causes"
+service_error_cat||--o{ service_error : "categorizes"
+order            ||--o{ service_error : ""
+order_item       ||--o{ service_error : ""
+restaurant_table ||--o{ service_error : ""
+
+' ============================================================
+'  RELATIONSHIPS — Promotion & Coupon
+' ============================================================
+
+promotion        ||--o{ promo_rule : "governed by"
+promotion        ||--o{ promo_target : "targets"
+promo_rule       }o--o| dish : ""
+promo_rule       }o--o| dish_category : ""
+promo_target     }o--o| dish : ""
+promo_target     }o--o| dish_category : ""
+
+' ============================================================
+'  RELATIONSHIPS — Shift & Attendance
+' ============================================================
+
+shift_template    ||--o{ shift_assignment : "schedules"
+staff             ||--o{ shift_assignment : "assigned to"
+shift_assignment  ||--o| attendance : "records"
+attendance        ||--o{ time_log : "logs"
+
+' ============================================================
+'  RELATIONSHIPS — Notification
+' ============================================================
+
+notification      ||--o{ notif_read : "read by"
+
+' ============================================================
+'  RELATIONSHIPS — Infrastructure
+' ============================================================
+
+lookup_type       ||--|{ lookup_value : "defines"
+i18n_lang         ||--o{ i18n_text : ""
+i18n_text         ||--o{ i18n_trans : ""
+i18n_lang         ||--o{ i18n_trans : ""
+
+media             ||--o{ dish_medium : ""
+dish              ||--o{ dish_medium : ""
+media             ||--o{ table_medium : ""
+restaurant_table  ||--o{ table_medium : ""
+media             ||--o{ inv_txn_medium : ""
+inv_transaction   ||--o{ inv_txn_medium : ""
+
+dish              ||--o{ dish_tag : ""
+
+@enduml

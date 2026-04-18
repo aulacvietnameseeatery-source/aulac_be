@@ -1,0 +1,124 @@
+@startuml
+title 2.5.2.3 Create Staff Reservation
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":Staff" as U
+participant ":ManualReservationPage" as Client
+participant ":ManualReservationController" as Ctrl
+participant ":AdminReservationService" as Svc
+participant ":IUnitOfWork" as UoW
+participant ":ITableRepository" as TableRepo
+participant ":IReservationRepository" as ResRepo
+participant ":ICustomerService" as CustSvc
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : Select tables, fill reservation details, and submit
+activate Client
+
+Client ->> Ctrl : POST /api/manual/reservations\n(CreateManualReservationRequest)
+activate Ctrl
+
+Ctrl ->> Svc : CreateManualReservationAsync(request, ct)
+activate Svc
+
+loop#White For each selected tableId
+    Svc ->> TableRepo : GetByIdAsync(tableId, ct)
+    activate TableRepo
+    TableRepo ->> DB : Query table by ID
+    activate DB
+    DB -->> TableRepo : Return table entity
+    deactivate DB
+    TableRepo -->> Svc : RestaurantTable
+    deactivate TableRepo
+
+    alt#White Table not found
+        Svc -->> Ctrl : throw KeyNotFoundException
+        Ctrl -->> Client : 404 Not Found
+        Client -->> U : Display "Table not found"
+    end
+end
+
+Svc ->> Svc : Validate table statuses (not locked, not occupied if immediate)
+
+alt#White Table is under maintenance or occupied
+    Svc -->> Ctrl : throw InvalidOperationException
+    Ctrl -->> Client : 400 Bad Request
+    Client -->> U : Display validation error
+else#White Tables are valid
+
+    loop#White For each selected table
+        Svc ->> ResRepo : GetTableReservationsForTimeAsync(tableId, reservedTime, duration, ...)
+        activate ResRepo
+        ResRepo ->> DB : Query conflicting reservations
+        activate DB
+        DB -->> ResRepo : Return conflicts
+        deactivate DB
+        ResRepo -->> Svc : List<Reservation>
+        deactivate ResRepo
+    end
+
+    alt#White Conflict detected
+        Svc -->> Ctrl : throw InvalidOperationException
+        Ctrl -->> Client : 400 Bad Request
+        Client -->> U : Display "Table already reserved at this time"
+    else#White No conflicts
+
+        Svc ->> Svc : Validate total capacity >= partySize
+
+        Svc ->> UoW : BeginTransactionAsync(ct)
+        activate UoW
+        UoW -->> Svc : Transaction started
+        deactivate UoW
+
+        Svc ->> CustSvc : FindOrCreateCustomerIdAsync(phone, name, email, ct)
+        activate CustSvc
+        CustSvc ->> DB : Find or insert customer record
+        activate DB
+        DB -->> CustSvc : Return customerId
+        deactivate DB
+        CustSvc -->> Svc : customerId
+        deactivate CustSvc
+
+        Svc ->> ResRepo : CreateAsync(reservation, ct)
+        activate ResRepo
+        ResRepo ->> DB : Insert reservation with assigned tables
+        activate DB
+        DB -->> ResRepo : Return created reservation
+        deactivate DB
+        ResRepo -->> Svc : Reservation
+        deactivate ResRepo
+
+        Svc ->> Svc : Publish RESERVATION_CREATED notification
+
+        opt#White Customer has email
+            Svc ->> Svc : SendReservationConfirmationEmailAsync(reservation, tableCodes)
+        end
+
+        Svc ->> UoW : CommitAsync(ct)
+        activate UoW
+        UoW -->> Svc : Transaction committed
+        deactivate UoW
+
+        Svc -->> Ctrl : ReservationResponseDto
+        deactivate Svc
+
+        Ctrl -->> Client : 200 OK (ReservationResponseDto)
+        deactivate Ctrl
+
+        Client -->> U : Display reservation confirmation
+    end
+end
+
+deactivate Client
+deactivate U
+
+@enduml

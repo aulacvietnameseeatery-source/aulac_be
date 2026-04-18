@@ -342,6 +342,7 @@ builder.Services.AddScoped<ICouponRepository, CouponRepository>();
 builder.Services.AddScoped<ISaleInvoiceRepository, SaleInvoiceRepository>();
 builder.Services.AddScoped<ITaxRepository, TaxRepository>();
 builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
+builder.Services.AddScoped<ILoyaltyRepository, LoyaltyRepository>();
 
 
 builder.Services.AddScoped<IShiftTemplateRepository, ShiftTemplateRepository>();
