@@ -1,0 +1,114 @@
+@startuml
+title 2.5.2.6 Update Reservation
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":Staff" as U
+participant ":ReservationDetailPage" as Client
+participant ":ReservationController" as Ctrl
+participant ":AdminReservationService" as Svc
+participant ":IUnitOfWork" as UoW
+participant ":IReservationRepository" as ResRepo
+participant ":ITableRepository" as TableRepo
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : Edit reservation info and submit
+activate Client
+
+Client ->> Ctrl : PUT /api/reservations/{id}\n(UpdateReservationRequest)
+activate Ctrl
+
+Ctrl ->> Svc : UpdateReservationAsync(id, request, ct)
+activate Svc
+
+Svc ->> ResRepo : GetByIdWithFullDetailsAsync(id, ct)
+activate ResRepo
+ResRepo ->> DB : Query reservation with tables and lookup values
+activate DB
+DB -->> ResRepo : Return reservation entity
+deactivate DB
+ResRepo -->> Svc : Reservation
+deactivate ResRepo
+
+alt#White Reservation not found
+    Svc -->> Ctrl : throw KeyNotFoundException
+    Ctrl -->> Client : 404 Not Found
+    Client -->> U : Display "Reservation not found"
+else#White Reservation found
+
+    Svc ->> UoW : BeginTransactionAsync(ct)
+    activate UoW
+    UoW -->> Svc : Transaction started
+    deactivate UoW
+
+    Svc ->> Svc : Detect changes (time, partySize, tables)
+
+    opt#White Time, party size, or tables changed
+        Svc ->> Svc : ValidateAndResolveTablesForUpdateAsync(reservationId, tableIds, reservedTime, partySize, ct)
+
+        loop#White For each requested tableId
+            Svc ->> TableRepo : GetByIdAsync(tableId, ct)
+            activate TableRepo
+            TableRepo ->> DB : Query table by ID
+            activate DB
+            DB -->> TableRepo : Return table
+            deactivate DB
+            TableRepo -->> Svc : RestaurantTable
+            deactivate TableRepo
+        end
+
+        loop#White For each table
+            Svc ->> ResRepo : GetTableReservationsForTimeAsync(tableId, reservedTime, duration, ...)
+            activate ResRepo
+            ResRepo ->> DB : Query conflicting reservations excluding current
+            activate DB
+            DB -->> ResRepo : Return conflicts
+            deactivate DB
+            ResRepo -->> Svc : List<Reservation>
+            deactivate ResRepo
+        end
+
+        alt#White Conflict detected or insufficient capacity
+            Svc ->> UoW : RollbackAsync(ct)
+            activate UoW
+            UoW -->> Svc : Transaction rolled back
+            deactivate UoW
+            Svc -->> Ctrl : throw InvalidOperationException
+            Ctrl -->> Client : 400 Bad Request
+            Client -->> U : Display validation error
+        end
+    end
+
+    Svc ->> Svc : Update reservation fields (name, phone, email, partySize, time, notes, tables)
+
+    Svc ->> UoW : SaveChangesAsync(ct)
+    activate UoW
+    UoW -->> Svc : Changes saved
+    deactivate UoW
+
+    Svc ->> UoW : CommitAsync(ct)
+    activate UoW
+    UoW -->> Svc : Transaction committed
+    deactivate UoW
+
+    Svc -->> Ctrl : void (success)
+    deactivate Svc
+
+    Ctrl -->> Client : 200 OK
+    deactivate Ctrl
+
+    Client -->> U : Display "Reservation updated successfully"
+end
+
+deactivate Client
+deactivate U
+
+@enduml

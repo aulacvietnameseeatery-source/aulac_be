@@ -375,3 +375,5 @@ Api/appsettings.json
 /Api/wwwroot/uploads
 
 .idea 
+Tests/*.xlsx
+Tests/*.py
