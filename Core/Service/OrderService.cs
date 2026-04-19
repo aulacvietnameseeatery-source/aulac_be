@@ -55,37 +55,37 @@ public class OrderService : IOrderService
     }
 
     public Task<PagedResultDTO<OrderHistoryDTO>> GetOrderHistoryAsync(OrderHistoryQueryDTO query, CancellationToken cancellationToken = default)
-		=> _orderRepository.GetOrderHistoryAsync(query, cancellationToken);
+        => _orderRepository.GetOrderHistoryAsync(query, cancellationToken);
 
-	public async Task<OrderStatusCountDTO> GetOrderStatusCountAsync(CancellationToken cancellationToken = default)
-	{
-		var pendingId    = await OrderStatusCode.PENDING.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
-		var inProgressId = await OrderStatusCode.IN_PROGRESS.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
-		var completedId  = await OrderStatusCode.COMPLETED.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
-		var cancelledId  = await OrderStatusCode.CANCELLED.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+    public async Task<OrderStatusCountDTO> GetOrderStatusCountAsync(CancellationToken cancellationToken = default)
+    {
+        var pendingId = await OrderStatusCode.PENDING.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+        var inProgressId = await OrderStatusCode.IN_PROGRESS.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+        var completedId = await OrderStatusCode.COMPLETED.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+        var cancelledId = await OrderStatusCode.CANCELLED.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
 
-		return await _orderRepository.GetOrderStatusCountAsync(
-			pendingId,
-			inProgressId,
-			completedId,
-			cancelledId,
-			cancellationToken);
-	}
+        return await _orderRepository.GetOrderStatusCountAsync(
+            pendingId,
+            inProgressId,
+            completedId,
+            cancelledId,
+            cancellationToken);
+    }
 
-	public async Task<List<KitchenOrderDTO>> GetKitchenOrdersAsync(CancellationToken cancellationToken = default)
-	{
-		var pendingId    = await OrderStatusCode.PENDING.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
-		var inProgressId = await OrderStatusCode.IN_PROGRESS.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
-		var completedId  = await OrderStatusCode.COMPLETED.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
-		var cancelledId  = await OrderStatusCode.CANCELLED.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+    public async Task<List<KitchenOrderDTO>> GetKitchenOrdersAsync(CancellationToken cancellationToken = default)
+    {
+        var pendingId = await OrderStatusCode.PENDING.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+        var inProgressId = await OrderStatusCode.IN_PROGRESS.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+        var completedId = await OrderStatusCode.COMPLETED.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+        var cancelledId = await OrderStatusCode.CANCELLED.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
 
-		return await _orderRepository.GetKitchenOrdersAsync(
-			pendingId,
-			inProgressId,
-			completedId,
-			cancelledId,
-			cancellationToken);
-	}
+        return await _orderRepository.GetKitchenOrdersAsync(
+            pendingId,
+            inProgressId,
+            completedId,
+            cancelledId,
+            cancellationToken);
+    }
 
     public async Task UpdateOrderStatusAsync(long orderId, OrderStatusCode newStatus, CancellationToken cancellationToken = default)
     {
@@ -205,76 +205,76 @@ public class OrderService : IOrderService
         }
     }
 
-	public async Task UpdateOrderItemStatusAsync(long orderItemId, uint newStatusLvId, string? rejectReason, CancellationToken cancellationToken = default)
-	{
-		var inProgressItemId = await OrderItemStatusCode.IN_PROGRESS.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
-		var readyItemId      = await OrderItemStatusCode.READY.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
-		var servedItemId     = await OrderItemStatusCode.SERVED.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
-		var rejectedItemId   = await OrderItemStatusCode.REJECTED.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
-		var cancelledItemId  = await OrderItemStatusCode.CANCELLED.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
+    public async Task UpdateOrderItemStatusAsync(long orderItemId, uint newStatusLvId, string? rejectReason, CancellationToken cancellationToken = default)
+    {
+        var inProgressItemId = await OrderItemStatusCode.IN_PROGRESS.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
+        var readyItemId = await OrderItemStatusCode.READY.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
+        var servedItemId = await OrderItemStatusCode.SERVED.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
+        var rejectedItemId = await OrderItemStatusCode.REJECTED.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
+        var cancelledItemId = await OrderItemStatusCode.CANCELLED.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
 
-		var pendingOrderId    = await OrderStatusCode.PENDING.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
-		var inProgressOrderId = await OrderStatusCode.IN_PROGRESS.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
-		var completedOrderId  = await OrderStatusCode.COMPLETED.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
-		var cancelledOrderId  = await OrderStatusCode.CANCELLED.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
-		var availableTableId  = await TableStatusCode.AVAILABLE.ToTableStatusIdAsync(_lookupResolver, cancellationToken);
+        var pendingOrderId = await OrderStatusCode.PENDING.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+        var inProgressOrderId = await OrderStatusCode.IN_PROGRESS.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+        var completedOrderId = await OrderStatusCode.COMPLETED.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+        var cancelledOrderId = await OrderStatusCode.CANCELLED.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+        var availableTableId = await TableStatusCode.AVAILABLE.ToTableStatusIdAsync(_lookupResolver, cancellationToken);
 
-		await _orderRepository.UpdateOrderItemStatusAsync(
-			orderItemId,
-			newStatusLvId,
-			rejectReason,
-			inProgressItemId,
-			readyItemId,
-			servedItemId,
-			rejectedItemId,
-			cancelledItemId,
-			pendingOrderId,
-			inProgressOrderId,
-			completedOrderId,
-			cancelledOrderId,
-			availableTableId,
-			cancellationToken);
+        await _orderRepository.UpdateOrderItemStatusAsync(
+            orderItemId,
+            newStatusLvId,
+            rejectReason,
+            inProgressItemId,
+            readyItemId,
+            servedItemId,
+            rejectedItemId,
+            cancelledItemId,
+            pendingOrderId,
+            inProgressOrderId,
+            completedOrderId,
+            cancelledOrderId,
+            availableTableId,
+            cancellationToken);
 
-		// Fire notification for READY / REJECTED item status changes
-		if (newStatusLvId == readyItemId)
-		{
-			await _notificationService.PublishAsync(new PublishNotificationRequest
-			{
-				Type = nameof(NotificationType.ORDER_ITEM_READY),
-				Title = "Order Item Ready",
-				Body = $"An item in order is ready to serve",
-				Priority = nameof(NotificationPriority.High),
-				SoundKey = "notification_high",
-				ActionUrl = "/dashboard/orders",
-				EntityType = "OrderItem",
-				EntityId = orderItemId.ToString(),
-				Metadata = new Dictionary<string, object>
-				{
-					["orderItemId"] = orderItemId.ToString()
-				},
-				TargetPermissions = new List<string> { Permissions.ViewOrder }
-			}, cancellationToken);
-		}
-		else if (newStatusLvId == rejectedItemId)
-		{
-			await _notificationService.PublishAsync(new PublishNotificationRequest
-			{
-				Type = nameof(NotificationType.ORDER_ITEM_REJECTED),
-				Title = "Order Item Rejected",
-				Body = $"An item in order was rejected" + (rejectReason != null ? $": {rejectReason}" : ""),
-				Priority = nameof(NotificationPriority.High),
-				SoundKey = "notification_high",
-				ActionUrl = "/dashboard/orders",
-				EntityType = "OrderItem",
-				EntityId = orderItemId.ToString(),
-				Metadata = new Dictionary<string, object>
-				{
-					["orderItemId"] = orderItemId.ToString(),
-					["reason"] = rejectReason ?? ""
-				},
-				TargetPermissions = new List<string> { Permissions.ViewOrder }
-			}, cancellationToken);
-		}
+        // Fire notification for READY / REJECTED item status changes
+        if (newStatusLvId == readyItemId)
+        {
+            await _notificationService.PublishAsync(new PublishNotificationRequest
+            {
+                Type = nameof(NotificationType.ORDER_ITEM_READY),
+                Title = "Order Item Ready",
+                Body = $"An item in order is ready to serve",
+                Priority = nameof(NotificationPriority.High),
+                SoundKey = "notification_high",
+                ActionUrl = "/dashboard/orders",
+                EntityType = "OrderItem",
+                EntityId = orderItemId.ToString(),
+                Metadata = new Dictionary<string, object>
+                {
+                    ["orderItemId"] = orderItemId.ToString()
+                },
+                TargetPermissions = new List<string> { Permissions.ViewOrder }
+            }, cancellationToken);
+        }
+        else if (newStatusLvId == rejectedItemId)
+        {
+            await _notificationService.PublishAsync(new PublishNotificationRequest
+            {
+                Type = nameof(NotificationType.ORDER_ITEM_REJECTED),
+                Title = "Order Item Rejected",
+                Body = $"An item in order was rejected" + (rejectReason != null ? $": {rejectReason}" : ""),
+                Priority = nameof(NotificationPriority.High),
+                SoundKey = "notification_high",
+                ActionUrl = "/dashboard/orders",
+                EntityType = "OrderItem",
+                EntityId = orderItemId.ToString(),
+                Metadata = new Dictionary<string, object>
+                {
+                    ["orderItemId"] = orderItemId.ToString(),
+                    ["reason"] = rejectReason ?? ""
+                },
+                TargetPermissions = new List<string> { Permissions.ViewOrder }
+            }, cancellationToken);
+        }
 
         var updatedOrderItem = await _orderRepository.GetOrderItemAsync(orderItemId, cancellationToken);
 
@@ -286,35 +286,35 @@ public class OrderService : IOrderService
         }, cancellationToken);
     }
 
-	public async Task CancelOrderItemAsync(long orderItemId, CancellationToken cancellationToken = default)
-	{
-		// Fetch item details for rich notification before cancelling
-		var orderItem = await _orderRepository.GetOrderItemAsync(orderItemId, cancellationToken);
-		var dishName = orderItem?.Dish?.DishName ?? "";
-		var tableCode = orderItem?.Order?.Table?.TableCode ?? "";
+    public async Task CancelOrderItemAsync(long orderItemId, CancellationToken cancellationToken = default)
+    {
+        // Fetch item details for rich notification before cancelling
+        var orderItem = await _orderRepository.GetOrderItemAsync(orderItemId, cancellationToken);
+        var dishName = orderItem?.Dish?.DishName ?? "";
+        var tableCode = orderItem?.Order?.Table?.TableCode ?? "";
 
-		var cancelledStatusId = await OrderItemStatusCode.CANCELLED.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
+        var cancelledStatusId = await OrderItemStatusCode.CANCELLED.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
 
-		// Update to CANCELLED status (repository will validate if item is CREATED)
-		await UpdateOrderItemStatusAsync(orderItemId, cancelledStatusId, null, cancellationToken);
+        // Update to CANCELLED status (repository will validate if item is CREATED)
+        await UpdateOrderItemStatusAsync(orderItemId, cancelledStatusId, null, cancellationToken);
 
-		await _notificationService.PublishAsync(new PublishNotificationRequest
-		{
-			Type = nameof(NotificationType.ORDER_ITEM_CANCELLED),
-			Priority = nameof(NotificationPriority.High),
-			SoundKey = "notification_high",
-			ActionUrl = "/dashboard/kitchen",
-			EntityType = "OrderItem",
-			EntityId = orderItemId.ToString(),
-			Metadata = new Dictionary<string, object>
-			{
-				["orderItemId"] = orderItemId.ToString(),
-				["tableCode"] = tableCode,
-				["dishName"] = dishName
-			},
-			TargetPermissions = new List<string> { Permissions.UpdateOrderItemStatus }
-		}, cancellationToken);
-	}
+        await _notificationService.PublishAsync(new PublishNotificationRequest
+        {
+            Type = nameof(NotificationType.ORDER_ITEM_CANCELLED),
+            Priority = nameof(NotificationPriority.High),
+            SoundKey = "notification_high",
+            ActionUrl = "/dashboard/kitchen",
+            EntityType = "OrderItem",
+            EntityId = orderItemId.ToString(),
+            Metadata = new Dictionary<string, object>
+            {
+                ["orderItemId"] = orderItemId.ToString(),
+                ["tableCode"] = tableCode,
+                ["dishName"] = dishName
+            },
+            TargetPermissions = new List<string> { Permissions.UpdateOrderItemStatus }
+        }, cancellationToken);
+    }
 
     public Task<OrderDetailDTO> GetOrderByIdAsync(long orderId, CancellationToken cancellationToken = default)
         => _orderRepository.GetOrderByIdAsync(orderId, cancellationToken);
@@ -583,7 +583,7 @@ public class OrderService : IOrderService
                 await ApplyTaxToOrderAsync(order, ct);
 
                 // ===== Status transition logic =====
-  
+
                 if (order.OrderStatusLvId == completedStatusId)
                 {
                     order.OrderStatusLvId = inProgressStatusId;

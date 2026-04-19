@@ -208,12 +208,18 @@ Row 11 is the header row:
 | Col A | Col B | Col C | Col D | Col F+ |
 |-------|-------|-------|-------|--------|
 | `Condition` | `Precondition` | | | |
-| | {condition group name} | | | |
+| | {parameter name} | | | |
 | | | | {input value} | `O` marks which test case uses this value |
 
-- Col B = condition group label (e.g., `username`, `password`, `accountStatus`)
-- Col D = specific input value for that condition
-- Cols F+ = mark `O` in the column of each test case that uses this input value
+**Condition matrix rules:**
+1. **Input from parameters only** — Row labels (Col B) must be actual method parameters (e.g., `orderId`, `newStatus`, `query`, `items`). For DTO parameters, use the property names (e.g., `source`, `tableId`, `items` from a request DTO).
+2. **No mock rows** — Do NOT add separate rows for mock setup data (e.g., `repoReturns`, `tableStatus`, `dishesExist`, `orderExists`, `hasPaid`). These are internal mock configurations, not method inputs.
+3. **Describe mock data inline** — Append mock/internal state descriptions in parentheses after the parameter value. Examples:
+   - `orderId | 1 (StatusLvId=PENDING, TableId=10, Payments=[])` — describes the mocked order state found by this ID
+   - `orderId | 999 (order not found — repo returns null)` — describes the abnormal scenario
+   - `tableId | 10 (table found, LOCKED status — TableStatusLvId=203)` — describes table mock state
+   - `items | [{DishId=1, Qty=1}, {DishId=999, Qty=1}] (DishId=999 not found — partial match)` — describes dish lookup result
+4. **No-parameter methods** — If the method has no input parameters (only `CancellationToken`), add a note: `*(No input parameters — each test case varies only by mock repository response)*` and use a single row: `(no input) | Method called with CancellationToken only | O | O | ...`
 
 **Confirmation section (after conditions):**
 
@@ -223,7 +229,28 @@ Row 11 is the header row:
 | | `Return` | | |
 | | | {expected value} | `O` marks which test case expects this |
 | | `Exception` | | |
-| | `Log message` | | |
+
+**Confirmation section rules:**
+1. **No Verify rows** — Do NOT add `Verify` rows. Side-effect assertions (repository calls, status changes, notifications) are implied by the inline parameter descriptions in the Condition section.
+2. **Return row** — For value-returning methods (`T`, `Task<T>`), fill concrete expected value(s).
+3. **Void/Task Return** — For non-returning methods, use `No return value (void method executes successfully)` for success paths.
+4. **Exception row** — For error paths, keep `Return` blank and fill expected exception in `Exception`.
+
+**Return section rule by method type:**
+
+| Method type | How to fill `Return` in Excel |
+|------------|-------------------------------|
+| returns value (`T`, `Task<T>`) | Fill concrete expected value(s) in `Return` |
+| non-returning (`void`, `Task`) success path | `No return value (void method executes successfully)` |
+| exception path | Keep `Return` blank and fill expected exception in `Exception` |
+
+**Abnormal cases summary:**
+After the Confirmation section, add an **Abnormal cases summary** block listing each abnormal test case with its UTCID, parameter scenario, and expected exception. Example:
+```
+**Abnormal cases summary:**
+- **UTCID03**: orderId=999, order not found → `NotFoundException`
+- **UTCID04**: order is CANCELLED → `InvalidOperationException`
+```
 
 **Result section (bottom rows):**
 
