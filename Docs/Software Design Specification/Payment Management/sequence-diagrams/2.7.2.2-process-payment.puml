@@ -1,0 +1,153 @@
+@startuml 2.7.2.2-process-payment
+title 2.7.2.2 Process Payment
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":User" as U
+participant ":ProcessPaymentPage" as Client
+participant ":PaymentController" as Ctrl
+participant ":PaymentService" as Svc
+participant ":ISystemSettingService" as Settings
+participant ":IUnitOfWork" as UoW
+participant ":INotificationService" as Notif
+participant ":IShiftLiveRealtimePublisher" as ShiftRT
+participant ":IOrderRealtimeService" as OrderRT
+participant ":Database" as DB
+
+activate U
+U ->> Client : Submit payment for an order
+activate Client
+Client ->> Ctrl : POST /api/payments (CreatePaymentDTO)
+activate Ctrl
+Ctrl ->> Svc : ProcessPaymentAsync(CreatePaymentDTO, ct)
+activate Svc
+
+Svc ->> DB : Query order with payments, customer,\norder items, coupons, and promotions
+activate DB
+DB -->> Svc : Order or empty
+deactivate DB
+
+alt#White Order not found
+    Svc -->> Ctrl : throw KeyNotFoundException
+    deactivate Svc
+    Ctrl -->> Client : 404 Not Found ApiResponse<object>
+    deactivate Ctrl
+    Client -->> U : Display order not found error
+else Order is CANCELLED
+    Svc -->> Ctrl : throw InvalidOperationException
+    deactivate Svc
+    Ctrl -->> Client : 400 Bad Request ApiResponse<object>
+    deactivate Ctrl
+    Client -->> U : Display cannot pay cancelled order
+else Order already has a payment
+    Svc -->> Ctrl : throw InvalidOperationException
+    deactivate Svc
+    Ctrl -->> Client : 400 Bad Request ApiResponse<object>
+    deactivate Ctrl
+    Client -->> U : Display order already paid error
+else Payment request can be processed
+    Svc ->> Svc : Resolve lookup IDs and payment method ID
+
+    Svc ->> Settings : GetBoolAsync("loyalty.enabled")
+    activate Settings
+    Settings -->> Svc : bool loyaltyEnabled
+    deactivate Settings
+
+    opt#White Loyalty is enabled
+        Svc ->> Settings : GetDecimalAsync("loyalty.point_base_amount")
+        activate Settings
+        Settings -->> Svc : decimal pointBaseAmount
+        deactivate Settings
+    end
+
+    Svc ->> UoW : BeginTransactionAsync(ct)
+    activate UoW
+    UoW -->> Svc : OK
+    deactivate UoW
+
+    Svc ->> Svc : Calculate subtotal from payable items, tip amount,\nand initial discount totals
+
+    opt#White Request includes coupon IDs
+        loop Each distinct couponId
+            Svc ->> DB : Query coupon with type lookup
+            activate DB
+            DB -->> Svc : Coupon or empty
+            deactivate DB
+            Svc ->> Svc : Validate coupon ownership, status, validity period,\nusage limit, and accumulate coupon discount
+        end
+    end
+
+    Svc ->> DB : Query all active promotions with rules and targets
+    activate DB
+    DB -->> Svc : Active promotions
+    deactivate DB
+
+    loop Each applicable promotion
+        Svc ->> Svc : Evaluate promotion rules, accumulate discount,\nand append OrderPromotion when applicable
+    end
+
+    Svc ->> Svc : Calculate final amount and compare with received amount
+
+    alt#White Coupon, promotion, loyalty, or amount validation fails
+        Svc ->> UoW : RollbackAsync(ct)
+        activate UoW
+        UoW -->> Svc : OK
+        deactivate UoW
+        Svc -->> Ctrl : throw InvalidOperationException
+        deactivate Svc
+        Ctrl -->> Client : 400 Bad Request ApiResponse<object>
+        deactivate Ctrl
+        Client -->> U : Display payment validation error
+    else Payment is valid
+        Svc ->> Svc : Create Payment entity and update tracked order totals,\nstatus, coupon usage, promotion usage, and optional table availability
+
+        opt#White Loyalty is enabled and customer is not guest
+            Svc ->> Svc : Calculate and apply earned loyalty points
+        end
+
+        Svc ->> UoW : SaveChangesAsync(ct)
+        activate UoW
+        UoW ->> DB : Insert Payment and persist order, coupon, promotion,\ntable, and customer loyalty updates
+        activate DB
+        DB -->> UoW : OK
+        deactivate DB
+        UoW -->> Svc : OK
+        deactivate UoW
+
+        Svc ->> UoW : CommitAsync(ct)
+        activate UoW
+        UoW -->> Svc : OK
+        deactivate UoW
+
+        Svc ->> Notif : PublishAsync(PAYMENT_COMPLETED)
+        activate Notif
+        Notif -->> Svc : OK
+        deactivate Notif
+
+        Svc ->> ShiftRT : PublishBoardChangedAsync(payment_completed)
+        activate ShiftRT
+        ShiftRT -->> Svc : OK
+        deactivate ShiftRT
+
+        Svc ->> OrderRT : OrderPaidAsync(orderId)
+        activate OrderRT
+        OrderRT -->> Svc : OK
+        deactivate OrderRT
+
+        Svc -->> Ctrl : OK
+        deactivate Svc
+        Ctrl -->> Client : 200 OK ApiResponse<object>
+        deactivate Ctrl
+        Client -->> U : Display payment completion result
+    end
+end
+
+deactivate Client
+deactivate U
+
+@enduml

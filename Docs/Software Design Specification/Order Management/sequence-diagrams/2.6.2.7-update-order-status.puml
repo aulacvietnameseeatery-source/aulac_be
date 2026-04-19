@@ -1,0 +1,155 @@
+@startuml 2.6.2.7-update-order-status
+title 2.6.2.7 Update Order Status
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":User" as U
+participant ":OrderHistoryPage" as Client
+participant ":OrderController" as Ctrl
+participant ":OrderService" as Svc
+participant ":IOrderRepository" as Repo
+participant ":ITableRepository" as TRepo
+participant ":IUnitOfWork" as UoW
+participant ":INotificationService" as Notif
+participant ":IOrderRealtimeService" as OrderRT
+participant ":IShiftLiveRealtimePublisher" as ShiftRT
+participant ":Database" as DB
+
+activate U
+U ->> Client : Change order status from the order history list
+activate Client
+Client ->> Ctrl : PATCH /api/orders/{id}/status (UpdateOrderStatusDTO)
+activate Ctrl
+
+alt#White dto.Status is not a valid OrderStatusCode
+    Ctrl -->> Client : 400 Bad Request ApiResponse<object>
+    deactivate Ctrl
+    Client -->> U : Display invalid status error
+else Valid status code
+    Ctrl ->> Svc : UpdateOrderStatusAsync(id, statusCode, ct)
+    activate Svc
+
+    Svc ->> Svc : Resolve order and table status lookup IDs\nand validate current transition rules
+
+    Svc ->> Repo : GetByIdForUpdateAsync(id, ct)
+    activate Repo
+    Repo ->> DB : Query order with current status, table reference,\nand payment collection for update
+    activate DB
+    DB -->> Repo : Order or empty
+    deactivate DB
+    Repo -->> Svc : Order?
+    deactivate Repo
+
+    alt#White Order not found
+        Svc -->> Ctrl : throw NotFoundException
+        deactivate Svc
+        Ctrl -->> Client : 404 ApiResponse<object> via exception middleware
+        deactivate Ctrl
+        Client -->> U : Display order not found error
+    else Order found
+        alt#White Requested status is the same as current status
+            Svc -->> Ctrl : throw InvalidOperationException
+            deactivate Svc
+            Ctrl -->> Client : 400 Bad Request ApiResponse<object>
+            deactivate Ctrl
+            Client -->> U : Display order already in this status
+        else Invalid status transition
+            Svc -->> Ctrl : throw InvalidOperationException
+            deactivate Svc
+            Ctrl -->> Client : 400 Bad Request ApiResponse<object>
+            deactivate Ctrl
+            Client -->> U : Display invalid transition error
+        else Cancelling an already paid order
+            Svc -->> Ctrl : throw InvalidOperationException
+            deactivate Svc
+            Ctrl -->> Client : 400 Bad Request ApiResponse<object>
+            deactivate Ctrl
+            Client -->> U : Display paid order cancellation error
+        else Valid transition
+            Svc ->> UoW : BeginTransactionAsync(ct)
+            activate UoW
+            UoW -->> Svc : OK
+            deactivate UoW
+
+            Svc ->> Svc : Update order status and UpdatedAt
+
+            opt#White Order has an assigned table
+                Svc ->> TRepo : GetByIdAsync(order.TableId, ct)
+                activate TRepo
+                TRepo ->> DB : Query table by ID
+                activate DB
+                DB -->> TRepo : RestaurantTable or empty
+                deactivate DB
+                TRepo -->> Svc : RestaurantTable?
+                deactivate TRepo
+
+                alt#White New status is CANCELLED or COMPLETED
+                    Svc ->> TRepo : UpdateAsync(table -> AVAILABLE, ct)
+                    activate TRepo
+                    TRepo ->> DB : Update table status to AVAILABLE
+                    activate DB
+                    DB -->> TRepo : OK
+                    deactivate DB
+                    TRepo -->> Svc : OK
+                    deactivate TRepo
+                else Current status is CANCELLED and new status is PENDING
+                    Svc ->> TRepo : UpdateAsync(table -> OCCUPIED, ct)
+                    activate TRepo
+                    TRepo ->> DB : Update table status to OCCUPIED
+                    activate DB
+                    DB -->> TRepo : OK
+                    deactivate DB
+                    TRepo -->> Svc : OK
+                    deactivate TRepo
+                end
+            end
+
+            Svc ->> UoW : SaveChangesAsync(ct)
+            activate UoW
+            UoW ->> DB : Persist order and optional table updates
+            activate DB
+            DB -->> UoW : OK
+            deactivate DB
+            UoW -->> Svc : OK
+            deactivate UoW
+
+            Svc ->> UoW : CommitAsync(ct)
+            activate UoW
+            UoW -->> Svc : OK
+            deactivate UoW
+
+            opt#White New status is CANCELLED
+                Svc ->> Notif : PublishAsync(ORDER_CANCELLED)
+                activate Notif
+                Notif -->> Svc : OK
+                deactivate Notif
+            end
+
+            Svc ->> OrderRT : OrderUpdatedAsync(OrderRealtimeDTO)
+            activate OrderRT
+            OrderRT -->> Svc : OK
+            deactivate OrderRT
+
+            Svc ->> ShiftRT : PublishBoardChangedAsync(order_status_changed)
+            activate ShiftRT
+            ShiftRT -->> Svc : OK
+            deactivate ShiftRT
+
+            Svc -->> Ctrl : OK
+            deactivate Svc
+            Ctrl -->> Client : 200 OK ApiResponse<object>
+            deactivate Ctrl
+            Client -->> U : Display updated order status
+        end
+    end
+end
+
+deactivate Client
+deactivate U
+
+@enduml

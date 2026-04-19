@@ -1,0 +1,51 @@
+@startuml 2.6.2.3-view-order-list-history
+title 2.6.2.3 View Order List/History
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":User" as U
+participant ":OrderHistoryPage" as Client
+participant ":OrderController" as Ctrl
+participant ":OrderService" as Svc
+participant ":IOrderRepository" as Repo
+participant ":Database" as DB
+
+activate U
+U ->> Client : Open order history page
+activate Client
+Client ->> Ctrl : GET /api/orders/history?search&pageIndex&pageSize&orderStatusCode&fromDate&toDate
+activate Ctrl
+Ctrl ->> Svc : GetOrderHistoryAsync(OrderHistoryQueryDTO, ct)
+activate Svc
+Svc ->> Repo : GetOrderHistoryAsync(query, ct)
+activate Repo
+Repo ->> DB : Query orders with filters, related customer/staff/table/items,\nand pagination sorted by created time descending
+activate DB
+DB -->> Repo : Return paged order history and total count
+deactivate DB
+Repo -->> Svc : PagedResultDTO<OrderHistoryDTO>
+deactivate Repo
+
+alt#White No orders match current filters
+    Svc -->> Ctrl : empty PagedResultDTO<OrderHistoryDTO>
+    deactivate Svc
+    Ctrl -->> Client : 200 OK ApiResponse<PagedResultDTO<OrderHistoryDTO>>
+    deactivate Ctrl
+    Client -->> U : Display empty order history list
+else Orders found
+    Svc -->> Ctrl : PagedResultDTO<OrderHistoryDTO>
+    deactivate Svc
+    Ctrl -->> Client : 200 OK ApiResponse<PagedResultDTO<OrderHistoryDTO>>
+    deactivate Ctrl
+    Client -->> U : Display paginated order history
+end
+
+deactivate Client
+deactivate U
+
+@enduml

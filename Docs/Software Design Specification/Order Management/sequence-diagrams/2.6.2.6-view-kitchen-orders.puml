@@ -1,0 +1,58 @@
+@startuml 2.6.2.6-view-kitchen-orders
+title 2.6.2.6 View Kitchen Orders
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":User" as U
+participant ":KitchenOrdersPage" as Client
+participant ":OrderController" as Ctrl
+participant ":OrderService" as Svc
+participant ":ILookupResolver" as Lookup
+participant ":IOrderRepository" as Repo
+participant ":Database" as DB
+
+activate U
+U ->> Client : Open kitchen orders page
+activate Client
+Client ->> Ctrl : GET /api/orders/kitchen
+activate Ctrl
+Ctrl ->> Svc : GetKitchenOrdersAsync(ct)
+activate Svc
+
+Svc ->> Lookup : Resolve order status IDs for PENDING, IN_PROGRESS, COMPLETED, and CANCELLED
+activate Lookup
+Lookup -->> Svc : pendingId, inProgressId, completedId, cancelledId
+deactivate Lookup
+
+Svc ->> Repo : GetKitchenOrdersAsync(pendingId, inProgressId, completedId, cancelledId, ct)
+activate Repo
+Repo ->> DB : Query today's orders with allowed statuses,\nincluding table, order items, dishes, and item statuses
+activate DB
+DB -->> Repo : Return List<KitchenOrderDTO>
+deactivate DB
+Repo -->> Svc : List<KitchenOrderDTO>
+deactivate Repo
+
+alt#White No kitchen orders for today
+    Svc -->> Ctrl : empty List<KitchenOrderDTO>
+    deactivate Svc
+    Ctrl -->> Client : 200 OK ApiResponse<List<KitchenOrderDTO>>
+    deactivate Ctrl
+    Client -->> U : Display empty kitchen order board
+else Kitchen orders found
+    Svc -->> Ctrl : List<KitchenOrderDTO>
+    deactivate Svc
+    Ctrl -->> Client : 200 OK ApiResponse<List<KitchenOrderDTO>>
+    deactivate Ctrl
+    Client -->> U : Display kitchen orders with item statuses
+end
+
+deactivate Client
+deactivate U
+
+@enduml
