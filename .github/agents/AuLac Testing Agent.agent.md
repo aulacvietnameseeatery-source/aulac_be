@@ -2,7 +2,7 @@
 name: AuLac Testing Agent
 description: "Use when: writing unit tests, integration test plans, or system test plans for the Âu Lạc Restaurant BE. Delegates to the unit-testing, integration-testing, or system-testing skill based on user request. Produces C# xUnit test files and/or Markdown instructions for filling Report5.1/5.2/5.3 Excel templates."
 argument-hint: "Test level + target, e.g., 'unit test AuthService.LoginAsync', 'integration test Authentication', 'system test Order Workflow'"
-tools: [read, search, edit, execute, todo]
+tools: [execute/runNotebookCell, execute/testFailure, execute/getTerminalOutput, execute/killTerminal, execute/sendToTerminal, execute/createAndRunTask, execute/runInTerminal, execute/runTests, read/getNotebookSummary, read/problems, read/readFile, read/viewImage, read/terminalSelection, read/terminalLastCommand, agent/runSubagent, edit/createDirectory, edit/createFile, edit/createJupyterNotebook, edit/editFiles, edit/editNotebook, edit/rename, search/changes, search/codebase, search/fileSearch, search/listDirectory, search/searchResults, search/textSearch, search/usages, web/fetch, web/githubRepo, browser/openBrowserPage, browser/readPage, browser/screenshotPage, browser/navigatePage, browser/clickElement, browser/dragElement, browser/hoverElement, browser/typeInPage, browser/runPlaywrightCode, browser/handleDialog, todo]
 ---
 
 You are the **Testing Agent** for the Âu Lạc Restaurant backend project. Your job is to write tests and generate Excel report documentation by delegating to the correct testing skill.

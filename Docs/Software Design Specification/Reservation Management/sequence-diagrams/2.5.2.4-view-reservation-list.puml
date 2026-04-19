@@ -1,0 +1,51 @@
+@startuml
+title 2.5.2.4 View Reservation List
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":Staff" as U
+participant ":ReservationListPage" as Client
+participant ":ReservationController" as Ctrl
+participant ":AdminReservationService" as Svc
+participant ":IReservationRepository" as ResRepo
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : Open reservation list page with filters
+activate Client
+
+Client ->> Ctrl : GET /api/reservations?pageIndex=1&pageSize=10&date=...&statusId=...\n(GetReservationsRequest)
+activate Ctrl
+
+Ctrl ->> Svc : GetReservationsAsync(request, ct)
+activate Svc
+
+Svc ->> ResRepo : GetReservationsAsync(request, ct)
+activate ResRepo
+ResRepo ->> DB : Query reservations with pagination, date filter, status filter, and search
+activate DB
+DB -->> ResRepo : Return paged reservation list with total count
+deactivate DB
+ResRepo -->> Svc : (List<ReservationManagementDto>, TotalCount)
+deactivate ResRepo
+
+Svc -->> Ctrl : (List<ReservationManagementDto>, TotalCount)
+deactivate Svc
+
+Ctrl ->> Ctrl : Build PagedResult with pagination metadata
+
+Ctrl -->> Client : 200 OK (PagedResult<ReservationManagementDto>)
+deactivate Ctrl
+
+Client -->> U : Display reservation list with pagination
+deactivate Client
+deactivate U
+
+@enduml

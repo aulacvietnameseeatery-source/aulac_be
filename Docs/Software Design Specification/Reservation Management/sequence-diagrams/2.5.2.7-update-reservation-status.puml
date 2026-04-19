@@ -1,0 +1,145 @@
+@startuml
+title 2.5.2.7 Update Reservation Status
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":Staff" as U
+participant ":ReservationDetailPage" as Client
+participant ":ReservationController" as Ctrl
+participant ":AdminReservationService" as Svc
+participant ":IUnitOfWork" as UoW
+participant ":IReservationRepository" as ResRepo
+participant ":ITableRepository" as TableRepo
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : Select new status and submit
+activate Client
+
+Client ->> Ctrl : PATCH /api/reservations/{id}/status\n(UpdateReservationStatusRequest)
+activate Ctrl
+
+Ctrl ->> Svc : UpdateReservationStatusAsync(id, statusCode, note, ct)
+activate Svc
+
+Svc ->> ResRepo : GetByIdWithFullDetailsAsync(reservationId, ct)
+activate ResRepo
+ResRepo ->> DB : Query reservation with tables, status, and source
+activate DB
+DB -->> ResRepo : Return reservation entity
+deactivate DB
+ResRepo -->> Svc : Reservation
+deactivate ResRepo
+
+alt#White Reservation not found
+    Svc -->> Ctrl : throw KeyNotFoundException
+    Ctrl -->> Client : 404 Not Found
+    Client -->> U : Display "Reservation not found"
+else#White Reservation found
+
+    Svc ->> UoW : BeginTransactionAsync(ct)
+    activate UoW
+    UoW -->> Svc : Transaction started
+    deactivate UoW
+
+    Svc ->> Svc : Resolve new status lookup ID from status code
+
+    Svc ->> Svc : Update reservation status and append note
+
+    alt#White Status = CHECKED_IN
+        loop#White For each assigned table
+            Svc ->> TableRepo : GetByIdAsync(tableId, ct)
+            activate TableRepo
+            TableRepo ->> DB : Query current table status
+            activate DB
+            DB -->> TableRepo : Return table
+            deactivate DB
+            TableRepo -->> Svc : RestaurantTable
+            deactivate TableRepo
+
+            alt#White Table already OCCUPIED
+                Svc ->> UoW : RollbackAsync(ct)
+                activate UoW
+                UoW -->> Svc : Transaction rolled back
+                deactivate UoW
+                Svc -->> Ctrl : throw InvalidOperationException
+                Ctrl -->> Client : 400 Bad Request
+                Client -->> U : Display "Table already occupied by another customer"
+            end
+        end
+
+        loop#White For each assigned table
+            Svc ->> TableRepo : UpdateStatusAsync(tableId, OCCUPIED, ct)
+            activate TableRepo
+            TableRepo ->> DB : Update table status to OCCUPIED
+            activate DB
+            DB -->> TableRepo : Updated
+            deactivate DB
+            TableRepo -->> Svc : void
+            deactivate TableRepo
+        end
+
+    else#White Status = CANCELLED / COMPLETED / NO_SHOW
+        loop#White For each assigned table
+            Svc ->> TableRepo : UpdateStatusAsync(tableId, AVAILABLE, ct)
+            activate TableRepo
+            TableRepo ->> DB : Update table status to AVAILABLE
+            activate DB
+            DB -->> TableRepo : Updated
+            deactivate DB
+            TableRepo -->> Svc : void
+            deactivate TableRepo
+        end
+
+    else#White Status = CONFIRMED
+        Svc ->> Svc : Calculate time until 2 hours before reservation
+        alt#White Less than 2 hours remaining
+            loop#White For each assigned table
+                Svc ->> TableRepo : UpdateStatusAsync(tableId, RESERVED, ct)
+                activate TableRepo
+                TableRepo ->> DB : Update table status to RESERVED
+                activate DB
+                DB -->> TableRepo : Updated
+                deactivate DB
+                TableRepo -->> Svc : void
+                deactivate TableRepo
+            end
+        else#White More than 2 hours remaining
+            Svc ->> Svc : Schedule Hangfire table lock job
+        end
+        Svc ->> Svc : Schedule Hangfire no-show check job (15 min after reserved time)
+    end
+
+    Svc ->> UoW : SaveChangesAsync(ct)
+    activate UoW
+    UoW -->> Svc : Changes saved
+    deactivate UoW
+
+    Svc ->> UoW : CommitAsync(ct)
+    activate UoW
+    UoW -->> Svc : Transaction committed
+    deactivate UoW
+
+    Svc ->> Svc : Notify real-time reservation status changed
+    Svc ->> Svc : Publish RESERVATION_STATUS_CHANGED notification
+
+    Svc -->> Ctrl : void (success)
+    deactivate Svc
+
+    Ctrl -->> Client : 200 OK
+    deactivate Ctrl
+
+    Client -->> U : Display "Status updated successfully"
+end
+
+deactivate Client
+deactivate U
+
+@enduml

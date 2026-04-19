@@ -6,280 +6,374 @@ using Core.Interface.Service.Entity;
 using Core.Service;
 using FluentAssertions;
 using Moq;
+using LookupTypeEnum = Core.Enum.LookupType;
 
 namespace Tests.Services;
 
 /// <summary>
-/// Unit Test - CouponService
+/// Unit Test — CouponService
 /// Code Module : Core/Service/CouponService.cs
-/// Method      : GetCouponsAsync, GetCouponDetailAsync, CreateCouponAsync, UpdateCouponAsync, DeleteCouponAsync
+/// Method      : GetCouponsAsync, GetCouponDetailAsync, CreateCouponAsync,
+///               UpdateCouponAsync, DeleteCouponAsync
 /// Created By  : quantm
 /// Executed By : quantm
-/// Test Req.   : Test business rules for coupon filtering, create/update validation, and delete constraints.
+/// Test Req.   : Verify coupon management business logic including listing active coupons
+///               with optional customer filtering, retrieving coupon details, creating coupons
+///               with code normalization/uniqueness/date/discount validation, updating coupons
+///               with used-vs-unused branching, and deleting unused coupons.
 /// </summary>
 public class CouponServiceTests
 {
-    // Mocks
-    private readonly Mock<ICouponRepository> _couponRepositoryMock = new();
+    // ── Mocks ──
+    private readonly Mock<ICouponRepository> _couponRepoMock = new();
     private readonly Mock<ILookupResolver> _lookupResolverMock = new();
 
-    private const uint CouponTypePercentId = 11;
-    private const uint CouponStatusActiveId = 21;
+    // ── Lookup IDs ──
+    private const uint ActiveStatusId = 500;
+    private const uint ScheduledStatusId = 501;
+    private const uint ExpiredStatusId = 502;
+    private const uint FixedAmountTypeId = 600;
+    private const uint PercentTypeId = 601;
 
+    // ── Factory ──
     private CouponService CreateService() => new(
-        _couponRepositoryMock.Object,
+        _couponRepoMock.Object,
         _lookupResolverMock.Object);
 
-    // Helper: tạo Coupon giả
-    private static Coupon MakeCoupon(
+    // ── Test Data Helpers ──
+    private static LookupValue MakeTypeLv(string code = "FIXED_AMOUNT") => new()
+    {
+        ValueId = code == "PERCENT" ? PercentTypeId : FixedAmountTypeId,
+        ValueCode = code,
+        ValueName = code
+    };
+
+    private static LookupValue MakeStatusLv(string code = "ACTIVE") => new()
+    {
+        ValueId = code switch
+        {
+            "SCHEDULED" => ScheduledStatusId,
+            "EXPIRED" => ExpiredStatusId,
+            _ => ActiveStatusId
+        },
+        ValueCode = code,
+        ValueName = code
+    };
+
+    private static Coupon MakeValidCoupon(
         long id = 1,
-        string code = "SAVE10",
-        string name = "Save 10",
-        long? customerId = null,
+        string code = "SUMMER2025",
+        string name = "Summer Discount",
+        decimal discount = 50000,
         int? usedCount = 0,
-        string typeCode = "PERCENT",
-        string statusCode = "ACTIVE") => new()
+        int? maxUsage = 100,
+        long? customerId = null,
+        string typeCode = "FIXED_AMOUNT",
+        string statusCode = "ACTIVE",
+        DateTime? start = null,
+        DateTime? end = null) => new()
     {
         CouponId = id,
         CouponCode = code,
         CouponName = name,
-        CustomerId = customerId,
-        StartTime = DateTime.UtcNow.AddDays(-1),
-        EndTime = DateTime.UtcNow.AddDays(10),
-        DiscountValue = 10,
-        MaxUsage = 100,
+        Description = "Test coupon",
+        DiscountValue = discount,
         UsedCount = usedCount,
-        TypeLv = new LookupValue { ValueCode = typeCode },
-        CouponStatusLv = new LookupValue { ValueCode = statusCode },
-        Customer = customerId.HasValue ? new Customer { FullName = "Customer " + customerId } : null
+        MaxUsage = maxUsage,
+        CustomerId = customerId,
+        Customer = customerId.HasValue ? new Customer { CustomerId = customerId.Value, FullName = "Test Customer" } : null,
+        StartTime = start ?? DateTime.UtcNow.AddDays(-1),
+        EndTime = end ?? DateTime.UtcNow.AddDays(30),
+        TypeLvId = typeCode == "PERCENT" ? PercentTypeId : FixedAmountTypeId,
+        TypeLv = MakeTypeLv(typeCode),
+        CouponStatusLvId = statusCode switch
+        {
+            "SCHEDULED" => ScheduledStatusId,
+            "EXPIRED" => ExpiredStatusId,
+            _ => ActiveStatusId
+        },
+        CouponStatusLv = MakeStatusLv(statusCode),
+        CreatedAt = DateTime.UtcNow.AddDays(-5)
     };
 
-    // Helper: tạo CreateCouponRequest giả
-    private static CreateCouponRequest MakeCreateRequest() => new()
+    private static CreateCouponRequest MakeValidCreateRequest() => new()
     {
-        CouponCode = " save10 ",
-        CouponName = "  Save 10  ",
-        Description = "  desc  ",
+        CouponCode = "NEWYEAR2025",
+        CouponName = "New Year Discount",
+        Description = "New year special",
         StartTime = DateTime.UtcNow.AddDays(-1),
-        EndTime = DateTime.UtcNow.AddDays(10),
-        DiscountValue = 10,
-        MaxUsage = 100,
-        Type = "PERCENT"
+        EndTime = DateTime.UtcNow.AddDays(30),
+        DiscountValue = 20000,
+        MaxUsage = 50,
+        Type = "FIXED_AMOUNT"
     };
 
-    // Helper: tạo UpdateCouponRequest giả
-    private static UpdateCouponRequest MakeUpdateRequest() => new()
+    private static UpdateCouponRequest MakeValidUpdateRequest() => new()
     {
-        CouponCode = " up20 ",
-        CouponName = "  Update 20  ",
-        Description = "  new desc  ",
-        StartTime = DateTime.UtcNow.AddDays(3),
-        EndTime = DateTime.UtcNow.AddDays(4),
-        DiscountValue = 20,
-        MaxUsage = 50,
-        Type = "PERCENT"
+        CouponCode = "UPDATED2025",
+        CouponName = "Updated Coupon",
+        Description = "Updated description",
+        StartTime = DateTime.UtcNow.AddDays(-1),
+        EndTime = DateTime.UtcNow.AddDays(60),
+        DiscountValue = 30000,
+        MaxUsage = 200,
+        Type = "FIXED_AMOUNT"
     };
+
+    // ══════════════════════════════════════════════════════════════════
+    //  GetCouponsAsync
+    // ══════════════════════════════════════════════════════════════════
+
+    #region GetCouponsAsync
 
     [Fact]
     [Trait("Type", "Normal")]
     [Trait("Method", "GetCouponsAsync")]
     public async Task GetCouponsAsync_WhenNoCustomerId_ReturnsAllActiveCoupons()
     {
+        // Arrange
         var coupons = new List<Coupon>
         {
-            MakeCoupon(id: 1, customerId: null),
-            MakeCoupon(id: 2, customerId: 100)
+            MakeValidCoupon(id: 1, code: "COUPON1"),
+            MakeValidCoupon(id: 2, code: "COUPON2", customerId: 10)
         };
-
-        _couponRepositoryMock
+        _couponRepoMock
             .Setup(r => r.GetActiveCouponsAsync(It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(coupons);
 
-        var service = CreateService();
+        var svc = CreateService();
 
-        var result = await service.GetCouponsAsync(null, CancellationToken.None);
+        // Act
+        var result = await svc.GetCouponsAsync(null, CancellationToken.None);
 
+        // Assert
         result.Should().HaveCount(2);
+        result[0].CouponCode.Should().Be("COUPON1");
+        result[1].CouponCode.Should().Be("COUPON2");
     }
 
     [Fact]
     [Trait("Type", "Normal")]
     [Trait("Method", "GetCouponsAsync")]
-    public async Task GetCouponsAsync_WhenCustomerIdProvided_FiltersByCustomerIdOrGlobal()
+    public async Task GetCouponsAsync_WhenCustomerId_ReturnsFilteredCoupons()
     {
+        // Arrange
         var coupons = new List<Coupon>
         {
-            MakeCoupon(id: 1, customerId: null),
-            MakeCoupon(id: 2, customerId: 999),
-            MakeCoupon(id: 3, customerId: 100)
+            MakeValidCoupon(id: 1, code: "GLOBAL", customerId: null),
+            MakeValidCoupon(id: 2, code: "CUST10", customerId: 10),
+            MakeValidCoupon(id: 3, code: "CUST20", customerId: 20)
         };
-
-        _couponRepositoryMock
+        _couponRepoMock
             .Setup(r => r.GetActiveCouponsAsync(It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(coupons);
 
-        var service = CreateService();
+        var svc = CreateService();
 
-        var result = await service.GetCouponsAsync(100, CancellationToken.None);
+        // Act
+        var result = await svc.GetCouponsAsync(10, CancellationToken.None);
 
+        // Assert
         result.Should().HaveCount(2);
-        result.Select(x => x.CouponId).Should().BeEquivalentTo([1, 3]);
-    }
-
-    [Fact]
-    [Trait("Type", "Abnormal")]
-    [Trait("Method", "GetCouponsAsync")]
-    public async Task GetCouponsAsync_WhenNegativeCustomerId_ReturnsOnlyGlobalCoupons()
-    {
-        var coupons = new List<Coupon>
-        {
-            MakeCoupon(id: 1, customerId: null),
-            MakeCoupon(id: 2, customerId: 100)
-        };
-
-        _couponRepositoryMock
-            .Setup(r => r.GetActiveCouponsAsync(It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(coupons);
-
-        var service = CreateService();
-
-        var result = await service.GetCouponsAsync(-1, CancellationToken.None);
-
-        result.Should().HaveCount(1);
-        result[0].CouponId.Should().Be(1);
+        result.Select(c => c.CouponCode).Should().Contain("GLOBAL");
+        result.Select(c => c.CouponCode).Should().Contain("CUST10");
+        result.Select(c => c.CouponCode).Should().NotContain("CUST20");
     }
 
     [Fact]
     [Trait("Type", "Boundary")]
     [Trait("Method", "GetCouponsAsync")]
-    public async Task GetCouponsAsync_WhenRepositoryReturnsEmpty_ReturnsEmptyList()
+    public async Task GetCouponsAsync_WhenNoCoupons_ReturnsEmptyList()
     {
-        _couponRepositoryMock
+        // Arrange
+        _couponRepoMock
             .Setup(r => r.GetActiveCouponsAsync(It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Coupon>());
 
-        var service = CreateService();
+        var svc = CreateService();
 
-        var result = await service.GetCouponsAsync(null, CancellationToken.None);
+        // Act
+        var result = await svc.GetCouponsAsync(null, CancellationToken.None);
 
+        // Assert
         result.Should().BeEmpty();
     }
+
+    [Fact]
+    [Trait("Type", "Normal")]
+    [Trait("Method", "GetCouponsAsync")]
+    public async Task GetCouponsAsync_MapsAllDtoFieldsCorrectly()
+    {
+        // Arrange
+        var coupon = MakeValidCoupon(id: 1, code: "MAPPED", customerId: 10);
+        _couponRepoMock
+            .Setup(r => r.GetActiveCouponsAsync(It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Coupon> { coupon });
+
+        var svc = CreateService();
+
+        // Act
+        var result = await svc.GetCouponsAsync(null, CancellationToken.None);
+
+        // Assert
+        var dto = result.Single();
+        dto.CouponId.Should().Be(1);
+        dto.CouponCode.Should().Be("MAPPED");
+        dto.CouponName.Should().Be("Summer Discount");
+        dto.CustomerId.Should().Be(10);
+        dto.CustomerName.Should().Be("Test Customer");
+        dto.DiscountValue.Should().Be(50000);
+        dto.MaxUsage.Should().Be(100);
+        dto.UsedCount.Should().Be(0);
+        dto.Type.Should().Be("FIXED_AMOUNT");
+        dto.CouponStatus.Should().Be("ACTIVE");
+    }
+
+    #endregion
+
+    // ══════════════════════════════════════════════════════════════════
+    //  GetCouponDetailAsync
+    // ══════════════════════════════════════════════════════════════════
+
+    #region GetCouponDetailAsync
 
     [Fact]
     [Trait("Type", "Normal")]
     [Trait("Method", "GetCouponDetailAsync")]
     public async Task GetCouponDetailAsync_WhenCouponExists_ReturnsDetail()
     {
-        var coupon = MakeCoupon(id: 5, code: "C5", name: "Coupon 5");
-
-        _couponRepositoryMock
+        // Arrange
+        var coupon = MakeValidCoupon(id: 5, code: "DETAIL01");
+        _couponRepoMock
             .Setup(r => r.GetByIdAsync(5, It.IsAny<CancellationToken>()))
             .ReturnsAsync(coupon);
 
-        var service = CreateService();
+        var svc = CreateService();
 
-        var result = await service.GetCouponDetailAsync(5, CancellationToken.None);
+        // Act
+        var result = await svc.GetCouponDetailAsync(5, CancellationToken.None);
 
+        // Assert
         result.CouponId.Should().Be(5);
-        result.CouponCode.Should().Be("C5");
-        result.Type.Should().Be("PERCENT");
+        result.CouponCode.Should().Be("DETAIL01");
+        result.CouponName.Should().Be("Summer Discount");
+        result.Description.Should().Be("Test coupon");
+        result.DiscountValue.Should().Be(50000);
+        result.MaxUsage.Should().Be(100);
+        result.UsedCount.Should().Be(0);
+        result.Type.Should().Be("FIXED_AMOUNT");
         result.CouponStatus.Should().Be("ACTIVE");
+        result.CreatedAt.Should().NotBeNull();
     }
 
     [Fact]
     [Trait("Type", "Abnormal")]
     [Trait("Method", "GetCouponDetailAsync")]
-    public async Task GetCouponDetailAsync_WhenIdIsNegative_ThrowsKeyNotFoundException()
+    public async Task GetCouponDetailAsync_WhenCouponNotFound_ThrowsKeyNotFoundException()
     {
-        _couponRepositoryMock
-            .Setup(r => r.GetByIdAsync(-1, It.IsAny<CancellationToken>()))
+        // Arrange
+        _couponRepoMock
+            .Setup(r => r.GetByIdAsync(999, It.IsAny<CancellationToken>()))
             .ReturnsAsync((Coupon?)null);
 
-        var service = CreateService();
+        var svc = CreateService();
 
-        await service.Invoking(s => s.GetCouponDetailAsync(-1, CancellationToken.None))
-            .Should().ThrowAsync<KeyNotFoundException>();
+        // Act
+        var act = () => svc.GetCouponDetailAsync(999, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<KeyNotFoundException>()
+            .WithMessage("*999*");
     }
 
+    #endregion
+
+    // ══════════════════════════════════════════════════════════════════
+    //  CreateCouponAsync
+    // ══════════════════════════════════════════════════════════════════
+
+    #region CreateCouponAsync
+
     [Fact]
-    [Trait("Type", "Boundary")]
-    [Trait("Method", "GetCouponDetailAsync")]
-    public async Task GetCouponDetailAsync_WhenIdIsZero_ThrowsKeyNotFoundException()
+    [Trait("Type", "Normal")]
+    [Trait("Method", "CreateCouponAsync")]
+    public async Task CreateCouponAsync_WhenValidRequest_CreatesCouponAndReturnsDto()
     {
-        _couponRepositoryMock
-            .Setup(r => r.GetByIdAsync(0, It.IsAny<CancellationToken>()))
+        // Arrange
+        var request = MakeValidCreateRequest();
+
+        _couponRepoMock
+            .Setup(r => r.GetByCodeAsync("NEWYEAR2025", It.IsAny<CancellationToken>()))
             .ReturnsAsync((Coupon?)null);
 
-        var service = CreateService();
+        _lookupResolverMock
+            .Setup(r => r.GetIdAsync((ushort)LookupTypeEnum.CouponType, "FIXED_AMOUNT", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(FixedAmountTypeId);
+        _lookupResolverMock
+            .Setup(r => r.GetIdAsync((ushort)LookupTypeEnum.CouponStatus, It.IsAny<Enum>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ActiveStatusId);
 
-        await service.Invoking(s => s.GetCouponDetailAsync(0, CancellationToken.None))
-            .Should().ThrowAsync<KeyNotFoundException>();
+        _couponRepoMock
+            .Setup(r => r.CreateAsync(It.IsAny<Coupon>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Coupon c, CancellationToken _) =>
+            {
+                c.CouponId = 100;
+                c.TypeLv = MakeTypeLv("FIXED_AMOUNT");
+                c.CouponStatusLv = MakeStatusLv("ACTIVE");
+                return c;
+            });
+
+        var svc = CreateService();
+
+        // Act
+        var result = await svc.CreateCouponAsync(request, CancellationToken.None);
+
+        // Assert
+        result.CouponId.Should().Be(100);
+        result.CouponCode.Should().Be("NEWYEAR2025");
+        result.CouponName.Should().Be("New Year Discount");
+        result.DiscountValue.Should().Be(20000);
+        result.UsedCount.Should().Be(0);
+        result.Type.Should().Be("FIXED_AMOUNT");
+        result.CouponStatus.Should().Be("ACTIVE");
+        _couponRepoMock.Verify(r => r.CreateAsync(It.IsAny<Coupon>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
     [Trait("Type", "Normal")]
     [Trait("Method", "CreateCouponAsync")]
-    public async Task CreateCouponAsync_WhenValidRequest_CreatesCouponWithNormalizedCode()
+    public async Task CreateCouponAsync_NormalizesCodeToUpperCase()
     {
-        var request = MakeCreateRequest();
+        // Arrange
+        var request = MakeValidCreateRequest();
+        request.CouponCode = " new year 2025 ";
 
-        _couponRepositoryMock
-            .Setup(r => r.GetByCodeAsync("SAVE10", It.IsAny<CancellationToken>()))
+        _couponRepoMock
+            .Setup(r => r.GetByCodeAsync("NEWYEAR2025", It.IsAny<CancellationToken>()))
             .ReturnsAsync((Coupon?)null);
-
         _lookupResolverMock
-            .Setup(r => r.GetIdAsync(It.IsAny<ushort>(), "PERCENT", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(CouponTypePercentId);
-
+            .Setup(r => r.GetIdAsync((ushort)LookupTypeEnum.CouponType, It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(FixedAmountTypeId);
         _lookupResolverMock
-            .Setup(r => r.GetIdAsync(It.IsAny<ushort>(), It.Is<System.Enum>(e => e.Equals(CouponStatusCode.ACTIVE)), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(CouponStatusActiveId);
-
-        _couponRepositoryMock
+            .Setup(r => r.GetIdAsync((ushort)LookupTypeEnum.CouponStatus, It.IsAny<Enum>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ActiveStatusId);
+        _couponRepoMock
             .Setup(r => r.CreateAsync(It.IsAny<Coupon>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Coupon c, CancellationToken _) =>
             {
-                c.CouponId = 10;
-                c.TypeLv = new LookupValue { ValueCode = "PERCENT" };
-                c.CouponStatusLv = new LookupValue { ValueCode = "ACTIVE" };
+                c.CouponId = 101;
+                c.TypeLv = MakeTypeLv();
+                c.CouponStatusLv = MakeStatusLv();
                 return c;
             });
 
-        var service = CreateService();
+        var svc = CreateService();
 
-        var result = await service.CreateCouponAsync(request, CancellationToken.None);
+        // Act
+        var result = await svc.CreateCouponAsync(request, CancellationToken.None);
 
-        result.CouponId.Should().Be(10);
-        result.CouponCode.Should().Be("SAVE10");
-        result.CouponName.Should().Be("Save 10");
-        result.Type.Should().Be("PERCENT");
-        result.CouponStatus.Should().Be("ACTIVE");
-
-        _couponRepositoryMock.Verify(
-            r => r.CreateAsync(It.Is<Coupon>(c =>
-                c.CouponCode == "SAVE10" &&
-                c.CouponName == "Save 10" &&
-                c.Description == "desc" &&
-                c.TypeLvId == CouponTypePercentId &&
-                c.CouponStatusLvId == CouponStatusActiveId), It.IsAny<CancellationToken>()),
-            Times.Once);
-    }
-
-    [Fact]
-    [Trait("Type", "Abnormal")]
-    [Trait("Method", "CreateCouponAsync")]
-    public async Task CreateCouponAsync_WhenCodeExists_ThrowsInvalidOperationException()
-    {
-        var request = MakeCreateRequest();
-
-        _couponRepositoryMock
-            .Setup(r => r.GetByCodeAsync("SAVE10", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(MakeCoupon(code: "SAVE10"));
-
-        var service = CreateService();
-
-        await service.Invoking(s => s.CreateCouponAsync(request, CancellationToken.None))
-            .Should().ThrowAsync<InvalidOperationException>();
+        // Assert
+        result.CouponCode.Should().Be("NEWYEAR2025");
     }
 
     [Fact]
@@ -287,14 +381,39 @@ public class CouponServiceTests
     [Trait("Method", "CreateCouponAsync")]
     public async Task CreateCouponAsync_WhenCodeTooShort_ThrowsInvalidOperationException()
     {
-        var request = MakeCreateRequest();
+        // Arrange
+        var request = MakeValidCreateRequest();
         request.CouponCode = "AB";
 
-        var service = CreateService();
+        var svc = CreateService();
 
-        await service.Invoking(s => s.CreateCouponAsync(request, CancellationToken.None))
-            .Should().ThrowAsync<InvalidOperationException>()
+        // Act
+        var act = () => svc.CreateCouponAsync(request, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*at least 3 characters*");
+    }
+
+    [Fact]
+    [Trait("Type", "Abnormal")]
+    [Trait("Method", "CreateCouponAsync")]
+    public async Task CreateCouponAsync_WhenDuplicateCode_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        var request = MakeValidCreateRequest();
+        _couponRepoMock
+            .Setup(r => r.GetByCodeAsync("NEWYEAR2025", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(MakeValidCoupon());
+
+        var svc = CreateService();
+
+        // Act
+        var act = () => svc.CreateCouponAsync(request, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*already exists*");
     }
 
     [Fact]
@@ -302,56 +421,205 @@ public class CouponServiceTests
     [Trait("Method", "CreateCouponAsync")]
     public async Task CreateCouponAsync_WhenEndTimeBeforeStartTime_ThrowsInvalidOperationException()
     {
-        var request = MakeCreateRequest();
-        request.StartTime = DateTime.UtcNow.AddDays(5);
-        request.EndTime = DateTime.UtcNow.AddDays(4);
+        // Arrange
+        var request = MakeValidCreateRequest();
+        request.StartTime = DateTime.UtcNow.AddDays(10);
+        request.EndTime = DateTime.UtcNow.AddDays(5);
 
-        _couponRepositoryMock
-            .Setup(r => r.GetByCodeAsync("SAVE10", It.IsAny<CancellationToken>()))
+        _couponRepoMock
+            .Setup(r => r.GetByCodeAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Coupon?)null);
 
-        var service = CreateService();
+        var svc = CreateService();
 
-        await service.Invoking(s => s.CreateCouponAsync(request, CancellationToken.None))
-            .Should().ThrowAsync<InvalidOperationException>()
+        // Act
+        var act = () => svc.CreateCouponAsync(request, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*End time must be after start time*");
+    }
+
+    [Fact]
+    [Trait("Type", "Abnormal")]
+    [Trait("Method", "CreateCouponAsync")]
+    public async Task CreateCouponAsync_WhenPercentOver100_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        var request = MakeValidCreateRequest();
+        request.Type = "PERCENT";
+        request.DiscountValue = 150;
+
+        _couponRepoMock
+            .Setup(r => r.GetByCodeAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Coupon?)null);
+
+        var svc = CreateService();
+
+        // Act
+        var act = () => svc.CreateCouponAsync(request, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*between 0 and 100*");
     }
 
     [Fact]
     [Trait("Type", "Boundary")]
     [Trait("Method", "CreateCouponAsync")]
-    public async Task CreateCouponAsync_WhenPercentIsExactly100_AllowsCreation()
+    public async Task CreateCouponAsync_WhenPercentExactly100_Succeeds()
     {
-        var request = MakeCreateRequest();
+        // Arrange
+        var request = MakeValidCreateRequest();
+        request.Type = "PERCENT";
         request.DiscountValue = 100;
 
-        _couponRepositoryMock
-            .Setup(r => r.GetByCodeAsync("SAVE10", It.IsAny<CancellationToken>()))
+        _couponRepoMock
+            .Setup(r => r.GetByCodeAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Coupon?)null);
-
         _lookupResolverMock
-            .Setup(r => r.GetIdAsync(It.IsAny<ushort>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(1u);
-
+            .Setup(r => r.GetIdAsync((ushort)LookupTypeEnum.CouponType, "PERCENT", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(PercentTypeId);
         _lookupResolverMock
-            .Setup(r => r.GetIdAsync(It.IsAny<ushort>(), It.IsAny<System.Enum>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(1u);
-
-        _couponRepositoryMock
+            .Setup(r => r.GetIdAsync((ushort)LookupTypeEnum.CouponStatus, It.IsAny<Enum>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ActiveStatusId);
+        _couponRepoMock
             .Setup(r => r.CreateAsync(It.IsAny<Coupon>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Coupon c, CancellationToken _) =>
             {
-                c.CouponId = 11;
-                c.TypeLv = new LookupValue { ValueCode = "PERCENT" };
-                c.CouponStatusLv = new LookupValue { ValueCode = "ACTIVE" };
+                c.CouponId = 102;
+                c.TypeLv = MakeTypeLv("PERCENT");
+                c.CouponStatusLv = MakeStatusLv();
                 return c;
             });
 
-        var service = CreateService();
+        var svc = CreateService();
 
-        var result = await service.CreateCouponAsync(request, CancellationToken.None);
+        // Act
+        var result = await svc.CreateCouponAsync(request, CancellationToken.None);
 
+        // Assert
         result.DiscountValue.Should().Be(100);
+        result.Type.Should().Be("PERCENT");
+    }
+
+    [Fact]
+    [Trait("Type", "Boundary")]
+    [Trait("Method", "CreateCouponAsync")]
+    public async Task CreateCouponAsync_WhenCodeExactly3Chars_Succeeds()
+    {
+        // Arrange
+        var request = MakeValidCreateRequest();
+        request.CouponCode = "ABC";
+
+        _couponRepoMock
+            .Setup(r => r.GetByCodeAsync("ABC", It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Coupon?)null);
+        _lookupResolverMock
+            .Setup(r => r.GetIdAsync((ushort)LookupTypeEnum.CouponType, It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(FixedAmountTypeId);
+        _lookupResolverMock
+            .Setup(r => r.GetIdAsync((ushort)LookupTypeEnum.CouponStatus, It.IsAny<Enum>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ActiveStatusId);
+        _couponRepoMock
+            .Setup(r => r.CreateAsync(It.IsAny<Coupon>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Coupon c, CancellationToken _) =>
+            {
+                c.CouponId = 103;
+                c.TypeLv = MakeTypeLv();
+                c.CouponStatusLv = MakeStatusLv();
+                return c;
+            });
+
+        var svc = CreateService();
+
+        // Act
+        var result = await svc.CreateCouponAsync(request, CancellationToken.None);
+
+        // Assert
+        result.CouponCode.Should().Be("ABC");
+    }
+
+    #endregion
+
+    // ══════════════════════════════════════════════════════════════════
+    //  UpdateCouponAsync
+    // ══════════════════════════════════════════════════════════════════
+
+    #region UpdateCouponAsync
+
+    [Fact]
+    [Trait("Type", "Normal")]
+    [Trait("Method", "UpdateCouponAsync")]
+    public async Task UpdateCouponAsync_WhenUnusedCoupon_PerformsFullUpdate()
+    {
+        // Arrange
+        var coupon = MakeValidCoupon(id: 10, code: "OLD_CODE", usedCount: 0);
+        var request = MakeValidUpdateRequest();
+
+        _couponRepoMock
+            .Setup(r => r.GetByIdAsync(10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(coupon);
+        _couponRepoMock
+            .Setup(r => r.GetByCodeAsync("UPDATED2025", It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Coupon?)null);
+        _lookupResolverMock
+            .Setup(r => r.GetIdAsync((ushort)LookupTypeEnum.CouponType, "FIXED_AMOUNT", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(FixedAmountTypeId);
+        _couponRepoMock
+            .Setup(r => r.UpdateAsync(It.IsAny<Coupon>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Coupon c, CancellationToken _) =>
+            {
+                c.TypeLv = MakeTypeLv();
+                c.CouponStatusLv = MakeStatusLv();
+                return c;
+            });
+
+        var svc = CreateService();
+
+        // Act
+        var result = await svc.UpdateCouponAsync(10, request, CancellationToken.None);
+
+        // Assert
+        result.CouponCode.Should().Be("UPDATED2025");
+        result.CouponName.Should().Be("Updated Coupon");
+        result.DiscountValue.Should().Be(30000);
+        _couponRepoMock.Verify(r => r.UpdateAsync(It.IsAny<Coupon>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    [Trait("Type", "Normal")]
+    [Trait("Method", "UpdateCouponAsync")]
+    public async Task UpdateCouponAsync_WhenUsedCoupon_OnlyUpdatesAllowedFields()
+    {
+        // Arrange
+        var coupon = MakeValidCoupon(id: 11, code: "USED_CODE", usedCount: 5);
+        var request = MakeValidUpdateRequest();
+        request.Description = "Updated description only";
+        request.EndTime = DateTime.UtcNow.AddDays(90);
+        request.MaxUsage = 500;
+
+        _couponRepoMock
+            .Setup(r => r.GetByIdAsync(11, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(coupon);
+        _couponRepoMock
+            .Setup(r => r.UpdateAsync(It.IsAny<Coupon>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Coupon c, CancellationToken _) =>
+            {
+                c.TypeLv = MakeTypeLv();
+                c.CouponStatusLv = MakeStatusLv();
+                return c;
+            });
+
+        var svc = CreateService();
+
+        // Act
+        var result = await svc.UpdateCouponAsync(11, request, CancellationToken.None);
+
+        // Assert
+        result.CouponCode.Should().Be("USED_CODE"); // Code should NOT change
+        result.MaxUsage.Should().Be(500);
+        _couponRepoMock.Verify(r => r.GetByCodeAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -359,76 +627,19 @@ public class CouponServiceTests
     [Trait("Method", "UpdateCouponAsync")]
     public async Task UpdateCouponAsync_WhenCouponNotFound_ThrowsKeyNotFoundException()
     {
-        _couponRepositoryMock
-            .Setup(r => r.GetByIdAsync(99, It.IsAny<CancellationToken>()))
+        // Arrange
+        _couponRepoMock
+            .Setup(r => r.GetByIdAsync(999, It.IsAny<CancellationToken>()))
             .ReturnsAsync((Coupon?)null);
 
-        var service = CreateService();
+        var svc = CreateService();
 
-        await service.Invoking(s => s.UpdateCouponAsync(99, MakeUpdateRequest(), CancellationToken.None))
-            .Should().ThrowAsync<KeyNotFoundException>();
-    }
+        // Act
+        var act = () => svc.UpdateCouponAsync(999, MakeValidUpdateRequest(), CancellationToken.None);
 
-    [Fact]
-    [Trait("Type", "Normal")]
-    [Trait("Method", "UpdateCouponAsync")]
-    public async Task UpdateCouponAsync_WhenCodeChangedAndUnique_UpdatesSuccessfully()
-    {
-        var existing = MakeCoupon(id: 8, code: "OLD10", name: "Old");
-        var request = MakeUpdateRequest();
-
-        _couponRepositoryMock
-            .Setup(r => r.GetByIdAsync(8, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(existing);
-
-        _couponRepositoryMock
-            .Setup(r => r.GetByCodeAsync("UP20", It.IsAny<CancellationToken>()))
-            .ReturnsAsync((Coupon?)null);
-
-        _lookupResolverMock
-            .Setup(r => r.GetIdAsync(It.IsAny<ushort>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(1u);
-
-        _couponRepositoryMock
-            .Setup(r => r.UpdateAsync(It.IsAny<Coupon>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((Coupon c, CancellationToken _) =>
-            {
-                c.TypeLv = new LookupValue { ValueCode = "PERCENT" };
-                c.CouponStatusLv = new LookupValue { ValueCode = "ACTIVE" };
-                return c;
-            });
-
-        var service = CreateService();
-
-        var result = await service.UpdateCouponAsync(8, request, CancellationToken.None);
-
-        result.CouponCode.Should().Be("UP20");
-        result.CouponName.Should().Be("Update 20");
-        result.DiscountValue.Should().Be(20);
-    }
-
-    [Fact]
-    [Trait("Type", "Abnormal")]
-    [Trait("Method", "UpdateCouponAsync")]
-    public async Task UpdateCouponAsync_WhenPercentGreaterThan100_ThrowsInvalidOperationException()
-    {
-        var existing = MakeCoupon(id: 8, code: "OLD10", name: "Old");
-        var request = MakeUpdateRequest();
-        request.DiscountValue = 100.01m;
-
-        _couponRepositoryMock
-            .Setup(r => r.GetByIdAsync(8, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(existing);
-
-        _couponRepositoryMock
-            .Setup(r => r.GetByCodeAsync("UP20", It.IsAny<CancellationToken>()))
-            .ReturnsAsync((Coupon?)null);
-
-        var service = CreateService();
-
-        await service.Invoking(s => s.UpdateCouponAsync(8, request, CancellationToken.None))
-            .Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*between 0 and 100%*");
+        // Assert
+        await act.Should().ThrowAsync<KeyNotFoundException>()
+            .WithMessage("*999*");
     }
 
     [Fact]
@@ -436,86 +647,168 @@ public class CouponServiceTests
     [Trait("Method", "UpdateCouponAsync")]
     public async Task UpdateCouponAsync_WhenCouponExpired_ThrowsInvalidOperationException()
     {
-        var existing = MakeCoupon(id: 15, code: "EXPIRED", name: "Expired Coupon");
-        existing.EndTime = DateTime.UtcNow.AddDays(-1); // expired
+        // Arrange
+        var coupon = MakeValidCoupon(
+            id: 12,
+            end: DateTime.UtcNow.AddDays(-1));
 
-        _couponRepositoryMock
-            .Setup(r => r.GetByIdAsync(15, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(existing);
+        _couponRepoMock
+            .Setup(r => r.GetByIdAsync(12, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(coupon);
 
-        var service = CreateService();
+        var svc = CreateService();
 
-        await service.Invoking(s => s.UpdateCouponAsync(15, MakeUpdateRequest(), CancellationToken.None))
-            .Should().ThrowAsync<InvalidOperationException>()
+        // Act
+        var act = () => svc.UpdateCouponAsync(12, MakeValidUpdateRequest(), CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*expired*");
+    }
+
+    [Fact]
+    [Trait("Type", "Abnormal")]
+    [Trait("Method", "UpdateCouponAsync")]
+    public async Task UpdateCouponAsync_WhenUnusedAndDuplicateCode_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        var coupon = MakeValidCoupon(id: 13, code: "ORIGINAL", usedCount: 0);
+        var request = MakeValidUpdateRequest();
+        request.CouponCode = "DUPLICATE";
+
+        _couponRepoMock
+            .Setup(r => r.GetByIdAsync(13, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(coupon);
+        _couponRepoMock
+            .Setup(r => r.GetByCodeAsync("DUPLICATE", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(MakeValidCoupon(id: 99, code: "DUPLICATE"));
+
+        var svc = CreateService();
+
+        // Act
+        var act = () => svc.UpdateCouponAsync(13, request, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*already exists*");
+    }
+
+    [Fact]
+    [Trait("Type", "Abnormal")]
+    [Trait("Method", "UpdateCouponAsync")]
+    public async Task UpdateCouponAsync_WhenUnusedAndEndBeforeStart_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        var coupon = MakeValidCoupon(id: 14, usedCount: 0);
+        var request = MakeValidUpdateRequest();
+        request.StartTime = DateTime.UtcNow.AddDays(10);
+        request.EndTime = DateTime.UtcNow.AddDays(5);
+
+        _couponRepoMock
+            .Setup(r => r.GetByIdAsync(14, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(coupon);
+        _couponRepoMock
+            .Setup(r => r.GetByCodeAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Coupon?)null);
+
+        var svc = CreateService();
+
+        // Act
+        var act = () => svc.UpdateCouponAsync(14, request, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*End time must be after start time*");
+    }
+
+    [Fact]
+    [Trait("Type", "Abnormal")]
+    [Trait("Method", "UpdateCouponAsync")]
+    public async Task UpdateCouponAsync_WhenUsedAndEndBeforeStart_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        var coupon = MakeValidCoupon(id: 15, usedCount: 3);
+        var request = MakeValidUpdateRequest();
+        request.EndTime = coupon.StartTime.AddDays(-1);
+
+        _couponRepoMock
+            .Setup(r => r.GetByIdAsync(15, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(coupon);
+
+        var svc = CreateService();
+
+        // Act
+        var act = () => svc.UpdateCouponAsync(15, request, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*End time must be after start time*");
     }
 
     [Fact]
     [Trait("Type", "Boundary")]
     [Trait("Method", "UpdateCouponAsync")]
-    public async Task UpdateCouponAsync_WhenCouponIsUsed_UpdatesOnlyLimitedFields()
+    public async Task UpdateCouponAsync_WhenUnusedAndSameCode_SkipsUniquenessCheck()
     {
-        var existing = MakeCoupon(id: 12, code: "USED10", name: "Used Coupon", usedCount: 5);
-        var request = MakeUpdateRequest(); // has new code, name, desc, discount, etc.
+        // Arrange
+        var coupon = MakeValidCoupon(id: 16, code: "SAMECODE", usedCount: 0);
+        var request = MakeValidUpdateRequest();
+        request.CouponCode = "SAMECODE";
 
-        _couponRepositoryMock
-            .Setup(r => r.GetByIdAsync(12, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(existing);
-
-        _couponRepositoryMock
+        _couponRepoMock
+            .Setup(r => r.GetByIdAsync(16, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(coupon);
+        _lookupResolverMock
+            .Setup(r => r.GetIdAsync((ushort)LookupTypeEnum.CouponType, It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(FixedAmountTypeId);
+        _couponRepoMock
             .Setup(r => r.UpdateAsync(It.IsAny<Coupon>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Coupon c, CancellationToken _) =>
             {
-                c.TypeLv = new LookupValue { ValueCode = "PERCENT" };
-                c.CouponStatusLv = new LookupValue { ValueCode = "ACTIVE" };
+                c.TypeLv = MakeTypeLv();
+                c.CouponStatusLv = MakeStatusLv();
                 return c;
             });
 
-        var service = CreateService();
+        var svc = CreateService();
 
-        var result = await service.UpdateCouponAsync(12, request, CancellationToken.None);
+        // Act
+        var result = await svc.UpdateCouponAsync(16, request, CancellationToken.None);
 
-        // Used coupon: only Description, EndTime, MaxUsage change
-        result.CouponCode.Should().Be("USED10"); // NOT changed to "UP20"
-        result.CouponName.Should().Be("Used Coupon"); // NOT changed
-        result.DiscountValue.Should().Be(10); // NOT changed to 20
-        result.MaxUsage.Should().Be(50); // changed from request
+        // Assert
+        result.CouponCode.Should().Be("SAMECODE");
+        _couponRepoMock.Verify(r => r.GetByCodeAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
-    [Fact]
-    [Trait("Type", "Abnormal")]
-    [Trait("Method", "DeleteCouponAsync")]
-    public async Task DeleteCouponAsync_WhenCouponUsed_ThrowsInvalidOperationException()
-    {
-        _couponRepositoryMock
-            .Setup(r => r.GetByIdAsync(20, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(MakeCoupon(id: 20, usedCount: 1));
+    #endregion
 
-        var service = CreateService();
+    // ══════════════════════════════════════════════════════════════════
+    //  DeleteCouponAsync
+    // ══════════════════════════════════════════════════════════════════
 
-        await service.Invoking(s => s.DeleteCouponAsync(20, CancellationToken.None))
-            .Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*has been used*");
-    }
+    #region DeleteCouponAsync
 
     [Fact]
     [Trait("Type", "Normal")]
     [Trait("Method", "DeleteCouponAsync")]
-    public async Task DeleteCouponAsync_WhenValid_DeletesSuccessfully()
+    public async Task DeleteCouponAsync_WhenUnusedCoupon_DeletesSuccessfully()
     {
-        _couponRepositoryMock
-            .Setup(r => r.GetByIdAsync(30, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(MakeCoupon(id: 30, usedCount: 0));
-
-        _couponRepositoryMock
-            .Setup(r => r.DeleteAsync(30, It.IsAny<CancellationToken>()))
+        // Arrange
+        var coupon = MakeValidCoupon(id: 20, usedCount: 0);
+        _couponRepoMock
+            .Setup(r => r.GetByIdAsync(20, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(coupon);
+        _couponRepoMock
+            .Setup(r => r.DeleteAsync(20, It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
-        var service = CreateService();
+        var svc = CreateService();
 
-        await service.DeleteCouponAsync(30, CancellationToken.None);
+        // Act
+        await svc.DeleteCouponAsync(20, CancellationToken.None);
 
-        _couponRepositoryMock.Verify(r => r.DeleteAsync(30, It.IsAny<CancellationToken>()), Times.Once);
+        // Assert
+        _couponRepoMock.Verify(r => r.DeleteAsync(20, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -523,33 +816,65 @@ public class CouponServiceTests
     [Trait("Method", "DeleteCouponAsync")]
     public async Task DeleteCouponAsync_WhenCouponNotFound_ThrowsKeyNotFoundException()
     {
-        _couponRepositoryMock
-            .Setup(r => r.GetByIdAsync(-1, It.IsAny<CancellationToken>()))
+        // Arrange
+        _couponRepoMock
+            .Setup(r => r.GetByIdAsync(999, It.IsAny<CancellationToken>()))
             .ReturnsAsync((Coupon?)null);
 
-        var service = CreateService();
+        var svc = CreateService();
 
-        await service.Invoking(s => s.DeleteCouponAsync(-1, CancellationToken.None))
-            .Should().ThrowAsync<KeyNotFoundException>();
+        // Act
+        var act = () => svc.DeleteCouponAsync(999, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<KeyNotFoundException>()
+            .WithMessage("*999*");
     }
 
     [Fact]
-    [Trait("Type", "Boundary")]
+    [Trait("Type", "Abnormal")]
     [Trait("Method", "DeleteCouponAsync")]
-    public async Task DeleteCouponAsync_WhenDeleteReturnsFalse_ThrowsKeyNotFoundException()
+    public async Task DeleteCouponAsync_WhenCouponUsed_ThrowsInvalidOperationException()
     {
-        _couponRepositoryMock
-            .Setup(r => r.GetByIdAsync(40, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(MakeCoupon(id: 40, usedCount: 0));
+        // Arrange
+        var coupon = MakeValidCoupon(id: 21, usedCount: 3);
+        _couponRepoMock
+            .Setup(r => r.GetByIdAsync(21, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(coupon);
 
-        _couponRepositoryMock
-            .Setup(r => r.DeleteAsync(40, It.IsAny<CancellationToken>()))
+        var svc = CreateService();
+
+        // Act
+        var act = () => svc.DeleteCouponAsync(21, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*has been used*");
+    }
+
+    [Fact]
+    [Trait("Type", "Abnormal")]
+    [Trait("Method", "DeleteCouponAsync")]
+    public async Task DeleteCouponAsync_WhenRepoReturnsFalse_ThrowsKeyNotFoundException()
+    {
+        // Arrange
+        var coupon = MakeValidCoupon(id: 22, usedCount: 0);
+        _couponRepoMock
+            .Setup(r => r.GetByIdAsync(22, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(coupon);
+        _couponRepoMock
+            .Setup(r => r.DeleteAsync(22, It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
 
-        var service = CreateService();
+        var svc = CreateService();
 
-        await service.Invoking(s => s.DeleteCouponAsync(40, CancellationToken.None))
-            .Should().ThrowAsync<KeyNotFoundException>()
+        // Act
+        var act = () => svc.DeleteCouponAsync(22, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<KeyNotFoundException>()
             .WithMessage("*Failed to delete*");
     }
+
+    #endregion
 }

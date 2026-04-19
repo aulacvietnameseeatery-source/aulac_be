@@ -1,0 +1,152 @@
+@startuml
+title Order Management Module - Persistence Layer Class Diagram
+
+package "Persistence Layer" {
+
+    interface IOrderRepository <<interface>> {
+        +GetOrderHistoryAsync(query: OrderHistoryQueryDTO, ct: CancellationToken) : Task<PagedResultDTO<OrderHistoryDTO>>
+        +GetOrderStatusCountAsync(pendingStatusId: uint, inProgressStatusId: uint, completedStatusId: uint, cancelledStatusId: uint, ct: CancellationToken) : Task<OrderStatusCountDTO>
+        +GetKitchenOrdersAsync(pendingStatusId: uint, inProgressStatusId: uint, completedStatusId: uint, cancelledStatusId: uint, ct: CancellationToken) : Task<List<KitchenOrderDTO>>
+        +GetOrderByIdAsync(orderId: long, ct: CancellationToken) : Task<OrderDetailDTO>
+        +GetCustomerOrderByIdAsync(orderId: long, ct: CancellationToken) : Task<CustomerOrderHistoryDTO>
+        +CreateOrderAsync(order: Order, items: List<OrderItem>, ct: CancellationToken) : Task<long>
+        +AddAsync(order: Order, ct: CancellationToken) : Task
+        +AddItemsToOrderAsync(orderId: long, items: List<OrderItem>, completedOrderStatusId: uint, cancelledOrderStatusId: uint, pendingOrderStatusId: uint, ct: CancellationToken) : Task
+        +UpdateOrderItemStatusAsync(orderItemId: long, newStatusLvId: uint, rejectReason: string?, inProgressItemStatusId: uint, readyItemStatusId: uint, servedItemStatusId: uint, rejectedItemStatusId: uint, cancelledItemStatusId: uint, pendingOrderStatusId: uint, inProgressOrderStatusId: uint, completedOrderStatusId: uint, cancelledOrderStatusId: uint, availableTableStatusId: uint, ct: CancellationToken) : Task
+        +GetByIdForUpdateAsync(orderId: long, ct: CancellationToken) : Task<Order?>
+        +GetOrderWithItemsAsync(orderId: long, ct: CancellationToken) : Task<Order?>
+        +GetActiveOrderByTableAsync(tableId: long, ct: CancellationToken) : Task<Order?>
+        +GetOrderItemAsync(orderItemId: long, ct: CancellationToken) : Task<OrderItem?>
+        +GetRecentOrdersAsync(userId: long, roles: List<string>, limit: int, ct: CancellationToken) : Task<List<RecentOrderDTO>>
+    }
+
+    class OrderRepository <<Repository>> {
+        -_context : RestaurantMgmtContext
+        -_realtime : IOrderRealtimeService
+        -_i18nService : Ii18nService
+        +GetOrderHistoryAsync(query: OrderHistoryQueryDTO, ct: CancellationToken) : Task<PagedResultDTO<OrderHistoryDTO>>
+        +GetOrderStatusCountAsync(pendingStatusId: uint, inProgressStatusId: uint, completedStatusId: uint, cancelledStatusId: uint, ct: CancellationToken) : Task<OrderStatusCountDTO>
+        +GetKitchenOrdersAsync(pendingStatusId: uint, inProgressStatusId: uint, completedStatusId: uint, cancelledStatusId: uint, ct: CancellationToken) : Task<List<KitchenOrderDTO>>
+        +GetOrderByIdAsync(orderId: long, ct: CancellationToken) : Task<OrderDetailDTO>
+        +GetCustomerOrderByIdAsync(orderId: long, ct: CancellationToken) : Task<CustomerOrderHistoryDTO>
+        +CreateOrderAsync(order: Order, items: List<OrderItem>, ct: CancellationToken) : Task<long>
+        +AddAsync(order: Order, ct: CancellationToken) : Task
+        +AddItemsToOrderAsync(orderId: long, items: List<OrderItem>, completedOrderStatusId: uint, cancelledOrderStatusId: uint, pendingOrderStatusId: uint, ct: CancellationToken) : Task
+        +UpdateOrderItemStatusAsync(orderItemId: long, newStatusLvId: uint, rejectReason: string?, ..., ct: CancellationToken) : Task
+        +GetByIdForUpdateAsync(orderId: long, ct: CancellationToken) : Task<Order?>
+        +GetOrderWithItemsAsync(orderId: long, ct: CancellationToken) : Task<Order?>
+        +GetActiveOrderByTableAsync(tableId: long, ct: CancellationToken) : Task<Order?>
+        +GetOrderItemAsync(orderItemId: long, ct: CancellationToken) : Task<OrderItem?>
+        +GetRecentOrdersAsync(userId: long, roles: List<string>, limit: int, ct: CancellationToken) : Task<List<RecentOrderDTO>>
+    }
+
+    interface IPaymentRepository <<interface>> {
+        +GetPaymentsAsync(query: PaymentListQueryDTO, ct: CancellationToken) : Task<PagedResultDTO<PaymentListDTO>>
+    }
+
+    class PaymentRepository <<Repository>> {
+        -_context : RestaurantMgmtContext
+        +GetPaymentsAsync(query: PaymentListQueryDTO, ct: CancellationToken) : Task<PagedResultDTO<PaymentListDTO>>
+    }
+
+    interface ITableRepository <<interface>> {
+        +GetByIdAsync(tableId: long, ct: CancellationToken) : Task<RestaurantTable?>
+        +GetAvailableTablesAsync(ct: CancellationToken) : Task<List<RestaurantTable>>
+    }
+
+    class TableRepository <<Repository>> {
+        -_context : RestaurantMgmtContext
+        +GetByIdAsync(tableId: long, ct: CancellationToken) : Task<RestaurantTable?>
+        +GetAvailableTablesAsync(ct: CancellationToken) : Task<List<RestaurantTable>>
+    }
+
+    interface IDishRepository <<interface>> {
+        +GetByIdAsync(dishId: long, ct: CancellationToken) : Task<Dish?>
+    }
+
+    class DishRepository <<Repository>> {
+        -_context : RestaurantMgmtContext
+        +GetByIdAsync(dishId: long, ct: CancellationToken) : Task<Dish?>
+    }
+
+    interface ITaxRepository <<interface>> {
+        +GetDefaultTaxAsync(ct: CancellationToken) : Task<Tax?>
+        +GetByIdAsync(taxId: long, ct: CancellationToken) : Task<Tax?>
+    }
+
+    class TaxRepository <<Repository>> {
+        -_context : RestaurantMgmtContext
+        +GetDefaultTaxAsync(ct: CancellationToken) : Task<Tax?>
+        +GetByIdAsync(taxId: long, ct: CancellationToken) : Task<Tax?>
+    }
+
+    interface IUnitOfWork <<interface>> {
+        +BeginTransactionAsync(ct: CancellationToken) : Task
+        +CommitAsync(ct: CancellationToken) : Task
+        +RollbackAsync(ct: CancellationToken) : Task
+        +SaveChangesAsync(ct: CancellationToken) : Task
+    }
+
+    class UnitOfWork <<Repository>> {
+        -_db : RestaurantMgmtContext
+        +BeginTransactionAsync(ct: CancellationToken) : Task
+        +CommitAsync(ct: CancellationToken) : Task
+        +RollbackAsync(ct: CancellationToken) : Task
+        +SaveChangesAsync(ct: CancellationToken) : Task
+    }
+}
+
+' ── External stubs ──
+class RestaurantMgmtContext <<DbContext>>
+class IOrderRealtimeService <<interface>>
+class Ii18nService <<interface>>
+class Order <<Entity>>
+class OrderItem <<Entity>>
+class RestaurantTable <<Entity>>
+class Dish <<Entity>>
+class Tax <<Entity>>
+class OrderHistoryQueryDTO <<DTO>>
+class OrderHistoryDTO <<DTO>>
+class OrderDetailDTO <<DTO>>
+class CustomerOrderHistoryDTO <<DTO>>
+class KitchenOrderDTO <<DTO>>
+class OrderStatusCountDTO <<DTO>>
+class RecentOrderDTO <<DTO>>
+class PaymentListQueryDTO <<DTO>>
+class PaymentListDTO <<DTO>>
+
+' ── Relationships ──
+
+OrderRepository ..|> IOrderRepository : implements
+OrderRepository --> RestaurantMgmtContext : uses for data access
+OrderRepository --> IOrderRealtimeService : pushes real-time events on item status change
+OrderRepository --> Ii18nService : resolves i18n dish names
+OrderRepository ..> Order : queries and persists
+OrderRepository ..> OrderItem : queries and persists
+OrderRepository ..> RestaurantTable : joins for table info
+OrderRepository ..> OrderHistoryDTO : projects to history DTO
+OrderRepository ..> OrderDetailDTO : projects to detail DTO
+OrderRepository ..> CustomerOrderHistoryDTO : projects to customer DTO
+OrderRepository ..> KitchenOrderDTO : projects to kitchen DTO
+OrderRepository ..> OrderStatusCountDTO : projects to count DTO
+
+PaymentRepository ..|> IPaymentRepository : implements
+PaymentRepository --> RestaurantMgmtContext : uses for data access
+PaymentRepository ..> PaymentListDTO : projects to list DTO
+
+TableRepository ..|> ITableRepository : implements
+TableRepository --> RestaurantMgmtContext : uses for data access
+TableRepository ..> RestaurantTable : queries
+
+DishRepository ..|> IDishRepository : implements
+DishRepository --> RestaurantMgmtContext : uses for data access
+DishRepository ..> Dish : queries
+
+TaxRepository ..|> ITaxRepository : implements
+TaxRepository --> RestaurantMgmtContext : uses for data access
+TaxRepository ..> Tax : queries
+
+UnitOfWork ..|> IUnitOfWork : implements
+UnitOfWork --> RestaurantMgmtContext : coordinates transactions
+
+@enduml

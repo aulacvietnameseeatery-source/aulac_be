@@ -1,5 +1,6 @@
-@startuml 2.6.2.6-view-kitchen-orders
+@startuml
 title 2.6.2.6 View Kitchen Orders
+
 skinparam maxMessageSize 250
 skinparam sequence {
     ParticipantBackgroundColor #ffffff
@@ -8,35 +9,55 @@ skinparam sequence {
 
 autonumber
 
-actor ":User" as U
-participant ":KitchenOrdersPage" as Client
+actor ":Kitchen Staff" as U
+participant ":KitchenDisplayPage" as Client
 participant ":OrderController" as Ctrl
 participant ":OrderService" as Svc
 participant ":ILookupResolver" as Lookup
-participant ":IOrderRepository" as Repo
+participant ":IOrderRepository" as OrderRepo
 participant ":Database" as DB
 
 activate U
-U ->> Client : Open kitchen orders page
+
+U ->> Client : Open Kitchen Display Screen
 activate Client
+
 Client ->> Ctrl : GET /api/orders/kitchen
 activate Ctrl
+
+note right of Ctrl : [HasPermission(Permissions.ViewOrder)]
+
 Ctrl ->> Svc : GetKitchenOrdersAsync(ct)
 activate Svc
 
-Svc ->> Lookup : Resolve order status IDs for PENDING, IN_PROGRESS, COMPLETED, and CANCELLED
+Svc ->> Lookup : GetIdAsync(OrderStatus, PENDING)
 activate Lookup
-Lookup -->> Svc : pendingId, inProgressId, completedId, cancelledId
+Lookup -->> Svc : pendingStatusId
 deactivate Lookup
 
-Svc ->> Repo : GetKitchenOrdersAsync(pendingId, inProgressId, completedId, cancelledId, ct)
-activate Repo
-Repo ->> DB : Query today's orders with allowed statuses,\nincluding table, order items, dishes, and item statuses
+Svc ->> Lookup : GetIdAsync(OrderStatus, IN_PROGRESS)
+activate Lookup
+Lookup -->> Svc : inProgressStatusId
+deactivate Lookup
+
+Svc ->> Lookup : GetIdAsync(OrderStatus, COMPLETED)
+activate Lookup
+Lookup -->> Svc : completedStatusId
+deactivate Lookup
+
+Svc ->> Lookup : GetIdAsync(OrderStatus, CANCELLED)
+activate Lookup
+Lookup -->> Svc : cancelledStatusId
+deactivate Lookup
+
+Svc ->> OrderRepo : GetKitchenOrdersAsync(pendingStatusId, inProgressStatusId, completedStatusId, cancelledStatusId, ct)
+activate OrderRepo
+OrderRepo ->> DB : SELECT active orders (PENDING + IN_PROGRESS) with items, table code, item statuses
 activate DB
-DB -->> Repo : Return List<KitchenOrderDTO>
+DB -->> OrderRepo : List<KitchenOrderDTO>
 deactivate DB
-Repo -->> Svc : List<KitchenOrderDTO>
-deactivate Repo
+OrderRepo -->> Svc : List<KitchenOrderDTO>
+deactivate OrderRepo
 
 alt#White No kitchen orders for today
     Svc -->> Ctrl : empty List<KitchenOrderDTO>
@@ -45,12 +66,15 @@ alt#White No kitchen orders for today
     deactivate Ctrl
     Client -->> U : Display empty kitchen order board
 else Kitchen orders found
-    Svc -->> Ctrl : List<KitchenOrderDTO>
-    deactivate Svc
-    Ctrl -->> Client : 200 OK ApiResponse<List<KitchenOrderDTO>>
-    deactivate Ctrl
-    Client -->> U : Display kitchen orders with item statuses
-end
+Svc -->> Ctrl : List<KitchenOrderDTO>
+deactivate Svc
+
+Ctrl -->> Client : 200 OK (List<KitchenOrderDTO>)
+deactivate Ctrl
+
+Client -->> U : Display kitchen order board (orders grouped by table, items with statuses)
+
+note over Client : Real-time updates via SignalR\n(OrderCreated, OrderUpdated, OrderItemUpdated events)
 
 deactivate Client
 deactivate U

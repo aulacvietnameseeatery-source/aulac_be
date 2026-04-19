@@ -25,53 +25,48 @@ namespace Tests.Services;
 /// Unit Test — OrderService
 /// Code Module : Core/Service/OrderService.cs
 /// Method      : GetOrderHistoryAsync, GetOrderStatusCountAsync, GetKitchenOrdersAsync,
-///               UpdateOrderStatusAsync, UpdateOrderItemStatusAsync, CancelOrderItemAsync,
-///               GetOrderByIdAsync, CreateOrderAsync (staff), AddItemsAsync,
-///               GetCustomerOrderByIdAsync, AddItemsToOrderAsync (customer),
-///               CreateOrderAsync (customer DTO), GetRecentOrdersAsync
+///               UpdateOrderStatusAsync, CancelOrderItemAsync, GetOrderByIdAsync,
+///               CreateOrderAsync (Staff), AddItemsAsync, CreateOrderAsync (Customer),
+///               AddItemsToOrderAsync, GetRecentOrdersAsync
 /// Created By  : quantm
 /// Executed By : quantm
-/// Test Req.   : Kiểm tra toàn bộ logic quản lý đơn hàng bao gồm:
-///               CRUD đơn hàng, chuyển trạng thái, thêm món, huỷ món,
-///               xử lý bàn khi đổi trạng thái, validate thanh toán,
-///               tạo đơn từ QR (customer), tính thuế tự động.
+/// Test Req.   : Verify order management business logic including order listing,
+///               status counting, kitchen view, status transitions, item cancellation,
+///               order creation by staff and customer, item additions, and recent orders.
 /// </summary>
 public class OrderServiceTests
 {
-    // ── Mocks ──────────────────────────────────────────────────────────────
-    private readonly Mock<IOrderRepository>              _orderRepoMock    = new();
-    private readonly Mock<ITableRepository>              _tableRepoMock    = new();
-    private readonly Mock<ILookupResolver>               _lookupResolverMock = new();
-    private readonly Mock<IDishRepository>               _dishRepoMock     = new();
-    private readonly Mock<ICustomerService>              _customerServiceMock = new();
-    private readonly Mock<IUnitOfWork>                   _uowMock          = new();
-    private readonly Mock<INotificationService>          _notificationServiceMock = new();
-    private readonly Mock<IOrderRealtimeService>         _realtimeMock     = new();
-    private readonly Mock<IShiftLiveRealtimePublisher>   _shiftLiveMock    = new();
-    private readonly Mock<ITaxRepository>                _taxRepoMock      = new();
+    // ── Mocks ──
+    private readonly Mock<IOrderRepository> _orderRepoMock = new();
+    private readonly Mock<ITableRepository> _tableRepoMock = new();
+    private readonly Mock<ILookupResolver> _lookupResolverMock = new();
+    private readonly Mock<IDishRepository> _dishRepoMock = new();
+    private readonly Mock<ICustomerService> _customerServiceMock = new();
+    private readonly Mock<IUnitOfWork> _uowMock = new();
+    private readonly Mock<INotificationService> _notificationServiceMock = new();
+    private readonly Mock<IOrderRealtimeService> _realtimeMock = new();
+    private readonly Mock<IShiftLiveRealtimePublisher> _shiftLiveMock = new();
+    private readonly Mock<ITaxRepository> _taxRepoMock = new();
 
-    // ── Lookup ID Constants ────────────────────────────────────────────────
-    private const uint ORDER_PENDING_ID     = 10;
-    private const uint ORDER_IN_PROGRESS_ID = 11;
-    private const uint ORDER_COMPLETED_ID   = 12;
-    private const uint ORDER_CANCELLED_ID   = 13;
+    // ── Lookup IDs ──
+    private const uint PendingStatusId = 100;
+    private const uint InProgressStatusId = 101;
+    private const uint CompletedStatusId = 102;
+    private const uint CancelledStatusId = 103;
+    private const uint AvailableTableStatusId = 200;
+    private const uint OccupiedTableStatusId = 201;
+    private const uint ReservedTableStatusId = 202;
+    private const uint LockedTableStatusId = 203;
+    private const uint CreatedItemStatusId = 300;
+    private const uint InProgressItemStatusId = 301;
+    private const uint ReadyItemStatusId = 302;
+    private const uint ServedItemStatusId = 303;
+    private const uint RejectedItemStatusId = 304;
+    private const uint CancelledItemStatusId = 305;
+    private const uint DineInSourceId = 400;
+    private const uint TakeawaySourceId = 401;
 
-    private const uint ITEM_CREATED_ID      = 20;
-    private const uint ITEM_IN_PROGRESS_ID  = 21;
-    private const uint ITEM_READY_ID        = 22;
-    private const uint ITEM_SERVED_ID       = 23;
-    private const uint ITEM_REJECTED_ID     = 24;
-    private const uint ITEM_CANCELLED_ID    = 25;
-
-    private const uint TABLE_AVAILABLE_ID   = 30;
-    private const uint TABLE_OCCUPIED_ID    = 31;
-    private const uint TABLE_LOCKED_ID      = 32;
-    private const uint TABLE_RESERVED_ID    = 33;
-
-    private const uint SOURCE_DINE_IN_ID    = 40;
-    private const uint SOURCE_TAKEAWAY_ID   = 41;
-
-    // ── Factory ────────────────────────────────────────────────────────────
+    // ── Factory ──
     private OrderService CreateService() => new(
         _orderRepoMock.Object,
         _tableRepoMock.Object,
@@ -84,234 +79,319 @@ public class OrderServiceTests
         _shiftLiveMock.Object,
         _taxRepoMock.Object);
 
-    // ── Test Data Helpers ──────────────────────────────────────────────────
-    private static Order MakeOrder(
-        long orderId = 1,
-        long? tableId = 1,
-        long? staffId = 100,
-        uint statusId = ORDER_PENDING_ID,
-        decimal totalAmount = 100m,
-        List<OrderItem>? items = null,
-        List<Payment>? payments = null) => new()
+    // ── Setup Helpers ──
+    private void SetupLookupResolver()
     {
-        OrderId = orderId,
-        TableId = tableId,
-        StaffId = staffId,
-        CustomerId = 1,
-        TotalAmount = totalAmount,
-        SubTotalAmount = totalAmount,
-        OrderStatusLvId = statusId,
-        SourceLvId = SOURCE_DINE_IN_ID,
-        CreatedAt = DateTime.UtcNow,
-        UpdatedAt = DateTime.UtcNow,
-        OrderStatusLv = new LookupValue { ValueCode = statusId switch
-        {
-            ORDER_PENDING_ID => "PENDING",
-            ORDER_IN_PROGRESS_ID => "IN_PROGRESS",
-            ORDER_COMPLETED_ID => "COMPLETED",
-            ORDER_CANCELLED_ID => "CANCELLED",
-            _ => "PENDING"
-        }},
-        OrderItems = items != null ? new List<OrderItem>(items) : new List<OrderItem>(),
-        Payments = payments != null ? new List<Payment>(payments) : new List<Payment>()
-    };
-
-    private static RestaurantTable MakeTable(
-        long tableId = 1,
-        string tableCode = "T001",
-        int capacity = 4,
-        uint statusId = TABLE_AVAILABLE_ID) => new()
-    {
-        TableId = tableId,
-        TableCode = tableCode,
-        Capacity = capacity,
-        TableStatusLvId = statusId,
-        IsOnline = true,
-        QrToken = "valid-qr-token"
-    };
-
-    private static Dish MakeDish(long dishId = 1, string name = "Phở bò", decimal price = 50000m) => new()
-    {
-        DishId = dishId,
-        DishName = name,
-        Price = price
-    };
-
-    private static Tax MakeTax(long taxId = 1, decimal rate = 10m, string type = "EXCLUSIVE", bool isDefault = true) => new()
-    {
-        TaxId = taxId,
-        TaxName = "VAT",
-        TaxRate = rate,
-        TaxType = type,
-        IsActive = true,
-        IsDefault = isDefault
-    };
-
-    // ── Common Setup Helpers ───────────────────────────────────────────────
-    private void SetupDefaultLookupBehavior()
-    {
+        // Order statuses
         _lookupResolverMock
-            .Setup(r => r.GetIdAsync(It.IsAny<ushort>(), It.IsAny<System.Enum>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((ushort typeId, System.Enum code, CancellationToken ct) =>
+            .Setup(x => x.GetIdAsync((ushort)LookupTypeEnum.OrderStatus, It.Is<System.Enum>(e => e.ToString() == "PENDING"), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(PendingStatusId);
+        _lookupResolverMock
+            .Setup(x => x.GetIdAsync((ushort)LookupTypeEnum.OrderStatus, It.Is<System.Enum>(e => e.ToString() == "IN_PROGRESS"), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(InProgressStatusId);
+        _lookupResolverMock
+            .Setup(x => x.GetIdAsync((ushort)LookupTypeEnum.OrderStatus, It.Is<System.Enum>(e => e.ToString() == "COMPLETED"), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(CompletedStatusId);
+        _lookupResolverMock
+            .Setup(x => x.GetIdAsync((ushort)LookupTypeEnum.OrderStatus, It.Is<System.Enum>(e => e.ToString() == "CANCELLED"), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(CancelledStatusId);
+
+        // Table statuses
+        _lookupResolverMock
+            .Setup(x => x.GetIdAsync((ushort)LookupTypeEnum.TableStatus, It.Is<System.Enum>(e => e.ToString() == "AVAILABLE"), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AvailableTableStatusId);
+        _lookupResolverMock
+            .Setup(x => x.GetIdAsync((ushort)LookupTypeEnum.TableStatus, It.Is<System.Enum>(e => e.ToString() == "OCCUPIED"), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(OccupiedTableStatusId);
+        _lookupResolverMock
+            .Setup(x => x.GetIdAsync((ushort)LookupTypeEnum.TableStatus, It.Is<System.Enum>(e => e.ToString() == "RESERVED"), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ReservedTableStatusId);
+        _lookupResolverMock
+            .Setup(x => x.GetIdAsync((ushort)LookupTypeEnum.TableStatus, It.Is<System.Enum>(e => e.ToString() == "LOCKED"), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(LockedTableStatusId);
+
+        // Order item statuses
+        _lookupResolverMock
+            .Setup(x => x.GetIdAsync((ushort)LookupTypeEnum.OrderItemStatus, It.Is<System.Enum>(e => e.ToString() == "CREATED"), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(CreatedItemStatusId);
+        _lookupResolverMock
+            .Setup(x => x.GetIdAsync((ushort)LookupTypeEnum.OrderItemStatus, It.Is<System.Enum>(e => e.ToString() == "IN_PROGRESS"), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(InProgressItemStatusId);
+        _lookupResolverMock
+            .Setup(x => x.GetIdAsync((ushort)LookupTypeEnum.OrderItemStatus, It.Is<System.Enum>(e => e.ToString() == "READY"), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ReadyItemStatusId);
+        _lookupResolverMock
+            .Setup(x => x.GetIdAsync((ushort)LookupTypeEnum.OrderItemStatus, It.Is<System.Enum>(e => e.ToString() == "SERVED"), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ServedItemStatusId);
+        _lookupResolverMock
+            .Setup(x => x.GetIdAsync((ushort)LookupTypeEnum.OrderItemStatus, It.Is<System.Enum>(e => e.ToString() == "REJECTED"), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(RejectedItemStatusId);
+        _lookupResolverMock
+            .Setup(x => x.GetIdAsync((ushort)LookupTypeEnum.OrderItemStatus, It.Is<System.Enum>(e => e.ToString() == "CANCELLED"), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(CancelledItemStatusId);
+
+        // Order source
+        _lookupResolverMock
+            .Setup(x => x.GetIdAsync((ushort)LookupTypeEnum.OrderSource, It.Is<System.Enum>(e => e.ToString() == "DINE_IN"), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(DineInSourceId);
+        _lookupResolverMock
+            .Setup(x => x.GetIdAsync((ushort)LookupTypeEnum.OrderSource, It.Is<System.Enum>(e => e.ToString() == "TAKEAWAY"), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(TakeawaySourceId);
+    }
+
+    private void SetupDefaultTax()
+    {
+        _taxRepoMock.Setup(x => x.GetDefaultTaxAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Tax
             {
-                return code switch
-                {
-                    OrderStatusCode.PENDING       => ORDER_PENDING_ID,
-                    OrderStatusCode.IN_PROGRESS   => ORDER_IN_PROGRESS_ID,
-                    OrderStatusCode.COMPLETED     => ORDER_COMPLETED_ID,
-                    OrderStatusCode.CANCELLED     => ORDER_CANCELLED_ID,
-                    OrderItemStatusCode.CREATED   => ITEM_CREATED_ID,
-                    OrderItemStatusCode.IN_PROGRESS => ITEM_IN_PROGRESS_ID,
-                    OrderItemStatusCode.READY     => ITEM_READY_ID,
-                    OrderItemStatusCode.SERVED    => ITEM_SERVED_ID,
-                    OrderItemStatusCode.REJECTED  => ITEM_REJECTED_ID,
-                    OrderItemStatusCode.CANCELLED => ITEM_CANCELLED_ID,
-                    TableStatusCode.AVAILABLE     => TABLE_AVAILABLE_ID,
-                    TableStatusCode.OCCUPIED      => TABLE_OCCUPIED_ID,
-                    TableStatusCode.LOCKED        => TABLE_LOCKED_ID,
-                    TableStatusCode.RESERVED      => TABLE_RESERVED_ID,
-                    OrderSourceCode.DINE_IN       => SOURCE_DINE_IN_ID,
-                    OrderSourceCode.TAKEAWAY      => SOURCE_TAKEAWAY_ID,
-                    _ => 0u
-                };
+                TaxId = 1,
+                TaxName = "VAT",
+                TaxRate = 10m,
+                TaxType = "EXCLUSIVE",
+                IsDefault = true,
+                IsActive = true
             });
     }
 
-    private void SetupDefaultUoW()
-    {
-        _uowMock.Setup(u => u.BeginTransactionAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-        _uowMock.Setup(u => u.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-        _uowMock.Setup(u => u.RollbackAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-        _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-    }
+    // ── Entity Helpers ──
+    private static Order MakeOrder(
+        long orderId = 1,
+        uint statusId = PendingStatusId,
+        long? tableId = 10,
+        long? staffId = 5,
+        long customerId = 1,
+        decimal totalAmount = 100_000m,
+        decimal subTotalAmount = 100_000m) => new()
+        {
+            OrderId = orderId,
+            OrderStatusLvId = statusId,
+            TableId = tableId,
+            StaffId = staffId,
+            CustomerId = customerId,
+            TotalAmount = totalAmount,
+            SubTotalAmount = subTotalAmount,
+            CreatedAt = new DateTime(2025, 6, 1, 12, 0, 0, DateTimeKind.Utc),
+            UpdatedAt = new DateTime(2025, 6, 1, 12, 0, 0, DateTimeKind.Utc),
+            OrderStatusLv = new LookupValue { ValueId = statusId, ValueCode = "PENDING" },
+            Payments = new List<Payment>(),
+            OrderItems = new List<OrderItem>()
+        };
 
-    private void SetupNoDefaultTax()
-    {
-        _taxRepoMock
-            .Setup(t => t.GetDefaultTaxAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync((Tax?)null);
-    }
+    private static RestaurantTable MakeTable(
+        long tableId = 10,
+        string tableCode = "TB-001",
+        uint statusId = AvailableTableStatusId) => new()
+        {
+            TableId = tableId,
+            TableCode = tableCode,
+            Capacity = 4,
+            TableStatusLvId = statusId,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+            IsDeleted = false,
+            QrToken = "valid-qr-token"
+        };
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // TEST CASES — GetOrderHistoryAsync
-    // ═══════════════════════════════════════════════════════════════════════
+    private static Dish MakeDish(long dishId = 1, string name = "Pho Bo", decimal price = 50_000m) => new()
+    {
+        DishId = dishId,
+        DishName = name,
+        Price = price,
+        CategoryId = 1,
+        CreatedAt = DateTime.UtcNow
+    };
+
+    private static OrderItem MakeOrderItem(
+        long orderItemId = 1,
+        long orderId = 1,
+        long dishId = 1,
+        int qty = 2,
+        decimal price = 50_000m,
+        uint statusId = CreatedItemStatusId) => new()
+        {
+            OrderItemId = orderItemId,
+            OrderId = orderId,
+            DishId = dishId,
+            Quantity = qty,
+            Price = price,
+            ItemStatusLvId = statusId,
+            Dish = MakeDish(dishId),
+            Order = new Order
+            {
+                OrderId = orderId,
+                Table = MakeTable()
+            }
+        };
+
+    // ══════════════════════════════════════════════════════════════════
+    // GetOrderHistoryAsync
+    // ══════════════════════════════════════════════════════════════════
 
     #region GetOrderHistoryAsync
 
     [Fact]
     [Trait("Type", "Normal")]
     [Trait("Method", "GetOrderHistoryAsync")]
-    public async Task GetOrderHistoryAsync_WhenDataExists_ReturnsPagedResult()
+    public async Task GetOrderHistoryAsync_WhenValidQuery_ReturnsPagedResult()
     {
         // Arrange
+        var query = new OrderHistoryQueryDTO { PageIndex = 1, PageSize = 10 };
         var expected = new PagedResultDTO<OrderHistoryDTO>
         {
             PageData = new List<OrderHistoryDTO>
             {
-                new() { OrderId = 1 },
-                new() { OrderId = 2 }
+                new() { OrderId = 1, TableCode = "TB-001", StaffName = "Staff A", TotalAmount = 100_000m, OrderStatus = "PENDING" },
+                new() { OrderId = 2, TableCode = "TB-002", StaffName = "Staff B", TotalAmount = 200_000m, OrderStatus = "COMPLETED" }
             },
+            PageIndex = 1,
+            PageSize = 10,
             TotalCount = 2
         };
-
-        _orderRepoMock
-            .Setup(r => r.GetOrderHistoryAsync(It.IsAny<OrderHistoryQueryDTO>(), It.IsAny<CancellationToken>()))
+        _orderRepoMock.Setup(x => x.GetOrderHistoryAsync(query, It.IsAny<CancellationToken>()))
             .ReturnsAsync(expected);
-
         var service = CreateService();
-        var query = new OrderHistoryQueryDTO();
 
         // Act
-        var result = await service.GetOrderHistoryAsync(query);
+        var result = await service.GetOrderHistoryAsync(query, CancellationToken.None);
 
         // Assert
+        result.Should().BeSameAs(expected);
         result.PageData.Should().HaveCount(2);
+        result.PageData[0].OrderId.Should().Be(1);
+        result.PageData[1].OrderId.Should().Be(2);
         result.TotalCount.Should().Be(2);
+    }
+
+    [Fact]
+    [Trait("Type", "Normal")]
+    [Trait("Method", "GetOrderHistoryAsync")]
+    public async Task GetOrderHistoryAsync_WhenFilteredByStatus_ReturnsFilteredResult()
+    {
+        // Arrange
+        var query = new OrderHistoryQueryDTO
+        {
+            PageIndex = 1,
+            PageSize = 10,
+            OrderStatusCode = OrderStatusCode.COMPLETED
+        };
+        var expected = new PagedResultDTO<OrderHistoryDTO>
+        {
+            PageData = new List<OrderHistoryDTO>
+            {
+                new() { OrderId = 3, OrderStatus = "COMPLETED", TotalAmount = 150_000m }
+            },
+            PageIndex = 1,
+            PageSize = 10,
+            TotalCount = 1
+        };
+        _orderRepoMock.Setup(x => x.GetOrderHistoryAsync(query, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(expected);
+        var service = CreateService();
+
+        // Act
+        var result = await service.GetOrderHistoryAsync(query, CancellationToken.None);
+
+        // Assert
+        result.PageData.Should().HaveCount(1);
+        result.PageData[0].OrderStatus.Should().Be("COMPLETED");
+        result.TotalCount.Should().Be(1);
     }
 
     [Fact]
     [Trait("Type", "Boundary")]
     [Trait("Method", "GetOrderHistoryAsync")]
-    public async Task GetOrderHistoryAsync_WhenNoData_ReturnsEmptyResult()
+    public async Task GetOrderHistoryAsync_WhenNoOrders_ReturnsEmptyPage()
     {
         // Arrange
+        var query = new OrderHistoryQueryDTO { PageIndex = 1, PageSize = 10 };
         var expected = new PagedResultDTO<OrderHistoryDTO>
         {
             PageData = new List<OrderHistoryDTO>(),
+            PageIndex = 1,
+            PageSize = 10,
             TotalCount = 0
         };
-
-        _orderRepoMock
-            .Setup(r => r.GetOrderHistoryAsync(It.IsAny<OrderHistoryQueryDTO>(), It.IsAny<CancellationToken>()))
+        _orderRepoMock.Setup(x => x.GetOrderHistoryAsync(query, It.IsAny<CancellationToken>()))
             .ReturnsAsync(expected);
-
         var service = CreateService();
-        var query = new OrderHistoryQueryDTO();
 
         // Act
-        var result = await service.GetOrderHistoryAsync(query);
+        var result = await service.GetOrderHistoryAsync(query, CancellationToken.None);
 
         // Assert
         result.PageData.Should().BeEmpty();
         result.TotalCount.Should().Be(0);
+        result.TotalPage.Should().Be(0);
     }
 
     [Fact]
-    [Trait("Type", "Abnormal")]
+    [Trait("Type", "Normal")]
     [Trait("Method", "GetOrderHistoryAsync")]
-    public async Task GetOrderHistoryAsync_WhenRepositoryThrows_PropagatesException()
+    public async Task GetOrderHistoryAsync_WhenSearchByKeyword_DelegatesToRepo()
     {
         // Arrange
-        _orderRepoMock
-            .Setup(r => r.GetOrderHistoryAsync(It.IsAny<OrderHistoryQueryDTO>(), It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new ArgumentException("Invalid query parameters"));
-
+        var query = new OrderHistoryQueryDTO { PageIndex = 1, PageSize = 5, Search = "TB-001" };
+        var expected = new PagedResultDTO<OrderHistoryDTO>
+        {
+            PageData = new List<OrderHistoryDTO>
+            {
+                new() { OrderId = 10, TableCode = "TB-001", TotalAmount = 80_000m }
+            },
+            PageIndex = 1,
+            PageSize = 5,
+            TotalCount = 1
+        };
+        _orderRepoMock.Setup(x => x.GetOrderHistoryAsync(query, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(expected);
         var service = CreateService();
 
-        // Act & Assert
-        await service.Invoking(s => s.GetOrderHistoryAsync(new OrderHistoryQueryDTO()))
-            .Should().ThrowAsync<ArgumentException>()
-            .WithMessage("*Invalid query*");
+        // Act
+        var result = await service.GetOrderHistoryAsync(query, CancellationToken.None);
+
+        // Assert
+        result.PageData.Should().HaveCount(1);
+        result.PageData[0].TableCode.Should().Be("TB-001");
+        _orderRepoMock.Verify(x => x.GetOrderHistoryAsync(query, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     #endregion
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // TEST CASES — GetOrderStatusCountAsync
-    // ═══════════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════
+    // GetOrderStatusCountAsync
+    // ══════════════════════════════════════════════════════════════════
 
     #region GetOrderStatusCountAsync
 
     [Fact]
     [Trait("Type", "Normal")]
     [Trait("Method", "GetOrderStatusCountAsync")]
-    public async Task GetOrderStatusCountAsync_WhenCalled_ResolvesStatusIdsAndReturnsCount()
+    public async Task GetOrderStatusCountAsync_WhenCalled_ReturnsCorrectCounts()
     {
         // Arrange
-        SetupDefaultLookupBehavior();
-
+        SetupLookupResolver();
         var expected = new OrderStatusCountDTO
         {
+            All = 25,
             Pending = 5,
-            InProgress = 3,
+            InProgress = 8,
             Completed = 10,
-            Cancelled = 1
+            Cancelled = 2
         };
-
-        _orderRepoMock
-            .Setup(r => r.GetOrderStatusCountAsync(
-                ORDER_PENDING_ID, ORDER_IN_PROGRESS_ID, ORDER_COMPLETED_ID, ORDER_CANCELLED_ID,
+        _orderRepoMock.Setup(x => x.GetOrderStatusCountAsync(
+                PendingStatusId, InProgressStatusId, CompletedStatusId, CancelledStatusId,
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(expected);
-
         var service = CreateService();
 
         // Act
-        var result = await service.GetOrderStatusCountAsync();
+        var result = await service.GetOrderStatusCountAsync(CancellationToken.None);
 
         // Assert
+        result.All.Should().Be(25);
         result.Pending.Should().Be(5);
+        result.InProgress.Should().Be(8);
         result.Completed.Should().Be(10);
+        result.Cancelled.Should().Be(2);
     }
 
     [Fact]
@@ -320,243 +400,297 @@ public class OrderServiceTests
     public async Task GetOrderStatusCountAsync_WhenAllZero_ReturnsZeroCounts()
     {
         // Arrange
-        SetupDefaultLookupBehavior();
-
-        _orderRepoMock
-            .Setup(r => r.GetOrderStatusCountAsync(
-                It.IsAny<uint>(), It.IsAny<uint>(), It.IsAny<uint>(), It.IsAny<uint>(),
+        SetupLookupResolver();
+        var expected = new OrderStatusCountDTO
+        {
+            All = 0,
+            Pending = 0,
+            InProgress = 0,
+            Completed = 0,
+            Cancelled = 0
+        };
+        _orderRepoMock.Setup(x => x.GetOrderStatusCountAsync(
+                PendingStatusId, InProgressStatusId, CompletedStatusId, CancelledStatusId,
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new OrderStatusCountDTO());
-
+            .ReturnsAsync(expected);
         var service = CreateService();
 
         // Act
-        var result = await service.GetOrderStatusCountAsync();
+        var result = await service.GetOrderStatusCountAsync(CancellationToken.None);
 
         // Assert
+        result.All.Should().Be(0);
         result.Pending.Should().Be(0);
         result.InProgress.Should().Be(0);
+        result.Completed.Should().Be(0);
+        result.Cancelled.Should().Be(0);
     }
 
     [Fact]
-    [Trait("Type", "Abnormal")]
+    [Trait("Type", "Normal")]
     [Trait("Method", "GetOrderStatusCountAsync")]
-    public async Task GetOrderStatusCountAsync_WhenLookupResolverFails_PropagatesException()
+    public async Task GetOrderStatusCountAsync_ResolvesAllFourStatusIds()
     {
-        // Arrange — lookup resolver cannot resolve status codes (corrupt/missing data)
-        _lookupResolverMock
-            .Setup(r => r.GetIdAsync(It.IsAny<ushort>(), It.IsAny<System.Enum>(), It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new KeyNotFoundException("Lookup value not found"));
-
+        // Arrange
+        SetupLookupResolver();
+        _orderRepoMock.Setup(x => x.GetOrderStatusCountAsync(
+                PendingStatusId, InProgressStatusId, CompletedStatusId, CancelledStatusId,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new OrderStatusCountDTO());
         var service = CreateService();
 
-        // Act & Assert
-        await service.Invoking(s => s.GetOrderStatusCountAsync())
-            .Should().ThrowAsync<KeyNotFoundException>()
-            .WithMessage("*not found*");
+        // Act
+        await service.GetOrderStatusCountAsync(CancellationToken.None);
+
+        // Assert
+        _orderRepoMock.Verify(x => x.GetOrderStatusCountAsync(
+            PendingStatusId, InProgressStatusId, CompletedStatusId, CancelledStatusId,
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     #endregion
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // TEST CASES — GetKitchenOrdersAsync
-    // ═══════════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════
+    // GetKitchenOrdersAsync
+    // ══════════════════════════════════════════════════════════════════
 
     #region GetKitchenOrdersAsync
 
     [Fact]
     [Trait("Type", "Normal")]
     [Trait("Method", "GetKitchenOrdersAsync")]
-    public async Task GetKitchenOrdersAsync_WhenOrdersExist_ReturnsList()
+    public async Task GetKitchenOrdersAsync_WhenCalled_ReturnsKitchenOrders()
     {
         // Arrange
-        SetupDefaultLookupBehavior();
-
-        var orders = new List<KitchenOrderDTO>
+        SetupLookupResolver();
+        var expected = new List<KitchenOrderDTO>
         {
-            new() { OrderId = 1 },
-            new() { OrderId = 2 }
+            new()
+            {
+                OrderId = 1, TableCode = "TB-001", OrderStatus = "PENDING",
+                CreatedAt = new DateTime(2025, 6, 1, 12, 0, 0, DateTimeKind.Utc),
+                Items = new List<KitchenOrderItemDTO>
+                {
+                    new() { OrderItemId = 10, DishName = "Pho Bo", Quantity = 2, ItemStatus = "CREATED" }
+                }
+            },
+            new()
+            {
+                OrderId = 2, TableCode = "TB-002", OrderStatus = "IN_PROGRESS",
+                CreatedAt = new DateTime(2025, 6, 1, 12, 5, 0, DateTimeKind.Utc),
+                Items = new List<KitchenOrderItemDTO>
+                {
+                    new() { OrderItemId = 20, DishName = "Bun Cha", Quantity = 1, ItemStatus = "IN_PROGRESS" }
+                }
+            }
         };
-
-        _orderRepoMock
-            .Setup(r => r.GetKitchenOrdersAsync(
-                ORDER_PENDING_ID, ORDER_IN_PROGRESS_ID, ORDER_COMPLETED_ID, ORDER_CANCELLED_ID,
+        _orderRepoMock.Setup(x => x.GetKitchenOrdersAsync(
+                PendingStatusId, InProgressStatusId, CompletedStatusId, CancelledStatusId,
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(orders);
-
+            .ReturnsAsync(expected);
         var service = CreateService();
 
         // Act
-        var result = await service.GetKitchenOrdersAsync();
+        var result = await service.GetKitchenOrdersAsync(CancellationToken.None);
 
         // Assert
         result.Should().HaveCount(2);
+        result[0].OrderId.Should().Be(1);
+        result[0].TableCode.Should().Be("TB-001");
+        result[0].Items.Should().HaveCount(1);
+        result[0].Items[0].DishName.Should().Be("Pho Bo");
+        result[1].OrderId.Should().Be(2);
+        result[1].OrderStatus.Should().Be("IN_PROGRESS");
     }
 
     [Fact]
     [Trait("Type", "Boundary")]
     [Trait("Method", "GetKitchenOrdersAsync")]
-    public async Task GetKitchenOrdersAsync_WhenNoOrders_ReturnsEmpty()
+    public async Task GetKitchenOrdersAsync_WhenNoActiveOrders_ReturnsEmptyList()
     {
         // Arrange
-        SetupDefaultLookupBehavior();
-
-        _orderRepoMock
-            .Setup(r => r.GetKitchenOrdersAsync(
-                It.IsAny<uint>(), It.IsAny<uint>(), It.IsAny<uint>(), It.IsAny<uint>(),
+        SetupLookupResolver();
+        _orderRepoMock.Setup(x => x.GetKitchenOrdersAsync(
+                PendingStatusId, InProgressStatusId, CompletedStatusId, CancelledStatusId,
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<KitchenOrderDTO>());
-
         var service = CreateService();
 
         // Act
-        var result = await service.GetKitchenOrdersAsync();
+        var result = await service.GetKitchenOrdersAsync(CancellationToken.None);
 
         // Assert
         result.Should().BeEmpty();
     }
 
     [Fact]
-    [Trait("Type", "Abnormal")]
+    [Trait("Type", "Normal")]
     [Trait("Method", "GetKitchenOrdersAsync")]
-    public async Task GetKitchenOrdersAsync_WhenLookupResolverFails_PropagatesException()
+    public async Task GetKitchenOrdersAsync_ResolvesAllFourStatusIds()
     {
-        // Arrange — lookup resolver cannot resolve status codes (corrupt/missing data)
-        _lookupResolverMock
-            .Setup(r => r.GetIdAsync(It.IsAny<ushort>(), It.IsAny<System.Enum>(), It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new KeyNotFoundException("Lookup value not found"));
-
+        // Arrange
+        SetupLookupResolver();
+        _orderRepoMock.Setup(x => x.GetKitchenOrdersAsync(
+                PendingStatusId, InProgressStatusId, CompletedStatusId, CancelledStatusId,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<KitchenOrderDTO>());
         var service = CreateService();
 
-        // Act & Assert
-        await service.Invoking(s => s.GetKitchenOrdersAsync())
-            .Should().ThrowAsync<KeyNotFoundException>()
-            .WithMessage("*not found*");
+        // Act
+        await service.GetKitchenOrdersAsync(CancellationToken.None);
+
+        // Assert
+        _orderRepoMock.Verify(x => x.GetKitchenOrdersAsync(
+            PendingStatusId, InProgressStatusId, CompletedStatusId, CancelledStatusId,
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     #endregion
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // TEST CASES — UpdateOrderStatusAsync
-    // ═══════════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════
+    // UpdateOrderStatusAsync
+    // ══════════════════════════════════════════════════════════════════
 
     #region UpdateOrderStatusAsync
 
     [Fact]
     [Trait("Type", "Normal")]
     [Trait("Method", "UpdateOrderStatusAsync")]
-    public async Task UpdateOrderStatusAsync_WhenPendingToInProgress_UpdatesStatusAndCommits()
+    public async Task UpdateOrderStatusAsync_PendingToInProgress_UpdatesStatus()
     {
         // Arrange
-        SetupDefaultLookupBehavior();
-        SetupDefaultUoW();
-        SetupNoDefaultTax();
-
-        var order = MakeOrder(statusId: ORDER_PENDING_ID);
-
-        _orderRepoMock
-            .Setup(r => r.GetByIdForUpdateAsync(1, It.IsAny<CancellationToken>()))
+        SetupLookupResolver();
+        var order = MakeOrder(orderId: 1, statusId: PendingStatusId, tableId: 10);
+        _orderRepoMock.Setup(x => x.GetByIdForUpdateAsync(1, It.IsAny<CancellationToken>()))
             .ReturnsAsync(order);
-
+        _tableRepoMock.Setup(x => x.GetByIdAsync(10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(MakeTable(10, "TB-001", OccupiedTableStatusId));
+        _uowMock.Setup(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _realtimeMock.Setup(x => x.OrderUpdatedAsync(It.IsAny<OrderRealtimeDTO>())).Returns(Task.CompletedTask);
+        _shiftLiveMock.Setup(x => x.PublishBoardChangedAsync(It.IsAny<ShiftLiveRealtimeEventDto>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         var service = CreateService();
 
         // Act
-        await service.UpdateOrderStatusAsync(1, OrderStatusCode.IN_PROGRESS);
+        await service.UpdateOrderStatusAsync(1, OrderStatusCode.IN_PROGRESS, CancellationToken.None);
 
         // Assert
-        order.OrderStatusLvId.Should().Be(ORDER_IN_PROGRESS_ID);
-        _uowMock.Verify(u => u.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
+        order.OrderStatusLvId.Should().Be(InProgressStatusId);
+        _uowMock.Verify(x => x.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
     [Trait("Type", "Normal")]
     [Trait("Method", "UpdateOrderStatusAsync")]
-    public async Task UpdateOrderStatusAsync_WhenCancelled_SetsTableToAvailable()
+    public async Task UpdateOrderStatusAsync_PendingToCancelled_SetsTableAvailable()
     {
         // Arrange
-        SetupDefaultLookupBehavior();
-        SetupDefaultUoW();
-        SetupNoDefaultTax();
-
-        var order = MakeOrder(statusId: ORDER_IN_PROGRESS_ID, tableId: 1);
-        var table = MakeTable(1, "T001", 4, TABLE_OCCUPIED_ID);
-
-        _orderRepoMock
-            .Setup(r => r.GetByIdForUpdateAsync(1, It.IsAny<CancellationToken>()))
+        SetupLookupResolver();
+        var order = MakeOrder(orderId: 2, statusId: PendingStatusId, tableId: 10);
+        var table = MakeTable(10, "TB-001", OccupiedTableStatusId);
+        _orderRepoMock.Setup(x => x.GetByIdForUpdateAsync(2, It.IsAny<CancellationToken>()))
             .ReturnsAsync(order);
-
-        _tableRepoMock
-            .Setup(t => t.GetByIdAsync(1, It.IsAny<CancellationToken>()))
+        _tableRepoMock.Setup(x => x.GetByIdAsync(10, It.IsAny<CancellationToken>()))
             .ReturnsAsync(table);
-
+        _uowMock.Setup(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _tableRepoMock.Setup(x => x.UpdateAsync(It.IsAny<RestaurantTable>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _notificationServiceMock.Setup(x => x.PublishAsync(It.IsAny<PublishNotificationRequest>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _realtimeMock.Setup(x => x.OrderUpdatedAsync(It.IsAny<OrderRealtimeDTO>())).Returns(Task.CompletedTask);
+        _shiftLiveMock.Setup(x => x.PublishBoardChangedAsync(It.IsAny<ShiftLiveRealtimeEventDto>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         var service = CreateService();
 
         // Act
-        await service.UpdateOrderStatusAsync(1, OrderStatusCode.CANCELLED);
+        await service.UpdateOrderStatusAsync(2, OrderStatusCode.CANCELLED, CancellationToken.None);
 
         // Assert
-        table.TableStatusLvId.Should().Be(TABLE_AVAILABLE_ID);
-        _tableRepoMock.Verify(t => t.UpdateAsync(table, It.IsAny<CancellationToken>()), Times.Once);
+        order.OrderStatusLvId.Should().Be(CancelledStatusId);
+        table.TableStatusLvId.Should().Be(AvailableTableStatusId);
+        _tableRepoMock.Verify(x => x.UpdateAsync(table, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
     [Trait("Type", "Normal")]
     [Trait("Method", "UpdateOrderStatusAsync")]
-    public async Task UpdateOrderStatusAsync_WhenCompleted_SetsTableToAvailable()
+    public async Task UpdateOrderStatusAsync_InProgressToCompleted_SetsTableAvailable()
     {
         // Arrange
-        SetupDefaultLookupBehavior();
-        SetupDefaultUoW();
-        SetupNoDefaultTax();
-
-        var order = MakeOrder(statusId: ORDER_IN_PROGRESS_ID, tableId: 1);
-        var table = MakeTable(1, "T001", 4, TABLE_OCCUPIED_ID);
-
-        _orderRepoMock
-            .Setup(r => r.GetByIdForUpdateAsync(1, It.IsAny<CancellationToken>()))
+        SetupLookupResolver();
+        var order = MakeOrder(orderId: 3, statusId: InProgressStatusId, tableId: 10);
+        var table = MakeTable(10, "TB-001", OccupiedTableStatusId);
+        _orderRepoMock.Setup(x => x.GetByIdForUpdateAsync(3, It.IsAny<CancellationToken>()))
             .ReturnsAsync(order);
-
-        _tableRepoMock
-            .Setup(t => t.GetByIdAsync(1, It.IsAny<CancellationToken>()))
+        _tableRepoMock.Setup(x => x.GetByIdAsync(10, It.IsAny<CancellationToken>()))
             .ReturnsAsync(table);
-
+        _uowMock.Setup(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _tableRepoMock.Setup(x => x.UpdateAsync(It.IsAny<RestaurantTable>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _realtimeMock.Setup(x => x.OrderUpdatedAsync(It.IsAny<OrderRealtimeDTO>())).Returns(Task.CompletedTask);
+        _shiftLiveMock.Setup(x => x.PublishBoardChangedAsync(It.IsAny<ShiftLiveRealtimeEventDto>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         var service = CreateService();
 
         // Act
-        await service.UpdateOrderStatusAsync(1, OrderStatusCode.COMPLETED);
+        await service.UpdateOrderStatusAsync(3, OrderStatusCode.COMPLETED, CancellationToken.None);
 
         // Assert
-        table.TableStatusLvId.Should().Be(TABLE_AVAILABLE_ID);
+        order.OrderStatusLvId.Should().Be(CompletedStatusId);
+        table.TableStatusLvId.Should().Be(AvailableTableStatusId);
     }
 
     [Fact]
     [Trait("Type", "Normal")]
     [Trait("Method", "UpdateOrderStatusAsync")]
-    public async Task UpdateOrderStatusAsync_WhenCancelledToPending_SetsTableToOccupied()
+    public async Task UpdateOrderStatusAsync_CancelledToPending_SetsTableOccupied()
     {
         // Arrange
-        SetupDefaultLookupBehavior();
-        SetupDefaultUoW();
-        SetupNoDefaultTax();
-
-        var order = MakeOrder(statusId: ORDER_CANCELLED_ID, tableId: 1);
-        var table = MakeTable(1, "T001", 4, TABLE_AVAILABLE_ID);
-
-        _orderRepoMock
-            .Setup(r => r.GetByIdForUpdateAsync(1, It.IsAny<CancellationToken>()))
+        SetupLookupResolver();
+        var order = MakeOrder(orderId: 4, statusId: CancelledStatusId, tableId: 10);
+        var table = MakeTable(10, "TB-001", AvailableTableStatusId);
+        _orderRepoMock.Setup(x => x.GetByIdForUpdateAsync(4, It.IsAny<CancellationToken>()))
             .ReturnsAsync(order);
-
-        _tableRepoMock
-            .Setup(t => t.GetByIdAsync(1, It.IsAny<CancellationToken>()))
+        _tableRepoMock.Setup(x => x.GetByIdAsync(10, It.IsAny<CancellationToken>()))
             .ReturnsAsync(table);
-
+        _uowMock.Setup(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _tableRepoMock.Setup(x => x.UpdateAsync(It.IsAny<RestaurantTable>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _realtimeMock.Setup(x => x.OrderUpdatedAsync(It.IsAny<OrderRealtimeDTO>())).Returns(Task.CompletedTask);
+        _shiftLiveMock.Setup(x => x.PublishBoardChangedAsync(It.IsAny<ShiftLiveRealtimeEventDto>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         var service = CreateService();
 
         // Act
-        await service.UpdateOrderStatusAsync(1, OrderStatusCode.PENDING);
+        await service.UpdateOrderStatusAsync(4, OrderStatusCode.PENDING, CancellationToken.None);
 
         // Assert
-        table.TableStatusLvId.Should().Be(TABLE_OCCUPIED_ID);
+        order.OrderStatusLvId.Should().Be(PendingStatusId);
+        table.TableStatusLvId.Should().Be(OccupiedTableStatusId);
+    }
+
+    [Fact]
+    [Trait("Type", "Normal")]
+    [Trait("Method", "UpdateOrderStatusAsync")]
+    public async Task UpdateOrderStatusAsync_CompletedToInProgress_AllowedTransition()
+    {
+        // Arrange
+        SetupLookupResolver();
+        var order = MakeOrder(orderId: 5, statusId: CompletedStatusId, tableId: null);
+        _orderRepoMock.Setup(x => x.GetByIdForUpdateAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(order);
+        _uowMock.Setup(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _realtimeMock.Setup(x => x.OrderUpdatedAsync(It.IsAny<OrderRealtimeDTO>())).Returns(Task.CompletedTask);
+        _shiftLiveMock.Setup(x => x.PublishBoardChangedAsync(It.IsAny<ShiftLiveRealtimeEventDto>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        var service = CreateService();
+
+        // Act
+        await service.UpdateOrderStatusAsync(5, OrderStatusCode.IN_PROGRESS, CancellationToken.None);
+
+        // Assert
+        order.OrderStatusLvId.Should().Be(InProgressStatusId);
     }
 
     [Fact]
@@ -565,18 +699,19 @@ public class OrderServiceTests
     public async Task UpdateOrderStatusAsync_WhenOrderNotFound_ThrowsNotFoundException()
     {
         // Arrange
-        SetupDefaultLookupBehavior();
-
-        _orderRepoMock
-            .Setup(r => r.GetByIdForUpdateAsync(999, It.IsAny<CancellationToken>()))
+        SetupLookupResolver();
+        _orderRepoMock.Setup(x => x.GetByIdForUpdateAsync(999, It.IsAny<CancellationToken>()))
             .ReturnsAsync((Order?)null);
-
+        _uowMock.Setup(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.RollbackAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         var service = CreateService();
 
-        // Act & Assert
-        await service.Invoking(s => s.UpdateOrderStatusAsync(999, OrderStatusCode.IN_PROGRESS))
-            .Should().ThrowAsync<NotFoundException>()
-            .WithMessage("*not found*");
+        // Act
+        Func<Task> act = () => service.UpdateOrderStatusAsync(999, OrderStatusCode.IN_PROGRESS, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<NotFoundException>()
+            .WithMessage("Order not found.");
     }
 
     [Fact]
@@ -585,92 +720,87 @@ public class OrderServiceTests
     public async Task UpdateOrderStatusAsync_WhenSameStatus_ThrowsInvalidOperationException()
     {
         // Arrange
-        SetupDefaultLookupBehavior();
-
-        var order = MakeOrder(statusId: ORDER_PENDING_ID);
-
-        _orderRepoMock
-            .Setup(r => r.GetByIdForUpdateAsync(1, It.IsAny<CancellationToken>()))
+        SetupLookupResolver();
+        var order = MakeOrder(orderId: 6, statusId: PendingStatusId);
+        _orderRepoMock.Setup(x => x.GetByIdForUpdateAsync(6, It.IsAny<CancellationToken>()))
             .ReturnsAsync(order);
-
-        var service = CreateService();
-
-        // Act & Assert
-        await service.Invoking(s => s.UpdateOrderStatusAsync(1, OrderStatusCode.PENDING))
-            .Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*already in this status*");
-    }
-
-    [Fact]
-    [Trait("Type", "Abnormal")]
-    [Trait("Method", "UpdateOrderStatusAsync")]
-    public async Task UpdateOrderStatusAsync_WhenInvalidTransition_ThrowsInvalidOperationException()
-    {
-        // Arrange
-        SetupDefaultLookupBehavior();
-
-        var order = MakeOrder(statusId: ORDER_PENDING_ID);
-
-        _orderRepoMock
-            .Setup(r => r.GetByIdForUpdateAsync(1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(order);
-
-        var service = CreateService();
-
-        // Act & Assert — PENDING → COMPLETED is not allowed
-        await service.Invoking(s => s.UpdateOrderStatusAsync(1, OrderStatusCode.COMPLETED))
-            .Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*Invalid status transition*");
-    }
-
-    [Fact]
-    [Trait("Type", "Abnormal")]
-    [Trait("Method", "UpdateOrderStatusAsync")]
-    public async Task UpdateOrderStatusAsync_WhenCancelPaidOrder_ThrowsInvalidOperationException()
-    {
-        // Arrange
-        SetupDefaultLookupBehavior();
-
-        var payment = new Payment { PaymentId = 1, ReceivedAmount = 100m };
-        var order = MakeOrder(statusId: ORDER_IN_PROGRESS_ID, payments: new List<Payment> { payment });
-
-        _orderRepoMock
-            .Setup(r => r.GetByIdForUpdateAsync(1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(order);
-
-        var service = CreateService();
-
-        // Act & Assert
-        await service.Invoking(s => s.UpdateOrderStatusAsync(1, OrderStatusCode.CANCELLED))
-            .Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*paid order*");
-    }
-
-    [Fact]
-    [Trait("Type", "Boundary")]
-    [Trait("Method", "UpdateOrderStatusAsync")]
-    public async Task UpdateOrderStatusAsync_WhenNoTableId_SkipsTableUpdate()
-    {
-        // Arrange
-        SetupDefaultLookupBehavior();
-        SetupDefaultUoW();
-        SetupNoDefaultTax();
-
-        var order = MakeOrder(statusId: ORDER_PENDING_ID, tableId: null);
-
-        _orderRepoMock
-            .Setup(r => r.GetByIdForUpdateAsync(1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(order);
-
+        _uowMock.Setup(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.RollbackAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         var service = CreateService();
 
         // Act
-        await service.UpdateOrderStatusAsync(1, OrderStatusCode.IN_PROGRESS);
+        Func<Task> act = () => service.UpdateOrderStatusAsync(6, OrderStatusCode.PENDING, CancellationToken.None);
 
         // Assert
-        _tableRepoMock.Verify(
-            t => t.GetByIdAsync(It.IsAny<long>(), It.IsAny<CancellationToken>()),
-            Times.Never);
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("Order is already in this status.");
+    }
+
+    [Fact]
+    [Trait("Type", "Abnormal")]
+    [Trait("Method", "UpdateOrderStatusAsync")]
+    public async Task UpdateOrderStatusAsync_InvalidTransition_PendingToCompleted_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        SetupLookupResolver();
+        var order = MakeOrder(orderId: 7, statusId: PendingStatusId);
+        _orderRepoMock.Setup(x => x.GetByIdForUpdateAsync(7, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(order);
+        _uowMock.Setup(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.RollbackAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        var service = CreateService();
+
+        // Act
+        Func<Task> act = () => service.UpdateOrderStatusAsync(7, OrderStatusCode.COMPLETED, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("Invalid status transition: PENDING -> COMPLETED.");
+    }
+
+    [Fact]
+    [Trait("Type", "Abnormal")]
+    [Trait("Method", "UpdateOrderStatusAsync")]
+    public async Task UpdateOrderStatusAsync_CancelPaidOrder_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        SetupLookupResolver();
+        var order = MakeOrder(orderId: 8, statusId: InProgressStatusId);
+        order.Payments = new List<Payment> { new() { PaymentId = 1, OrderId = 8, ReceivedAmount = 100_000m } };
+        _orderRepoMock.Setup(x => x.GetByIdForUpdateAsync(8, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(order);
+        _uowMock.Setup(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.RollbackAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        var service = CreateService();
+
+        // Act
+        Func<Task> act = () => service.UpdateOrderStatusAsync(8, OrderStatusCode.CANCELLED, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("Cannot cancel a paid order.");
+    }
+
+    [Fact]
+    [Trait("Type", "Abnormal")]
+    [Trait("Method", "UpdateOrderStatusAsync")]
+    public async Task UpdateOrderStatusAsync_CompletedToPending_InvalidTransition_Throws()
+    {
+        // Arrange
+        SetupLookupResolver();
+        var order = MakeOrder(orderId: 9, statusId: CompletedStatusId);
+        _orderRepoMock.Setup(x => x.GetByIdForUpdateAsync(9, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(order);
+        _uowMock.Setup(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.RollbackAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        var service = CreateService();
+
+        // Act
+        Func<Task> act = () => service.UpdateOrderStatusAsync(9, OrderStatusCode.PENDING, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("Invalid status transition: COMPLETED -> PENDING.");
     }
 
     [Fact]
@@ -679,387 +809,726 @@ public class OrderServiceTests
     public async Task UpdateOrderStatusAsync_WhenCancelled_SendsNotification()
     {
         // Arrange
-        SetupDefaultLookupBehavior();
-        SetupDefaultUoW();
-        SetupNoDefaultTax();
-
-        var order = MakeOrder(statusId: ORDER_IN_PROGRESS_ID, tableId: null);
-
-        _orderRepoMock
-            .Setup(r => r.GetByIdForUpdateAsync(1, It.IsAny<CancellationToken>()))
+        SetupLookupResolver();
+        var order = MakeOrder(orderId: 11, statusId: PendingStatusId, tableId: null);
+        _orderRepoMock.Setup(x => x.GetByIdForUpdateAsync(11, It.IsAny<CancellationToken>()))
             .ReturnsAsync(order);
-
+        _uowMock.Setup(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _notificationServiceMock.Setup(x => x.PublishAsync(It.IsAny<PublishNotificationRequest>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _realtimeMock.Setup(x => x.OrderUpdatedAsync(It.IsAny<OrderRealtimeDTO>())).Returns(Task.CompletedTask);
+        _shiftLiveMock.Setup(x => x.PublishBoardChangedAsync(It.IsAny<ShiftLiveRealtimeEventDto>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         var service = CreateService();
 
         // Act
-        await service.UpdateOrderStatusAsync(1, OrderStatusCode.CANCELLED);
+        await service.UpdateOrderStatusAsync(11, OrderStatusCode.CANCELLED, CancellationToken.None);
 
         // Assert
-        _notificationServiceMock.Verify(
-            n => n.PublishAsync(It.Is<PublishNotificationRequest>(r => r.Type == nameof(NotificationType.ORDER_CANCELLED)),
-                It.IsAny<CancellationToken>()),
-            Times.Once);
+        _notificationServiceMock.Verify(x => x.PublishAsync(
+            It.Is<PublishNotificationRequest>(n =>
+                n.Type == nameof(NotificationType.ORDER_CANCELLED) &&
+                n.EntityId == "11"),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    [Trait("Type", "Boundary")]
+    [Trait("Method", "UpdateOrderStatusAsync")]
+    public async Task UpdateOrderStatusAsync_WhenNoTable_SkipsTableUpdate()
+    {
+        // Arrange
+        SetupLookupResolver();
+        var order = MakeOrder(orderId: 12, statusId: InProgressStatusId, tableId: null);
+        _orderRepoMock.Setup(x => x.GetByIdForUpdateAsync(12, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(order);
+        _uowMock.Setup(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _realtimeMock.Setup(x => x.OrderUpdatedAsync(It.IsAny<OrderRealtimeDTO>())).Returns(Task.CompletedTask);
+        _shiftLiveMock.Setup(x => x.PublishBoardChangedAsync(It.IsAny<ShiftLiveRealtimeEventDto>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        var service = CreateService();
+
+        // Act
+        await service.UpdateOrderStatusAsync(12, OrderStatusCode.COMPLETED, CancellationToken.None);
+
+        // Assert
+        order.OrderStatusLvId.Should().Be(CompletedStatusId);
+        _tableRepoMock.Verify(x => x.GetByIdAsync(It.IsAny<long>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    [Trait("Type", "Boundary")]
+    [Trait("Method", "UpdateOrderStatusAsync")]
+    public async Task UpdateOrderStatusAsync_WhenOrderIdNegative_ThrowsNotFoundException()
+    {
+        // Arrange
+        SetupLookupResolver();
+        _orderRepoMock.Setup(x => x.GetByIdForUpdateAsync(-1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Order?)null);
+        _uowMock.Setup(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.RollbackAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        var service = CreateService();
+
+        // Act
+        Func<Task> act = () => service.UpdateOrderStatusAsync(-1, OrderStatusCode.IN_PROGRESS, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<NotFoundException>()
+            .WithMessage("Order not found.");
+    }
+
+    [Fact]
+    [Trait("Type", "Boundary")]
+    [Trait("Method", "UpdateOrderStatusAsync")]
+    public async Task UpdateOrderStatusAsync_WhenOrderIdMaxValue_ThrowsNotFoundException()
+    {
+        // Arrange
+        SetupLookupResolver();
+        _orderRepoMock.Setup(x => x.GetByIdForUpdateAsync(long.MaxValue, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Order?)null);
+        _uowMock.Setup(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.RollbackAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        var service = CreateService();
+
+        // Act
+        Func<Task> act = () => service.UpdateOrderStatusAsync(long.MaxValue, OrderStatusCode.CANCELLED, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<NotFoundException>()
+            .WithMessage("Order not found.");
     }
 
     #endregion
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // TEST CASES — CreateOrderAsync (staff)
-    // ═══════════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════
+    // CancelOrderItemAsync
+    // ══════════════════════════════════════════════════════════════════
+
+    #region CancelOrderItemAsync
+
+    [Fact]
+    [Trait("Type", "Normal")]
+    [Trait("Method", "CancelOrderItemAsync")]
+    public async Task CancelOrderItemAsync_WhenValidItem_CancelsAndNotifies()
+    {
+        // Arrange
+        SetupLookupResolver();
+        var orderItem = MakeOrderItem(orderItemId: 50, orderId: 1, dishId: 1);
+        _orderRepoMock.Setup(x => x.GetOrderItemAsync(50, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(orderItem);
+        _orderRepoMock.Setup(x => x.UpdateOrderItemStatusAsync(
+                50, CancelledItemStatusId, null,
+                InProgressItemStatusId, ReadyItemStatusId, ServedItemStatusId, RejectedItemStatusId, CancelledItemStatusId,
+                PendingStatusId, InProgressStatusId, CompletedStatusId, CancelledStatusId, AvailableTableStatusId,
+                It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        _notificationServiceMock.Setup(x => x.PublishAsync(It.IsAny<PublishNotificationRequest>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _shiftLiveMock.Setup(x => x.PublishBoardChangedAsync(It.IsAny<ShiftLiveRealtimeEventDto>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        var service = CreateService();
+
+        // Act
+        await service.CancelOrderItemAsync(50, CancellationToken.None);
+
+        // Assert
+        _orderRepoMock.Verify(x => x.UpdateOrderItemStatusAsync(
+            50, CancelledItemStatusId, null,
+            It.IsAny<uint>(), It.IsAny<uint>(), It.IsAny<uint>(), It.IsAny<uint>(), It.IsAny<uint>(),
+            It.IsAny<uint>(), It.IsAny<uint>(), It.IsAny<uint>(), It.IsAny<uint>(), It.IsAny<uint>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+        _notificationServiceMock.Verify(x => x.PublishAsync(
+            It.Is<PublishNotificationRequest>(n => n.Type == nameof(NotificationType.ORDER_ITEM_CANCELLED)),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    [Trait("Type", "Normal")]
+    [Trait("Method", "CancelOrderItemAsync")]
+    public async Task CancelOrderItemAsync_NotificationContainsDishAndTableInfo()
+    {
+        // Arrange
+        SetupLookupResolver();
+        var dish = MakeDish(1, "Pho Bo", 50_000m);
+        var table = MakeTable(10, "TB-001");
+        var orderItem = new OrderItem
+        {
+            OrderItemId = 51,
+            OrderId = 1,
+            DishId = 1,
+            Quantity = 2,
+            Price = 50_000m,
+            ItemStatusLvId = CreatedItemStatusId,
+            Dish = dish,
+            Order = new Order { OrderId = 1, Table = table }
+        };
+        _orderRepoMock.Setup(x => x.GetOrderItemAsync(51, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(orderItem);
+        _orderRepoMock.Setup(x => x.UpdateOrderItemStatusAsync(
+                51, CancelledItemStatusId, null,
+                It.IsAny<uint>(), It.IsAny<uint>(), It.IsAny<uint>(), It.IsAny<uint>(), It.IsAny<uint>(),
+                It.IsAny<uint>(), It.IsAny<uint>(), It.IsAny<uint>(), It.IsAny<uint>(), It.IsAny<uint>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        _notificationServiceMock.Setup(x => x.PublishAsync(It.IsAny<PublishNotificationRequest>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _shiftLiveMock.Setup(x => x.PublishBoardChangedAsync(It.IsAny<ShiftLiveRealtimeEventDto>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        var service = CreateService();
+
+        // Act
+        await service.CancelOrderItemAsync(51, CancellationToken.None);
+
+        // Assert
+        _notificationServiceMock.Verify(x => x.PublishAsync(
+            It.Is<PublishNotificationRequest>(n =>
+                n.Metadata != null &&
+                n.Metadata.ContainsKey("dishName") &&
+                (string)n.Metadata["dishName"] == "Pho Bo" &&
+                n.Metadata.ContainsKey("tableCode") &&
+                (string)n.Metadata["tableCode"] == "TB-001"),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    [Trait("Type", "Boundary")]
+    [Trait("Method", "CancelOrderItemAsync")]
+    public async Task CancelOrderItemAsync_WhenItemHasNoDish_HandlesGracefully()
+    {
+        // Arrange
+        SetupLookupResolver();
+        var orderItem = new OrderItem
+        {
+            OrderItemId = 52,
+            OrderId = 1,
+            DishId = 1,
+            Quantity = 1,
+            Price = 30_000m,
+            ItemStatusLvId = CreatedItemStatusId,
+            Dish = null!,
+            Order = new Order { OrderId = 1, Table = null }
+        };
+        _orderRepoMock.Setup(x => x.GetOrderItemAsync(52, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(orderItem);
+        _orderRepoMock.Setup(x => x.UpdateOrderItemStatusAsync(
+                52, CancelledItemStatusId, null,
+                It.IsAny<uint>(), It.IsAny<uint>(), It.IsAny<uint>(), It.IsAny<uint>(), It.IsAny<uint>(),
+                It.IsAny<uint>(), It.IsAny<uint>(), It.IsAny<uint>(), It.IsAny<uint>(), It.IsAny<uint>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        _notificationServiceMock.Setup(x => x.PublishAsync(It.IsAny<PublishNotificationRequest>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _shiftLiveMock.Setup(x => x.PublishBoardChangedAsync(It.IsAny<ShiftLiveRealtimeEventDto>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        var service = CreateService();
+
+        // Act
+        await service.CancelOrderItemAsync(52, CancellationToken.None);
+
+        // Assert
+        _notificationServiceMock.Verify(x => x.PublishAsync(
+            It.Is<PublishNotificationRequest>(n =>
+                n.Metadata != null &&
+                (string)n.Metadata["dishName"] == "" &&
+                (string)n.Metadata["tableCode"] == ""),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    #endregion
+
+    // ══════════════════════════════════════════════════════════════════
+    // GetOrderByIdAsync
+    // ══════════════════════════════════════════════════════════════════
+
+    #region GetOrderByIdAsync
+
+    [Fact]
+    [Trait("Type", "Normal")]
+    [Trait("Method", "GetOrderByIdAsync")]
+    public async Task GetOrderByIdAsync_WhenOrderExists_ReturnsDetail()
+    {
+        // Arrange
+        var expected = new OrderDetailDTO
+        {
+            OrderId = 1,
+            TableCode = "TB-001",
+            StaffName = "Staff A",
+            TotalAmount = 150_000m,
+            OrderStatus = "PENDING",
+            Source = "DINE_IN"
+        };
+        _orderRepoMock.Setup(x => x.GetOrderByIdAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(expected);
+        var service = CreateService();
+
+        // Act
+        var result = await service.GetOrderByIdAsync(1, CancellationToken.None);
+
+        // Assert
+        result.OrderId.Should().Be(1);
+        result.TableCode.Should().Be("TB-001");
+        result.TotalAmount.Should().Be(150_000m);
+        result.OrderStatus.Should().Be("PENDING");
+        result.Source.Should().Be("DINE_IN");
+    }
+
+    [Fact]
+    [Trait("Type", "Normal")]
+    [Trait("Method", "GetOrderByIdAsync")]
+    public async Task GetOrderByIdAsync_DelegatesToRepository()
+    {
+        // Arrange
+        _orderRepoMock.Setup(x => x.GetOrderByIdAsync(42, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new OrderDetailDTO { OrderId = 42 });
+        var service = CreateService();
+
+        // Act
+        var result = await service.GetOrderByIdAsync(42, CancellationToken.None);
+
+        // Assert
+        result.OrderId.Should().Be(42);
+        _orderRepoMock.Verify(x => x.GetOrderByIdAsync(42, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    [Trait("Type", "Boundary")]
+    [Trait("Method", "GetOrderByIdAsync")]
+    public async Task GetOrderByIdAsync_WhenRepoReturnsNull_ReturnsNull()
+    {
+        // Arrange
+        _orderRepoMock.Setup(x => x.GetOrderByIdAsync(999, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((OrderDetailDTO)null!);
+        var service = CreateService();
+
+        // Act
+        var result = await service.GetOrderByIdAsync(999, CancellationToken.None);
+
+        // Assert
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    [Trait("Type", "Boundary")]
+    [Trait("Method", "GetOrderByIdAsync")]
+    public async Task GetOrderByIdAsync_WhenOrderIdIsMaxValue_ReturnsNull()
+    {
+        // Arrange
+        _orderRepoMock.Setup(x => x.GetOrderByIdAsync(long.MaxValue, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((OrderDetailDTO)null!);
+        var service = CreateService();
+
+        // Act
+        var result = await service.GetOrderByIdAsync(long.MaxValue, CancellationToken.None);
+
+        // Assert
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    [Trait("Type", "Abnormal")]
+    [Trait("Method", "GetOrderByIdAsync")]
+    public async Task GetOrderByIdAsync_WhenOrderIdIsNegative()
+    {
+        // Arrange
+        _orderRepoMock.Setup(x => x.GetOrderByIdAsync(-1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((OrderDetailDTO)null!);
+        var service = CreateService();
+
+        // Act
+        var result = await service.GetOrderByIdAsync(-1, CancellationToken.None);
+
+        // Assert
+        result.Should().BeNull();
+    }
+
+    #endregion
+
+    // ══════════════════════════════════════════════════════════════════
+    // CreateOrderAsync (Staff)
+    // ══════════════════════════════════════════════════════════════════
 
     #region CreateOrderAsync_Staff
 
     [Fact]
     [Trait("Type", "Normal")]
     [Trait("Method", "CreateOrderAsync_Staff")]
-    public async Task CreateOrderAsync_Staff_WhenDineInValid_CreatesOrderAndSetsTableOccupied()
+    public async Task CreateOrderAsync_Staff_DineIn_CreatesOrderWithTable()
     {
         // Arrange
-        SetupDefaultLookupBehavior();
-        SetupDefaultUoW();
-        SetupNoDefaultTax();
-
-        var table = MakeTable(1, "T001", 4, TABLE_AVAILABLE_ID);
-        var dish = MakeDish(1, "Phở bò", 50000m);
-
-        _tableRepoMock
-            .Setup(t => t.GetByIdAsync(1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(table);
-
-        _dishRepoMock
-            .Setup(d => d.GetByIdsAsync(It.IsAny<List<long>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Dish> { dish });
-
-        _customerServiceMock
-            .Setup(c => c.ResolveCustomerAsync(It.IsAny<OrderCustomerDto?>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(1L);
-
-        _orderRepoMock
-            .Setup(r => r.AddAsync(It.IsAny<Order>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask)
-            .Callback<Order, CancellationToken>((o, _) => o.OrderId = 100);
-
-        var service = CreateService();
+        SetupLookupResolver();
+        SetupDefaultTax();
         var request = new CreateOrderRequest
         {
-            TableId = 1,
+            TableId = 10,
             Source = OrderSourceCode.DINE_IN,
+            Customer = new OrderCustomerDto { Phone = "0901234567", FullName = "Nguyen Van A" },
             Items = new List<CreateOrderItemDto>
             {
-                new() { DishId = 1, Quantity = 2 }
+                new() { DishId = 1, Quantity = 2 },
+                new() { DishId = 2, Quantity = 1 }
             }
         };
+        var table = MakeTable(10, "TB-001", AvailableTableStatusId);
+        _tableRepoMock.Setup(x => x.GetByIdAsync(10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(table);
+        _tableRepoMock.Setup(x => x.UpdateAsync(It.IsAny<RestaurantTable>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _customerServiceMock.Setup(x => x.ResolveCustomerAsync(request.Customer, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(100L);
+        _dishRepoMock.Setup(x => x.GetByIdsAsync(It.IsAny<List<long>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Dish>
+            {
+                MakeDish(1, "Pho Bo", 50_000m),
+                MakeDish(2, "Bun Cha", 45_000m)
+            });
+        _orderRepoMock.Setup(x => x.AddAsync(It.IsAny<Order>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask)
+            .Callback<Order, CancellationToken>((o, _) => o.OrderId = 1001);
+        _uowMock.Setup(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _realtimeMock.Setup(x => x.OrderCreatedAsync(It.IsAny<OrderRealtimeDTO>())).Returns(Task.CompletedTask);
+        _shiftLiveMock.Setup(x => x.PublishBoardChangedAsync(It.IsAny<ShiftLiveRealtimeEventDto>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _notificationServiceMock.Setup(x => x.PublishAsync(It.IsAny<PublishNotificationRequest>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        var service = CreateService();
 
         // Act
-        var result = await service.CreateOrderAsync(1, request, default);
+        var result = await service.CreateOrderAsync(5L, request, CancellationToken.None);
 
         // Assert
-        result.Should().Be(100);
-        table.TableStatusLvId.Should().Be(TABLE_OCCUPIED_ID);
-        _uowMock.Verify(u => u.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
+        result.Should().Be(1001);
+        table.TableStatusLvId.Should().Be(OccupiedTableStatusId);
+        _orderRepoMock.Verify(x => x.AddAsync(It.Is<Order>(o =>
+            o.StaffId == 5 &&
+            o.CustomerId == 100 &&
+            o.TableId == 10 &&
+            o.TotalAmount == 145_000m &&
+            o.OrderStatusLvId == PendingStatusId &&
+            o.SourceLvId == DineInSourceId &&
+            o.OrderItems.Count == 2
+        ), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
     [Trait("Type", "Normal")]
     [Trait("Method", "CreateOrderAsync_Staff")]
-    public async Task CreateOrderAsync_Staff_WhenTakeaway_NoTableUpdate()
+    public async Task CreateOrderAsync_Staff_Takeaway_CreatesOrderWithoutTable()
     {
         // Arrange
-        SetupDefaultLookupBehavior();
-        SetupDefaultUoW();
-        SetupNoDefaultTax();
-
-        var dish = MakeDish(1, "Phở bò", 50000m);
-
-        _dishRepoMock
-            .Setup(d => d.GetByIdsAsync(It.IsAny<List<long>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Dish> { dish });
-
-        _customerServiceMock
-            .Setup(c => c.ResolveCustomerAsync(It.IsAny<OrderCustomerDto?>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(1L);
-
-        _orderRepoMock
-            .Setup(r => r.AddAsync(It.IsAny<Order>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask)
-            .Callback<Order, CancellationToken>((o, _) => o.OrderId = 101);
-
-        var service = CreateService();
+        SetupLookupResolver();
+        SetupDefaultTax();
         var request = new CreateOrderRequest
         {
             TableId = null,
             Source = OrderSourceCode.TAKEAWAY,
+            Customer = null,
             Items = new List<CreateOrderItemDto>
             {
-                new() { DishId = 1, Quantity = 1 }
+                new() { DishId = 1, Quantity = 3 }
             }
         };
+        _customerServiceMock.Setup(x => x.ResolveCustomerAsync(null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(999L);
+        _dishRepoMock.Setup(x => x.GetByIdsAsync(It.IsAny<List<long>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Dish> { MakeDish(1, "Pho Bo", 50_000m) });
+        _orderRepoMock.Setup(x => x.AddAsync(It.IsAny<Order>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask)
+            .Callback<Order, CancellationToken>((o, _) => o.OrderId = 1002);
+        _uowMock.Setup(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _realtimeMock.Setup(x => x.OrderCreatedAsync(It.IsAny<OrderRealtimeDTO>())).Returns(Task.CompletedTask);
+        _shiftLiveMock.Setup(x => x.PublishBoardChangedAsync(It.IsAny<ShiftLiveRealtimeEventDto>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _notificationServiceMock.Setup(x => x.PublishAsync(It.IsAny<PublishNotificationRequest>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        var service = CreateService();
 
         // Act
-        var result = await service.CreateOrderAsync(1, request, default);
+        var result = await service.CreateOrderAsync(5L, request, CancellationToken.None);
 
         // Assert
-        result.Should().Be(101);
-        _tableRepoMock.Verify(
-            t => t.GetByIdAsync(It.IsAny<long>(), It.IsAny<CancellationToken>()), Times.Never);
+        result.Should().Be(1002);
+        _orderRepoMock.Verify(x => x.AddAsync(It.Is<Order>(o =>
+            o.TableId == null &&
+            o.SourceLvId == TakeawaySourceId &&
+            o.TotalAmount == 150_000m
+        ), It.IsAny<CancellationToken>()), Times.Once);
+        _tableRepoMock.Verify(x => x.GetByIdAsync(It.IsAny<long>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
     [Trait("Type", "Abnormal")]
     [Trait("Method", "CreateOrderAsync_Staff")]
-    public async Task CreateOrderAsync_Staff_WhenNoItems_ThrowsInvalidOperationException()
+    public async Task CreateOrderAsync_Staff_EmptyItems_ThrowsInvalidOperationException()
     {
         // Arrange
-        var service = CreateService();
         var request = new CreateOrderRequest
         {
-            TableId = 1,
             Source = OrderSourceCode.DINE_IN,
+            TableId = 10,
             Items = new List<CreateOrderItemDto>()
         };
+        _uowMock.Setup(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.RollbackAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        var service = CreateService();
 
-        // Act & Assert
-        await service.Invoking(s => s.CreateOrderAsync(1, request, default))
-            .Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*at least one item*");
+        // Act
+        Func<Task> act = () => service.CreateOrderAsync(5L, request, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("Order must contain at least one item.");
     }
 
     [Fact]
     [Trait("Type", "Abnormal")]
     [Trait("Method", "CreateOrderAsync_Staff")]
-    public async Task CreateOrderAsync_Staff_WhenDineInNoTable_ThrowsInvalidOperationException()
+    public async Task CreateOrderAsync_Staff_DineInWithoutTable_ThrowsInvalidOperationException()
     {
         // Arrange
-        var service = CreateService();
         var request = new CreateOrderRequest
         {
+            Source = OrderSourceCode.DINE_IN,
             TableId = null,
-            Source = OrderSourceCode.DINE_IN,
-            Items = new List<CreateOrderItemDto>
-            {
-                new() { DishId = 1, Quantity = 1 }
-            }
+            Items = new List<CreateOrderItemDto> { new() { DishId = 1, Quantity = 1 } }
         };
+        _uowMock.Setup(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.RollbackAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        var service = CreateService();
 
-        // Act & Assert
-        await service.Invoking(s => s.CreateOrderAsync(1, request, default))
-            .Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*requires table*");
+        // Act
+        Func<Task> act = () => service.CreateOrderAsync(5L, request, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("DINE_IN order requires table.");
     }
 
     [Fact]
     [Trait("Type", "Abnormal")]
     [Trait("Method", "CreateOrderAsync_Staff")]
-    public async Task CreateOrderAsync_Staff_WhenTakeawayWithTable_ThrowsInvalidOperationException()
+    public async Task CreateOrderAsync_Staff_TakeawayWithTable_ThrowsInvalidOperationException()
     {
         // Arrange
-        var service = CreateService();
         var request = new CreateOrderRequest
         {
-            TableId = 1,
             Source = OrderSourceCode.TAKEAWAY,
-            Items = new List<CreateOrderItemDto>
-            {
-                new() { DishId = 1, Quantity = 1 }
-            }
+            TableId = 10,
+            Items = new List<CreateOrderItemDto> { new() { DishId = 1, Quantity = 1 } }
         };
+        _uowMock.Setup(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.RollbackAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        var service = CreateService();
 
-        // Act & Assert
-        await service.Invoking(s => s.CreateOrderAsync(1, request, default))
-            .Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*cannot have table*");
+        // Act
+        Func<Task> act = () => service.CreateOrderAsync(5L, request, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("TAKEAWAY cannot have table.");
     }
 
     [Fact]
     [Trait("Type", "Abnormal")]
     [Trait("Method", "CreateOrderAsync_Staff")]
-    public async Task CreateOrderAsync_Staff_WhenTableNotFound_ThrowsNotFoundException()
+    public async Task CreateOrderAsync_Staff_TableNotFound_ThrowsNotFoundException()
     {
         // Arrange
-        SetupDefaultLookupBehavior();
-        SetupDefaultUoW();
-
-        _tableRepoMock
-            .Setup(t => t.GetByIdAsync(999, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((RestaurantTable?)null);
-
-        var service = CreateService();
+        SetupLookupResolver();
         var request = new CreateOrderRequest
         {
+            Source = OrderSourceCode.DINE_IN,
             TableId = 999,
-            Source = OrderSourceCode.DINE_IN,
-            Items = new List<CreateOrderItemDto>
-            {
-                new() { DishId = 1, Quantity = 1 }
-            }
+            Items = new List<CreateOrderItemDto> { new() { DishId = 1, Quantity = 1 } }
         };
+        _tableRepoMock.Setup(x => x.GetByIdAsync(999, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((RestaurantTable?)null);
+        _uowMock.Setup(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.RollbackAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        var service = CreateService();
 
-        // Act & Assert
-        await service.Invoking(s => s.CreateOrderAsync(1, request, default))
-            .Should().ThrowAsync<NotFoundException>()
-            .WithMessage("*not found*");
+        // Act
+        Func<Task> act = () => service.CreateOrderAsync(5L, request, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<NotFoundException>()
+            .WithMessage("Table not found.");
     }
 
     [Fact]
     [Trait("Type", "Abnormal")]
     [Trait("Method", "CreateOrderAsync_Staff")]
-    public async Task CreateOrderAsync_Staff_WhenTableOccupied_ThrowsInvalidOperationException()
+    public async Task CreateOrderAsync_Staff_TableOccupied_ThrowsInvalidOperationException()
     {
         // Arrange
-        SetupDefaultLookupBehavior();
-        SetupDefaultUoW();
-
-        var occupiedTable = MakeTable(1, "T001", 4, TABLE_OCCUPIED_ID);
-
-        _tableRepoMock
-            .Setup(t => t.GetByIdAsync(1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(occupiedTable);
-
-        var service = CreateService();
+        SetupLookupResolver();
         var request = new CreateOrderRequest
         {
-            TableId = 1,
             Source = OrderSourceCode.DINE_IN,
-            Items = new List<CreateOrderItemDto>
-            {
-                new() { DishId = 1, Quantity = 1 }
-            }
+            TableId = 10,
+            Items = new List<CreateOrderItemDto> { new() { DishId = 1, Quantity = 1 } }
         };
+        _tableRepoMock.Setup(x => x.GetByIdAsync(10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(MakeTable(10, "TB-001", OccupiedTableStatusId));
+        _uowMock.Setup(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.RollbackAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        var service = CreateService();
 
-        // Act & Assert
-        await service.Invoking(s => s.CreateOrderAsync(1, request, default))
-            .Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*not available*");
+        // Act
+        Func<Task> act = () => service.CreateOrderAsync(5L, request, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("Table is not available.");
     }
 
     [Fact]
     [Trait("Type", "Abnormal")]
     [Trait("Method", "CreateOrderAsync_Staff")]
-    public async Task CreateOrderAsync_Staff_WhenDishNotFound_ThrowsNotFoundException()
+    public async Task CreateOrderAsync_Staff_DishNotFound_ThrowsNotFoundException()
     {
         // Arrange
-        SetupDefaultLookupBehavior();
-        SetupDefaultUoW();
-        SetupNoDefaultTax();
-
-        var table = MakeTable(1, "T001", 4, TABLE_AVAILABLE_ID);
-
-        _tableRepoMock
-            .Setup(t => t.GetByIdAsync(1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(table);
-
-        _dishRepoMock
-            .Setup(d => d.GetByIdsAsync(It.IsAny<List<long>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Dish>()); // no dishes found
-
-        _customerServiceMock
-            .Setup(c => c.ResolveCustomerAsync(It.IsAny<OrderCustomerDto?>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(1L);
-
-        var service = CreateService();
+        SetupLookupResolver();
         var request = new CreateOrderRequest
         {
-            TableId = 1,
             Source = OrderSourceCode.DINE_IN,
+            TableId = 10,
+            Customer = null,
             Items = new List<CreateOrderItemDto>
             {
+                new() { DishId = 1, Quantity = 1 },
                 new() { DishId = 999, Quantity = 1 }
             }
         };
+        _tableRepoMock.Setup(x => x.GetByIdAsync(10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(MakeTable(10, "TB-001", AvailableTableStatusId));
+        _tableRepoMock.Setup(x => x.UpdateAsync(It.IsAny<RestaurantTable>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _customerServiceMock.Setup(x => x.ResolveCustomerAsync(null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(999L);
+        _dishRepoMock.Setup(x => x.GetByIdsAsync(It.IsAny<List<long>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Dish> { MakeDish(1, "Pho Bo", 50_000m) });
+        _uowMock.Setup(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.RollbackAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        var service = CreateService();
 
-        // Act & Assert
-        await service.Invoking(s => s.CreateOrderAsync(1, request, default))
-            .Should().ThrowAsync<NotFoundException>()
-            .WithMessage("*dishes not found*");
+        // Act
+        Func<Task> act = () => service.CreateOrderAsync(5L, request, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<NotFoundException>()
+            .WithMessage("One or more dishes not found.");
     }
 
     [Fact]
-    [Trait("Type", "Boundary")]
+    [Trait("Type", "Normal")]
     [Trait("Method", "CreateOrderAsync_Staff")]
-    public async Task CreateOrderAsync_Staff_WhenOnFailure_RollsBack()
+    public async Task CreateOrderAsync_Staff_CalculatesTotalCorrectly()
     {
         // Arrange
-        SetupDefaultLookupBehavior();
-        SetupDefaultUoW();
-
-        var table = MakeTable(1, "T001", 4, TABLE_AVAILABLE_ID);
-
-        _tableRepoMock
-            .Setup(t => t.GetByIdAsync(1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(table);
-
-        _dishRepoMock
-            .Setup(d => d.GetByIdsAsync(It.IsAny<List<long>>(), It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new Exception("DB failure"));
-
-        _customerServiceMock
-            .Setup(c => c.ResolveCustomerAsync(It.IsAny<OrderCustomerDto?>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(1L);
-
-        var service = CreateService();
+        SetupLookupResolver();
+        SetupDefaultTax();
         var request = new CreateOrderRequest
         {
-            TableId = 1,
             Source = OrderSourceCode.DINE_IN,
+            TableId = 10,
             Items = new List<CreateOrderItemDto>
             {
-                new() { DishId = 1, Quantity = 1 }
+                new() { DishId = 1, Quantity = 2 },
+                new() { DishId = 2, Quantity = 3 }
             }
         };
+        _tableRepoMock.Setup(x => x.GetByIdAsync(10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(MakeTable(10, "TB-001", AvailableTableStatusId));
+        _tableRepoMock.Setup(x => x.UpdateAsync(It.IsAny<RestaurantTable>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _customerServiceMock.Setup(x => x.ResolveCustomerAsync(null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(999L);
+        _dishRepoMock.Setup(x => x.GetByIdsAsync(It.IsAny<List<long>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Dish>
+            {
+                MakeDish(1, "Pho Bo", 50_000m),
+                MakeDish(2, "Bun Cha", 30_000m)
+            });
+        Order? capturedOrder = null;
+        _orderRepoMock.Setup(x => x.AddAsync(It.IsAny<Order>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask)
+            .Callback<Order, CancellationToken>((o, _) => { capturedOrder = o; o.OrderId = 1003; });
+        _uowMock.Setup(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _realtimeMock.Setup(x => x.OrderCreatedAsync(It.IsAny<OrderRealtimeDTO>())).Returns(Task.CompletedTask);
+        _shiftLiveMock.Setup(x => x.PublishBoardChangedAsync(It.IsAny<ShiftLiveRealtimeEventDto>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _notificationServiceMock.Setup(x => x.PublishAsync(It.IsAny<PublishNotificationRequest>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        var service = CreateService();
 
-        // Act & Assert
-        await service.Invoking(s => s.CreateOrderAsync(1, request, default))
-            .Should().ThrowAsync<Exception>();
+        // Act
+        await service.CreateOrderAsync(5L, request, CancellationToken.None);
 
-        _uowMock.Verify(u => u.RollbackAsync(It.IsAny<CancellationToken>()), Times.Once);
+        // Assert — 2×50000 + 3×30000 = 190000
+        capturedOrder.Should().NotBeNull();
+        capturedOrder!.TotalAmount.Should().Be(190_000m);
+        capturedOrder.SubTotalAmount.Should().Be(190_000m);
+    }
+
+    [Fact]
+    [Trait("Type", "Normal")]
+    [Trait("Method", "CreateOrderAsync_Staff")]
+    public async Task CreateOrderAsync_Staff_TableLocked_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        SetupLookupResolver();
+        var request = new CreateOrderRequest
+        {
+            Source = OrderSourceCode.DINE_IN,
+            TableId = 10,
+            Items = new List<CreateOrderItemDto> { new() { DishId = 1, Quantity = 1 } }
+        };
+        _tableRepoMock.Setup(x => x.GetByIdAsync(10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(MakeTable(10, "TB-001", LockedTableStatusId));
+        _uowMock.Setup(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.RollbackAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        var service = CreateService();
+
+        // Act
+        Func<Task> act = () => service.CreateOrderAsync(5L, request, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("Table is not available.");
     }
 
     #endregion
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // TEST CASES — AddItemsAsync (staff)
-    // ═══════════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════
+    // AddItemsAsync (Staff)
+    // ══════════════════════════════════════════════════════════════════
 
     #region AddItemsAsync
 
     [Fact]
     [Trait("Type", "Normal")]
     [Trait("Method", "AddItemsAsync")]
-    public async Task AddItemsAsync_WhenValidItems_AddsItemsAndUpdatesTotal()
+    public async Task AddItemsAsync_WhenValidOrder_AddsItemsAndUpdatesTotal()
     {
         // Arrange
-        SetupDefaultLookupBehavior();
-        SetupDefaultUoW();
-        SetupNoDefaultTax();
-
-        var existingOrder = MakeOrder(statusId: ORDER_IN_PROGRESS_ID, totalAmount: 100000m);
-        existingOrder.OrderStatusLv = new LookupValue { ValueCode = "IN_PROGRESS" };
-
-        _orderRepoMock
-            .Setup(r => r.GetByIdForUpdateAsync(1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(existingOrder);
-
-        var dish = MakeDish(1, "Phở bò", 50000m);
-
-        _dishRepoMock
-            .Setup(d => d.GetByIdsAsync(It.IsAny<List<long>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Dish> { dish });
-
-        var service = CreateService();
+        SetupLookupResolver();
+        SetupDefaultTax();
+        var order = MakeOrder(orderId: 20, statusId: PendingStatusId, totalAmount: 100_000m, subTotalAmount: 100_000m);
+        order.OrderStatusLv = new LookupValue { ValueId = PendingStatusId, ValueCode = "PENDING" };
         var request = new AddOrderItemsRequest
         {
             Items = new List<CreateOrderItemDto>
             {
-                new() { DishId = 1, Quantity = 2 }
+                new() { DishId = 3, Quantity = 2 }
             }
         };
+        _orderRepoMock.Setup(x => x.GetByIdForUpdateAsync(20, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(order);
+        _dishRepoMock.Setup(x => x.GetByIdsAsync(It.IsAny<List<long>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Dish> { MakeDish(3, "Com Tam", 40_000m) });
+        _uowMock.Setup(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _realtimeMock.Setup(x => x.OrderUpdatedAsync(It.IsAny<OrderRealtimeDTO>())).Returns(Task.CompletedTask);
+        _shiftLiveMock.Setup(x => x.PublishBoardChangedAsync(It.IsAny<ShiftLiveRealtimeEventDto>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        var service = CreateService();
 
         // Act
-        await service.AddItemsAsync(1, request, default);
+        await service.AddItemsAsync(20, request, CancellationToken.None);
 
-        // Assert
-        existingOrder.TotalAmount.Should().Be(200000m); // 100000 + 50000*2
-        _uowMock.Verify(u => u.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
+        // Assert — original 100000 + 2×40000 = 180000
+        order.TotalAmount.Should().Be(180_000m);
+        order.SubTotalAmount.Should().Be(180_000m);
+        order.OrderItems.Should().HaveCount(1);
     }
 
     [Fact]
@@ -1068,25 +1537,19 @@ public class OrderServiceTests
     public async Task AddItemsAsync_WhenOrderNotFound_ThrowsNotFoundException()
     {
         // Arrange
-        SetupDefaultLookupBehavior();
-        SetupDefaultUoW();
-
-        _orderRepoMock
-            .Setup(r => r.GetByIdForUpdateAsync(999, It.IsAny<CancellationToken>()))
+        SetupLookupResolver();
+        _orderRepoMock.Setup(x => x.GetByIdForUpdateAsync(999, It.IsAny<CancellationToken>()))
             .ReturnsAsync((Order?)null);
-
+        _uowMock.Setup(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.RollbackAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         var service = CreateService();
-        var request = new AddOrderItemsRequest
-        {
-            Items = new List<CreateOrderItemDto>
-            {
-                new() { DishId = 1, Quantity = 1 }
-            }
-        };
 
-        // Act & Assert
-        await service.Invoking(s => s.AddItemsAsync(999, request, default))
-            .Should().ThrowAsync<NotFoundException>();
+        // Act
+        Func<Task> act = () => service.AddItemsAsync(999, new AddOrderItemsRequest { Items = new() }, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<NotFoundException>()
+            .WithMessage("Order not found.");
     }
 
     [Fact]
@@ -1095,98 +1558,43 @@ public class OrderServiceTests
     public async Task AddItemsAsync_WhenOrderCancelled_ThrowsInvalidOperationException()
     {
         // Arrange
-        SetupDefaultLookupBehavior();
-        SetupDefaultUoW();
-
-        var cancelledOrder = MakeOrder(statusId: ORDER_CANCELLED_ID);
-
-        _orderRepoMock
-            .Setup(r => r.GetByIdForUpdateAsync(1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(cancelledOrder);
-
+        SetupLookupResolver();
+        var order = MakeOrder(orderId: 21, statusId: CancelledStatusId);
+        _orderRepoMock.Setup(x => x.GetByIdForUpdateAsync(21, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(order);
+        _uowMock.Setup(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.RollbackAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         var service = CreateService();
-        var request = new AddOrderItemsRequest
-        {
-            Items = new List<CreateOrderItemDto>
-            {
-                new() { DishId = 1, Quantity = 1 }
-            }
-        };
 
-        // Act & Assert
-        await service.Invoking(s => s.AddItemsAsync(1, request, default))
-            .Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*canceled order*");
+        // Act
+        Func<Task> act = () => service.AddItemsAsync(21, new AddOrderItemsRequest { Items = new() }, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("Cannot add items to canceled order.");
     }
 
     [Fact]
     [Trait("Type", "Abnormal")]
     [Trait("Method", "AddItemsAsync")]
-    public async Task AddItemsAsync_WhenOrderHasPayment_ThrowsInvalidOperationException()
+    public async Task AddItemsAsync_WhenOrderPaid_ThrowsInvalidOperationException()
     {
         // Arrange
-        SetupDefaultLookupBehavior();
-        SetupDefaultUoW();
-
-        var paidOrder = MakeOrder(statusId: ORDER_IN_PROGRESS_ID,
-            payments: new List<Payment> { new() { PaymentId = 1, ReceivedAmount = 100m } });
-
-        _orderRepoMock
-            .Setup(r => r.GetByIdForUpdateAsync(1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(paidOrder);
-
+        SetupLookupResolver();
+        var order = MakeOrder(orderId: 22, statusId: PendingStatusId);
+        order.Payments = new List<Payment> { new() { PaymentId = 1, OrderId = 22, ReceivedAmount = 100_000m } };
+        _orderRepoMock.Setup(x => x.GetByIdForUpdateAsync(22, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(order);
+        _uowMock.Setup(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.RollbackAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         var service = CreateService();
-        var request = new AddOrderItemsRequest
-        {
-            Items = new List<CreateOrderItemDto>
-            {
-                new() { DishId = 1, Quantity = 1 }
-            }
-        };
-
-        // Act & Assert
-        await service.Invoking(s => s.AddItemsAsync(1, request, default))
-            .Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*paid order*");
-    }
-
-    [Fact]
-    [Trait("Type", "Boundary")]
-    [Trait("Method", "AddItemsAsync")]
-    public async Task AddItemsAsync_WhenCompletedOrder_SetsStatusToInProgress()
-    {
-        // Arrange
-        SetupDefaultLookupBehavior();
-        SetupDefaultUoW();
-        SetupNoDefaultTax();
-
-        var completedOrder = MakeOrder(statusId: ORDER_COMPLETED_ID, totalAmount: 100000m);
-        completedOrder.OrderStatusLv = new LookupValue { ValueCode = "COMPLETED" };
-
-        _orderRepoMock
-            .Setup(r => r.GetByIdForUpdateAsync(1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(completedOrder);
-
-        var dish = MakeDish(1, "Phở bò", 50000m);
-
-        _dishRepoMock
-            .Setup(d => d.GetByIdsAsync(It.IsAny<List<long>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Dish> { dish });
-
-        var service = CreateService();
-        var request = new AddOrderItemsRequest
-        {
-            Items = new List<CreateOrderItemDto>
-            {
-                new() { DishId = 1, Quantity = 1 }
-            }
-        };
 
         // Act
-        await service.AddItemsAsync(1, request, default);
+        Func<Task> act = () => service.AddItemsAsync(22, new AddOrderItemsRequest { Items = new() }, CancellationToken.None);
 
-        // Assert — completed → in_progress when adding items
-        completedOrder.OrderStatusLvId.Should().Be(ORDER_IN_PROGRESS_ID);
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("Cannot add items to paid order.");
     }
 
     [Fact]
@@ -1195,87 +1603,195 @@ public class OrderServiceTests
     public async Task AddItemsAsync_WhenDishNotFound_ThrowsNotFoundException()
     {
         // Arrange
-        SetupDefaultLookupBehavior();
-        SetupDefaultUoW();
-
-        var order = MakeOrder(statusId: ORDER_IN_PROGRESS_ID);
-        order.OrderStatusLv = new LookupValue { ValueCode = "IN_PROGRESS" };
-
-        _orderRepoMock
-            .Setup(r => r.GetByIdForUpdateAsync(1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(order);
-
-        _dishRepoMock
-            .Setup(d => d.GetByIdsAsync(It.IsAny<List<long>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Dish>()); // empty
-
-        var service = CreateService();
+        SetupLookupResolver();
+        var order = MakeOrder(orderId: 23, statusId: InProgressStatusId);
         var request = new AddOrderItemsRequest
         {
             Items = new List<CreateOrderItemDto>
             {
-                new() { DishId = 999, Quantity = 1 }
+                new() { DishId = 1, Quantity = 1 },
+                new() { DishId = 888, Quantity = 1 }
             }
         };
+        _orderRepoMock.Setup(x => x.GetByIdForUpdateAsync(23, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(order);
+        _dishRepoMock.Setup(x => x.GetByIdsAsync(It.IsAny<List<long>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Dish> { MakeDish(1) });
+        _uowMock.Setup(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.RollbackAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        var service = CreateService();
 
-        // Act & Assert
-        await service.Invoking(s => s.AddItemsAsync(1, request, default))
-            .Should().ThrowAsync<NotFoundException>()
-            .WithMessage("*dishes not found*");
+        // Act
+        Func<Task> act = () => service.AddItemsAsync(23, request, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<NotFoundException>()
+            .WithMessage("One or more dishes not found.");
+    }
+
+    [Fact]
+    [Trait("Type", "Normal")]
+    [Trait("Method", "AddItemsAsync")]
+    public async Task AddItemsAsync_WhenCompletedOrder_TransitionsToInProgress()
+    {
+        // Arrange
+        SetupLookupResolver();
+        SetupDefaultTax();
+        var order = MakeOrder(orderId: 24, statusId: CompletedStatusId, totalAmount: 50_000m, subTotalAmount: 50_000m);
+        order.OrderStatusLv = new LookupValue { ValueId = CompletedStatusId, ValueCode = "COMPLETED" };
+        var request = new AddOrderItemsRequest
+        {
+            Items = new List<CreateOrderItemDto> { new() { DishId = 1, Quantity = 1 } }
+        };
+        _orderRepoMock.Setup(x => x.GetByIdForUpdateAsync(24, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(order);
+        _dishRepoMock.Setup(x => x.GetByIdsAsync(It.IsAny<List<long>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Dish> { MakeDish(1, "Pho Bo", 50_000m) });
+        _uowMock.Setup(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _realtimeMock.Setup(x => x.OrderUpdatedAsync(It.IsAny<OrderRealtimeDTO>())).Returns(Task.CompletedTask);
+        _shiftLiveMock.Setup(x => x.PublishBoardChangedAsync(It.IsAny<ShiftLiveRealtimeEventDto>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        var service = CreateService();
+
+        // Act
+        await service.AddItemsAsync(24, request, CancellationToken.None);
+
+        // Assert
+        order.OrderStatusLvId.Should().Be(InProgressStatusId);
+        order.TotalAmount.Should().Be(100_000m);
+    }
+
+    [Fact]
+    [Trait("Type", "Normal")]
+    [Trait("Method", "AddItemsAsync")]
+    public async Task AddItemsAsync_WhenCustomerProvided_ResolvesCustomer()
+    {
+        // Arrange
+        SetupLookupResolver();
+        SetupDefaultTax();
+        var order = MakeOrder(orderId: 25, statusId: PendingStatusId);
+        order.OrderStatusLv = new LookupValue { ValueId = PendingStatusId, ValueCode = "PENDING" };
+        order.CustomerId = 100;
+        var request = new AddOrderItemsRequest
+        {
+            Customer = new OrderCustomerDto { Phone = "0909999999", FullName = "New Customer" },
+            Items = new List<CreateOrderItemDto>()
+        };
+        _orderRepoMock.Setup(x => x.GetByIdForUpdateAsync(25, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(order);
+        _customerServiceMock.Setup(x => x.ResolveCustomerAsync(request.Customer, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(200L);
+        _uowMock.Setup(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _realtimeMock.Setup(x => x.OrderUpdatedAsync(It.IsAny<OrderRealtimeDTO>())).Returns(Task.CompletedTask);
+        _shiftLiveMock.Setup(x => x.PublishBoardChangedAsync(It.IsAny<ShiftLiveRealtimeEventDto>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        var service = CreateService();
+
+        // Act
+        await service.AddItemsAsync(25, request, CancellationToken.None);
+
+        // Assert
+        order.CustomerId.Should().Be(200L);
     }
 
     #endregion
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // TEST CASES — CreateOrderAsync (customer DTO)
-    // ═══════════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════
+    // CreateOrderAsync (Customer)
+    // ══════════════════════════════════════════════════════════════════
 
     #region CreateOrderAsync_Customer
 
     [Fact]
     [Trait("Type", "Normal")]
     [Trait("Method", "CreateOrderAsync_Customer")]
-    public async Task CreateOrderAsync_Customer_WhenValid_CreatesOrderAndReturnsResponse()
+    public async Task CreateOrderAsync_Customer_WhenTableAvailable_CreatesNewOrder()
     {
         // Arrange
-        SetupDefaultLookupBehavior();
-        SetupDefaultUoW();
-        SetupNoDefaultTax();
-
-        var table = MakeTable(1, "T001", 4, TABLE_AVAILABLE_ID);
-
-        _tableRepoMock
-            .Setup(t => t.GetByCodeAsync("T001", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(table);
-
-        _customerServiceMock
-            .Setup(c => c.GetGuestCustomerIdAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(68L);
-
-        _orderRepoMock
-            .Setup(r => r.CreateOrderAsync(It.IsAny<Order>(), It.IsAny<List<OrderItem>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(200L);
-
-        var service = CreateService();
+        SetupLookupResolver();
+        SetupDefaultTax();
         var request = new CreateOrderRequestDTO
         {
-            TableCode = "T001",
+            TableCode = "TB-001",
             QrToken = "valid-qr-token",
             Items = new List<CreateOrderItemDTO>
             {
-                new() { DishId = 1, Quantity = 2, Price = 50000m }
+                new() { DishId = 1, Quantity = 2, Price = 50_000m },
+                new() { DishId = 2, Quantity = 1, Price = 45_000m }
             }
         };
+        var table = MakeTable(10, "TB-001", AvailableTableStatusId);
+        _tableRepoMock.Setup(x => x.GetByCodeAsync("TB-001", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(table);
+        _tableRepoMock.Setup(x => x.UpdateAsync(It.IsAny<RestaurantTable>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _customerServiceMock.Setup(x => x.GetGuestCustomerIdAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(68L);
+        _orderRepoMock.Setup(x => x.CreateOrderAsync(It.IsAny<Order>(), It.IsAny<List<OrderItem>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(2001L);
+        _uowMock.Setup(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _realtimeMock.Setup(x => x.OrderCreatedAsync(It.IsAny<OrderRealtimeDTO>())).Returns(Task.CompletedTask);
+        _shiftLiveMock.Setup(x => x.PublishBoardChangedAsync(It.IsAny<ShiftLiveRealtimeEventDto>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _notificationServiceMock.Setup(x => x.PublishAsync(It.IsAny<PublishNotificationRequest>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        var service = CreateService();
 
         // Act
-        var result = await service.CreateOrderAsync(request);
+        var result = await service.CreateOrderAsync(request, CancellationToken.None);
 
         // Assert
-        result.OrderId.Should().Be(200);
-        result.TableCode.Should().Be("T001");
+        result.OrderId.Should().Be(2001);
+        result.TableId.Should().Be(10);
+        result.TableCode.Should().Be("TB-001");
         result.CustomerId.Should().Be(68);
+        result.TotalAmount.Should().Be(145_000m);
         result.OrderStatus.Should().Be("PENDING");
-        table.TableStatusLvId.Should().Be(TABLE_OCCUPIED_ID);
+        table.TableStatusLvId.Should().Be(OccupiedTableStatusId);
+    }
+
+    [Fact]
+    [Trait("Type", "Normal")]
+    [Trait("Method", "CreateOrderAsync_Customer")]
+    public async Task CreateOrderAsync_Customer_WhenTableOccupied_AddsToExistingOrder()
+    {
+        // Arrange
+        SetupLookupResolver();
+        SetupDefaultTax();
+        var request = new CreateOrderRequestDTO
+        {
+            TableCode = "TB-001",
+            QrToken = "valid-qr-token",
+            Items = new List<CreateOrderItemDTO>
+            {
+                new() { DishId = 1, Quantity = 1, Price = 50_000m }
+            }
+        };
+        var table = MakeTable(10, "TB-001", OccupiedTableStatusId);
+        var existingOrder = MakeOrder(orderId: 500, statusId: PendingStatusId, tableId: 10, customerId: 68);
+        existingOrder.TotalAmount = 100_000m;
+        _tableRepoMock.Setup(x => x.GetByCodeAsync("TB-001", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(table);
+        _orderRepoMock.Setup(x => x.GetActiveOrderByTableAsync(10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existingOrder);
+        _orderRepoMock.Setup(x => x.AddItemsToOrderAsync(500, It.IsAny<List<OrderItem>>(), It.IsAny<uint>(), It.IsAny<uint>(), It.IsAny<uint>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _realtimeMock.Setup(x => x.OrderCreatedAsync(It.IsAny<OrderRealtimeDTO>())).Returns(Task.CompletedTask);
+        _shiftLiveMock.Setup(x => x.PublishBoardChangedAsync(It.IsAny<ShiftLiveRealtimeEventDto>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _notificationServiceMock.Setup(x => x.PublishAsync(It.IsAny<PublishNotificationRequest>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        var service = CreateService();
+
+        // Act
+        var result = await service.CreateOrderAsync(request, CancellationToken.None);
+
+        // Assert
+        result.OrderId.Should().Be(500);
+        result.TableCode.Should().Be("TB-001");
+        result.OrderStatus.Should().Be("PENDING");
+        _orderRepoMock.Verify(x => x.AddItemsToOrderAsync(500, It.IsAny<List<OrderItem>>(), It.IsAny<uint>(), It.IsAny<uint>(), It.IsAny<uint>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -1284,26 +1800,23 @@ public class OrderServiceTests
     public async Task CreateOrderAsync_Customer_WhenTableNotFound_ThrowsKeyNotFoundException()
     {
         // Arrange
-        SetupDefaultUoW();
-
-        _tableRepoMock
-            .Setup(t => t.GetByCodeAsync("INVALID", It.IsAny<CancellationToken>()))
-            .ReturnsAsync((RestaurantTable?)null);
-
-        var service = CreateService();
         var request = new CreateOrderRequestDTO
         {
             TableCode = "INVALID",
-            Items = new List<CreateOrderItemDTO>
-            {
-                new() { DishId = 1, Quantity = 1, Price = 50000m }
-            }
+            Items = new List<CreateOrderItemDTO> { new() { DishId = 1, Quantity = 1, Price = 50_000m } }
         };
+        _tableRepoMock.Setup(x => x.GetByCodeAsync("INVALID", It.IsAny<CancellationToken>()))
+            .ReturnsAsync((RestaurantTable?)null);
+        _uowMock.Setup(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.RollbackAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        var service = CreateService();
 
-        // Act & Assert
-        await service.Invoking(s => s.CreateOrderAsync(request))
-            .Should().ThrowAsync<KeyNotFoundException>()
-            .WithMessage("*not found*");
+        // Act
+        Func<Task> act = () => service.CreateOrderAsync(request, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<KeyNotFoundException>()
+            .WithMessage("Table 'INVALID' not found.");
     }
 
     [Fact]
@@ -1312,30 +1825,26 @@ public class OrderServiceTests
     public async Task CreateOrderAsync_Customer_WhenInvalidQrToken_ThrowsValidationException()
     {
         // Arrange
-        SetupDefaultUoW();
-
-        var table = MakeTable(1, "T001", 4, TABLE_AVAILABLE_ID);
-        table.QrToken = "correct-token";
-
-        _tableRepoMock
-            .Setup(t => t.GetByCodeAsync("T001", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(table);
-
-        var service = CreateService();
         var request = new CreateOrderRequestDTO
         {
-            TableCode = "T001",
+            TableCode = "TB-001",
             QrToken = "wrong-token",
-            Items = new List<CreateOrderItemDTO>
-            {
-                new() { DishId = 1, Quantity = 1, Price = 50000m }
-            }
+            Items = new List<CreateOrderItemDTO> { new() { DishId = 1, Quantity = 1, Price = 50_000m } }
         };
+        var table = MakeTable(10, "TB-001", AvailableTableStatusId);
+        table.QrToken = "valid-qr-token";
+        _tableRepoMock.Setup(x => x.GetByCodeAsync("TB-001", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(table);
+        _uowMock.Setup(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.RollbackAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        var service = CreateService();
 
-        // Act & Assert
-        await service.Invoking(s => s.CreateOrderAsync(request))
-            .Should().ThrowAsync<ValidationException>()
-            .WithMessage("*Invalid QR token*");
+        // Act
+        Func<Task> act = () => service.CreateOrderAsync(request, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<ValidationException>()
+            .WithMessage("Invalid QR token. Please scan the QR code on the table again.");
     }
 
     [Fact]
@@ -1344,197 +1853,173 @@ public class OrderServiceTests
     public async Task CreateOrderAsync_Customer_WhenTableLocked_ThrowsInvalidOperationException()
     {
         // Arrange
-        SetupDefaultLookupBehavior();
-        SetupDefaultUoW();
-
-        var lockedTable = MakeTable(1, "T001", 4, TABLE_LOCKED_ID);
-
-        _tableRepoMock
-            .Setup(t => t.GetByCodeAsync("T001", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(lockedTable);
-
-        var service = CreateService();
+        SetupLookupResolver();
         var request = new CreateOrderRequestDTO
         {
-            TableCode = "T001",
-            Items = new List<CreateOrderItemDTO>
-            {
-                new() { DishId = 1, Quantity = 1, Price = 50000m }
-            }
+            TableCode = "TB-001",
+            Items = new List<CreateOrderItemDTO> { new() { DishId = 1, Quantity = 1, Price = 50_000m } }
         };
+        var table = MakeTable(10, "TB-001", LockedTableStatusId);
+        table.QrToken = null;
+        _tableRepoMock.Setup(x => x.GetByCodeAsync("TB-001", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(table);
+        _uowMock.Setup(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.RollbackAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        var service = CreateService();
 
-        // Act & Assert
-        await service.Invoking(s => s.CreateOrderAsync(request))
-            .Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*maintenance*");
+        // Act
+        Func<Task> act = () => service.CreateOrderAsync(request, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("Table 'TB-001' is under maintenance and cannot be used.");
     }
 
     [Fact]
     [Trait("Type", "Abnormal")]
     [Trait("Method", "CreateOrderAsync_Customer")]
-    public async Task CreateOrderAsync_Customer_WhenTableOccupiedWithActiveOrders_ThrowsConflictException()
+    public async Task CreateOrderAsync_Customer_WhenTableDeleted_ThrowsInvalidOperationException()
     {
         // Arrange
-        SetupDefaultLookupBehavior();
-        SetupDefaultUoW();
-
-        var occupiedTable = MakeTable(1, "T001", 4, TABLE_OCCUPIED_ID);
-
-        _tableRepoMock
-            .Setup(t => t.GetByCodeAsync("T001", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(occupiedTable);
-
-        _tableRepoMock
-            .Setup(t => t.CountActiveOrdersAsync(1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(1);
-
-        var service = CreateService();
+        SetupLookupResolver();
         var request = new CreateOrderRequestDTO
         {
-            TableCode = "T001",
-            Items = new List<CreateOrderItemDTO>
-            {
-                new() { DishId = 1, Quantity = 1, Price = 50000m }
-            }
+            TableCode = "TB-001",
+            Items = new List<CreateOrderItemDTO> { new() { DishId = 1, Quantity = 1, Price = 50_000m } }
         };
-
-        // Act & Assert
-        await service.Invoking(s => s.CreateOrderAsync(request))
-            .Should().ThrowAsync<ConflictException>()
-            .WithMessage("*already occupied*");
-    }
-
-    [Fact]
-    [Trait("Type", "Boundary")]
-    [Trait("Method", "CreateOrderAsync_Customer")]
-    public async Task CreateOrderAsync_Customer_WhenReservedTable_SetsToOccupied()
-    {
-        // Arrange
-        SetupDefaultLookupBehavior();
-        SetupDefaultUoW();
-        SetupNoDefaultTax();
-
-        var reservedTable = MakeTable(1, "T001", 4, TABLE_RESERVED_ID);
-
-        _tableRepoMock
-            .Setup(t => t.GetByCodeAsync("T001", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(reservedTable);
-
-        _customerServiceMock
-            .Setup(c => c.GetGuestCustomerIdAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(68L);
-
-        _orderRepoMock
-            .Setup(r => r.CreateOrderAsync(It.IsAny<Order>(), It.IsAny<List<OrderItem>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(300L);
-
+        var table = MakeTable(10, "TB-001", AvailableTableStatusId);
+        table.IsDeleted = true;
+        table.QrToken = null;
+        _tableRepoMock.Setup(x => x.GetByCodeAsync("TB-001", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(table);
+        _uowMock.Setup(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.RollbackAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         var service = CreateService();
-        var request = new CreateOrderRequestDTO
-        {
-            TableCode = "T001",
-            Items = new List<CreateOrderItemDTO>
-            {
-                new() { DishId = 1, Quantity = 1, Price = 50000m }
-            }
-        };
 
         // Act
-        var result = await service.CreateOrderAsync(request);
+        Func<Task> act = () => service.CreateOrderAsync(request, CancellationToken.None);
 
         // Assert
-        reservedTable.TableStatusLvId.Should().Be(TABLE_OCCUPIED_ID);
-        result.OrderId.Should().Be(300);
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("Table 'TB-001' is no longer available.");
+    }
+
+    [Fact]
+    [Trait("Type", "Normal")]
+    [Trait("Method", "CreateOrderAsync_Customer")]
+    public async Task CreateOrderAsync_Customer_WhenTableReserved_ChangesToOccupied()
+    {
+        // Arrange
+        SetupLookupResolver();
+        SetupDefaultTax();
+        var request = new CreateOrderRequestDTO
+        {
+            TableCode = "TB-001",
+            Items = new List<CreateOrderItemDTO>
+            {
+                new() { DishId = 1, Quantity = 1, Price = 50_000m }
+            }
+        };
+        var table = MakeTable(10, "TB-001", ReservedTableStatusId);
+        table.QrToken = null;
+        _tableRepoMock.Setup(x => x.GetByCodeAsync("TB-001", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(table);
+        _tableRepoMock.Setup(x => x.UpdateAsync(It.IsAny<RestaurantTable>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _customerServiceMock.Setup(x => x.GetGuestCustomerIdAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(68L);
+        _orderRepoMock.Setup(x => x.CreateOrderAsync(It.IsAny<Order>(), It.IsAny<List<OrderItem>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(2002L);
+        _uowMock.Setup(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.CommitAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _realtimeMock.Setup(x => x.OrderCreatedAsync(It.IsAny<OrderRealtimeDTO>())).Returns(Task.CompletedTask);
+        _shiftLiveMock.Setup(x => x.PublishBoardChangedAsync(It.IsAny<ShiftLiveRealtimeEventDto>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _notificationServiceMock.Setup(x => x.PublishAsync(It.IsAny<PublishNotificationRequest>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        var service = CreateService();
+
+        // Act
+        var result = await service.CreateOrderAsync(request, CancellationToken.None);
+
+        // Assert
+        table.TableStatusLvId.Should().Be(OccupiedTableStatusId);
+        result.OrderId.Should().Be(2002);
     }
 
     [Fact]
     [Trait("Type", "Boundary")]
     [Trait("Method", "CreateOrderAsync_Customer")]
-    public async Task CreateOrderAsync_Customer_WhenNoQrToken_SkipsValidation()
+    public async Task CreateOrderAsync_Customer_WhenTableCodeHasSpaces_TrimsBeforeLookup()
     {
         // Arrange
-        SetupDefaultLookupBehavior();
-        SetupDefaultUoW();
-        SetupNoDefaultTax();
-
-        var table = MakeTable(1, "T001", 4, TABLE_AVAILABLE_ID);
-
-        _tableRepoMock
-            .Setup(t => t.GetByCodeAsync("T001", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(table);
-
-        _customerServiceMock
-            .Setup(c => c.GetGuestCustomerIdAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(68L);
-
-        _orderRepoMock
-            .Setup(r => r.CreateOrderAsync(It.IsAny<Order>(), It.IsAny<List<OrderItem>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(400L);
-
-        var service = CreateService();
         var request = new CreateOrderRequestDTO
         {
-            TableCode = "T001",
-            QrToken = null, // no QR token
-            Items = new List<CreateOrderItemDTO>
-            {
-                new() { DishId = 1, Quantity = 1, Price = 50000m }
-            }
+            TableCode = "  TB-001  ",
+            Items = new List<CreateOrderItemDTO> { new() { DishId = 1, Quantity = 1, Price = 50_000m } }
         };
+        _tableRepoMock.Setup(x => x.GetByCodeAsync("TB-001", It.IsAny<CancellationToken>()))
+            .ReturnsAsync((RestaurantTable?)null);
+        _uowMock.Setup(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _uowMock.Setup(x => x.RollbackAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        var service = CreateService();
 
         // Act
-        var result = await service.CreateOrderAsync(request);
+        Func<Task> act = () => service.CreateOrderAsync(request, CancellationToken.None);
 
-        // Assert — should succeed without QR validation
-        result.OrderId.Should().Be(400);
+        // Assert — verifies Trim() is applied by checking repo is called with trimmed value
+        await act.Should().ThrowAsync<KeyNotFoundException>();
+        _tableRepoMock.Verify(x => x.GetByCodeAsync("TB-001", It.IsAny<CancellationToken>()), Times.Once);
     }
 
     #endregion
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // TEST CASES — AddItemsToOrderAsync (customer)
-    // ═══════════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════
+    // AddItemsToOrderAsync (Customer)
+    // ══════════════════════════════════════════════════════════════════
 
     #region AddItemsToOrderAsync
 
     [Fact]
     [Trait("Type", "Normal")]
     [Trait("Method", "AddItemsToOrderAsync")]
-    public async Task AddItemsToOrderAsync_WhenValid_AddsItemsAndRecalcsTax()
+    public async Task AddItemsToOrderAsync_WhenValidOrder_AddsItemsAndNotifies()
     {
         // Arrange
-        SetupDefaultLookupBehavior();
-        SetupNoDefaultTax();
-
-        var order = MakeOrder(statusId: ORDER_IN_PROGRESS_ID);
-
-        _orderRepoMock
-            .Setup(r => r.GetByIdForUpdateAsync(1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(order);
-
-        _dishRepoMock
-            .Setup(d => d.GetByIdsAsync(It.IsAny<List<long>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Dish> { MakeDish(1) });
-
-        _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-
-        var service = CreateService();
+        SetupLookupResolver();
+        var order = MakeOrder(orderId: 30, statusId: PendingStatusId, tableId: 10);
         var request = new AddOrderItemsRequestDTO
         {
             Items = new List<CreateOrderItemDTO>
             {
-                new() { DishId = 1, Quantity = 1, Price = 50000m }
+                new() { DishId = 1, Quantity = 2, Price = 50_000m, Note = "Extra spicy" }
             }
         };
+        _orderRepoMock.Setup(x => x.GetByIdForUpdateAsync(30, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(order);
+        _orderRepoMock.Setup(x => x.AddItemsToOrderAsync(30, It.IsAny<List<OrderItem>>(), CompletedStatusId, CancelledStatusId, PendingStatusId, It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        _dishRepoMock.Setup(x => x.GetByIdsAsync(It.IsAny<List<long>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Dish> { MakeDish(1, "Pho Bo", 50_000m) });
+        _tableRepoMock.Setup(x => x.GetByIdAsync(10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(MakeTable(10, "TB-001"));
+        _notificationServiceMock.Setup(x => x.PublishAsync(It.IsAny<PublishNotificationRequest>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _taxRepoMock.Setup(x => x.GetDefaultTaxAsync(It.IsAny<CancellationToken>())).ReturnsAsync((Tax?)null);
+        _uowMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        var service = CreateService();
 
         // Act
-        await service.AddItemsToOrderAsync(1, request);
+        await service.AddItemsToOrderAsync(30, request, CancellationToken.None);
 
         // Assert
-        _orderRepoMock.Verify(
-            r => r.AddItemsToOrderAsync(1, It.IsAny<List<OrderItem>>(),
-                It.IsAny<uint>(), It.IsAny<uint>(), It.IsAny<uint>(),
-                It.IsAny<CancellationToken>()),
-            Times.Once);
+        _orderRepoMock.Verify(x => x.AddItemsToOrderAsync(30, It.Is<List<OrderItem>>(items =>
+            items.Count == 1 &&
+            items[0].DishId == 1 &&
+            items[0].Quantity == 2 &&
+            items[0].Price == 50_000m &&
+            items[0].Note == "Extra spicy" &&
+            items[0].ItemStatusLvId == CreatedItemStatusId
+        ), CompletedStatusId, CancelledStatusId, PendingStatusId, It.IsAny<CancellationToken>()), Times.Once);
+        _notificationServiceMock.Verify(x => x.PublishAsync(
+            It.Is<PublishNotificationRequest>(n => n.Type == nameof(NotificationType.ORDER_ITEMS_ADDED)),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -1543,22 +2028,16 @@ public class OrderServiceTests
     public async Task AddItemsToOrderAsync_WhenOrderNotFound_ThrowsKeyNotFoundException()
     {
         // Arrange
-        _orderRepoMock
-            .Setup(r => r.GetByIdForUpdateAsync(999, It.IsAny<CancellationToken>()))
+        _orderRepoMock.Setup(x => x.GetByIdForUpdateAsync(999, It.IsAny<CancellationToken>()))
             .ReturnsAsync((Order?)null);
-
         var service = CreateService();
-        var request = new AddOrderItemsRequestDTO
-        {
-            Items = new List<CreateOrderItemDTO>
-            {
-                new() { DishId = 1, Quantity = 1, Price = 50000m }
-            }
-        };
 
-        // Act & Assert
-        await service.Invoking(s => s.AddItemsToOrderAsync(999, request))
-            .Should().ThrowAsync<KeyNotFoundException>();
+        // Act
+        Func<Task> act = () => service.AddItemsToOrderAsync(999, new AddOrderItemsRequestDTO { Items = new() }, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<KeyNotFoundException>()
+            .WithMessage("Order 999 not found.");
     }
 
     [Fact]
@@ -1567,121 +2046,168 @@ public class OrderServiceTests
     public async Task AddItemsToOrderAsync_WhenOrderAlreadyPaid_ThrowsInvalidOperationException()
     {
         // Arrange
-        var paidOrder = MakeOrder(statusId: ORDER_IN_PROGRESS_ID,
-            payments: new List<Payment> { new() { PaymentId = 1, ReceivedAmount = 100m } });
-
-        _orderRepoMock
-            .Setup(r => r.GetByIdForUpdateAsync(1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(paidOrder);
-
+        var order = MakeOrder(orderId: 31, statusId: CompletedStatusId);
+        order.Payments = new List<Payment> { new() { PaymentId = 1, OrderId = 31, ReceivedAmount = 100_000m } };
+        _orderRepoMock.Setup(x => x.GetByIdForUpdateAsync(31, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(order);
         var service = CreateService();
-        var request = new AddOrderItemsRequestDTO
-        {
-            Items = new List<CreateOrderItemDTO>
-            {
-                new() { DishId = 1, Quantity = 1, Price = 50000m }
-            }
-        };
 
-        // Act & Assert
-        await service.Invoking(s => s.AddItemsToOrderAsync(1, request))
-            .Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*already been paid*");
+        // Act
+        Func<Task> act = () => service.AddItemsToOrderAsync(31, new AddOrderItemsRequestDTO { Items = new() }, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("This order has already been paid. Please ask staff to create a new order for your table.");
     }
 
     [Fact]
-    [Trait("Type", "Boundary")]
+    [Trait("Type", "Abnormal")]
     [Trait("Method", "AddItemsToOrderAsync")]
-    public async Task AddItemsToOrderAsync_WhenOrderIsPending_StillAddsItems()
+    public async Task AddItemsToOrderAsync_WhenDishNotFound_ThrowsNotFoundException()
     {
-        // Arrange — PENDING status (boundary: typical usage is IN_PROGRESS)
-        SetupDefaultLookupBehavior();
-        SetupNoDefaultTax();
-
-        var pendingOrder = MakeOrder(statusId: ORDER_PENDING_ID);
-
-        _orderRepoMock
-            .Setup(r => r.GetByIdForUpdateAsync(1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(pendingOrder);
-
-        _dishRepoMock
-            .Setup(d => d.GetByIdsAsync(It.IsAny<List<long>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Dish> { MakeDish(1) });
-
-        _uowMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-
-        var service = CreateService();
+        // Arrange
+        SetupLookupResolver();
+        var order = MakeOrder(orderId: 33, statusId: PendingStatusId, tableId: 10);
         var request = new AddOrderItemsRequestDTO
         {
             Items = new List<CreateOrderItemDTO>
             {
-                new() { DishId = 1, Quantity = 1, Price = 50000m }
+                new() { DishId = 1, Quantity = 1, Price = 50_000m },
+                new() { DishId = 999, Quantity = 1, Price = 45_000m }
             }
         };
 
-        // Act
-        await service.AddItemsToOrderAsync(1, request);
+        _orderRepoMock.Setup(x => x.GetByIdForUpdateAsync(33, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(order);
+        _orderRepoMock.Setup(x => x.AddItemsToOrderAsync(33, It.IsAny<List<OrderItem>>(), It.IsAny<uint>(), It.IsAny<uint>(), It.IsAny<uint>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        _dishRepoMock.Setup(x => x.GetByIdsAsync(It.IsAny<List<long>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Dish> { MakeDish(1, "Pho Bo", 50_000m) });
 
-        // Assert — items added successfully to PENDING order
-        _orderRepoMock.Verify(
-            r => r.AddItemsToOrderAsync(1, It.IsAny<List<OrderItem>>(),
-                It.IsAny<uint>(), It.IsAny<uint>(), It.IsAny<uint>(),
-                It.IsAny<CancellationToken>()),
-            Times.Once);
+        var service = CreateService();
+
+        // Act
+        Func<Task> act = () => service.AddItemsToOrderAsync(33, request, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<NotFoundException>()
+            .WithMessage("One or more dishes not found.");
+    }
+
+    [Fact]
+    [Trait("Type", "Normal")]
+    [Trait("Method", "AddItemsToOrderAsync")]
+    public async Task AddItemsToOrderAsync_NotificationContainsDishNamesAndTableCode()
+    {
+        // Arrange
+        SetupLookupResolver();
+        var order = MakeOrder(orderId: 32, statusId: PendingStatusId, tableId: 10);
+        var request = new AddOrderItemsRequestDTO
+        {
+            Items = new List<CreateOrderItemDTO>
+            {
+                new() { DishId = 1, Quantity = 1, Price = 50_000m },
+                new() { DishId = 2, Quantity = 1, Price = 45_000m }
+            }
+        };
+        _orderRepoMock.Setup(x => x.GetByIdForUpdateAsync(32, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(order);
+        _orderRepoMock.Setup(x => x.AddItemsToOrderAsync(32, It.IsAny<List<OrderItem>>(), It.IsAny<uint>(), It.IsAny<uint>(), It.IsAny<uint>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        _dishRepoMock.Setup(x => x.GetByIdsAsync(It.IsAny<List<long>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Dish>
+            {
+                MakeDish(1, "Pho Bo", 50_000m),
+                MakeDish(2, "Bun Cha", 45_000m)
+            });
+        _tableRepoMock.Setup(x => x.GetByIdAsync(10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(MakeTable(10, "TB-001"));
+        _notificationServiceMock.Setup(x => x.PublishAsync(It.IsAny<PublishNotificationRequest>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _taxRepoMock.Setup(x => x.GetDefaultTaxAsync(It.IsAny<CancellationToken>())).ReturnsAsync((Tax?)null);
+        _uowMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        var service = CreateService();
+
+        // Act
+        await service.AddItemsToOrderAsync(32, request, CancellationToken.None);
+
+        // Assert
+        _notificationServiceMock.Verify(x => x.PublishAsync(
+            It.Is<PublishNotificationRequest>(n =>
+                n.Metadata != null &&
+                (string)n.Metadata["tableCode"] == "TB-001" &&
+                ((string)n.Metadata["dishNames"]).Contains("Pho Bo") &&
+                ((string)n.Metadata["dishNames"]).Contains("Bun Cha") &&
+                (string)n.Metadata["itemCount"] == "2"),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     #endregion
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // TEST CASES — GetRecentOrdersAsync
-    // ═══════════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════
+    // GetRecentOrdersAsync
+    // ══════════════════════════════════════════════════════════════════
 
     #region GetRecentOrdersAsync
 
     [Fact]
     [Trait("Type", "Normal")]
     [Trait("Method", "GetRecentOrdersAsync")]
-    public async Task GetRecentOrdersAsync_WhenCalled_ReturnsList()
+    public async Task GetRecentOrdersAsync_WhenValidInput_ReturnsRecentOrders()
     {
         // Arrange
-        var orders = new List<RecentOrderDTO>
+        var expected = new List<RecentOrderDTO>
         {
-            new() { OrderId = 1 },
-            new() { OrderId = 2 }
+            new() { OrderId = 1, CustomerName = "Nguyen Van A", Source = "DINE_IN", TableCode = "TB-001", Status = "PENDING", CreatedAt = new DateTime(2025, 6, 1) },
+            new() { OrderId = 2, CustomerName = "Guest", Source = "TAKEAWAY", TableCode = null, Status = "COMPLETED", CreatedAt = new DateTime(2025, 6, 1) }
         };
-
-        _orderRepoMock
-            .Setup(r => r.GetRecentOrdersAsync(1, It.IsAny<List<string>>(), 10, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(orders);
-
+        _orderRepoMock.Setup(x => x.GetRecentOrdersAsync(5, It.IsAny<List<string>>(), 10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(expected);
         var service = CreateService();
 
         // Act
-        var result = await service.GetRecentOrdersAsync(1, new List<string> { "ADMIN" }, 10, default);
+        var result = await service.GetRecentOrdersAsync(5, new List<string> { "Admin" }, 10, CancellationToken.None);
 
         // Assert
         result.Should().HaveCount(2);
+        result[0].OrderId.Should().Be(1);
+        result[0].CustomerName.Should().Be("Nguyen Van A");
+        result[1].OrderId.Should().Be(2);
+        result[1].Source.Should().Be("TAKEAWAY");
     }
 
     [Fact]
     [Trait("Type", "Boundary")]
     [Trait("Method", "GetRecentOrdersAsync")]
-    public async Task GetRecentOrdersAsync_WhenLimitIsZero_DefaultsTo20()
+    public async Task GetRecentOrdersAsync_WhenLimitZero_DefaultsTo20()
     {
         // Arrange
-        _orderRepoMock
-            .Setup(r => r.GetRecentOrdersAsync(1, It.IsAny<List<string>>(), 20, It.IsAny<CancellationToken>()))
+        _orderRepoMock.Setup(x => x.GetRecentOrdersAsync(5, It.IsAny<List<string>>(), 20, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<RecentOrderDTO>());
-
         var service = CreateService();
 
         // Act
-        await service.GetRecentOrdersAsync(1, new List<string> { "ADMIN" }, 0, default);
+        var result = await service.GetRecentOrdersAsync(5, new List<string> { "Admin" }, 0, CancellationToken.None);
 
         // Assert
-        _orderRepoMock.Verify(
-            r => r.GetRecentOrdersAsync(1, It.IsAny<List<string>>(), 20, It.IsAny<CancellationToken>()),
-            Times.Once);
+        result.Should().BeEmpty();
+        _orderRepoMock.Verify(x => x.GetRecentOrdersAsync(5, It.IsAny<List<string>>(), 20, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    [Trait("Type", "Boundary")]
+    [Trait("Method", "GetRecentOrdersAsync")]
+    public async Task GetRecentOrdersAsync_WhenLimitNegative_DefaultsTo20()
+    {
+        // Arrange
+        _orderRepoMock.Setup(x => x.GetRecentOrdersAsync(5, It.IsAny<List<string>>(), 20, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<RecentOrderDTO>());
+        var service = CreateService();
+
+        // Act
+        var result = await service.GetRecentOrdersAsync(5, new List<string> { "Admin" }, -5, CancellationToken.None);
+
+        // Assert
+        _orderRepoMock.Verify(x => x.GetRecentOrdersAsync(5, It.IsAny<List<string>>(), 20, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -1690,327 +2216,69 @@ public class OrderServiceTests
     public async Task GetRecentOrdersAsync_WhenLimitExceeds100_DefaultsTo20()
     {
         // Arrange
-        _orderRepoMock
-            .Setup(r => r.GetRecentOrdersAsync(1, It.IsAny<List<string>>(), 20, It.IsAny<CancellationToken>()))
+        _orderRepoMock.Setup(x => x.GetRecentOrdersAsync(5, It.IsAny<List<string>>(), 20, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<RecentOrderDTO>());
-
         var service = CreateService();
 
         // Act
-        await service.GetRecentOrdersAsync(1, new List<string> { "ADMIN" }, 150, default);
+        var result = await service.GetRecentOrdersAsync(5, new List<string> { "Admin" }, 150, CancellationToken.None);
 
         // Assert
-        _orderRepoMock.Verify(
-            r => r.GetRecentOrdersAsync(1, It.IsAny<List<string>>(), 20, It.IsAny<CancellationToken>()),
-            Times.Once);
+        _orderRepoMock.Verify(x => x.GetRecentOrdersAsync(5, It.IsAny<List<string>>(), 20, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    [Trait("Type", "Abnormal")]
+    [Trait("Type", "Boundary")]
     [Trait("Method", "GetRecentOrdersAsync")]
-    public async Task GetRecentOrdersAsync_WhenLimitIsNegative_DefaultsTo20()
+    public async Task GetRecentOrdersAsync_WhenLimit100_UsesExactLimit()
     {
-        // Arrange — negative limit is abnormal input
-        _orderRepoMock
-            .Setup(r => r.GetRecentOrdersAsync(1, It.IsAny<List<string>>(), 20, It.IsAny<CancellationToken>()))
+        // Arrange
+        _orderRepoMock.Setup(x => x.GetRecentOrdersAsync(5, It.IsAny<List<string>>(), 100, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<RecentOrderDTO>());
-
         var service = CreateService();
 
         // Act
-        await service.GetRecentOrdersAsync(1, new List<string> { "ADMIN" }, -5, default);
-
-        // Assert — service clamps -5 → 20
-        _orderRepoMock.Verify(
-            r => r.GetRecentOrdersAsync(1, It.IsAny<List<string>>(), 20, It.IsAny<CancellationToken>()),
-            Times.Once);
-    }
-
-    #endregion
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // TEST CASES — UpdateOrderItemStatusAsync
-    // ═══════════════════════════════════════════════════════════════════════
-
-    #region UpdateOrderItemStatusAsync
-
-    [Fact]
-    [Trait("Type", "Normal")]
-    [Trait("Method", "UpdateOrderItemStatusAsync")]
-    public async Task UpdateOrderItemStatusAsync_WhenReady_DelegatesAndPublishesNotification()
-    {
-        // Arrange
-        SetupDefaultLookupBehavior();
-
-        _orderRepoMock
-            .Setup(r => r.GetOrderItemAsync(1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new OrderItem
-            {
-                OrderItemId = 1,
-                DishId = 1,
-                Dish = MakeDish(),
-                Order = MakeOrder()
-            });
-
-        var service = CreateService();
-
-        // Act
-        await service.UpdateOrderItemStatusAsync(1, ITEM_READY_ID, null);
+        await service.GetRecentOrdersAsync(5, new List<string> { "Admin" }, 100, CancellationToken.None);
 
         // Assert
-        _orderRepoMock.Verify(
-            r => r.UpdateOrderItemStatusAsync(1, ITEM_READY_ID, null,
-                It.IsAny<uint>(), It.IsAny<uint>(), It.IsAny<uint>(),
-                It.IsAny<uint>(), It.IsAny<uint>(), It.IsAny<uint>(),
-                It.IsAny<uint>(), It.IsAny<uint>(), It.IsAny<uint>(),
-                It.IsAny<uint>(), It.IsAny<CancellationToken>()),
-            Times.Once);
-
-        _notificationServiceMock.Verify(
-            n => n.PublishAsync(
-                It.Is<PublishNotificationRequest>(r => r.Type == nameof(NotificationType.ORDER_ITEM_READY)),
-                It.IsAny<CancellationToken>()),
-            Times.Once);
-    }
-
-    [Fact]
-    [Trait("Type", "Normal")]
-    [Trait("Method", "UpdateOrderItemStatusAsync")]
-    public async Task UpdateOrderItemStatusAsync_WhenRejected_PublishesRejectNotificationWithReason()
-    {
-        // Arrange
-        SetupDefaultLookupBehavior();
-
-        _orderRepoMock
-            .Setup(r => r.GetOrderItemAsync(1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new OrderItem
-            {
-                OrderItemId = 1,
-                DishId = 1,
-                Dish = MakeDish(),
-                Order = MakeOrder()
-            });
-
-        var service = CreateService();
-
-        // Act
-        await service.UpdateOrderItemStatusAsync(1, ITEM_REJECTED_ID, "Out of stock");
-
-        // Assert
-        _notificationServiceMock.Verify(
-            n => n.PublishAsync(
-                It.Is<PublishNotificationRequest>(r => r.Type == nameof(NotificationType.ORDER_ITEM_REJECTED)),
-                It.IsAny<CancellationToken>()),
-            Times.Once);
+        _orderRepoMock.Verify(x => x.GetRecentOrdersAsync(5, It.IsAny<List<string>>(), 100, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
     [Trait("Type", "Boundary")]
-    [Trait("Method", "UpdateOrderItemStatusAsync")]
-    public async Task UpdateOrderItemStatusAsync_WhenStatusNotReadyOrRejected_NoNotification()
+    [Trait("Method", "GetRecentOrdersAsync")]
+    public async Task GetRecentOrdersAsync_WhenLimit1_UsesExactLimit()
     {
         // Arrange
-        SetupDefaultLookupBehavior();
-
-        _orderRepoMock
-            .Setup(r => r.GetOrderItemAsync(1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new OrderItem
-            {
-                OrderItemId = 1,
-                DishId = 1,
-                Dish = MakeDish(),
-                Order = MakeOrder()
-            });
-
+        _orderRepoMock.Setup(x => x.GetRecentOrdersAsync(5, It.IsAny<List<string>>(), 1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<RecentOrderDTO> { new() { OrderId = 1 } });
         var service = CreateService();
 
-        // Act — SERVED status
-        await service.UpdateOrderItemStatusAsync(1, ITEM_SERVED_ID, null);
+        // Act
+        var result = await service.GetRecentOrdersAsync(5, new List<string> { "Admin" }, 1, CancellationToken.None);
 
-        // Assert - no notification for SERVED
-        _notificationServiceMock.Verify(
-            n => n.PublishAsync(It.IsAny<PublishNotificationRequest>(), It.IsAny<CancellationToken>()),
-            Times.Never);
+        // Assert
+        result.Should().HaveCount(1);
+        _orderRepoMock.Verify(x => x.GetRecentOrdersAsync(5, It.IsAny<List<string>>(), 1, It.IsAny<CancellationToken>()), Times.Once);
     }
-
-    [Fact]
-    [Trait("Type", "Abnormal")]
-    [Trait("Method", "UpdateOrderItemStatusAsync")]
-    public async Task UpdateOrderItemStatusAsync_WhenInvalidItemId_PropagatesRepositoryException()
-    {
-        // Arrange — negative item ID is abnormal input
-        SetupDefaultLookupBehavior();
-
-        _orderRepoMock
-            .Setup(r => r.UpdateOrderItemStatusAsync(
-                -1, It.IsAny<uint>(), It.IsAny<string?>(),
-                It.IsAny<uint>(), It.IsAny<uint>(), It.IsAny<uint>(),
-                It.IsAny<uint>(), It.IsAny<uint>(), It.IsAny<uint>(),
-                It.IsAny<uint>(), It.IsAny<uint>(), It.IsAny<uint>(),
-                It.IsAny<uint>(), It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new KeyNotFoundException("Order item not found"));
-
-        var service = CreateService();
-
-        // Act & Assert
-        await service.Invoking(s => s.UpdateOrderItemStatusAsync(-1, ITEM_READY_ID, null))
-            .Should().ThrowAsync<KeyNotFoundException>()
-            .WithMessage("*not found*");
-    }
-
-    #endregion
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // TEST CASES — CancelOrderItemAsync
-    // ═══════════════════════════════════════════════════════════════════════
-
-    #region CancelOrderItemAsync
 
     [Fact]
     [Trait("Type", "Normal")]
-    [Trait("Method", "CancelOrderItemAsync")]
-    public async Task CancelOrderItemAsync_WhenValid_CancelsItemAndNotifies()
+    [Trait("Method", "GetRecentOrdersAsync")]
+    public async Task GetRecentOrdersAsync_WhenEmptyRoles_PassesEmptyList()
     {
         // Arrange
-        SetupDefaultLookupBehavior();
-
-        var orderItem = new OrderItem
-        {
-            OrderItemId = 1,
-            DishId = 1,
-            Dish = new Dish { DishName = "Phở bò" },
-            Order = new Order { Table = new RestaurantTable { TableCode = "T001" } }
-        };
-
-        _orderRepoMock
-            .Setup(r => r.GetOrderItemAsync(1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(orderItem);
-
+        var emptyRoles = new List<string>();
+        _orderRepoMock.Setup(x => x.GetRecentOrdersAsync(5, emptyRoles, 10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<RecentOrderDTO>());
         var service = CreateService();
 
         // Act
-        await service.CancelOrderItemAsync(1);
-
-        // Assert — calls UpdateOrderItemStatusAsync with CANCELLED status, then fires notification
-        _notificationServiceMock.Verify(
-            n => n.PublishAsync(
-                It.Is<PublishNotificationRequest>(r => r.Type == nameof(NotificationType.ORDER_ITEM_CANCELLED)),
-                It.IsAny<CancellationToken>()),
-            Times.Once);
-    }
-
-    [Fact]
-    [Trait("Type", "Boundary")]
-    [Trait("Method", "CancelOrderItemAsync")]
-    public async Task CancelOrderItemAsync_WhenOrderItemHasNoDish_StillCancels()
-    {
-        // Arrange
-        SetupDefaultLookupBehavior();
-
-        _orderRepoMock
-            .Setup(r => r.GetOrderItemAsync(1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new OrderItem
-            {
-                OrderItemId = 1,
-                Dish = null!,
-                Order = new Order { Table = null }
-            });
-
-        var service = CreateService();
-
-        // Act
-        await service.CancelOrderItemAsync(1);
-
-        // Assert — metadata should handle null gracefully
-        _notificationServiceMock.Verify(
-            n => n.PublishAsync(It.IsAny<PublishNotificationRequest>(), It.IsAny<CancellationToken>()),
-            Times.Once);
-    }
-
-    [Fact]
-    [Trait("Type", "Abnormal")]
-    [Trait("Method", "CancelOrderItemAsync")]
-    public async Task CancelOrderItemAsync_WhenOrderItemNotFound_PropagatesException()
-    {
-        // Arrange — negative item ID is abnormal input
-        _orderRepoMock
-            .Setup(r => r.GetOrderItemAsync(-1, It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new KeyNotFoundException("Order item not found"));
-
-        var service = CreateService();
-
-        // Act & Assert
-        await service.Invoking(s => s.CancelOrderItemAsync(-1))
-            .Should().ThrowAsync<KeyNotFoundException>()
-            .WithMessage("*not found*");
-    }
-
-    #endregion
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // TEST CASES — GetOrderByIdAsync
-    // ═══════════════════════════════════════════════════════════════════════
-
-    #region GetOrderByIdAsync
-
-    [Fact]
-    [Trait("Type", "Normal")]
-    [Trait("Method", "GetOrderByIdAsync")]
-    public async Task GetOrderByIdAsync_WhenCalled_DelegatesToRepository()
-    {
-        // Arrange
-        var expected = new OrderDetailDTO { OrderId = 1 };
-
-        _orderRepoMock
-            .Setup(r => r.GetOrderByIdAsync(1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(expected);
-
-        var service = CreateService();
-
-        // Act
-        var result = await service.GetOrderByIdAsync(1);
+        var result = await service.GetRecentOrdersAsync(5, emptyRoles, 10, CancellationToken.None);
 
         // Assert
-        result.OrderId.Should().Be(1);
-    }
-
-    [Fact]
-    [Trait("Type", "Abnormal")]
-    [Trait("Method", "GetOrderByIdAsync")]
-    public async Task GetOrderByIdAsync_WhenIdIsNegative_ReturnsNull()
-    {
-        // Arrange — negative ID is abnormal input for a primary key
-        _orderRepoMock
-            .Setup(r => r.GetOrderByIdAsync(-1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(null as OrderDetailDTO);
-
-        var service = CreateService();
-
-        // Act
-        var result = await service.GetOrderByIdAsync(-1);
-
-        // Assert
-        result.Should().BeNull();
-    }
-
-    [Fact]
-    [Trait("Type", "Boundary")]
-    [Trait("Method", "GetOrderByIdAsync")]
-    public async Task GetOrderByIdAsync_WhenIdIsZero_DelegatesToRepository()
-    {
-        // Arrange — zero is boundary between valid and invalid IDs
-        _orderRepoMock
-            .Setup(r => r.GetOrderByIdAsync(0, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(null as OrderDetailDTO);
-
-        var service = CreateService();
-
-        // Act
-        var result = await service.GetOrderByIdAsync(0);
-
-        // Assert
-        result.Should().BeNull();
-        _orderRepoMock.Verify(r => r.GetOrderByIdAsync(0, It.IsAny<CancellationToken>()), Times.Once);
+        result.Should().BeEmpty();
+        _orderRepoMock.Verify(x => x.GetRecentOrdersAsync(5, emptyRoles, 10, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     #endregion

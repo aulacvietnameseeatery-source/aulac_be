@@ -1,0 +1,185 @@
+@startuml
+title Order Management Module - Main Cross-Layer Interactions
+
+package "Presentation Layer" {
+    class OrderController <<Controller>> {
+        -_orderService : IOrderService
+        +CreateOrder(dto, ct) : Task<IActionResult>
+        +CreateStaffOrder(request, ct) : Task<IActionResult>
+        +GetOrderHistory(query, ct) : Task<IActionResult>
+        +GetCustomerOrderById(orderId, ct) : Task<IActionResult>
+        +GetOrderById(id, ct) : Task<IActionResult>
+        +GetKitchenOrders(ct) : Task<IActionResult>
+        +GetOrderStatusCount(ct) : Task<IActionResult>
+        +UpdateOrderStatus(id, dto, ct) : Task<IActionResult>
+        +UpdateOrderItemStatus(id, dto, ct) : Task<IActionResult>
+        +AddItemsToOrder(orderId, dto, ct) : Task<IActionResult>
+        +AddStaffOrderItems(id, request, ct) : Task<IActionResult>
+        +CancelOrderItem(orderItemId, ct) : Task<IActionResult>
+    }
+
+    class PaymentController <<Controller>> {
+        -_paymentService : IPaymentService
+        +GetPayments(query, ct) : Task<IActionResult>
+        +ProcessPayment(dto, ct) : Task<IActionResult>
+    }
+}
+
+package "Application Layer" {
+    interface IOrderService <<interface>> {
+        +CreateOrderAsync(request, ct) : Task<CreateOrderResponseDTO>
+        +CreateOrderAsync(staffId, request, ct) : Task<long>
+        +GetOrderHistoryAsync(query, ct) : Task<PagedResultDTO<OrderHistoryDTO>>
+        +GetCustomerOrderByIdAsync(orderId, ct) : Task<CustomerOrderHistoryDTO>
+        +GetOrderByIdAsync(orderId, ct) : Task<OrderDetailDTO>
+        +GetOrderStatusCountAsync(ct) : Task<OrderStatusCountDTO>
+        +GetKitchenOrdersAsync(ct) : Task<List<KitchenOrderDTO>>
+        +UpdateOrderStatusAsync(orderId, newStatus, ct) : Task
+        +UpdateOrderItemStatusAsync(orderItemId, newStatusLvId, rejectReason, ct) : Task
+        +AddItemsToOrderAsync(orderId, request, ct) : Task
+        +AddItemsAsync(orderId, request, ct) : Task
+        +CancelOrderItemAsync(orderItemId, ct) : Task
+    }
+
+    class OrderService <<Service>> {
+        -_orderRepository : IOrderRepository
+        -_tableRepository : ITableRepository
+        -_dishRepository : IDishRepository
+        -_taxRepository : ITaxRepository
+        -_lookupResolver : ILookupResolver
+        -_customerService : ICustomerService
+        -_uow : IUnitOfWork
+        -_notificationService : INotificationService
+        -_realtime : IOrderRealtimeService
+        -_shiftLiveRealtimePublisher : IShiftLiveRealtimePublisher
+    }
+
+    interface IPaymentService <<interface>> {
+        +ProcessPaymentAsync(dto, ct) : Task
+        +GetPaymentsAsync(query, ct) : Task<PagedResultDTO<PaymentListDTO>>
+    }
+
+    class PaymentService <<Service>> {
+        -_lookupResolver : ILookupResolver
+        -_unitOfWork : IUnitOfWork
+        -_paymentRepository : IPaymentRepository
+        -_notificationService : INotificationService
+        -_orderRealtime : IOrderRealtimeService
+        -_shiftLiveRealtimePublisher : IShiftLiveRealtimePublisher
+        -_systemSettingService : ISystemSettingService
+    }
+
+    interface IOrderRealtimeService <<interface>> {
+        +OrderCreatedAsync(data) : Task
+        +OrderUpdatedAsync(data) : Task
+        +OrderItemUpdatedAsync(data) : Task
+        +OrderPaidAsync(orderId) : Task
+    }
+
+    class OrderRealtimeService <<Service>> {
+        -_hub : IHubContext<RestaurantHub>
+    }
+}
+
+package "Persistence Layer" {
+    interface IOrderRepository <<interface>> {
+        +CreateOrderAsync(order, items, ct) : Task<long>
+        +AddAsync(order, ct) : Task
+        +AddItemsToOrderAsync(orderId, items, ..., ct) : Task
+        +UpdateOrderItemStatusAsync(orderItemId, newStatusLvId, ..., ct) : Task
+        +GetOrderHistoryAsync(query, ct) : Task<PagedResultDTO<OrderHistoryDTO>>
+        +GetOrderByIdAsync(orderId, ct) : Task<OrderDetailDTO>
+        +GetKitchenOrdersAsync(..., ct) : Task<List<KitchenOrderDTO>>
+        +GetCustomerOrderByIdAsync(orderId, ct) : Task<CustomerOrderHistoryDTO>
+        +GetByIdForUpdateAsync(orderId, ct) : Task<Order?>
+        +GetOrderWithItemsAsync(orderId, ct) : Task<Order?>
+        +GetOrderItemAsync(orderItemId, ct) : Task<OrderItem?>
+    }
+
+    class OrderRepository <<Repository>> {
+        -_context : RestaurantMgmtContext
+    }
+
+    interface IPaymentRepository <<interface>> {
+        +GetPaymentsAsync(query, ct) : Task<PagedResultDTO<PaymentListDTO>>
+    }
+
+    interface IUnitOfWork <<interface>> {
+        +BeginTransactionAsync(ct) : Task
+        +CommitAsync(ct) : Task
+        +RollbackAsync(ct) : Task
+        +SaveChangesAsync(ct) : Task
+    }
+}
+
+package "Domain Layer" {
+    class Order <<Entity>> {
+        +OrderId : long
+        +TableId : long?
+        +StaffId : long?
+        +CustomerId : long
+        +TotalAmount : decimal
+        +OrderStatusLvId : uint
+        +SourceLvId : uint
+    }
+
+    class OrderItem <<Entity>> {
+        +OrderItemId : long
+        +OrderId : long
+        +DishId : long
+        +Quantity : int
+        +Price : decimal
+        +ItemStatusLvId : uint
+    }
+
+    class Payment <<Entity>> {
+        +PaymentId : long
+        +OrderId : long
+        +ReceivedAmount : decimal
+        +MethodLvId : uint
+    }
+
+    enum OrderStatusCode <<enum>> {
+        PENDING
+        IN_PROGRESS
+        COMPLETED
+        CANCELLED
+    }
+
+    enum OrderItemStatusCode <<enum>> {
+        CREATED
+        IN_PROGRESS
+        READY
+        SERVED
+        REJECTED
+        CANCELLED
+    }
+}
+
+' ── Cross-layer relationships ──
+
+OrderController --> IOrderService : delegates order operations
+PaymentController --> IPaymentService : delegates payment operations
+
+OrderService ..|> IOrderService : implements
+PaymentService ..|> IPaymentService : implements
+OrderRealtimeService ..|> IOrderRealtimeService : implements
+
+OrderService --> IOrderRepository : uses for order data access
+OrderService --> IUnitOfWork : uses for transactions
+OrderService --> IOrderRealtimeService : pushes real-time order events
+
+PaymentService --> IPaymentRepository : uses for payment data access
+PaymentService --> IUnitOfWork : uses for transactions
+PaymentService --> IOrderRealtimeService : notifies order paid event
+
+OrderRepository ..|> IOrderRepository : implements
+OrderRepository ..> Order : queries and persists
+OrderRepository ..> OrderItem : queries and persists
+
+Order *-- "1..*" OrderItem : contains items
+Order *-- "0..*" Payment : payments received
+Order --> "1" OrderStatusCode : status
+OrderItem --> "1" OrderItemStatusCode : item status
+
+@enduml

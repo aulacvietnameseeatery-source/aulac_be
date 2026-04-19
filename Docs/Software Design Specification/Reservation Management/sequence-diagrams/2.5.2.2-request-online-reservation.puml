@@ -1,0 +1,133 @@
+@startuml
+title 2.5.2.2 Request Online Reservation
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":Customer" as U
+participant ":ReservationPage" as Client
+participant ":PublicReservationController" as Ctrl
+participant ":PublicReservationService" as Svc
+participant ":IUnitOfWork" as UoW
+participant ":ITableRepository" as TableRepo
+participant ":IReservationRepository" as ResRepo
+participant ":ICustomerService" as CustSvc
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : Fill reservation form and submit
+activate Client
+
+Client ->> Ctrl : POST /api/public/reservations\n(CreateReservationRequest)
+activate Ctrl
+
+Ctrl ->> Svc : CreateReservationAsync(request, ct)
+activate Svc
+
+Svc ->> UoW : BeginTransactionAsync(ct)
+activate UoW
+UoW -->> Svc : Transaction started
+deactivate UoW
+
+Svc ->> Svc : FindCandidateTablesAsync(reservedTime, partySize, ct)
+
+Svc ->> TableRepo : GetManualAvailableTablesAsync(isOnline: true, ct)
+activate TableRepo
+TableRepo ->> DB : Query online tables not deleted and not locked
+activate DB
+DB -->> TableRepo : Return online tables
+deactivate DB
+TableRepo -->> Svc : List<RestaurantTable>
+deactivate TableRepo
+
+loop#White For each candidate table
+    Svc ->> ResRepo : GetTableReservationsForTimeAsync(tableId, reservedTime, duration, ...)
+    activate ResRepo
+    ResRepo ->> DB : Query conflicting reservations in time window
+    activate DB
+    DB -->> ResRepo : Return conflicts
+    deactivate DB
+    ResRepo -->> Svc : List<Reservation>
+    deactivate ResRepo
+end
+
+alt#White No candidate tables found
+    Svc ->> UoW : RollbackAsync(ct)
+    activate UoW
+    UoW -->> Svc : Transaction rolled back
+    deactivate UoW
+    Svc -->> Ctrl : throw InvalidOperationException
+    Ctrl -->> Client : 400 Bad Request
+    Client -->> U : Display "No suitable table arrangement found"
+else#White Candidate tables available
+
+    Svc ->> TableRepo : LockTablesForUpdateAsync(candidateTableIds, ct)
+    activate TableRepo
+    TableRepo ->> DB : Lock selected table rows for update
+    activate DB
+    DB -->> TableRepo : Rows locked
+    deactivate DB
+    TableRepo -->> Svc : Lock acquired
+    deactivate TableRepo
+
+    Svc ->> Svc : ValidateCandidateTablesAsync(candidates, reservedTime, ct)
+
+    alt#White Validation fails (race condition)
+        Svc ->> UoW : RollbackAsync(ct)
+        activate UoW
+        UoW -->> Svc : Transaction rolled back
+        deactivate UoW
+        Svc -->> Ctrl : throw InvalidOperationException
+        Ctrl -->> Client : 400 Bad Request
+        Client -->> U : Display "Table taken by another customer"
+    else#White Validation passes
+
+        Svc ->> CustSvc : FindOrCreateCustomerIdAsync(phone, name, email, ct)
+        activate CustSvc
+        CustSvc ->> DB : Find or insert customer record
+        activate DB
+        DB -->> CustSvc : Return customerId
+        deactivate DB
+        CustSvc -->> Svc : customerId
+        deactivate CustSvc
+
+        Svc ->> ResRepo : CreateAsync(reservation, ct)
+        activate ResRepo
+        ResRepo ->> DB : Insert reservation with assigned tables
+        activate DB
+        DB -->> ResRepo : Return created reservation
+        deactivate DB
+        ResRepo -->> Svc : Reservation
+        deactivate ResRepo
+
+        Svc ->> Svc : Schedule Hangfire no-show check job
+
+        opt#White Customer has email
+            Svc ->> Svc : SendReservationConfirmationEmailAsync(reservation, tableCodes)
+        end
+
+        Svc ->> UoW : CommitAsync(ct)
+        activate UoW
+        UoW -->> Svc : Transaction committed
+        deactivate UoW
+
+        Svc -->> Ctrl : ReservationResponseDto
+        deactivate Svc
+
+        Ctrl -->> Client : 200 OK (ReservationResponseDto)
+        deactivate Ctrl
+
+        Client -->> U : Display reservation confirmation
+    end
+end
+
+deactivate Client
+deactivate U
+
+@enduml

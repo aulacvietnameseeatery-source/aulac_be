@@ -1,0 +1,797 @@
+@startuml "Order Management Module - Specification Class Diagram"
+
+!theme plain
+skinparam linetype ortho
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam shadowing false
+
+title Order Management Module — Specification Class Diagram
+
+' ============================================================
+'  PRESENTATION LAYER
+' ============================================================
+package "Presentation Layer" <<Rectangle>> {
+
+    class OrderController <<Controller>> {
+        - _orderService : IOrderService
+        - _lookupResolver : ILookupResolver
+        - _logger : ILogger<OrderController>
+        + CreateOrder(dto: CreateOrderRequestDTO, ct: CancellationToken) : Task<IActionResult>
+        + CreateStaffOrder(request: CreateOrderRequest, ct: CancellationToken) : Task<IActionResult>
+        + GetOrderHistory(query: OrderHistoryQueryDTO, ct: CancellationToken) : Task<IActionResult>
+        + GetCustomerOrderById(orderId: long, ct: CancellationToken) : Task<IActionResult>
+        + GetOrderById(id: long, ct: CancellationToken) : Task<IActionResult>
+        + GetKitchenOrders(ct: CancellationToken) : Task<IActionResult>
+        + GetOrderStatusCount(ct: CancellationToken) : Task<IActionResult>
+        + UpdateOrderStatus(id: long, dto: UpdateOrderStatusDTO, ct: CancellationToken) : Task<IActionResult>
+        + UpdateOrderItemStatus(id: long, dto: UpdateOrderItemStatusDTO, ct: CancellationToken) : Task<IActionResult>
+        + AddItemsToOrder(orderId: long, dto: AddOrderItemsRequestDTO, ct: CancellationToken) : Task<IActionResult>
+        + AddStaffOrderItems(id: long, request: AddOrderItemsRequest, ct: CancellationToken) : Task<IActionResult>
+        + CancelOrderItem(orderItemId: long, ct: CancellationToken) : Task<IActionResult>
+    }
+
+    class PaymentController <<Controller>> {
+        - _paymentService : IPaymentService
+        - _logger : ILogger<PaymentController>
+        + GetPayments(query: PaymentListQueryDTO, ct: CancellationToken) : Task<IActionResult>
+        + ProcessPayment(dto: CreatePaymentDTO, ct: CancellationToken) : Task<IActionResult>
+    }
+
+    ' ── Request DTOs (QR / Customer flow) ──
+
+    class CreateOrderRequestDTO <<DTO>> {
+        + TableCode : string
+        + QrToken : string?
+        + Items : List<CreateOrderItemDTO>
+    }
+
+    class CreateOrderItemDTO <<DTO>> {
+        + DishId : long
+        + Quantity : int
+        + Price : decimal
+        + Note : string?
+    }
+
+    class AddOrderItemsRequestDTO <<DTO>> {
+        + Items : List<CreateOrderItemDTO>
+    }
+
+    ' ── Request DTOs (Staff flow) ──
+
+    class CreateOrderRequest <<DTO>> {
+        + TableId : long?
+        + Customer : OrderCustomerDto?
+        + Source : OrderSourceCode
+        + Items : List<CreateOrderItemDto>
+    }
+
+    class AddOrderItemsRequest <<DTO>> {
+        + Customer : OrderCustomerDto?
+        + Items : List<CreateOrderItemDto>
+    }
+
+    class CreateOrderItemDto <<DTO>> {
+        + DishId : long
+        + Quantity : int
+        + Note : string?
+    }
+
+    class OrderCustomerDto <<DTO>> {
+        + CustomerId : long?
+        + FullName : string?
+        + Phone : string?
+        + Email : string?
+    }
+
+    ' ── Status Update Request DTOs ──
+
+    class UpdateOrderStatusDTO <<DTO>> {
+        + Status : string
+    }
+
+    class UpdateOrderItemStatusDTO <<DTO>> {
+        + Status : string
+        + RejectReason : string?
+    }
+
+    ' ── Query DTOs ──
+
+    class OrderHistoryQueryDTO <<DTO>> {
+        + Search : string?
+        + PageIndex : int
+        + PageSize : int
+        + OrderStatusCode : OrderStatusCode?
+        + OrderStatusLvId : uint?
+        + FromDate : DateTime?
+        + ToDate : DateTime?
+    }
+
+    ' ── Payment Request DTOs ──
+
+    class CreatePaymentDTO <<DTO>> {
+        + OrderId : long
+        + ReceivedAmount : decimal
+        + PaymentMethod : string
+        + CouponIds : List<long>?
+        + PromotionId : long?
+        + Note : string?
+        + TipAmount : decimal?
+    }
+
+    class PaymentListQueryDTO <<DTO>> {
+        + Search : string?
+        + Method : PaymentMethodCode?
+        + FromDate : DateTime?
+        + ToDate : DateTime?
+        + PageIndex : int
+        + PageSize : int
+    }
+
+    ' ── Response DTOs ──
+
+    class CreateOrderResponseDTO <<DTO>> {
+        + OrderId : long
+        + TableId : long
+        + TableCode : string
+        + CustomerId : long
+        + TotalAmount : decimal
+        + OrderStatus : string
+        + CreatedAt : DateTime?
+    }
+
+    class OrderDetailDTO <<DTO>> {
+        + OrderId : long
+        + TableId : long?
+        + TableCode : string
+        + StaffId : long?
+        + StaffName : string
+        + CustomerId : long
+        + CustomerName : string?
+        + SubTotalAmount : decimal
+        + TotalAmount : decimal
+        + TaxAmount : decimal
+        + TaxId : long?
+        + TipAmount : decimal?
+        + OrderStatus : string
+        + Source : string
+        + CreatedAt : DateTime?
+        + UpdatedAt : DateTime?
+        + IsPaid : bool
+        + OrderItems : List<OrderItemI18nDTO>
+        + Promotions : List<OrderPromotionDTO>
+        + Coupons : List<OrderCouponDTO>
+        + Payments : List<OrderPaymentDTO>
+        + ItemCount : int
+    }
+
+    class OrderItemI18nDTO <<DTO>> {
+        + OrderItemId : long
+        + DishId : long
+        + CategoryId : long
+        + DishNameI18n : LookupValueTranslationDto
+        + Quantity : int
+        + Price : decimal
+        + ItemStatus : string
+        + RejectReason : string?
+        + Note : string?
+    }
+
+    class OrderPromotionDTO <<DTO>> {
+        + PromotionId : long
+        + PromotionName : string
+        + DiscountAmount : decimal
+    }
+
+    class OrderCouponDTO <<DTO>> {
+        + CouponId : long
+        + CouponCode : string
+        + DiscountAmount : decimal
+    }
+
+    class OrderPaymentDTO <<DTO>> {
+        + PaymentId : long
+        + ReceivedAmount : decimal
+        + ChangeAmount : decimal
+        + PaidAt : DateTime?
+        + Method : string
+    }
+
+    class OrderHistoryDTO <<DTO>> {
+        + OrderId : long
+        + TableId : long?
+        + TableCode : string
+        + StaffId : long?
+        + StaffName : string
+        + CustomerId : long
+        + CustomerName : string?
+        + TotalAmount : decimal
+        + TipAmount : decimal?
+        + OrderStatus : string
+        + Source : string
+        + CreatedAt : DateTime?
+        + UpdatedAt : DateTime?
+        + IsPaid : bool
+        + TaxAmount : decimal
+        + TaxId : long?
+        + OrderItems : List<OrderItemDTO>
+        + ItemCount : int
+    }
+
+    class OrderItemDTO <<DTO>> {
+        + OrderItemId : long
+        + DishId : long
+        + CategoryId : long
+        + DishName : string
+        + Quantity : int
+        + Price : decimal
+        + ItemStatus : string
+        + RejectReason : string?
+        + Note : string?
+    }
+
+    class OrderStatusCountDTO <<DTO>> {
+        + All : int
+        + Pending : int
+        + InProgress : int
+        + Completed : int
+        + Cancelled : int
+    }
+
+    class CustomerOrderHistoryDTO <<DTO>> {
+        + TableCode : string
+        + TotalItems : int
+        + EstimatedTotal : decimal
+        + TaxAmount : decimal
+        + Items : List<OrderItemDTO>
+    }
+
+    class KitchenOrderDTO <<DTO>> {
+        + OrderId : long
+        + TableCode : string
+        + OrderStatus : string
+        + CreatedAt : DateTime?
+        + Items : List<KitchenOrderItemDTO>
+    }
+
+    class KitchenOrderItemDTO <<DTO>> {
+        + OrderItemId : long
+        + DishName : string
+        + Quantity : int
+        + ItemStatus : string
+        + Note : string?
+        + RejectReason : string?
+    }
+
+    class PaymentListDTO <<DTO>> {
+        + PaymentId : long
+        + OrderId : long
+        + ReceivedAmount : decimal
+        + ChangeAmount : decimal
+        + FinalAmount : decimal
+        + Method : string
+        + PaidAt : DateTime?
+        + CustomerName : string?
+        + CustomerPhone : string?
+    }
+
+    class OrderRealtimeDTO <<DTO>> {
+        + OrderId : long
+        + Status : string
+        + TableId : long?
+        + UpdatedAt : DateTime
+    }
+
+    class OrderItemRealtimeDTO <<DTO>> {
+        + OrderItemId : long
+        + OrderId : long
+        + Status : string
+        + UpdatedAt : DateTime
+    }
+
+    class "PagedResultDTO<T>" as PagedResultDTO <<DTO>> {
+        + PageData : List<T>
+        + PageIndex : int
+        + PageSize : int
+        + TotalCount : int
+        + TotalPage : int
+    }
+}
+
+' ============================================================
+'  APPLICATION LAYER
+' ============================================================
+package "Application Layer" <<Rectangle>> {
+
+    interface IOrderService <<interface>> {
+        + CreateOrderAsync(request: CreateOrderRequestDTO, ct: CancellationToken) : Task<CreateOrderResponseDTO>
+        + CreateOrderAsync(staffId: long, request: CreateOrderRequest, ct: CancellationToken) : Task<long>
+        + GetOrderHistoryAsync(query: OrderHistoryQueryDTO, ct: CancellationToken) : Task<PagedResultDTO<OrderHistoryDTO>>
+        + GetCustomerOrderByIdAsync(orderId: long, ct: CancellationToken) : Task<CustomerOrderHistoryDTO>
+        + GetOrderByIdAsync(orderId: long, ct: CancellationToken) : Task<OrderDetailDTO>
+        + GetOrderStatusCountAsync(ct: CancellationToken) : Task<OrderStatusCountDTO>
+        + GetKitchenOrdersAsync(ct: CancellationToken) : Task<List<KitchenOrderDTO>>
+        + UpdateOrderStatusAsync(orderId: long, newStatus: OrderStatusCode, ct: CancellationToken) : Task
+        + UpdateOrderItemStatusAsync(orderItemId: long, newStatusLvId: uint, rejectReason: string?, ct: CancellationToken) : Task
+        + AddItemsToOrderAsync(orderId: long, request: AddOrderItemsRequestDTO, ct: CancellationToken) : Task
+        + AddItemsAsync(orderId: long, request: AddOrderItemsRequest, ct: CancellationToken) : Task
+        + CancelOrderItemAsync(orderItemId: long, ct: CancellationToken) : Task
+    }
+
+    class OrderService <<Service>> {
+        - _orderRepository : IOrderRepository
+        - _tableRepository : ITableRepository
+        - _lookupResolver : ILookupResolver
+        - _dishRepository : IDishRepository
+        - _customerService : ICustomerService
+        - _uow : IUnitOfWork
+        - _notificationService : INotificationService
+        - _realtime : IOrderRealtimeService
+        - _shiftLiveRealtimePublisher : IShiftLiveRealtimePublisher
+        - _taxRepository : ITaxRepository
+        + CreateOrderAsync(request: CreateOrderRequestDTO, ct: CancellationToken) : Task<CreateOrderResponseDTO>
+        + CreateOrderAsync(staffId: long, request: CreateOrderRequest, ct: CancellationToken) : Task<long>
+        + GetOrderHistoryAsync(query: OrderHistoryQueryDTO, ct: CancellationToken) : Task<PagedResultDTO<OrderHistoryDTO>>
+        + GetCustomerOrderByIdAsync(orderId: long, ct: CancellationToken) : Task<CustomerOrderHistoryDTO>
+        + GetOrderByIdAsync(orderId: long, ct: CancellationToken) : Task<OrderDetailDTO>
+        + GetOrderStatusCountAsync(ct: CancellationToken) : Task<OrderStatusCountDTO>
+        + GetKitchenOrdersAsync(ct: CancellationToken) : Task<List<KitchenOrderDTO>>
+        + UpdateOrderStatusAsync(orderId: long, newStatus: OrderStatusCode, ct: CancellationToken) : Task
+        + UpdateOrderItemStatusAsync(orderItemId: long, newStatusLvId: uint, rejectReason: string?, ct: CancellationToken) : Task
+        + AddItemsToOrderAsync(orderId: long, request: AddOrderItemsRequestDTO, ct: CancellationToken) : Task
+        + AddItemsAsync(orderId: long, request: AddOrderItemsRequest, ct: CancellationToken) : Task
+        + CancelOrderItemAsync(orderItemId: long, ct: CancellationToken) : Task
+        - PublishShiftLiveOrderEventAsync(eventType: string, orderId: long, staffId: long?, ct: CancellationToken) : Task
+        - ApplyTaxToOrderAsync(order: Order, ct: CancellationToken) : Task
+    }
+
+    interface IPaymentService <<interface>> {
+        + ProcessPaymentAsync(dto: CreatePaymentDTO, ct: CancellationToken) : Task
+        + GetPaymentsAsync(query: PaymentListQueryDTO, ct: CancellationToken) : Task<PagedResultDTO<PaymentListDTO>>
+    }
+
+    class PaymentService <<Service>> {
+        - _context : RestaurantMgmtContext
+        - _lookupResolver : ILookupResolver
+        - _unitOfWork : IUnitOfWork
+        - _systemSettingService : ISystemSettingService
+        - _notificationService : INotificationService
+        - _shiftLiveRealtimePublisher : IShiftLiveRealtimePublisher
+        - _paymentRepository : IPaymentRepository
+        - _orderRealtime : IOrderRealtimeService
+        + ProcessPaymentAsync(dto: CreatePaymentDTO, ct: CancellationToken) : Task
+        + GetPaymentsAsync(query: PaymentListQueryDTO, ct: CancellationToken) : Task<PagedResultDTO<PaymentListDTO>>
+    }
+
+    interface IOrderRealtimeService <<interface>> {
+        + OrderCreatedAsync(data: OrderRealtimeDTO) : Task
+        + OrderUpdatedAsync(data: OrderRealtimeDTO) : Task
+        + OrderItemUpdatedAsync(data: OrderItemRealtimeDTO) : Task
+        + OrderPaidAsync(orderId: long) : Task
+    }
+
+    class OrderRealtimeService <<Service>> {
+        - _hub : IHubContext<RestaurantHub>
+        + OrderCreatedAsync(data: OrderRealtimeDTO) : Task
+        + OrderUpdatedAsync(data: OrderRealtimeDTO) : Task
+        + OrderItemUpdatedAsync(data: OrderItemRealtimeDTO) : Task
+        + OrderPaidAsync(orderId: long) : Task
+    }
+
+    interface INotificationService <<interface>> {
+        + PublishAsync(request: PublishNotificationRequest, ct: CancellationToken) : Task
+        + GetNotificationsAsync(query: NotificationQueryDto, userPermissions: IEnumerable<string>, userId: long, ct: CancellationToken) : Task<List<NotificationListItemDto>>
+        + GetUnreadCountAsync(userPermissions: IEnumerable<string>, userId: long, ct: CancellationToken) : Task<int>
+        + GetMissedAsync(userPermissions: IEnumerable<string>, userId: long, afterUtc: DateTime?, ct: CancellationToken) : Task<List<NotificationListItemDto>>
+        + MarkAsReadAsync(notificationId: long, userId: long, ct: CancellationToken) : Task
+        + MarkAllReadAsync(userPermissions: IEnumerable<string>, userId: long, ct: CancellationToken) : Task
+        + AcknowledgeAsync(notificationId: long, userId: long, ct: CancellationToken) : Task
+        + GetPreferencesAsync(userId: long, ct: CancellationToken) : Task<List<NotificationPreferenceDto>>
+        + UpdatePreferencesAsync(userId: long, request: UpdateNotificationPreferencesRequest, ct: CancellationToken) : Task
+    }
+
+    class NotificationService <<Service>> {
+        - _notificationRepository : INotificationRepository
+        - _realtimePublisher : INotificationRealtimePublisher
+        - _logger : ILogger<NotificationService>
+        + PublishAsync(request: PublishNotificationRequest, ct: CancellationToken) : Task
+        + GetNotificationsAsync(query: NotificationQueryDto, userPermissions: IEnumerable<string>, userId: long, ct: CancellationToken) : Task<List<NotificationListItemDto>>
+        + GetUnreadCountAsync(userPermissions: IEnumerable<string>, userId: long, ct: CancellationToken) : Task<int>
+        + GetMissedAsync(userPermissions: IEnumerable<string>, userId: long, afterUtc: DateTime?, ct: CancellationToken) : Task<List<NotificationListItemDto>>
+        + MarkAsReadAsync(notificationId: long, userId: long, ct: CancellationToken) : Task
+        + MarkAllReadAsync(userPermissions: IEnumerable<string>, userId: long, ct: CancellationToken) : Task
+        + AcknowledgeAsync(notificationId: long, userId: long, ct: CancellationToken) : Task
+        + GetPreferencesAsync(userId: long, ct: CancellationToken) : Task<List<NotificationPreferenceDto>>
+        + UpdatePreferencesAsync(userId: long, request: UpdateNotificationPreferencesRequest, ct: CancellationToken) : Task
+    }
+
+    interface ILookupResolver <<interface>> {
+        + GetIdAsync(typeId: ushort, valueCode: string, ct: CancellationToken) : Task<uint>
+    }
+}
+
+' ============================================================
+'  PERSISTENCE LAYER
+' ============================================================
+package "Persistence Layer" <<Rectangle>> {
+
+    interface IOrderRepository <<interface>> {
+        + GetOrderHistoryAsync(query: OrderHistoryQueryDTO, ct: CancellationToken) : Task<PagedResultDTO<OrderHistoryDTO>>
+        + GetOrderStatusCountAsync(pendingStatusId: uint, inProgressStatusId: uint, completedStatusId: uint, cancelledStatusId: uint, ct: CancellationToken) : Task<OrderStatusCountDTO>
+        + GetKitchenOrdersAsync(pendingStatusId: uint, inProgressStatusId: uint, completedStatusId: uint, cancelledStatusId: uint, ct: CancellationToken) : Task<List<KitchenOrderDTO>>
+        + GetOrderByIdAsync(orderId: long, ct: CancellationToken) : Task<OrderDetailDTO>
+        + GetCustomerOrderByIdAsync(orderId: long, ct: CancellationToken) : Task<CustomerOrderHistoryDTO>
+        + CreateOrderAsync(order: Order, items: List<OrderItem>, ct: CancellationToken) : Task<long>
+        + AddAsync(order: Order, ct: CancellationToken) : Task
+        + AddItemsToOrderAsync(orderId: long, items: List<OrderItem>, completedOrderStatusId: uint, cancelledOrderStatusId: uint, pendingOrderStatusId: uint, ct: CancellationToken) : Task
+        + UpdateOrderItemStatusAsync(orderItemId: long, newStatusLvId: uint, rejectReason: string?, inProgressItemStatusId: uint, readyItemStatusId: uint, servedItemStatusId: uint, rejectedItemStatusId: uint, cancelledItemStatusId: uint, pendingOrderStatusId: uint, inProgressOrderStatusId: uint, completedOrderStatusId: uint, cancelledOrderStatusId: uint, availableTableStatusId: uint, ct: CancellationToken) : Task
+        + GetByIdForUpdateAsync(orderId: long, ct: CancellationToken) : Task<Order?>
+        + GetOrderWithItemsAsync(orderId: long, ct: CancellationToken) : Task<Order?>
+        + GetActiveOrderByTableAsync(tableId: long, ct: CancellationToken) : Task<Order?>
+        + GetOrderItemAsync(orderItemId: long, ct: CancellationToken) : Task<OrderItem?>
+        + GetRecentOrdersAsync(userId: long, roles: List<string>, limit: int, ct: CancellationToken) : Task<List<RecentOrderDTO>>
+    }
+
+    class OrderRepository <<Repository>> {
+        - _context : RestaurantMgmtContext
+        - _realtime : IOrderRealtimeService
+        - _i18nService : Ii18nService
+        + GetOrderHistoryAsync(query: OrderHistoryQueryDTO, ct: CancellationToken) : Task<PagedResultDTO<OrderHistoryDTO>>
+        + GetOrderStatusCountAsync(pendingStatusId: uint, inProgressStatusId: uint, completedStatusId: uint, cancelledStatusId: uint, ct: CancellationToken) : Task<OrderStatusCountDTO>
+        + GetKitchenOrdersAsync(pendingStatusId: uint, inProgressStatusId: uint, completedStatusId: uint, cancelledStatusId: uint, ct: CancellationToken) : Task<List<KitchenOrderDTO>>
+        + GetOrderByIdAsync(orderId: long, ct: CancellationToken) : Task<OrderDetailDTO>
+        + GetCustomerOrderByIdAsync(orderId: long, ct: CancellationToken) : Task<CustomerOrderHistoryDTO>
+        + CreateOrderAsync(order: Order, items: List<OrderItem>, ct: CancellationToken) : Task<long>
+        + AddAsync(order: Order, ct: CancellationToken) : Task
+        + AddItemsToOrderAsync(orderId: long, items: List<OrderItem>, completedOrderStatusId: uint, cancelledOrderStatusId: uint, pendingOrderStatusId: uint, ct: CancellationToken) : Task
+        + UpdateOrderItemStatusAsync(orderItemId: long, newStatusLvId: uint, rejectReason: string?, ..., ct: CancellationToken) : Task
+        + GetByIdForUpdateAsync(orderId: long, ct: CancellationToken) : Task<Order?>
+        + GetOrderWithItemsAsync(orderId: long, ct: CancellationToken) : Task<Order?>
+        + GetActiveOrderByTableAsync(tableId: long, ct: CancellationToken) : Task<Order?>
+        + GetOrderItemAsync(orderItemId: long, ct: CancellationToken) : Task<OrderItem?>
+        + GetRecentOrdersAsync(userId: long, roles: List<string>, limit: int, ct: CancellationToken) : Task<List<RecentOrderDTO>>
+    }
+
+    interface IPaymentRepository <<interface>> {
+        + GetPaymentsAsync(query: PaymentListQueryDTO, ct: CancellationToken) : Task<PagedResultDTO<PaymentListDTO>>
+    }
+
+    class PaymentRepository <<Repository>> {
+        - _context : RestaurantMgmtContext
+        + GetPaymentsAsync(query: PaymentListQueryDTO, ct: CancellationToken) : Task<PagedResultDTO<PaymentListDTO>>
+    }
+
+    interface ITableRepository <<interface>> {
+        + GetByIdAsync(tableId: long, ct: CancellationToken) : Task<RestaurantTable?>
+        + GetAvailableTablesAsync(ct: CancellationToken) : Task<List<RestaurantTable>>
+    }
+
+    class TableRepository <<Repository>> {
+        - _context : RestaurantMgmtContext
+        + GetByIdAsync(tableId: long, ct: CancellationToken) : Task<RestaurantTable?>
+        + GetAvailableTablesAsync(ct: CancellationToken) : Task<List<RestaurantTable>>
+    }
+
+    interface IDishRepository <<interface>> {
+        + GetByIdAsync(dishId: long, ct: CancellationToken) : Task<Dish?>
+    }
+
+    class DishRepository <<Repository>> {
+        - _context : RestaurantMgmtContext
+        + GetByIdAsync(dishId: long, ct: CancellationToken) : Task<Dish?>
+    }
+
+    interface ITaxRepository <<interface>> {
+        + GetDefaultTaxAsync(ct: CancellationToken) : Task<Tax?>
+        + GetByIdAsync(taxId: long, ct: CancellationToken) : Task<Tax?>
+    }
+
+    class TaxRepository <<Repository>> {
+        - _context : RestaurantMgmtContext
+        + GetDefaultTaxAsync(ct: CancellationToken) : Task<Tax?>
+        + GetByIdAsync(taxId: long, ct: CancellationToken) : Task<Tax?>
+    }
+
+    interface IUnitOfWork <<interface>> {
+        + BeginTransactionAsync(ct: CancellationToken) : Task
+        + CommitAsync(ct: CancellationToken) : Task
+        + RollbackAsync(ct: CancellationToken) : Task
+        + SaveChangesAsync(ct: CancellationToken) : Task
+    }
+
+    class UnitOfWork <<Repository>> {
+        - _db : RestaurantMgmtContext
+        + BeginTransactionAsync(ct: CancellationToken) : Task
+        + CommitAsync(ct: CancellationToken) : Task
+        + RollbackAsync(ct: CancellationToken) : Task
+        + SaveChangesAsync(ct: CancellationToken) : Task
+    }
+
+    class RestaurantMgmtContext <<DbContext>> {
+        + Orders : DbSet<Order>
+        + OrderItems : DbSet<OrderItem>
+        + OrderCoupons : DbSet<OrderCoupon>
+        + OrderPromotions : DbSet<OrderPromotion>
+        + Payments : DbSet<Payment>
+        + RestaurantTables : DbSet<RestaurantTable>
+        + Customers : DbSet<Customer>
+        + Dishes : DbSet<Dish>
+        + LookupValues : DbSet<LookupValue>
+    }
+}
+
+' ============================================================
+'  DOMAIN LAYER
+' ============================================================
+package "Domain Layer" <<Rectangle>> {
+
+    enum OrderStatusCode <<Enum>> {
+        PENDING
+        IN_PROGRESS
+        COMPLETED
+        CANCELLED
+    }
+
+    enum OrderItemStatusCode <<Enum>> {
+        CREATED
+        IN_PROGRESS
+        READY
+        SERVED
+        REJECTED
+        CANCELLED
+    }
+
+    enum OrderSourceCode <<Enum>> {
+        DINE_IN
+        TAKEAWAY
+        DELIVERY
+    }
+
+    enum PaymentMethodCode <<Enum>> {
+        CASH
+        CARD
+        QR
+    }
+
+    class Order <<Entity>> {
+        + OrderId : long
+        + TableId : long?
+        + StaffId : long?
+        + CustomerId : long
+        + SubTotalAmount : decimal
+        + TotalAmount : decimal
+        + TipAmount : decimal?
+        + TaxId : long?
+        + TaxAmount : decimal
+        + SourceLvId : uint
+        + OrderStatusLvId : uint
+        + CreatedAt : DateTime?
+        + UpdatedAt : DateTime?
+    }
+
+    class OrderItem <<Entity>> {
+        + OrderItemId : long
+        + OrderId : long
+        + DishId : long
+        + Quantity : int
+        + Price : decimal
+        + ItemStatus : byte
+        + ItemStatusLvId : uint
+        + RejectReason : string?
+        + Note : string?
+    }
+
+    class OrderCoupon <<Entity>> {
+        + OrderCouponId : long
+        + OrderId : long
+        + CouponId : long
+        + DiscountAmount : decimal
+        + AppliedAt : DateTime?
+    }
+
+    class OrderPromotion <<Entity>> {
+        + OrderPromotionId : long
+        + OrderId : long
+        + PromotionId : long
+        + DiscountAmount : decimal
+        + AppliedAt : DateTime?
+    }
+
+    class Payment <<Entity>> {
+        + PaymentId : long
+        + OrderId : long
+        + ReceivedAmount : decimal
+        + ChangeAmount : decimal
+        + PaidAt : DateTime?
+        + MethodLvId : uint
+    }
+
+    class Customer <<Entity>> {
+        + CustomerId : long
+        + FullName : string
+        + Phone : string
+        + Email : string?
+        + LoyaltyPoints : int
+    }
+
+    class RestaurantTable <<Entity>> {
+        + TableId : long
+        + TableCode : string
+        + Capacity : int
+        + TableStatusLvId : uint
+    }
+
+    class StaffAccount <<Entity>> {
+        + StaffId : long
+        + FullName : string
+    }
+
+    class Dish <<Entity>> {
+        + DishId : long
+        + DishName : string
+        + Price : decimal
+    }
+
+    class Tax <<Entity>> {
+        + TaxId : long
+        + TaxName : string
+        + TaxRate : decimal
+        + IsDefault : bool
+    }
+
+    class Coupon <<Entity>> {
+        + CouponId : long
+        + CouponCode : string
+        + DiscountType : string
+        + DiscountValue : decimal
+    }
+
+    class Promotion <<Entity>> {
+        + PromotionId : long
+        + PromotionName : string
+        + DiscountType : string
+        + DiscountValue : decimal
+    }
+
+    class LookupValue <<Entity>> {
+        + ValueId : uint
+        + TypeId : ushort
+        + ValueCode : string
+        + ValueName : string
+        + SortOrder : short
+        + IsActive : bool?
+    }
+}
+
+' ============================================================
+'  RELATIONSHIPS
+' ============================================================
+
+' --- Presentation → Application ---
+OrderController --> IOrderService : uses
+PaymentController --> IPaymentService : uses
+
+' --- Presentation → DTOs ---
+OrderController ..> CreateOrderRequestDTO : receives
+OrderController ..> CreateOrderRequest : receives
+OrderController ..> AddOrderItemsRequestDTO : receives
+OrderController ..> AddOrderItemsRequest : receives
+OrderController ..> UpdateOrderStatusDTO : receives
+OrderController ..> UpdateOrderItemStatusDTO : receives
+OrderController ..> OrderHistoryQueryDTO : receives
+OrderController ..> CreateOrderResponseDTO : returns
+OrderController ..> OrderDetailDTO : returns
+OrderController ..> OrderHistoryDTO : returns
+OrderController ..> OrderStatusCountDTO : returns
+OrderController ..> CustomerOrderHistoryDTO : returns
+OrderController ..> KitchenOrderDTO : returns
+OrderController ..> PagedResultDTO : paginates results
+
+PaymentController ..> CreatePaymentDTO : receives
+PaymentController ..> PaymentListQueryDTO : receives
+PaymentController ..> PaymentListDTO : returns
+PaymentController ..> PagedResultDTO : paginates results
+
+CreateOrderRequestDTO *-- "1..*" CreateOrderItemDTO : contains items
+AddOrderItemsRequestDTO *-- "1..*" CreateOrderItemDTO : contains items
+CreateOrderRequest *-- "0..*" CreateOrderItemDto : contains items
+CreateOrderRequest *-- "0..1" OrderCustomerDto : contains customer info
+AddOrderItemsRequest *-- "0..*" CreateOrderItemDto : contains items
+AddOrderItemsRequest *-- "0..1" OrderCustomerDto : contains customer info
+
+OrderDetailDTO *-- "0..*" OrderItemI18nDTO : contains items
+OrderDetailDTO *-- "0..*" OrderPromotionDTO : contains promotions
+OrderDetailDTO *-- "0..*" OrderCouponDTO : contains coupons
+OrderDetailDTO *-- "0..*" OrderPaymentDTO : contains payments
+OrderHistoryDTO *-- "0..*" OrderItemDTO : contains items
+CustomerOrderHistoryDTO *-- "0..*" OrderItemDTO : contains items
+KitchenOrderDTO *-- "1..*" KitchenOrderItemDTO : contains items
+
+' --- Application: realization ---
+OrderService ..|> IOrderService
+PaymentService ..|> IPaymentService
+OrderRealtimeService ..|> IOrderRealtimeService
+NotificationService ..|> INotificationService
+
+' --- Application → Persistence ---
+OrderService --> IOrderRepository : uses
+OrderService --> ITableRepository : uses
+OrderService --> IDishRepository : uses
+OrderService --> ITaxRepository : uses
+OrderService --> IUnitOfWork : uses
+OrderService --> ILookupResolver : uses
+OrderService --> IOrderRealtimeService : uses
+OrderService --> INotificationService : uses
+
+PaymentService --> IPaymentRepository : uses
+PaymentService --> IUnitOfWork : uses
+PaymentService --> ILookupResolver : uses
+PaymentService --> IOrderRealtimeService : uses
+PaymentService --> INotificationService : uses
+PaymentService --> RestaurantMgmtContext : uses
+
+NotificationService --> INotificationRepository : persists notifications
+NotificationService --> INotificationRealtimePublisher : publishes real-time notifications
+
+' --- Application → DTOs ---
+OrderService ..> CreateOrderResponseDTO : creates
+OrderService ..> OrderDetailDTO : returns
+OrderService ..> OrderHistoryDTO : returns
+OrderService ..> OrderStatusCountDTO : returns
+OrderService ..> CustomerOrderHistoryDTO : returns
+OrderService ..> KitchenOrderDTO : returns
+OrderService ..> OrderRealtimeDTO : creates
+OrderService ..> OrderItemRealtimeDTO : creates
+
+PaymentService ..> PaymentListDTO : returns
+
+' --- Persistence: realization ---
+OrderRepository ..|> IOrderRepository
+PaymentRepository ..|> IPaymentRepository
+TableRepository ..|> ITableRepository
+DishRepository ..|> IDishRepository
+TaxRepository ..|> ITaxRepository
+UnitOfWork ..|> IUnitOfWork
+
+' --- Persistence → DbContext ---
+OrderRepository --> RestaurantMgmtContext : uses
+PaymentRepository --> RestaurantMgmtContext : uses
+TableRepository --> RestaurantMgmtContext : uses
+DishRepository --> RestaurantMgmtContext : uses
+TaxRepository --> RestaurantMgmtContext : uses
+UnitOfWork --> RestaurantMgmtContext : coordinates transactions
+
+' --- Persistence → Domain ---
+IOrderRepository ..> Order : queries and persists
+IOrderRepository ..> OrderItem : queries and persists
+IOrderRepository ..> OrderHistoryDTO : projects to list DTO
+IOrderRepository ..> OrderDetailDTO : projects to detail DTO
+IOrderRepository ..> CustomerOrderHistoryDTO : projects to customer DTO
+IOrderRepository ..> KitchenOrderDTO : projects to kitchen DTO
+IOrderRepository ..> OrderStatusCountDTO : projects to count DTO
+ITableRepository ..> RestaurantTable : queries
+IDishRepository ..> Dish : queries
+ITaxRepository ..> Tax : queries
+IPaymentRepository ..> PaymentListDTO : projects to list DTO
+IUnitOfWork ..> RestaurantMgmtContext : coordinates transactions
+
+' --- Domain: entity relationships ---
+Order *-- "1..*" OrderItem : contains items
+Order *-- "0..*" OrderCoupon : applied coupons
+Order *-- "0..*" OrderPromotion : applied promotions
+Order *-- "0..*" Payment : payments received
+Order --> "1" Customer : placed by
+Order --> "0..1" RestaurantTable : served at
+Order --> "0..1" StaffAccount : handled by
+Order --> "0..1" Tax : tax applied
+Order --> "1" LookupValue : order status
+Order --> "1" LookupValue : source
+
+OrderItem --> "1" Dish : references dish
+OrderItem --> "1" LookupValue : item status
+
+OrderCoupon --> "1" Coupon : references coupon
+OrderPromotion --> "1" Promotion : references promotion
+Payment --> "1" LookupValue : payment method
+
+@enduml

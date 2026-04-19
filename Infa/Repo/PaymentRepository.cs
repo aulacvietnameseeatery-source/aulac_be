@@ -1,5 +1,6 @@
 ﻿using Core.DTO.General;
 using Core.DTO.Payment;
+using Core.Entity;
 using Core.Interface.Repo;
 using Infa.Data;
 using Microsoft.EntityFrameworkCore;
@@ -110,6 +111,48 @@ namespace Infa.Repo
                 PageIndex = pageIndex,
                 PageSize = pageSize
             };
+        }
+
+        public Task<Order?> GetOrderForPaymentAsync(long orderId, CancellationToken ct)
+        {
+            return _context.Orders
+                .Include(o => o.Payments)
+                .Include(o => o.Customer)
+                .Include(o => o.OrderItems)
+                    .ThenInclude(oi => oi.Dish)
+                .Include(o => o.OrderCoupons)
+                .Include(o => o.OrderPromotions)
+                .FirstOrDefaultAsync(o => o.OrderId == orderId, ct);
+        }
+
+        public Task<Coupon?> GetCouponWithTypeAsync(long couponId, CancellationToken ct)
+        {
+            return _context.Coupons
+                .Include(c => c.TypeLv)
+                .FirstOrDefaultAsync(c => c.CouponId == couponId, ct);
+        }
+
+        public Task<List<Promotion>> GetActivePromotionsAsync(uint activePromotionStatusId, DateTime now, CancellationToken ct)
+        {
+            return _context.Promotions
+                .Include(p => p.TypeLv)
+                .Include(p => p.PromotionRules)
+                .Include(p => p.PromotionTargets)
+                .Where(p => p.PromotionStatusLvId == activePromotionStatusId)
+                .Where(p => now >= p.StartTime && now <= p.EndTime)
+                .Where(p => !p.MaxUsage.HasValue || (p.UsedCount ?? 0) < p.MaxUsage.Value)
+                .ToListAsync(ct);
+        }
+
+        public Task<RestaurantTable?> GetTableByIdAsync(long tableId, CancellationToken ct)
+        {
+            return _context.RestaurantTables
+                .FirstOrDefaultAsync(t => t.TableId == tableId, ct);
+        }
+
+        public Task AddPaymentAsync(Payment payment, CancellationToken ct)
+        {
+            return _context.Payments.AddAsync(payment, ct).AsTask();
         }
     }
 }

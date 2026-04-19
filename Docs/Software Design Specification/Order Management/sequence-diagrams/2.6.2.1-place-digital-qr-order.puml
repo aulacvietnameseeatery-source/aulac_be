@@ -1,0 +1,115 @@
+@startuml
+title 2.6.2.1 Place Digital QR Order
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":Customer" as U
+participant ":QRMenuPage" as Client
+participant ":OrderController" as Ctrl
+participant ":OrderService" as Svc
+participant ":ILookupResolver" as Lookup
+participant ":ITableRepository" as TableRepo
+participant ":IDishRepository" as DishRepo
+participant ":ITaxRepository" as TaxRepo
+participant ":ICustomerService" as CustSvc
+participant ":IOrderRepository" as OrderRepo
+participant ":IOrderRealtimeService" as Realtime
+participant ":INotificationService" as Notif
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : Scan QR code, select dishes, and submit order
+activate Client
+
+Client ->> Ctrl : POST /api/orders (CreateOrderRequestDTO)
+activate Ctrl
+
+Ctrl ->> Svc : CreateOrderAsync(CreateOrderRequestDTO, ct)
+activate Svc
+
+Svc ->> Lookup : GetIdAsync(OrderSource, DINE_IN)
+activate Lookup
+Lookup -->> Svc : sourceLvId
+deactivate Lookup
+
+Svc ->> Lookup : GetIdAsync(OrderStatus, PENDING)
+activate Lookup
+Lookup -->> Svc : pendingStatusLvId
+deactivate Lookup
+
+Svc ->> TableRepo : GetByIdAsync(tableCode, ct)
+activate TableRepo
+TableRepo ->> DB : SELECT table by code
+activate DB
+DB -->> TableRepo : RestaurantTable
+deactivate DB
+TableRepo -->> Svc : RestaurantTable
+deactivate TableRepo
+
+alt#White Table not found or not available
+    Svc -->> Ctrl : throw NotFoundException / InvalidOperationException
+    Ctrl -->> Client : 404 / 400 Error
+    Client -->> U : Display error message
+else Table is valid
+    Svc ->> CustSvc : Resolve walk-in / guest customer
+    activate CustSvc
+    CustSvc -->> Svc : Customer
+    deactivate CustSvc
+
+    loop For each item in request.Items
+        Svc ->> DishRepo : GetByIdAsync(dishId, ct)
+        activate DishRepo
+        DishRepo -->> Svc : Dish (validate exists and available)
+        deactivate DishRepo
+    end
+
+    Svc ->> Svc : Build Order entity with items
+
+    Svc ->> Svc : ApplyTaxToOrderAsync(order, ct)
+    activate Svc
+    Svc ->> TaxRepo : GetDefaultTaxAsync(ct)
+    activate TaxRepo
+    TaxRepo -->> Svc : Tax
+    deactivate TaxRepo
+    Svc ->> Svc : Calculate tax amount
+    deactivate Svc
+
+    Svc ->> OrderRepo : CreateOrderAsync(order, items, ct)
+    activate OrderRepo
+    OrderRepo ->> DB : INSERT Order + OrderItems
+    activate DB
+    DB -->> OrderRepo : orderId
+    deactivate DB
+    OrderRepo -->> Svc : orderId
+    deactivate OrderRepo
+
+    Svc ->> Realtime : OrderCreatedAsync(OrderRealtimeDTO)
+    activate Realtime
+    Realtime -->> Svc : done
+    deactivate Realtime
+
+    Svc ->> Notif : PublishAsync(new order notification)
+    activate Notif
+    Notif -->> Svc : done
+    deactivate Notif
+
+    Svc -->> Ctrl : CreateOrderResponseDTO
+    deactivate Svc
+
+    Ctrl -->> Client : 200 OK (CreateOrderResponseDTO)
+    deactivate Ctrl
+
+    Client -->> U : Display order confirmation
+end
+
+deactivate Client
+deactivate U
+
+@enduml

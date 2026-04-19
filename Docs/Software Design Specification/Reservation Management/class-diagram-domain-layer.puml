@@ -7,9 +7,28 @@ package "Domain Layer" {
         PENDING
         CONFIRMED
         CHECKED_IN
-        COMPLETED
         CANCELLED
         NO_SHOW
+        COMPLETED
+    }
+
+    enum ReservationSourceCode <<enum>> {
+        PHONE
+        WALK_IN
+        ONLINE
+    }
+
+    enum TableStatusCode <<enum>> {
+        AVAILABLE
+        OCCUPIED
+        RESERVED
+        LOCKED
+    }
+
+    enum TableZoneCode <<enum>> {
+        INDOOR
+        OUTDOOR
+        ROOFTOP
     }
 
     class Reservation <<Entity>> {
@@ -24,24 +43,39 @@ package "Domain Layer" {
         +SourceLvId : uint
         +Notes : string?
         +ReservationStatusLvId : uint
+        +Customer : Customer?
+        +ReservationStatusLv : LookupValue
+        +SourceLv : LookupValue
+        +Tables : ICollection<RestaurantTable>
     }
 
     class RestaurantTable <<Entity>> {
         +TableId : long
         +TableCode : string
         +Capacity : int
+        +TableQrImg : long?
         +TableStatusLvId : uint
         +TableTypeLvId : uint
         +ZoneLvId : uint
         +IsOnline : bool?
+        +QrToken : string?
+        +CreatedAt : DateTime
+        +UpdatedAt : DateTime
+        +IsDeleted : bool
+        +TableStatusLv : LookupValue
+        +TableTypeLv : LookupValue
+        +ZoneLv : LookupValue
+        +Reservations : ICollection<Reservation>
     }
+}
+
+package "Cross-Module Entities" <<Rectangle>> {
 
     class Customer <<Entity>> {
         +CustomerId : long
         +FullName : string
         +Phone : string
         +Email : string?
-        +LoyaltyPoints : int
     }
 
     class LookupValue <<Entity>> {
@@ -52,18 +86,17 @@ package "Domain Layer" {
         +SortOrder : short
         +IsActive : bool?
     }
-
 }
 
 ' ── Relationships ──
 
-Reservation --> "0..1" Customer : placed by
-Reservation --> "1" LookupValue : reservation status (ReservationStatusLvId)
-Reservation --> "1" LookupValue : source (SourceLvId)
-Reservation "0..*" o-- "0..*" RestaurantTable : assigned tables
+Reservation "0..*" --> "0..1" Customer : placed by customer
+Reservation "0..*" --> "1" LookupValue : references status via ReservationStatusLvId
+Reservation "0..*" --> "1" LookupValue : references source via SourceLvId
+Reservation "0..*" o-- "0..*" RestaurantTable : assigned tables (many-to-many)
 
-RestaurantTable --> "1" LookupValue : table status (TableStatusLvId)
-RestaurantTable --> "1" LookupValue : table type (TableTypeLvId)
-RestaurantTable --> "1" LookupValue : zone (ZoneLvId)
+RestaurantTable "0..*" --> "1" LookupValue : references status via TableStatusLvId
+RestaurantTable "0..*" --> "1" LookupValue : references type via TableTypeLvId
+RestaurantTable "0..*" --> "1" LookupValue : references zone via ZoneLvId
 
 @enduml

@@ -1,5 +1,6 @@
-@startuml 2.6.2.8-update-order-item-status
+@startuml
 title 2.6.2.8 Update Order Item Status
+
 skinparam maxMessageSize 250
 skinparam sequence {
     ParticipantBackgroundColor #ffffff
@@ -8,148 +9,117 @@ skinparam sequence {
 
 autonumber
 
-actor ":User" as U
-participant ":KitchenOrdersPage" as Client
+actor ":Kitchen Staff" as U
+participant ":KitchenDisplayPage" as Client
 participant ":OrderController" as Ctrl
-participant ":ILookupResolver" as Lookup
 participant ":OrderService" as Svc
-participant ":IOrderRepository" as Repo
-participant ":IOrderRealtimeService" as OrderRT
-participant ":INotificationService" as Notif
-participant ":IShiftLiveRealtimePublisher" as ShiftRT
+participant ":ILookupResolver" as Lookup
+participant ":IOrderRepository" as OrderRepo
+participant ":IOrderRealtimeService" as Realtime
 participant ":Database" as DB
 
 activate U
-U ->> Client : Update a kitchen order item status
+
+U ->> Client : Change item status (e.g., IN_PROGRESS ¨ READY ¨ SERVED, or REJECTED)
 activate Client
+
 Client ->> Ctrl : PATCH /api/orders/items/{id}/status (UpdateOrderItemStatusDTO)
 activate Ctrl
 
-alt#White dto.Status is not a valid OrderItemStatusCode
-    Ctrl -->> Client : 400 Bad Request ApiResponse<object>
-    deactivate Ctrl
-    Client -->> U : Display invalid item status error
-else Status code is valid
-    alt#White dto.Status is REJECTED and RejectReason is empty
-        Ctrl -->> Client : 400 Bad Request ApiResponse<object>
-        deactivate Ctrl
-        Client -->> U : Display reject reason required error
-    else Request is valid
-        Ctrl ->> Lookup : ToOrderItemStatusIdAsync(statusCode)
-        activate Lookup
-        Lookup -->> Ctrl : newStatusLvId
-        deactivate Lookup
+note right of Ctrl : [HasPermission(Permissions.UpdateOrderItemStatus)]
 
-        Ctrl ->> Svc : UpdateOrderItemStatusAsync(id, newStatusLvId, rejectReason, ct)
-        activate Svc
+Ctrl ->> Lookup : GetIdAsync(OrderItemStatus, dto.Status)
+activate Lookup
+Lookup -->> Ctrl : newStatusLvId
+deactivate Lookup
 
-        Svc ->> Lookup : Resolve item, order, and table status lookup IDs
-        activate Lookup
-        Lookup -->> Svc : inProgressId, readyId, servedId, rejectedId,\ncancelledId, pendingOrderId, inProgressOrderId,\ncompletedOrderId, cancelledOrderId, availableTableId
-        deactivate Lookup
+Ctrl ->> Svc : UpdateOrderItemStatusAsync(orderItemId, newStatusLvId, rejectReason, ct)
+activate Svc
 
-        Svc ->> Repo : UpdateOrderItemStatusAsync(..., ct)
-        activate Repo
-        Repo ->> DB : Query order item by ID
+Svc ->> Lookup : GetIdAsync for all order item status codes (CREATED, IN_PROGRESS, READY, SERVED, REJECTED, CANCELLED)
+activate Lookup
+Lookup -->> Svc : all item status LvIds
+deactivate Lookup
+
+Svc ->> Lookup : GetIdAsync for all order status codes (PENDING, IN_PROGRESS, COMPLETED, CANCELLED)
+activate Lookup
+Lookup -->> Svc : all order status LvIds
+deactivate Lookup
+
+Svc ->> Lookup : GetIdAsync(TableStatus, AVAILABLE)
+activate Lookup
+Lookup -->> Svc : availableTableStatusId
+deactivate Lookup
+
+Svc ->> OrderRepo : UpdateOrderItemStatusAsync(orderItemId, newStatusLvId, rejectReason, ...allLvIds, ct)
+activate OrderRepo
+
+OrderRepo ->> DB : SELECT OrderItem with Order (join Table)
+activate DB
+DB -->> OrderRepo : OrderItem + Order
+deactivate DB
+            end
+
+alt#White OrderItem not found
+    OrderRepo -->> Svc : throw NotFoundException
+    Svc -->> Ctrl : throw NotFoundException
+    Ctrl -->> Client : 404 Not Found
+    Client -->> U : Display error
+else Item found
+    OrderRepo ->> OrderRepo : Validate status transition
+
+    OrderRepo ->> DB : UPDATE OrderItem SET ItemStatusLvId = newStatusLvId, RejectReason
+    activate DB
+    DB -->> OrderRepo : done
+    deactivate DB
+
+    OrderRepo ->> OrderRepo : Recalculate parent Order status based on all item statuses
+
+    note right of OrderRepo
+        Auto-transition rules:
+        - Any item IN_PROGRESS ¨ Order becomes IN_PROGRESS
+        - All items SERVED/REJECTED/CANCELLED ¨ Order becomes COMPLETED
+        - All items CANCELLED ¨ Order becomes CANCELLED, table freed
+    end note
+
+    opt#White Order status changed
+        OrderRepo ->> DB : UPDATE Order SET OrderStatusLvId
         activate DB
-        DB -->> Repo : OrderItem or empty
+        DB -->> OrderRepo : done
         deactivate DB
-
-        alt#White Order item not found
-            Repo -->> Svc : throw KeyNotFoundException
-            deactivate Repo
-            Svc -->> Ctrl : propagate exception
-            deactivate Svc
-            Ctrl -->> Client : 404 ApiResponse<object> via exception middleware
-            deactivate Ctrl
-            Client -->> U : Display order item not found error
-        else Order item found
-            Repo ->> DB : Update item status and reject reason
-            activate DB
-            DB -->> Repo : OK
-            deactivate DB
-
-            Repo ->> DB : Query parent order, assigned table,\nand all item statuses for recalculation
-            activate DB
-            DB -->> Repo : Return order summary and item status list
-            deactivate DB
-
-            opt#White New item status is REJECTED or CANCELLED
-                Repo ->> DB : Reduce order subtotal and total by item amount
-                activate DB
-                DB -->> Repo : OK
-                deactivate DB
-            end
-
-            opt#White New item status is IN_PROGRESS and order is PENDING
-                Repo ->> DB : Update order status to IN_PROGRESS
-                activate DB
-                DB -->> Repo : OK
-                deactivate DB
-            end
-
-            alt#White All order items are finished
-                alt#White At least one item is READY or SERVED
-                    Repo ->> DB : Update order status to COMPLETED
-                    activate DB
-                    DB -->> Repo : OK
-                    deactivate DB
-                else All items are REJECTED or CANCELLED
-                    Repo ->> DB : Update order status to CANCELLED
-                    activate DB
-                    DB -->> Repo : OK
-                    deactivate DB
-
-                    opt#White Order has an assigned table
-                        Repo ->> DB : Update table status to AVAILABLE
-                        activate DB
-                        DB -->> Repo : OK
-                        deactivate DB
-                    end
-                end
-            end
-
-            opt#White Parent order status changed
-                Repo ->> OrderRT : OrderUpdatedAsync(OrderRealtimeDTO)
-                activate OrderRT
-                OrderRT -->> Repo : OK
-                deactivate OrderRT
-            end
-
-            Repo ->> OrderRT : OrderItemUpdatedAsync(OrderItemRealtimeDTO)
-            activate OrderRT
-            OrderRT -->> Repo : OK
-            deactivate OrderRT
-
-            Repo -->> Svc : OK
-            deactivate Repo
-
-            opt#White New item status triggers notification
-                alt#White New item status is READY
-                    Svc ->> Notif : PublishAsync(ORDER_ITEM_READY)
-                    activate Notif
-                    Notif -->> Svc : OK
-                    deactivate Notif
-                else New item status is REJECTED
-                    Svc ->> Notif : PublishAsync(ORDER_ITEM_REJECTED with rejectReason)
-                    activate Notif
-                    Notif -->> Svc : OK
-                    deactivate Notif
-                end
-            end
-
-            Svc ->> ShiftRT : PublishBoardChangedAsync(order_item_changed)
-            activate ShiftRT
-            ShiftRT -->> Svc : OK
-            deactivate ShiftRT
-
-            Svc -->> Ctrl : OK
-            deactivate Svc
-            Ctrl -->> Client : 200 OK ApiResponse<object>
-            deactivate Ctrl
-            Client -->> U : Display updated kitchen item status
-        end
     end
+                end
+            end
+
+    opt#White Order completed and table should be freed
+        OrderRepo ->> DB : UPDATE RestaurantTable SET TableStatusLvId = available
+        activate DB
+        DB -->> OrderRepo : done
+        deactivate DB
+    end
+
+    OrderRepo ->> Realtime : OrderItemUpdatedAsync(OrderItemRealtimeDTO)
+    activate Realtime
+    Realtime -->> OrderRepo : done
+    deactivate Realtime
+
+    opt#White Order status also changed
+        OrderRepo ->> Realtime : OrderUpdatedAsync(OrderRealtimeDTO)
+        activate Realtime
+        Realtime -->> OrderRepo : done
+        deactivate Realtime
+    end
+
+    OrderRepo -->> Svc : done
+    deactivate OrderRepo
+
+    Svc -->> Ctrl : (void - success)
+    deactivate Svc
+
+    Ctrl -->> Client : 200 OK
+    deactivate Ctrl
+
+    Client -->> U : Display updated item status on kitchen board
 end
 
 deactivate Client

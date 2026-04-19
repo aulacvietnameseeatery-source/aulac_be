@@ -1,0 +1,250 @@
+@startuml
+title Role & Permission Management Module - Specification Class Diagram
+left to right direction
+
+' ══════════════════════════════════════════════════════════════
+'  PRESENTATION LAYER
+' ══════════════════════════════════════════════════════════════
+
+package "Presentation Layer" {
+
+    class RoleController <<Controller>> {
+        -_roleService: IRoleService
+        -_logger: ILogger<RoleController>
+        +GetRoles(query: PagedQuery): IActionResult
+        +GetRoleDetail(id: long): IActionResult
+        +CreateRole(request: CreateRoleRequestDto): IActionResult
+        +UpdateRole(id: long, request: UpdateRoleRequestDto): IActionResult
+        +DeleteRole(id: long): IActionResult
+    }
+
+    ' ── Request DTOs ──
+
+    class PagedQuery <<DTO>> {
+        +PageIndex: int
+        +PageSize: int
+        +Search: string?
+    }
+
+    class CreateRoleRequestDto <<DTO>> {
+        +RoleName: string
+        +IsActive: bool
+        +PermissionIds: List<long>
+    }
+
+    class UpdateRoleRequestDto <<DTO>> {
+        +RoleName: string
+        +IsActive: bool
+        +PermissionIds: List<long>
+    }
+
+    ' ── Response DTOs ──
+
+    class RoleListItemDto <<DTO>> {
+        +RoleId: long
+        +RoleCode: string
+        +RoleName: string
+        +StaffCount: int
+    }
+
+    class RoleDetailDto <<DTO>> {
+        +RoleId: long
+        +RoleCode: string
+        +RoleName: string
+        +RoleStatusLvId: uint
+        +IsActive: bool
+        +PermissionGroups: List<PermissionGroupDto>
+    }
+
+    class PermissionGroupDto <<DTO>> {
+        +ScreenCode: string
+        +DisplayName: string
+        +Permissions: List<PermissionItemDto>
+    }
+
+    class PermissionItemDto <<DTO>> {
+        +PermissionId: long
+        +ScreenCode: string
+        +ActionCode: string
+        +DisplayName: string
+        +IsAssigned: bool
+    }
+
+    class "PagedResult<T>" as PagedResult <<DTO>> {
+        +PageData: List<T>
+        +PageIndex: int
+        +PageSize: int
+        +TotalCount: int
+        +TotalPage: int
+    }
+
+    class "ApiResponse<T>" as ApiResponse <<DTO>> {
+        +Success: bool
+        +Code: int
+        +SubCode: int
+        +UserMessage: string?
+        +SystemMessage: string?
+        +Data: T
+        +ServerTime: DateTimeOffset
+    }
+}
+
+' ══════════════════════════════════════════════════════════════
+'  APPLICATION LAYER
+' ══════════════════════════════════════════════════════════════
+
+package "Application Layer" {
+
+    interface IRoleService <<interface>> {
+        +GetPagedAsync(query: PagedQuery): Task<(List<RoleListItemDto>, int)>
+        +GetRoleDetailAsync(roleId: long): Task<RoleDetailDto>
+        +CreateRoleAsync(request: CreateRoleRequestDto): Task<RoleDetailDto>
+        +UpdateRoleAsync(roleId: long, request: UpdateRoleRequestDto): Task<RoleDetailDto>
+        +DeleteRoleAsync(roleId: long): Task
+    }
+
+    class RoleService <<Service>> {
+        -_roleRepository: IRoleRepository
+        +GetPagedAsync(query: PagedQuery): Task<(List<RoleListItemDto>, int)>
+        +GetRoleDetailAsync(roleId: long): Task<RoleDetailDto>
+        +CreateRoleAsync(request: CreateRoleRequestDto): Task<RoleDetailDto>
+        +UpdateRoleAsync(roleId: long, request: UpdateRoleRequestDto): Task<RoleDetailDto>
+        +DeleteRoleAsync(roleId: long): Task
+        -GetScreenDisplayName(screenCode: string): string
+        -GetActionDisplayName(actionCode: string): string
+        -GetActionOrder(actionCode: string): int
+        -GetScreenOrder(screenCode: string): int
+    }
+
+    RoleService ..|> IRoleService : implements
+}
+
+' ══════════════════════════════════════════════════════════════
+'  PERSISTENCE LAYER
+' ══════════════════════════════════════════════════════════════
+
+package "Persistence Layer" {
+
+    interface IRoleRepository <<interface>> {
+        +FindByIdAsync(roleId: long, ct: CancellationToken): Task<Role?>
+        +FindByCodeAsync(roleCode: string, ct: CancellationToken): Task<Role?>
+        +GetAllAsync(ct: CancellationToken): Task<List<Role>>
+        +GetPagedWithStaffCountAsync(pageIndex: int, pageSize: int, search: string?): Task<(List<Role>, int)>
+        +GetRoleWithPermissionsAsync(roleId: long, ct: CancellationToken): Task<Role?>
+        +GetRoleWithPermissionsForUpdateAsync(roleId: long, ct: CancellationToken): Task<Role?>
+        +GetAllPermissionsAsync(ct: CancellationToken): Task<List<Permission>>
+        +GetPermissionsByIdsAsync(permissionIds: List<long>, ct: CancellationToken): Task<List<Permission>>
+        +AddAsync(role: Role, ct: CancellationToken): Task<Role>
+        +UpdateAsync(role: Role): Task
+        +DeleteAsync(role: Role): Task
+        +GetRoleStatusIdAsync(statusCode: string): Task<uint?>
+        +HasStaffAssignedAsync(roleId: long, ct: CancellationToken): Task<bool>
+        +RoleCodeExistsAsync(roleCode: string, ct: CancellationToken): Task<bool>
+    }
+
+    class RoleRepository <<Repository>> {
+        -_context: RestaurantMgmtContext
+        +FindByIdAsync(roleId: long, ct: CancellationToken): Task<Role?>
+        +FindByCodeAsync(roleCode: string, ct: CancellationToken): Task<Role?>
+        +GetAllAsync(ct: CancellationToken): Task<List<Role>>
+        +GetPagedWithStaffCountAsync(pageIndex: int, pageSize: int, search: string?): Task<(List<Role>, int)>
+        +GetRoleWithPermissionsAsync(roleId: long, ct: CancellationToken): Task<Role?>
+        +GetRoleWithPermissionsForUpdateAsync(roleId: long, ct: CancellationToken): Task<Role?>
+        +GetAllPermissionsAsync(ct: CancellationToken): Task<List<Permission>>
+        +GetPermissionsByIdsAsync(permissionIds: List<long>, ct: CancellationToken): Task<List<Permission>>
+        +AddAsync(role: Role, ct: CancellationToken): Task<Role>
+        +UpdateAsync(role: Role): Task
+        +DeleteAsync(role: Role): Task
+        +GetRoleStatusIdAsync(statusCode: string): Task<uint?>
+        +HasStaffAssignedAsync(roleId: long, ct: CancellationToken): Task<bool>
+        +RoleCodeExistsAsync(roleCode: string, ct: CancellationToken): Task<bool>
+    }
+
+    class RestaurantMgmtContext <<DbContext>> {
+        +Roles: DbSet<Role>
+        +Permissions: DbSet<Permission>
+        +StaffAccounts: DbSet<StaffAccount>
+        +LookupValues: DbSet<LookupValue>
+    }
+
+    RoleRepository ..|> IRoleRepository : implements
+}
+
+' ══════════════════════════════════════════════════════════════
+'  DOMAIN LAYER
+' ══════════════════════════════════════════════════════════════
+
+package "Domain Layer" {
+
+    class Role <<Entity>> {
+        +RoleId: long
+        +RoleCode: string
+        +RoleName: string
+        +RoleStatusLvId: uint
+    }
+
+    class Permission <<Entity>> {
+        +PermissionId: long
+        +ScreenCode: string
+        +ActionCode: string
+    }
+
+    class StaffAccount <<Entity>> {
+        +AccountId: long
+        +FullName: string
+        +RoleId: long
+    }
+
+    class LookupValue <<Entity>> {
+        +ValueId: uint
+        +TypeId: ushort
+        +ValueCode: string
+        +ValueName: string
+    }
+
+    enum RoleStatusCode <<Enum>> {
+        ACTIVE
+        INACTIVE
+    }
+}
+
+' ══════════════════════════════════════════════════════════════
+'  RELATIONSHIPS
+' ══════════════════════════════════════════════════════════════
+
+' --- Presentation → Application ---
+RoleController --> IRoleService : uses
+
+' --- Presentation → DTOs ---
+RoleController ..> PagedQuery : receives
+RoleController ..> CreateRoleRequestDto : receives
+RoleController ..> UpdateRoleRequestDto : receives
+RoleController ..> RoleListItemDto : returns
+RoleController ..> RoleDetailDto : returns
+RoleController ..> PagedResult : returns
+RoleController ..> ApiResponse : wraps response
+
+RoleDetailDto *-- "0..*" PermissionGroupDto : contains
+PermissionGroupDto *-- "1..*" PermissionItemDto : contains
+
+' --- Application → Persistence ---
+RoleService --> IRoleRepository : uses
+
+' --- Application → DTOs ---
+RoleService ..> RoleListItemDto : produces
+RoleService ..> RoleDetailDto : produces
+RoleService ..> CreateRoleRequestDto : consumes
+RoleService ..> UpdateRoleRequestDto : consumes
+
+' --- Persistence → DbContext ---
+RoleRepository --> RestaurantMgmtContext : uses
+
+' --- Persistence → Domain ---
+IRoleRepository ..> Role : persists
+IRoleRepository ..> Permission : queries / manages
+
+' --- Domain relationships ---
+Role "0..*" -- "0..*" Permission : many-to-many\n(role_permissions join table)
+Role "1" o-- "0..*" StaffAccount : assigned to
+Role "0..*" --> "1" LookupValue : RoleStatusLv\n(ROLE_STATUS)
+@enduml

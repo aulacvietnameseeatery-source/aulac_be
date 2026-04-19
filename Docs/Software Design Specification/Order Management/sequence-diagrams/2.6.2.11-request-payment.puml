@@ -1,0 +1,154 @@
+@startuml
+title 2.6.2.11 Request Payment
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":Staff" as U
+participant ":PaymentPage" as Client
+participant ":PaymentController" as Ctrl
+participant ":PaymentService" as Svc
+participant ":ILookupResolver" as Lookup
+participant ":IUnitOfWork" as UoW
+participant ":ISystemSettingService" as Settings
+participant ":IOrderRealtimeService" as Realtime
+participant ":INotificationService" as Notif
+participant ":IShiftLiveRealtimePublisher" as ShiftLive
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : Enter payment details (method, received amount, optional coupon/promotion/tip)
+activate Client
+
+Client ->> Ctrl : POST /api/payments (CreatePaymentDTO)
+activate Ctrl
+
+note right of Ctrl : [HasPermission(Permissions.ProcessPayment)]
+
+Ctrl ->> Svc : ProcessPaymentAsync(CreatePaymentDTO, ct)
+activate Svc
+
+Svc ->> DB : Load Order by dto.OrderId (include OrderItems, Customer, Table, existing Payments)
+activate DB
+DB -->> Svc : Order with navigation properties
+deactivate DB
+
+alt#White Order not found
+    Svc -->> Ctrl : throw KeyNotFoundException
+    Ctrl -->> Client : 404 Not Found
+    Client -->> U : Display "Order not found" error
+else Order found
+    alt#White Order already fully paid
+        Svc -->> Ctrl : throw InvalidOperationException
+        Ctrl -->> Client : 400 Bad Request
+        Client -->> U : Display "Order already paid" error
+    else Order not yet paid
+        Svc ->> Lookup : GetIdAsync(PaymentMethod, dto.PaymentMethod)
+        activate Lookup
+        Lookup -->> Svc : paymentMethodLvId
+        deactivate Lookup
+
+        opt#White PromotionId provided
+            Svc ->> DB : Load Promotion by id
+            activate DB
+            DB -->> Svc : Promotion
+            deactivate DB
+            Svc ->> Svc : CalculateDiscountAmount(promotion)
+            Svc ->> Svc : Create OrderPromotion entity
+        end
+
+        opt#White CouponIds provided
+            loop For each couponId
+                Svc ->> DB : Load Coupon by id
+                activate DB
+                DB -->> Svc : Coupon
+                deactivate DB
+                Svc ->> Svc : CalculateDiscountAmount(coupon)
+                Svc ->> Svc : Create OrderCoupon entity, mark coupon as used
+            end
+        end
+
+        Svc ->> Svc : Calculate final amount = subtotal - discounts + tax
+        Svc ->> Svc : Calculate changeAmount = receivedAmount - finalAmount
+
+        opt#White TipAmount provided
+            Svc ->> Svc : Set order.TipAmount = dto.TipAmount
+        end
+
+        Svc ->> Svc : Create Payment entity (receivedAmount, changeAmount, methodLvId)
+
+        Svc ->> Lookup : GetIdAsync(OrderStatus, COMPLETED)
+        activate Lookup
+        Lookup -->> Svc : completedStatusLvId
+        deactivate Lookup
+
+        Svc ->> Svc : Set order.OrderStatusLvId = completedStatusLvId
+
+        Svc ->> Lookup : GetIdAsync(TableStatus, AVAILABLE)
+        activate Lookup
+        Lookup -->> Svc : availableTableStatusId
+        deactivate Lookup
+
+        opt#White Order has a table (DINE_IN)
+            Svc ->> Svc : Set table.TableStatusLvId = availableTableStatusId (free the table)
+        end
+
+        Svc ->> UoW : BeginTransactionAsync(ct)
+        activate UoW
+
+        Svc ->> DB : SaveChangesAsync (persist Payment, OrderCoupons, OrderPromotions, Order status, Table status)
+        activate DB
+        DB -->> Svc : done
+        deactivate DB
+
+        Svc ->> Settings : ResolveLoyaltyPolicyAsync(ct)
+        activate Settings
+        Settings -->> Svc : (enabled, pointBaseAmount)
+        deactivate Settings
+
+        opt#White Loyalty enabled and customer is not guest
+            Svc ->> Svc : CalculateLoyaltyPoints(finalAmount, pointBaseAmount)
+            Svc ->> DB : UPDATE Customer SET LoyaltyPoints += earnedPoints
+            activate DB
+            DB -->> Svc : done
+            deactivate DB
+        end
+
+        Svc ->> UoW : CommitAsync(ct)
+        deactivate UoW
+
+        Svc ->> Realtime : OrderPaidAsync(orderId)
+        activate Realtime
+        Realtime -->> Svc : done
+        deactivate Realtime
+
+        Svc ->> Notif : PublishAsync(payment processed notification)
+        activate Notif
+        Notif -->> Svc : done
+        deactivate Notif
+
+        Svc ->> ShiftLive : PublishBoardChangedAsync(ShiftLiveRealtimeEventDto)
+        activate ShiftLive
+        ShiftLive -->> Svc : done
+        deactivate ShiftLive
+
+        Svc -->> Ctrl : (void - success)
+        deactivate Svc
+
+        Ctrl -->> Client : 200 OK ("Payment processed successfully")
+        deactivate Ctrl
+
+        Client -->> U : Display payment success confirmation
+    end
+end
+
+deactivate Client
+deactivate U
+
+@enduml

@@ -1,0 +1,122 @@
+@startuml
+title 2.6.2.9 Modify Order (Add Items)
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":User" as U
+participant ":OrderPage" as Client
+participant ":OrderController" as Ctrl
+participant ":OrderService" as Svc
+participant ":ILookupResolver" as Lookup
+participant ":IDishRepository" as DishRepo
+participant ":IOrderRepository" as OrderRepo
+participant ":IOrderRealtimeService" as Realtime
+participant ":INotificationService" as Notif
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : Select additional dishes and submit (customer QR or staff)
+activate Client
+
+alt#White Customer QR flow
+    Client ->> Ctrl : POST /api/orders/{orderId}/items (AddOrderItemsRequestDTO)
+    activate Ctrl
+
+    Ctrl ->> Svc : AddItemsToOrderAsync(orderId, AddOrderItemsRequestDTO, ct)
+    activate Svc
+else Staff flow
+    Client ->> Ctrl : POST /api/orders/staff/{id}/items (AddOrderItemsRequest)
+    activate Ctrl
+
+    note right of Ctrl : [HasPermission(Permissions.EditOrder)]
+
+    Ctrl ->> Svc : AddItemsAsync(orderId, AddOrderItemsRequest, ct)
+    activate Svc
+end
+
+Svc ->> Lookup : GetIdAsync(OrderItemStatus, CREATED)
+activate Lookup
+Lookup -->> Svc : createdItemStatusLvId
+deactivate Lookup
+
+Svc ->> Lookup : GetIdAsync(OrderStatus, PENDING)
+activate Lookup
+Lookup -->> Svc : pendingOrderStatusId
+deactivate Lookup
+
+Svc ->> Lookup : GetIdAsync(OrderStatus, COMPLETED)
+activate Lookup
+Lookup -->> Svc : completedOrderStatusId
+deactivate Lookup
+
+Svc ->> Lookup : GetIdAsync(OrderStatus, CANCELLED)
+activate Lookup
+Lookup -->> Svc : cancelledOrderStatusId
+deactivate Lookup
+
+loop For each item in request.Items
+    Svc ->> DishRepo : GetByIdAsync(dishId, ct)
+    activate DishRepo
+    DishRepo -->> Svc : Dish (validate and get price)
+    deactivate DishRepo
+end
+
+Svc ->> Svc : Build List<OrderItem> from validated dishes
+
+Svc ->> OrderRepo : AddItemsToOrderAsync(orderId, items, completedOrderStatusId, cancelledOrderStatusId, pendingOrderStatusId, ct)
+activate OrderRepo
+
+OrderRepo ->> DB : SELECT Order by id
+activate DB
+DB -->> OrderRepo : Order
+deactivate DB
+
+alt#White Order not found or already COMPLETED/CANCELLED
+    OrderRepo -->> Svc : throw InvalidOperationException
+    Svc -->> Ctrl : throw InvalidOperationException
+    Ctrl -->> Client : 400 Bad Request
+    Client -->> U : Display error message
+else Order is active (PENDING or IN_PROGRESS)
+    OrderRepo ->> DB : INSERT new OrderItems
+    activate DB
+    DB -->> OrderRepo : done
+    deactivate DB
+
+    OrderRepo ->> DB : UPDATE Order totals (SubTotalAmount, TotalAmount, TaxAmount)
+    activate DB
+    DB -->> OrderRepo : done
+    deactivate DB
+
+    OrderRepo -->> Svc : done
+    deactivate OrderRepo
+
+    Svc ->> Realtime : OrderUpdatedAsync(OrderRealtimeDTO)
+    activate Realtime
+    Realtime -->> Svc : done
+    deactivate Realtime
+
+    Svc ->> Notif : PublishAsync(items added notification)
+    activate Notif
+    Notif -->> Svc : done
+    deactivate Notif
+
+    Svc -->> Ctrl : (void - success)
+    deactivate Svc
+
+    Ctrl -->> Client : 200 OK
+    deactivate Ctrl
+
+    Client -->> U : Display updated order with new items
+end
+
+deactivate Client
+deactivate U
+
+@enduml
