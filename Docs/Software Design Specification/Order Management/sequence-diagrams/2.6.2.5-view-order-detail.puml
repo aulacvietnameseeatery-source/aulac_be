@@ -24,22 +24,20 @@ activate Client
 Client ->> Ctrl : GET /api/orders/{id}
 activate Ctrl
 
-note right of Ctrl : [HasPermission(Permissions.ViewOrder)]
-
 Ctrl ->> Svc : GetOrderByIdAsync(orderId, ct)
 activate Svc
 
 Svc ->> OrderRepo : GetOrderByIdAsync(orderId, ct)
 activate OrderRepo
-OrderRepo ->> DB : SELECT order with joins (Table, Staff, Customer, OrderItems+Dish, Promotions, Coupons, Payments, Tax)
+OrderRepo ->> DB : Query order with all joins (Table, Staff, Customer, OrderItems with Dish, Promotions, Coupons, Payments, Tax)
 activate DB
-DB -->> OrderRepo : OrderDetailDTO
+DB -->> OrderRepo : Return order detail with all navigation properties
 deactivate DB
 OrderRepo -->> Svc : OrderDetailDTO
 deactivate OrderRepo
 
 alt#White Order not found
-    Svc -->> Ctrl : throw NotFoundException
+    Svc -->> Ctrl : throw KeyNotFoundException
     Ctrl -->> Client : 404 Not Found
     Client -->> U : Display "Order not found" message
 else Order found
@@ -49,7 +47,7 @@ else Order found
     Ctrl -->> Client : 200 OK (OrderDetailDTO)
     deactivate Ctrl
 
-    Client -->> U : Display full order detail (items with i18n names, promotions, coupons, payments, totals, status, staff, table)
+    Client -->> U : Display full order detail (items, promotions, coupons, payments, totals, status, staff, table)
 end
 
 deactivate Client

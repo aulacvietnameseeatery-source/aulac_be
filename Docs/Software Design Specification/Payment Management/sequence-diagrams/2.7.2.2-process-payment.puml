@@ -1,5 +1,5 @@
 @startuml
-title 2.6.2.11 Request Payment
+title 2.7.2.2 Process Payment
 
 skinparam maxMessageSize 250
 skinparam sequence {

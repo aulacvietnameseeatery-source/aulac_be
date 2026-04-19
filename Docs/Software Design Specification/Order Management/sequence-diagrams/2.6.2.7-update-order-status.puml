@@ -15,8 +15,11 @@ participant ":OrderController" as Ctrl
 participant ":OrderService" as Svc
 participant ":ILookupResolver" as Lookup
 participant ":IOrderRepository" as OrderRepo
+participant ":ITableRepository" as TableRepo
+participant ":IUnitOfWork" as UoW
 participant ":IOrderRealtimeService" as Realtime
 participant ":INotificationService" as Notif
+participant ":IShiftLiveRealtimePublisher" as ShiftLive
 participant ":Database" as DB
 
 activate U
@@ -27,67 +30,112 @@ activate Client
 Client ->> Ctrl : PATCH /api/orders/{id}/status (UpdateOrderStatusDTO)
 activate Ctrl
 
-note right of Ctrl : [HasPermission(Permissions.EditOrder)]
+Ctrl ->> Ctrl : Parse dto.Status string to OrderStatusCode enum
 
-Ctrl ->> Ctrl : Parse status string to OrderStatusCode enum
+alt#White Invalid status string
+    Ctrl -->> Client : 400 Bad Request ("Invalid status")
+    Client -->> U : Display invalid status error
+else Valid status parsed
 
-Ctrl ->> Svc : UpdateOrderStatusAsync(orderId, OrderStatusCode, ct)
-activate Svc
+    Ctrl ->> Svc : UpdateOrderStatusAsync(orderId, OrderStatusCode, ct)
+    activate Svc
 
-Svc ->> Lookup : GetIdAsync(OrderStatus, newStatusCode)
-activate Lookup
-Lookup -->> Svc : newStatusLvId
-deactivate Lookup
+    Svc ->> Lookup : Resolve all order status IDs (PENDING, IN_PROGRESS, COMPLETED, CANCELLED)
+    activate Lookup
+    Lookup -->> Svc : pendingId, inProgressId, completedId, cancelledId
+    deactivate Lookup
 
-Svc ->> OrderRepo : GetByIdForUpdateAsync(orderId, ct)
-activate OrderRepo
-OrderRepo ->> DB : SELECT order by id
-activate DB
-DB -->> OrderRepo : Order
-deactivate DB
-OrderRepo -->> Svc : Order
-deactivate OrderRepo
+    Svc ->> Lookup : Resolve table status IDs (AVAILABLE, OCCUPIED)
+    activate Lookup
+    Lookup -->> Svc : availableTableStatusId, occupiedTableStatusId
+    deactivate Lookup
 
-alt#White Order not found
-    Svc -->> Ctrl : throw NotFoundException
-    Ctrl -->> Client : 404 Not Found
-    Client -->> U : Display "Order not found" error
-else Order found
-    Svc ->> Svc : Validate status transition is allowed
+    Svc ->> OrderRepo : GetByIdForUpdateAsync(orderId, ct)
+    activate OrderRepo
+    OrderRepo ->> DB : Query order by ID with payments and table
+    activate DB
+    DB -->> OrderRepo : Return order entity
+    deactivate DB
+    OrderRepo -->> Svc : Order
+    deactivate OrderRepo
 
-    alt#White Invalid status transition
-        Svc -->> Ctrl : throw InvalidOperationException
-        Ctrl -->> Client : 400 Bad Request
-        Client -->> U : Display invalid transition error
-    else Valid transition
-        Svc ->> Svc : Update order.OrderStatusLvId = newStatusLvId
+    alt#White Order not found
+        Svc -->> Ctrl : throw NotFoundException
+        Ctrl -->> Client : 404 Not Found
+        Client -->> U : Display "Order not found" error
+    else Order found
 
-        Svc ->> OrderRepo : Save updated order (via context tracking)
-        activate OrderRepo
-        OrderRepo ->> DB : UPDATE Order SET OrderStatusLvId = newStatusLvId
-        activate DB
-        DB -->> OrderRepo : done
-        deactivate DB
-        OrderRepo -->> Svc : done
-        deactivate OrderRepo
+        Svc ->> Svc : Determine current status from OrderStatusLvId
+        Svc ->> Svc : Validate status transition is allowed (PENDING→IN_PROGRESS, PENDING→CANCELLED, IN_PROGRESS→COMPLETED, IN_PROGRESS→CANCELLED, CANCELLED→PENDING, COMPLETED→IN_PROGRESS)
 
-        Svc ->> Realtime : OrderUpdatedAsync(OrderRealtimeDTO)
-        activate Realtime
-        Realtime -->> Svc : done
-        deactivate Realtime
+        alt#White Invalid status transition or cannot cancel paid order
+            Svc -->> Ctrl : throw InvalidOperationException
+            Ctrl -->> Client : 400 Bad Request
+            Client -->> U : Display transition error
+        else Valid transition
 
-        Svc ->> Notif : PublishAsync(order status changed notification)
-        activate Notif
-        Notif -->> Svc : done
-        deactivate Notif
+            Svc ->> UoW : BeginTransactionAsync(ct)
+            activate UoW
+            UoW -->> Svc : Transaction started
+            deactivate UoW
 
-        Svc -->> Ctrl : (void - success)
-        deactivate Svc
+            Svc ->> Svc : Set order.OrderStatusLvId = target status ID
 
-        Ctrl -->> Client : 200 OK
-        deactivate Ctrl
+            opt#White Order has a table and status is CANCELLED or COMPLETED
+                Svc ->> TableRepo : GetByIdAsync(tableId, ct)
+                activate TableRepo
+                TableRepo -->> Svc : RestaurantTable
+                deactivate TableRepo
+                Svc ->> Svc : Set table.TableStatusLvId = availableTableStatusId
+            end
 
-        Client -->> U : Display updated order status
+            opt#White Reactivating cancelled order (CANCELLED → PENDING) with table
+                Svc ->> TableRepo : GetByIdAsync(tableId, ct)
+                activate TableRepo
+                TableRepo -->> Svc : RestaurantTable
+                deactivate TableRepo
+                Svc ->> Svc : Set table.TableStatusLvId = occupiedTableStatusId
+            end
+
+            Svc ->> UoW : SaveChangesAsync(ct)
+            activate UoW
+            UoW ->> DB : Persist order status and table status changes
+            activate DB
+            DB -->> UoW : Changes saved
+            deactivate DB
+            UoW -->> Svc : done
+            deactivate UoW
+
+            Svc ->> UoW : CommitAsync(ct)
+            activate UoW
+            UoW -->> Svc : Transaction committed
+            deactivate UoW
+
+            opt#White Status is CANCELLED
+                Svc ->> Notif : PublishAsync(ORDER_CANCELLED notification)
+                activate Notif
+                Notif -->> Svc : done
+                deactivate Notif
+            end
+
+            Svc ->> Realtime : OrderUpdatedAsync(OrderRealtimeDTO)
+            activate Realtime
+            Realtime -->> Svc : done
+            deactivate Realtime
+
+            Svc ->> ShiftLive : PublishBoardChangedAsync(order_status_changed event)
+            activate ShiftLive
+            ShiftLive -->> Svc : done
+            deactivate ShiftLive
+
+            Svc -->> Ctrl : (void - success)
+            deactivate Svc
+
+            Ctrl -->> Client : 200 OK ("Order status updated successfully")
+            deactivate Ctrl
+
+            Client -->> U : Display updated order status
+        end
     end
 end
 

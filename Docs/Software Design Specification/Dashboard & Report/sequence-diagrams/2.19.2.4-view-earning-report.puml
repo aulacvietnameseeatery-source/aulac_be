@@ -1,0 +1,55 @@
+@startuml
+title 2.19.2.4 View Earning Report
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":Staff" as U
+participant ":EarningReportPage" as Client
+participant ":ReportController" as Ctrl
+participant ":ReportService" as Svc
+participant ":ILookupResolver" as Lookup
+participant ":IReportRepository" as Repo
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : Open Earning Report tab (with date range filter)
+activate Client
+
+Client ->> Ctrl : GET /api/reports/earnings/summary (ReportFilterRequest)
+activate Ctrl
+
+Ctrl ->> Svc : GetEarningSummaryAsync(request, ct)
+activate Svc
+
+Svc ->> Lookup : GetIdAsync(OrderStatus, COMPLETED, ct)
+activate Lookup
+Lookup -->> Svc : completedId
+deactivate Lookup
+
+Svc ->> Repo : GetEarningSummaryAsync(startDate, endDate, completedId, ct)
+activate Repo
+Repo ->> DB : Query completed orders in date range, calculate gross revenue, net revenue, total tax, and total discount
+activate DB
+DB -->> Repo : Return (GrossRevenue, NetRevenue, TotalTax, TotalDiscount)
+deactivate DB
+Repo -->> Svc : EarningSummaryDto
+deactivate Repo
+
+Svc -->> Ctrl : EarningSummaryDto
+deactivate Svc
+
+Ctrl -->> Client : 200 OK (EarningSummaryDto)
+deactivate Ctrl
+
+Client -->> U : Display earning summary cards (gross revenue, net revenue, tax, discount)
+deactivate Client
+deactivate U
+
+@enduml

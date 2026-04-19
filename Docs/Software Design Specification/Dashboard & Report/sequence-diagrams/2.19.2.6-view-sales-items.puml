@@ -1,0 +1,57 @@
+@startuml
+title 2.19.2.6 View Sales Items
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":Staff" as U
+participant ":SalesReportPage" as Client
+participant ":ReportController" as Ctrl
+participant ":ReportService" as Svc
+participant ":ILookupResolver" as Lookup
+participant ":IReportRepository" as Repo
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : Open Sales Items tab (with date range filter, page index, page size)
+activate Client
+
+Client ->> Ctrl : GET /api/reports/sales/items (ReportFilterRequest, pageIndex=1, pageSize=20)
+activate Ctrl
+
+Ctrl ->> Svc : GetSalesItemsAsync(request, pageIndex, pageSize, ct)
+activate Svc
+
+Svc ->> Lookup : GetIdAsync(OrderStatus, COMPLETED, ct)
+activate Lookup
+Lookup -->> Svc : completedId
+deactivate Lookup
+
+Svc ->> Svc : Calculate skip = (pageIndex - 1) * pageSize
+
+Svc ->> Repo : GetSalesItemsAsync(startDate, endDate, completedId, skip, pageSize, ct)
+activate Repo
+Repo ->> DB : Query order items from completed orders, group by dish, join dish name and category name, sum quantity sold and total revenue, order by total revenue descending, apply pagination
+activate DB
+DB -->> Repo : Return paginated list of (DishId, DishName, CategoryName, QuantitySold, TotalRevenue) and total count
+deactivate DB
+Repo -->> Svc : (List<SalesItemDto>, TotalCount)
+deactivate Repo
+
+Svc -->> Ctrl : (List<SalesItemDto> Items, int TotalCount)
+deactivate Svc
+
+Ctrl -->> Client : 200 OK (paginated SalesItemDto list with total count)
+deactivate Ctrl
+
+Client -->> U : Display sales items table with dish name, category, quantity sold, revenue, and pagination
+deactivate Client
+deactivate U
+
+@enduml

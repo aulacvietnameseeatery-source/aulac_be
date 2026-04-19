@@ -1,0 +1,57 @@
+@startuml
+title 2.19.2.2 View Revenue Chart
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":Staff" as U
+participant ":DashboardPage" as Client
+participant ":DashboardController" as Ctrl
+participant ":DashboardService" as Svc
+participant ":ILookupResolver" as Lookup
+participant ":IDashboardRepository" as Repo
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : View revenue chart section (optional date range filter)
+activate Client
+
+Client ->> Ctrl : GET /api/dashboard/revenue-chart (DashboardFilterRequest)
+activate Ctrl
+
+Ctrl ->> Svc : GetRevenueChartAsync(request, ct)
+activate Svc
+
+Svc ->> Svc : Resolve date range (StartDate ?? 7 days ago, EndDate ?? now)
+
+Svc ->> Lookup : ToOrderStatusIdAsync(OrderStatusCode.COMPLETED, ct)
+activate Lookup
+Lookup -->> Svc : completedOrderStatusId
+deactivate Lookup
+
+Svc ->> Repo : GetRevenueChartAsync(startDate, endDate, completedOrderStatusId, ct)
+activate Repo
+Repo ->> DB : Query completed orders grouped by date, calculating daily revenue sum and order count
+activate DB
+DB -->> Repo : Return list of (Date, Revenue, Orders) per day
+deactivate DB
+Repo -->> Svc : List<RevenueChartItemDto>
+deactivate Repo
+
+Svc -->> Ctrl : List<RevenueChartItemDto>
+deactivate Svc
+
+Ctrl -->> Client : 200 OK (List<RevenueChartItemDto>)
+deactivate Ctrl
+
+Client -->> U : Display revenue line/bar chart with daily revenue and order counts
+deactivate Client
+deactivate U
+
+@enduml

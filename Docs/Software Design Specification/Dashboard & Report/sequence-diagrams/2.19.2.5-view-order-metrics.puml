@@ -1,0 +1,60 @@
+@startuml
+title 2.19.2.5 View Order Metrics
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":Staff" as U
+participant ":OrderReportPage" as Client
+participant ":ReportController" as Ctrl
+participant ":ReportService" as Svc
+participant ":ILookupResolver" as Lookup
+participant ":IReportRepository" as Repo
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : Open Order Metrics tab (with date range filter)
+activate Client
+
+Client ->> Ctrl : GET /api/reports/orders/metrics (ReportFilterRequest)
+activate Ctrl
+
+Ctrl ->> Svc : GetOrderMetricsAsync(request, ct)
+activate Svc
+
+Svc ->> Lookup : GetIdAsync(OrderStatus, COMPLETED, ct)
+activate Lookup
+Lookup -->> Svc : completedId
+deactivate Lookup
+
+Svc ->> Lookup : GetIdAsync(OrderStatus, CANCELLED, ct)
+activate Lookup
+Lookup -->> Svc : cancelledId
+deactivate Lookup
+
+Svc ->> Repo : GetOrderMetricsAsync(startDate, endDate, completedId, cancelledId, ct)
+activate Repo
+Repo ->> DB : Query orders in date range, count total orders, count completed orders, count cancelled orders, calculate cancellation rate percentage
+activate DB
+DB -->> Repo : Return (TotalOrders, CompletedOrders, CancelledOrders, CancelRate)
+deactivate DB
+Repo -->> Svc : OrderMetricsDto
+deactivate Repo
+
+Svc -->> Ctrl : OrderMetricsDto
+deactivate Svc
+
+Ctrl -->> Client : 200 OK (OrderMetricsDto)
+deactivate Ctrl
+
+Client -->> U : Display order metrics (total, completed, cancelled, cancel rate %)
+deactivate Client
+deactivate U
+
+@enduml
