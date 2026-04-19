@@ -1,354 +1,370 @@
 # Unit Test Report Instructions — CouponService
 
-> **Target Excel:** `Docs/Report5.1_Unit Test.xlsx`
-> **Test file:** `Tests/Services/CouponServiceTests.cs`
-> **Module:** COUPON
-> **Total tests:** 21  |  **Passed:** 21  |  **Failed:** 0
+## How to fill `Report5.1_Unit Test.xlsx` for CouponService
 
 ---
 
-## 1. Sheet: MethodList (starting row 9)
+## 1. Sheet: Cover
 
-Add these rows to the MethodList sheet — one per tested method:
+| Cell | Value |
+|------|-------|
+| B2 | `UNIT TEST DOCUMENT` |
+| B4 | `AuLac Restaurant` |
+| B5 | `AULAC_BE` |
+| B6 | `AULAC_BE_UnitTest_v1.0` |
+| E4 | `quantm` |
+| E5 | *(execution date)* |
+| E6 | `1.0` |
+
+---
+
+## 2. Sheet: MethodList
+
+Starting from **row 9**, add one row per method:
 
 | No | Module Name | Method Name | Sheet Name | Description | Pre-Condition |
 |----|-------------|-------------|------------|-------------|---------------|
-| (next) | COUPON | GetCouponsAsync | GetCouponsAsync | Staff retrieves a list of active coupons, filtering by customer-specific or global visibility | Active coupon data exists |
-| (next) | COUPON | GetCouponDetailAsync | GetCouponDetailAsync | Staff views the details of a specific coupon by its ID | Coupon ID provided |
-| (next) | COUPON | CreateCouponAsync | CreateCouponAsync | Staff creates a new coupon with code normalization, uniqueness validation, and date range checks | Valid create request |
-| (next) | COUPON | UpdateCouponAsync | UpdateCouponAsync | Staff updates an existing coupon with code uniqueness and discount percentage validation | Coupon must exist |
-| (next) | COUPON | DeleteCouponAsync | DeleteCouponAsync | Staff soft-deletes a coupon only if it has not been used by any order | Coupon must exist |
+| 1 | COUPON | GetCouponsAsync | GetCouponsAsync | Customer or system retrieves all currently active coupons, optionally filtered by customer ID so that customer-specific coupons are included alongside global ones | CouponRepository is available; active coupons exist in the database |
+| 2 | COUPON | GetCouponDetailAsync | GetCouponDetailAsync | Staff retrieves the full detail of a specific coupon including code, name, description, dates, discount value, usage counts, type, status, and creation timestamp by providing the coupon ID | CouponRepository is available |
+| 3 | COUPON | CreateCouponAsync | CreateCouponAsync | Staff creates a new coupon by specifying code, name, description, date range, discount value, max usage, and type, with the system normalizing the code to uppercase, validating uniqueness, date range, and percent bounds, then resolving lookup values and persisting the coupon | Lookup values for coupon type and status are configured |
+| 4 | COUPON | UpdateCouponAsync | UpdateCouponAsync | Staff updates an existing coupon — if the coupon has been used, only description, end time, and max usage can be changed; if unused, all fields including code, name, type, and dates can be updated with full validation | CouponRepository is available; lookup values are configured |
+| 5 | COUPON | DeleteCouponAsync | DeleteCouponAsync | Staff deletes a coupon that has never been used, ensuring used coupons cannot be removed from the system | CouponRepository is available |
 
 ---
 
-## 2. Sheet: Statistics (starting from the next available row after row 11)
+## 3. Sheet: Statistics
 
-| No | Function code | Passed | Failed | Untested | N | A | B | Total |
-|----|---------------|--------|--------|----------|---|---|---|-------|
-| (next) | GetCouponsAsync | 4 | 0 | 0 | 2 | 1 | 1 | 4 |
-| (next) | GetCouponDetailAsync | 3 | 0 | 0 | 1 | 1 | 1 | 3 |
-| (next) | CreateCouponAsync | 5 | 0 | 0 | 1 | 3 | 1 | 5 |
-| (next) | UpdateCouponAsync | 5 | 0 | 0 | 1 | 3 | 1 | 5 |
-| (next) | DeleteCouponAsync | 4 | 0 | 0 | 1 | 2 | 1 | 4 |
-| **Sub total** | | **21** | **0** | **0** | **6** | **10** | **5** | **21** |
+Starting from **row 12**, one row per method:
 
-**Summary formulas (update row 16+):**
-- Test coverage: `(21 + 0) / 21 × 100 = 100%`
-- Test successful coverage: `21 / 21 × 100 = 100%`
+| No | Function Code | Passed | Failed | Untested | N | A | B | Total |
+|----|--------------|--------|--------|----------|---|---|---|-------|
+| 1 | GetCouponsAsync | 4 | 0 | 0 | 3 | 0 | 1 | 4 |
+| 2 | GetCouponDetailAsync | 2 | 0 | 0 | 1 | 1 | 0 | 2 |
+| 3 | CreateCouponAsync | 8 | 0 | 0 | 2 | 4 | 2 | 8 |
+| 4 | UpdateCouponAsync | 8 | 0 | 0 | 2 | 5 | 1 | 8 |
+| 5 | DeleteCouponAsync | 4 | 0 | 0 | 1 | 3 | 0 | 4 |
+| **Sub Total** | | **26** | **0** | **0** | **9** | **13** | **4** | **26** |
+
+- **Test Coverage**: (26 + 0) / 26 × 100 = **100%**
+- **Test Success Rate**: 26 / 26 × 100 = **100%**
 
 ---
 
-## 3. Per-Method Sheets
+## 4. Per-Method Sheets
 
-Copy the `Example` template sheet for each method listed below. Fill in the header, condition matrix, confirmation, and result sections as described.
+For each method below, **copy the `Example` sheet template**, rename the tab to the method name, and fill in the data.
 
 ---
 
 ### Sheet: GetCouponsAsync
 
-**Header (rows 1-5):**
+**Header (rows 1–5):**
 
-| Field | Value |
-|-------|-------|
-| Code Module | Core/Service/CouponService.cs |
-| Method | GetCouponsAsync |
-| Created By | quantm |
-| Executed By | quantm |
-| Test requirement | Staff retrieves a list of active coupons, filtering by customer-specific or global visibility |
-| Passed | 2 |
-| Failed | 0 |
-| Untested | 0 |
-| N / A / B | 2 / 1 / 1 → Total = 4 |
+| Row | Col A | Col C | Col F | Col L |
+|-----|-------|-------|-------|-------|
+| 1 | Code Module | Core/Service/CouponService.cs | Method | GetCouponsAsync |
+| 2 | Created By | quantm | Executed By | quantm |
+| 3 | Test requirement | Customer or system retrieves all currently active coupons, optionally filtered by customer ID so that customer-specific coupons are included alongside global ones | | |
+| 4 | Passed: 4 | Failed: 0 | Untested: 0 | N: 3 / A: 0 / B: 1 |
 
-**Test Case IDs (row 7, cols F+):** `UTCID01` – `UTCID04`
+**Test Case IDs (row 7, cols F+):** `UTCID01` | `UTCID02` | `UTCID03` | `UTCID04`
 
-**Condition section:**
+**Condition Matrix:**
 
-| Condition Group | Input Value | UTCID01 | UTCID02 |
-|-----------------|-------------|---------|---------|
-| customerId | null (no filter) | O | |
-| customerId | 100 (specific customer) | | O |
-| repositoryData | 2 active coupons (1 global + 1 customer=100) | O | |
-| repositoryData | 3 active coupons (1 global + 1 customer=999 + 1 customer=100) | | O |
+| Col A | Col B | Col D | UTCID01 | UTCID02 | UTCID03 | UTCID04 |
+|-------|-------|-------|---------|---------|---------|---------|
+| Condition | Precondition | | | | | |
+| | customerId | | | | | |
+| | | null (repo returns 2 coupons: [{CouponId=1, Code="COUPON1", CustomerId=null}, {CouponId=2, Code="COUPON2", CustomerId=10}]) | O | | | |
+| | | 10 (repo returns 3 coupons: [{CouponId=1, Code="GLOBAL", CustomerId=null}, {CouponId=2, Code="CUST10", CustomerId=10}, {CouponId=3, Code="CUST20", CustomerId=20}]) | | O | | |
+| | | null (repo returns empty list — no active coupons) | | | O | |
+| | | null (repo returns 1 coupon: [{CouponId=1, Code="MAPPED", CustomerId=10, FullName="Test Customer", Discount=50000, MaxUsage=100, UsedCount=0, Type="FIXED_AMOUNT", Status="ACTIVE"}]) | | | | O |
 
-**Confirmation section:**
+**Confirmation:**
 
-| Output | Expected Value | UTCID01 | UTCID02 |
-|--------|---------------|---------|---------|
-| Return | Count == 2 (all active coupons returned) | O | |
-| Return | Count == 2 (global + customer=100 only, excludes customer=999) | | O |
-| Return | Contains CouponId 1 and 3 | | O |
+| Col A | Col B | Col D | UTCID01 | UTCID02 | UTCID03 | UTCID04 |
+|-------|-------|-------|---------|---------|---------|---------|
+| Confirm | Return | | | | | |
+| | | Count==2, [0].CouponCode=="COUPON1", [1].CouponCode=="COUPON2" | O | | | |
+| | | Count==2, codes contain "GLOBAL" and "CUST10", codes do not contain "CUST20" (CustomerId=20 filtered out) | | O | | |
+| | | Count==0 (empty list) | | | O | |
+| | | Count==1, CouponId==1, CouponCode=="MAPPED", CouponName=="Summer Discount", CustomerId==10, CustomerName=="Test Customer", DiscountValue==50000, MaxUsage==100, UsedCount==0, Type=="FIXED_AMOUNT", CouponStatus=="ACTIVE" | | | | O |
 
-**Result section:**
+**Result:**
 
-| UTCID | Type | P/F | Date |
-|-------|------|-----|------|
-| UTCID01 | N | P | (execution date) |
-| UTCID02 | N | P | (execution date) |
-| UTCID03 | A | P | (execution date) |
-| UTCID04 | B | P | (execution date) |
+| Col B | UTCID01 | UTCID02 | UTCID03 | UTCID04 |
+|-------|---------|---------|---------|---------|
+| Type | N | N | B | N |
+| Passed/Failed | P | P | P | P |
+| Executed Date | *(date)* | *(date)* | *(date)* | *(date)* |
 
 ---
 
 ### Sheet: GetCouponDetailAsync
 
-**Header (rows 1-5):**
+**Header (rows 1–5):**
 
-| Field | Value |
-|-------|-------|
-| Code Module | Core/Service/CouponService.cs |
-| Method | GetCouponDetailAsync |
-| Created By | quantm |
-| Executed By | quantm |
-| Test requirement | Staff views the details of a specific coupon by its ID |
-| Passed | 3 |
-| Failed | 0 |
-| Untested | 0 |
-| N / A / B | 1 / 1 / 1 → Total = 3 |
+| Row | Col A | Col C | Col F | Col L |
+|-----|-------|-------|-------|-------|
+| 1 | Code Module | Core/Service/CouponService.cs | Method | GetCouponDetailAsync |
+| 2 | Created By | quantm | Executed By | quantm |
+| 3 | Test requirement | Staff retrieves the full detail of a specific coupon including code, name, description, dates, discount value, usage counts, type, status, and creation timestamp by providing the coupon ID | | |
+| 4 | Passed: 2 | Failed: 0 | Untested: 0 | N: 1 / A: 1 / B: 0 |
 
-**Test Case IDs (row 7, cols F+):** `UTCID01`, `UTCID02`
+**Test Case IDs (row 7, cols F+):** `UTCID01` | `UTCID02`
 
-**Condition section:**
+**Condition Matrix:**
 
-| Condition Group | Input Value | UTCID01 | UTCID02 |
-|-----------------|-------------|---------|---------|
-| couponId | 5 (exists) | O | |
-| couponId | 404 (not found → null) | | O |
+| Col A | Col B | Col D | UTCID01 | UTCID02 |
+|-------|-------|-------|---------|---------|
+| Condition | Precondition | | | |
+| | id | | | |
+| | | 5 (coupon found: {CouponId=5, Code="DETAIL01", Name="Summer Discount", Description="Test coupon", Discount=50000, MaxUsage=100, UsedCount=0, Type="FIXED_AMOUNT", Status="ACTIVE", CreatedAt=set}) | O | |
+| | | 999 (coupon not found — repo returns null) | | O |
 
-Change to:
-| couponId | -1 (negative — abnormal input for a primary key) | | O | |
-| couponId | 0 (zero — boundary between valid and invalid IDs) | | | O |
+**Confirmation:**
 
-**Confirmation section:**
+| Col A | Col B | Col D | UTCID01 | UTCID02 |
+|-------|-------|-------|---------|---------|
+| Confirm | Return | | | |
+| | | CouponId==5, CouponCode=="DETAIL01", CouponName=="Summer Discount", Description=="Test coupon", DiscountValue==50000, MaxUsage==100, UsedCount==0, Type=="FIXED_AMOUNT", CouponStatus=="ACTIVE", CreatedAt is not null | O | |
+| | Exception | | | |
+| | | KeyNotFoundException: "Coupon with ID 999 not found." | | O |
 
-| Output | Expected Value | UTCID01 | UTCID02 | UTCID03 |
-|--------|---------------|---------|---------|--------|
-| Return | CouponId==5, CouponCode=="C5", Type=="PERCENT", Status=="ACTIVE" | O | | |
-| Exception | KeyNotFoundException | | O | |
-| Exception | KeyNotFoundException | | | O |
+**Abnormal cases summary:**
+- **UTCID02**: id=999, coupon not found → `KeyNotFoundException`
 
-**Result section:**
+**Result:**
 
-| UTCID | Type | P/F | Date |
-|-------|------|-----|------|
-| UTCID01 | N | P | (execution date) |
-| UTCID02 | A | P | (execution date) |
-| UTCID03 | B | P | (execution date) |
+| Col B | UTCID01 | UTCID02 |
+|-------|---------|---------|
+| Type | N | A |
+| Passed/Failed | P | P |
+| Executed Date | *(date)* | *(date)* |
 
 ---
 
 ### Sheet: CreateCouponAsync
 
-**Header (rows 1-5):**
+**Header (rows 1–5):**
 
-| Field | Value |
-|-------|-------|
-| Code Module | Core/Service/CouponService.cs |
-| Method | CreateCouponAsync |
-| Created By | quantm |
-| Executed By | quantm |
-| Test requirement | Staff creates a new coupon with code normalization, uniqueness validation, date range checks, and discount percentage boundary |
-| Passed | 4 |
-| Failed | 0 |
-| Untested | 0 |
-| N / A / B | 1 / 3 / 1 → Total = 5 |
+| Row | Col A | Col C | Col F | Col L |
+|-----|-------|-------|-------|-------|
+| 1 | Code Module | Core/Service/CouponService.cs | Method | CreateCouponAsync |
+| 2 | Created By | quantm | Executed By | quantm |
+| 3 | Test requirement | Staff creates a new coupon by specifying code, name, description, date range, discount value, max usage, and type, with the system normalizing the code to uppercase, validating uniqueness, date range, and percent bounds, then resolving lookup values and persisting the coupon | | |
+| 4 | Passed: 8 | Failed: 0 | Untested: 0 | N: 2 / A: 4 / B: 2 |
 
-**Test Case IDs (row 7, cols F+):** `UTCID01` – `UTCID05`
+**Test Case IDs (row 7, cols F+):** `UTCID01` | `UTCID02` | `UTCID03` | `UTCID04` | `UTCID05` | `UTCID06` | `UTCID07` | `UTCID08`
 
-**Condition section:**
+**Condition Matrix:**
 
-| Condition Group | Input Value | UTCID01 | UTCID02 | UTCID03 | UTCID04 |
-|-----------------|-------------|---------|---------|---------|---------|
-| couponCode | " save10 " (unique, to be normalized) | O | | | |
-| couponCode | " save10 " (duplicate — code already exists) | | O | | |
-| couponCode | " save10 " (unique) | | | O | O |
-| existingCoupon | null (no duplicate) | O | | | O |
-| existingCoupon | Coupon with code "SAVE10" exists | | O | | |
-| dateRange | StartTime < EndTime (valid) | O | O | | O |
-| dateRange | StartTime > EndTime (invalid) | | | O | |
-| discountValue | 10 (normal) | O | O | O | |
-| discountValue | 100 (boundary — exactly 100%) | | | | O |
-| lookupResolver | Returns valid TypeLvId + StatusLvId | O | | | O |
+| Col A | Col B | Col D | UTCID01 | UTCID02 | UTCID03 | UTCID04 | UTCID05 | UTCID06 | UTCID07 | UTCID08 |
+|-------|-------|-------|---------|---------|---------|---------|---------|---------|---------|---------|
+| Condition | Precondition | | | | | | | | | |
+| | CouponCode | | | | | | | | | |
+| | | "NEWYEAR2025" (no duplicate — repo GetByCode returns null) | O | | | | | | | |
+| | | " new year 2025 " (whitespace, normalized to "NEWYEAR2025", no duplicate) | | O | | | | | | |
+| | | "AB" (after normalization, length < 3) | | | O | | | | | |
+| | | "NEWYEAR2025" (duplicate exists — repo GetByCode returns existing coupon) | | | | O | | | | |
+| | | "NEWYEAR2025" (no duplicate) | | | | | O | | | |
+| | | "NEWYEAR2025" (Type="PERCENT", DiscountValue=150) | | | | | | O | | |
+| | | "NEWYEAR2025" (Type="PERCENT", DiscountValue=100, no duplicate) | | | | | | | O | |
+| | | "ABC" (exactly 3 chars after normalization, no duplicate) | | | | | | | | O |
+| | CouponName | | | | | | | | | |
+| | | "New Year Discount" | O | O | O | O | O | O | O | O |
+| | StartTime | | | | | | | | | |
+| | | now-1d | O | O | O | O | | O | O | O |
+| | | now+10d (EndTime=now+5d, invalid range) | | | | | O | | | |
+| | EndTime | | | | | | | | | |
+| | | now+30d | O | O | O | O | | O | O | O |
+| | | now+5d (before StartTime=now+10d) | | | | | O | | | |
+| | DiscountValue | | | | | | | | | |
+| | | 20000 (Type="FIXED_AMOUNT") | O | O | O | O | O | | | O |
+| | | 150 (Type="PERCENT", over 100) | | | | | | O | | |
+| | | 100 (Type="PERCENT", boundary at 100) | | | | | | | O | |
+| | Type | | | | | | | | | |
+| | | "FIXED_AMOUNT" | O | O | O | O | O | | | O |
+| | | "PERCENT" | | | | | | O | O | |
 
-**Confirmation section:**
+**Confirmation:**
 
-| Output | Expected Value | UTCID01 | UTCID02 | UTCID03 | UTCID04 |
-|--------|---------------|---------|---------|---------|---------|
-| Return | CouponId==10, Code=="SAVE10", Name=="Save 10", Type=="PERCENT", Status=="ACTIVE" | O | | | |
-| Verify | CreateAsync called with normalized Code/Name/Description | O | | | |
-| Exception | InvalidOperationException (code already exists) | | O | | |
-| Exception | InvalidOperationException("*End time must be after start time*") | | | O | |
-| Return | CouponId==11, DiscountValue==100 | | | | O |
+| Col A | Col B | Col D | UTCID01 | UTCID02 | UTCID03 | UTCID04 | UTCID05 | UTCID06 | UTCID07 | UTCID08 |
+|-------|-------|-------|---------|---------|---------|---------|---------|---------|---------|---------|
+| Confirm | Return | | | | | | | | | |
+| | | CouponId==100, CouponCode=="NEWYEAR2025", CouponName=="New Year Discount", DiscountValue==20000, UsedCount==0, Type=="FIXED_AMOUNT", CouponStatus=="ACTIVE". Repo.CreateAsync called once | O | | | | | | | |
+| | | CouponCode=="NEWYEAR2025" (normalized from " new year 2025 ") | | O | | | | | | |
+| | | DiscountValue==100, Type=="PERCENT" | | | | | | | O | |
+| | | CouponCode=="ABC" | | | | | | | | O |
+| | Exception | | | | | | | | | |
+| | | InvalidOperationException: "Coupon code must be at least 3 characters." | | | O | | | | | |
+| | | InvalidOperationException: "Coupon with code 'NEWYEAR2025' already exists." | | | | O | | | | |
+| | | InvalidOperationException: "End time must be after start time." | | | | | O | | | |
+| | | InvalidOperationException: "Discount percentage must be between 0 and 100%." | | | | | | O | | |
 
-**Result section:**
+**Abnormal cases summary:**
+- **UTCID03**: CouponCode="AB" (too short after normalization) → `InvalidOperationException`
+- **UTCID04**: CouponCode="NEWYEAR2025" (duplicate exists) → `InvalidOperationException`
+- **UTCID05**: EndTime before StartTime → `InvalidOperationException`
+- **UTCID06**: Type="PERCENT", DiscountValue=150 (over 100) → `InvalidOperationException`
 
-| UTCID | Type | P/F | Date |
-|-------|------|-----|------|
-| UTCID01 | N | P | (execution date) |
-| UTCID02 | A | P | (execution date) |
-| UTCID03 | A | P | (execution date) |
-| UTCID04 | B | P | (execution date) |
+**Result:**
+
+| Col B | UTCID01 | UTCID02 | UTCID03 | UTCID04 | UTCID05 | UTCID06 | UTCID07 | UTCID08 |
+|-------|---------|---------|---------|---------|---------|---------|---------|---------|
+| Type | N | N | A | A | A | A | B | B |
+| Passed/Failed | P | P | P | P | P | P | P | P |
+| Executed Date | *(date)* | *(date)* | *(date)* | *(date)* | *(date)* | *(date)* | *(date)* | *(date)* |
 
 ---
 
 ### Sheet: UpdateCouponAsync
 
-**Header (rows 1-5):**
+**Header (rows 1–5):**
 
-| Field | Value |
-|-------|-------|
-| Code Module | Core/Service/CouponService.cs |
-| Method | UpdateCouponAsync |
-| Created By | quantm |
-| Executed By | quantm |
-| Test requirement | Staff updates an existing coupon with code uniqueness validation and discount percentage upper bound check |
-| Passed | 5 |
-| Failed | 0 |
-| Untested | 0 |
-| N / A / B | 1 / 3 / 1 → Total = 5 |
+| Row | Col A | Col C | Col F | Col L |
+|-----|-------|-------|-------|-------|
+| 1 | Code Module | Core/Service/CouponService.cs | Method | UpdateCouponAsync |
+| 2 | Created By | quantm | Executed By | quantm |
+| 3 | Test requirement | Staff updates an existing coupon — if the coupon has been used, only description, end time, and max usage can be changed; if unused, all fields including code, name, type, and dates can be updated with full validation | | |
+| 4 | Passed: 8 | Failed: 0 | Untested: 0 | N: 2 / A: 5 / B: 1 |
 
-**Test Case IDs (row 7, cols F+):** `UTCID01` – `UTCID05`
+**Test Case IDs (row 7, cols F+):** `UTCID01` | `UTCID02` | `UTCID03` | `UTCID04` | `UTCID05` | `UTCID06` | `UTCID07` | `UTCID08`
 
-**Condition section:**
+**Condition Matrix:**
 
-| Condition Group | Input Value | UTCID01 | UTCID02 | UTCID03 | UTCID04 | UTCID05 |
-|-----------------|-------------|---------|---------|---------|---------|---------|
-| couponId | 99 (not found → null) | O | | | | |
-| couponId | 8 (exists, code="OLD10") | | O | O | O | O |
-| newCode | — | O | | | | |
-| newCode | "UP20" (unique) | | O | | | |
-| newCode | "UP20" (unique) | | | O | | |
-| couponExpired | EndTime in the past | | | | O | |
-| couponUsed | UsedCount=5 (already used) | | | | | O |
-| discountValue | — | O | | | | |
-| discountValue | 20 (valid) | | O | | | |
-| discountValue | 100.01 (exceeds 100%) | | | O | | |
+| Col A | Col B | Col D | UTCID01 | UTCID02 | UTCID03 | UTCID04 | UTCID05 | UTCID06 | UTCID07 | UTCID08 |
+|-------|-------|-------|---------|---------|---------|---------|---------|---------|---------|---------|
+| Condition | Precondition | | | | | | | | | |
+| | id | | | | | | | | | |
+| | | 10 (coupon found: {Code="OLD_CODE", UsedCount=0, EndTime=now+30d}) | O | | | | | | | |
+| | | 11 (coupon found: {Code="USED_CODE", UsedCount=5, EndTime=now+30d}) | | O | | | | | | |
+| | | 999 (coupon not found — repo returns null) | | | O | | | | | |
+| | | 12 (coupon found: {EndTime=now-1d, expired}) | | | | O | | | | |
+| | | 13 (coupon found: {Code="ORIGINAL", UsedCount=0, EndTime=now+30d}) | | | | | O | | | |
+| | | 14 (coupon found: {UsedCount=0, EndTime=now+30d}) | | | | | | O | | |
+| | | 15 (coupon found: {UsedCount=3, EndTime=now+30d}) | | | | | | | O | |
+| | | 16 (coupon found: {Code="SAMECODE", UsedCount=0, EndTime=now+30d}) | | | | | | | | O |
+| | request.CouponCode | | | | | | | | | |
+| | | "UPDATED2025" (no duplicate) | O | | | | | | | |
+| | | "UPDATED2025" (used coupon — code ignored) | | O | | | | | | |
+| | | "UPDATED2025" | | | O | O | | | | |
+| | | "DUPLICATE" (duplicate exists — repo GetByCode returns existing) | | | | | O | | | |
+| | | "UPDATED2025" (StartTime=now+10d, EndTime=now+5d — invalid range) | | | | | | O | | |
+| | | "UPDATED2025" (EndTime before coupon.StartTime) | | | | | | | O | |
+| | | "SAMECODE" (same as existing code — case-insensitive match) | | | | | | | | O |
 
-**Confirmation section:**
+**Confirmation:**
 
-| Output | Expected Value | UTCID01 | UTCID02 | UTCID03 | UTCID04 | UTCID05 |
-|--------|---------------|---------|---------|---------|---------|---------|
-| Exception | KeyNotFoundException | O | | | | |
-| Return | Code=="UP20", Name=="Update 20", DiscountValue==20 | | O | | | |
-| Verify | UpdateAsync called once | | O | | | |
-| Exception | InvalidOperationException("*between 0 and 100%*") | | | O | | |
-| Exception | InvalidOperationException("*expired*") | | | | O | |
-| Verify | Only Desc/EndTime/MaxUsage updated, Code/Name/DiscountValue unchanged | | | | | O |
+| Col A | Col B | Col D | UTCID01 | UTCID02 | UTCID03 | UTCID04 | UTCID05 | UTCID06 | UTCID07 | UTCID08 |
+|-------|-------|-------|---------|---------|---------|---------|---------|---------|---------|---------|
+| Confirm | Return | | | | | | | | | |
+| | | CouponCode=="UPDATED2025", CouponName=="Updated Coupon", DiscountValue==30000. Repo.UpdateAsync called once | O | | | | | | | |
+| | | CouponCode=="USED_CODE" (code NOT changed), MaxUsage==500. Repo.GetByCodeAsync never called | | O | | | | | | |
+| | | CouponCode=="SAMECODE". Repo.GetByCodeAsync never called (same code skips uniqueness check) | | | | | | | | O |
+| | Exception | | | | | | | | | |
+| | | KeyNotFoundException: "Coupon with ID 999 not found." | | | O | | | | | |
+| | | InvalidOperationException: "Cannot update an expired coupon." | | | | O | | | | |
+| | | InvalidOperationException: "Coupon with code 'DUPLICATE' already exists." | | | | | O | | | |
+| | | InvalidOperationException: "End time must be after start time." | | | | | | O | | |
+| | | InvalidOperationException: "End time must be after start time." | | | | | | | O | |
 
-**Result section:**
+**Abnormal cases summary:**
+- **UTCID03**: id=999, coupon not found → `KeyNotFoundException`
+- **UTCID04**: coupon is expired (EndTime < now) → `InvalidOperationException`
+- **UTCID05**: unused coupon, duplicate code → `InvalidOperationException`
+- **UTCID06**: unused coupon, EndTime before StartTime → `InvalidOperationException`
+- **UTCID07**: used coupon, EndTime before coupon.StartTime → `InvalidOperationException`
 
-| UTCID | Type | P/F | Date |
-|-------|------|-----|------|
-| UTCID01 | A | P | (execution date) |
-| UTCID02 | N | P | (execution date) |
-| UTCID03 | A | P | (execution date) |
-| UTCID04 | A | P | (execution date) |
-| UTCID05 | B | P | (execution date) |
+**Result:**
+
+| Col B | UTCID01 | UTCID02 | UTCID03 | UTCID04 | UTCID05 | UTCID06 | UTCID07 | UTCID08 |
+|-------|---------|---------|---------|---------|---------|---------|---------|---------|
+| Type | N | N | A | A | A | A | A | B |
+| Passed/Failed | P | P | P | P | P | P | P | P |
+| Executed Date | *(date)* | *(date)* | *(date)* | *(date)* | *(date)* | *(date)* | *(date)* | *(date)* |
 
 ---
 
 ### Sheet: DeleteCouponAsync
 
-**Header (rows 1-5):**
+**Header (rows 1–5):**
 
-| Field | Value |
-|-------|-------|
-| Code Module | Core/Service/CouponService.cs |
-| Method | DeleteCouponAsync |
-| Created By | quantm |
-| Executed By | quantm |
-| Test requirement | Staff soft-deletes a coupon, blocking deletion if the coupon has already been used by any order |
-| Passed | 4 |
-| Failed | 0 |
-| Untested | 0 |
-| N / A / B | 1 / 2 / 1 → Total = 4 |
+| Row | Col A | Col C | Col F | Col L |
+|-----|-------|-------|-------|-------|
+| 1 | Code Module | Core/Service/CouponService.cs | Method | DeleteCouponAsync |
+| 2 | Created By | quantm | Executed By | quantm |
+| 3 | Test requirement | Staff deletes a coupon that has never been used, ensuring used coupons cannot be removed from the system | | |
+| 4 | Passed: 4 | Failed: 0 | Untested: 0 | N: 1 / A: 3 / B: 0 |
 
-**Test Case IDs (row 7, cols F+):** `UTCID01` – `UTCID04`
+**Test Case IDs (row 7, cols F+):** `UTCID01` | `UTCID02` | `UTCID03` | `UTCID04`
 
-**Condition section:**
+**Condition Matrix:**
 
-| Condition Group | Input Value | UTCID01 | UTCID02 | UTCID03 | UTCID04 |
-|-----------------|-------------|---------|---------|---------|---------|
-| couponId | 20 (exists, usedCount=1) | O | | | |
-| couponId | 30 (exists, usedCount=0) | | O | | |
-| couponId | -1 (not found — abnormal) | | | O | |
-| couponId | 40 (exists, DeleteAsync returns false) | | | | O |
-| usedCount | 1 (coupon has been used) | O | | | |
-| usedCount | 0 (coupon never used) | | O | | |
+| Col A | Col B | Col D | UTCID01 | UTCID02 | UTCID03 | UTCID04 |
+|-------|-------|-------|---------|---------|---------|---------|
+| Condition | Precondition | | | | | |
+| | id | | | | | |
+| | | 20 (coupon found: {UsedCount=0} — repo DeleteAsync returns true) | O | | | |
+| | | 999 (coupon not found — repo returns null) | | O | | |
+| | | 21 (coupon found: {UsedCount=3} — has been used) | | | O | |
+| | | 22 (coupon found: {UsedCount=0} — repo DeleteAsync returns false) | | | | O |
 
-**Confirmation section:**
+**Confirmation:**
 
-| Output | Expected Value | UTCID01 | UTCID02 | UTCID03 | UTCID04 |
-|--------|---------------|---------|---------|---------|---------|
-| Exception | InvalidOperationException("*has been used*") | O | | | |
-| Verify | DeleteAsync(30) called once | | O | | |
-| Exception | KeyNotFoundException | | | O | |
-| Exception | KeyNotFoundException("*Failed to delete*") | | | | O |
+| Col A | Col B | Col D | UTCID01 | UTCID02 | UTCID03 | UTCID04 |
+|-------|-------|-------|---------|---------|---------|---------|
+| Confirm | Return | | | | | |
+| | | No return value (void method executes successfully). Repo.DeleteAsync(20) called once | O | | | |
+| | Exception | | | | | |
+| | | KeyNotFoundException: "Coupon with ID 999 not found." | | O | | |
+| | | InvalidOperationException: "Cannot delete coupon that has been used." | | | O | |
+| | | KeyNotFoundException: "Failed to delete coupon with ID 22." | | | | O |
 
-**Result section:**
+**Abnormal cases summary:**
+- **UTCID02**: id=999, coupon not found → `KeyNotFoundException`
+- **UTCID03**: id=21, coupon has been used (UsedCount=3) → `InvalidOperationException`
+- **UTCID04**: id=22, repo DeleteAsync returns false → `KeyNotFoundException`
 
-| UTCID | Type | P/F | Date |
-|-------|------|-----|------|
-| UTCID01 | A | P | (execution date) |
-| UTCID02 | N | P | (execution date) |
-| UTCID03 | A | P | (execution date) |
-| UTCID04 | B | P | (execution date) |
+**Result:**
 
-**Condition section:**
-
-| Condition Group | Input Value | UTCID01 | UTCID02 |
-|-----------------|-------------|---------|---------|
-| couponId | 20 (exists, usedCount=1) | O | |
-| couponId | 30 (exists, usedCount=0) | | O |
-| usedCount | 1 (coupon has been used) | O | |
-| usedCount | 0 (coupon never used) | | O |
-
-**Confirmation section:**
-
-| Output | Expected Value | UTCID01 | UTCID02 |
-|--------|---------------|---------|---------|
-| Exception | InvalidOperationException("*has been used*") | O | |
-| Verify | DeleteAsync(30) called once | | O |
-
-**Result section:**
-
-| UTCID | Type | P/F | Date |
-|-------|------|-----|------|
-| UTCID01 | A | P | (execution date) |
-| UTCID02 | N | P | (execution date) |
+| Col B | UTCID01 | UTCID02 | UTCID03 | UTCID04 |
+|-------|---------|---------|---------|---------|
+| Type | N | A | A | A |
+| Passed/Failed | P | P | P | P |
+| Executed Date | *(date)* | *(date)* | *(date)* | *(date)* |
 
 ---
 
-## 4. Test Case ↔ C# Method Mapping
+## 5. C# Test ↔ UTCID Mapping
 
-| UTCID | C# Test Method | Trait Type |
-|-------|----------------|------------|
-| GetCouponsAsync UTCID01 | `GetCouponsAsync_WhenNoCustomerId_ReturnsAllActiveCoupons` | N |
-| GetCouponsAsync UTCID02 | `GetCouponsAsync_WhenCustomerIdProvided_FiltersByCustomerIdOrGlobal` | N |
-| GetCouponsAsync UTCID03 | `GetCouponsAsync_WhenNegativeCustomerId_ReturnsOnlyGlobalCoupons` | A |
-| GetCouponsAsync UTCID04 | `GetCouponsAsync_WhenRepositoryReturnsEmpty_ReturnsEmptyList` | B |
-| GetCouponDetailAsync UTCID01 | `GetCouponDetailAsync_WhenCouponExists_ReturnsDetail` | N |
-| GetCouponDetailAsync UTCID02 | `GetCouponDetailAsync_WhenIdIsNegative_ThrowsKeyNotFoundException` | A |
-| GetCouponDetailAsync UTCID03 | `GetCouponDetailAsync_WhenIdIsZero_ThrowsKeyNotFoundException` | B |
-| CreateCouponAsync UTCID01 | `CreateCouponAsync_WhenValidRequest_CreatesCouponWithNormalizedCode` | N |
-| CreateCouponAsync UTCID02 | `CreateCouponAsync_WhenCodeExists_ThrowsInvalidOperationException` | A |
-| CreateCouponAsync UTCID03 | `CreateCouponAsync_WhenEndTimeBeforeStartTime_ThrowsInvalidOperationException` | A |
-| CreateCouponAsync UTCID04 | `CreateCouponAsync_WhenPercentIsExactly100_AllowsCreation` | B |
-| CreateCouponAsync UTCID05 | `CreateCouponAsync_WhenCodeTooShort_ThrowsInvalidOperationException` | A |
-| UpdateCouponAsync UTCID01 | `UpdateCouponAsync_WhenCouponNotFound_ThrowsKeyNotFoundException` | A |
-| UpdateCouponAsync UTCID02 | `UpdateCouponAsync_WhenCodeChangedAndUnique_UpdatesSuccessfully` | N |
-| UpdateCouponAsync UTCID03 | `UpdateCouponAsync_WhenPercentGreaterThan100_ThrowsInvalidOperationException` | A |
-| UpdateCouponAsync UTCID04 | `UpdateCouponAsync_WhenCouponExpired_ThrowsInvalidOperationException` | A |
-| UpdateCouponAsync UTCID05 | `UpdateCouponAsync_WhenCouponIsUsed_UpdatesOnlyLimitedFields` | B |
-| DeleteCouponAsync UTCID01 | `DeleteCouponAsync_WhenCouponUsed_ThrowsInvalidOperationException` | A |
-| DeleteCouponAsync UTCID02 | `DeleteCouponAsync_WhenValid_DeletesSuccessfully` | N |
-| DeleteCouponAsync UTCID03 | `DeleteCouponAsync_WhenCouponNotFound_ThrowsKeyNotFoundException` | A |
-| DeleteCouponAsync UTCID04 | `DeleteCouponAsync_WhenDeleteReturnsFalse_ThrowsKeyNotFoundException` | B |
+| UTCID | Method Sheet | C# Test Name | Type |
+|-------|-------------|--------------|------|
+| UTCID01 | GetCouponsAsync | GetCouponsAsync_WhenNoCustomerId_ReturnsAllActiveCoupons | N |
+| UTCID02 | GetCouponsAsync | GetCouponsAsync_WhenCustomerId_ReturnsFilteredCoupons | N |
+| UTCID03 | GetCouponsAsync | GetCouponsAsync_WhenNoCoupons_ReturnsEmptyList | B |
+| UTCID04 | GetCouponsAsync | GetCouponsAsync_MapsAllDtoFieldsCorrectly | N |
+| UTCID01 | GetCouponDetailAsync | GetCouponDetailAsync_WhenCouponExists_ReturnsDetail | N |
+| UTCID02 | GetCouponDetailAsync | GetCouponDetailAsync_WhenCouponNotFound_ThrowsKeyNotFoundException | A |
+| UTCID01 | CreateCouponAsync | CreateCouponAsync_WhenValidRequest_CreatesCouponAndReturnsDto | N |
+| UTCID02 | CreateCouponAsync | CreateCouponAsync_NormalizesCodeToUpperCase | N |
+| UTCID03 | CreateCouponAsync | CreateCouponAsync_WhenCodeTooShort_ThrowsInvalidOperationException | A |
+| UTCID04 | CreateCouponAsync | CreateCouponAsync_WhenDuplicateCode_ThrowsInvalidOperationException | A |
+| UTCID05 | CreateCouponAsync | CreateCouponAsync_WhenEndTimeBeforeStartTime_ThrowsInvalidOperationException | A |
+| UTCID06 | CreateCouponAsync | CreateCouponAsync_WhenPercentOver100_ThrowsInvalidOperationException | A |
+| UTCID07 | CreateCouponAsync | CreateCouponAsync_WhenPercentExactly100_Succeeds | B |
+| UTCID08 | CreateCouponAsync | CreateCouponAsync_WhenCodeExactly3Chars_Succeeds | B |
+| UTCID01 | UpdateCouponAsync | UpdateCouponAsync_WhenUnusedCoupon_PerformsFullUpdate | N |
+| UTCID02 | UpdateCouponAsync | UpdateCouponAsync_WhenUsedCoupon_OnlyUpdatesAllowedFields | N |
+| UTCID03 | UpdateCouponAsync | UpdateCouponAsync_WhenCouponNotFound_ThrowsKeyNotFoundException | A |
+| UTCID04 | UpdateCouponAsync | UpdateCouponAsync_WhenCouponExpired_ThrowsInvalidOperationException | A |
+| UTCID05 | UpdateCouponAsync | UpdateCouponAsync_WhenUnusedAndDuplicateCode_ThrowsInvalidOperationException | A |
+| UTCID06 | UpdateCouponAsync | UpdateCouponAsync_WhenUnusedAndEndBeforeStart_ThrowsInvalidOperationException | A |
+| UTCID07 | UpdateCouponAsync | UpdateCouponAsync_WhenUsedAndEndBeforeStart_ThrowsInvalidOperationException | A |
+| UTCID08 | UpdateCouponAsync | UpdateCouponAsync_WhenUnusedAndSameCode_SkipsUniquenessCheck | B |
+| UTCID01 | DeleteCouponAsync | DeleteCouponAsync_WhenUnusedCoupon_DeletesSuccessfully | N |
+| UTCID02 | DeleteCouponAsync | DeleteCouponAsync_WhenCouponNotFound_ThrowsKeyNotFoundException | A |
+| UTCID03 | DeleteCouponAsync | DeleteCouponAsync_WhenCouponUsed_ThrowsInvalidOperationException | A |
+| UTCID04 | DeleteCouponAsync | DeleteCouponAsync_WhenRepoReturnsFalse_ThrowsKeyNotFoundException | A |
 
----
-
-## Notes
-
-- All coupon codes are normalized (trimmed + uppercased) before persistence.
-- CouponService depends on ICouponRepository and ILookupResolver only (lightweight service).
-- Boundary test (UTCID04 of CreateCouponAsync) validates that DiscountValue == 100 is allowed for PERCENT type.
+*Note: The total C# test count is **26**, all mapped to **26** documented UTCIDs across 5 method sheets.*
