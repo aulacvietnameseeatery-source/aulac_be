@@ -1,4 +1,4 @@
-﻿using Core.DTO.General;
+using Core.DTO.General;
 using Core.DTO.Promotion;
 using Core.Entity;
 using Core.Interface.Repo;
@@ -146,7 +146,8 @@ namespace Infa.Repo
                 .Where(p =>
                     p.StartTime <= now &&
                     p.EndTime >= now &&
-                    p.PromotionStatusLv.ValueCode != PromotionStatusCode.DISABLED.ToString())
+                    p.PromotionStatusLv.ValueCode != PromotionStatusCode.DISABLED.ToString() &&
+                    (!p.MaxUsage.HasValue || (p.UsedCount ?? 0) < p.MaxUsage.Value))
                 .ToListAsync(ct);
         }
 
