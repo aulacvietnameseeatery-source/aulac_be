@@ -132,57 +132,45 @@ public class PaymentService : IPaymentService
 
             var promotionDiscounts = new Dictionary<long, decimal>();
 
-            // 1. Automatic Dish-Level Promotions
-            var autoPromos = allActivePromotions.Where(p => p.PromotionTargets.Any()).ToList();
             var orderItems = order.OrderItems
                 .Where(oi => oi.ItemStatusLvId != rejectedItemStatusId && oi.ItemStatusLvId != cancelledItemStatusId)
                 .ToList();
 
-            foreach (var item in orderItems)
+            foreach (var promo in allActivePromotions)
             {
-                foreach (var promo in autoPromos)
-                {
-                    // Check if item matches any target
-                    if (promo.PromotionTargets.Any(t => (t.DishId.HasValue && t.DishId == item.DishId) || 
-                                                        (t.CategoryId.HasValue && t.CategoryId == item.Dish.CategoryId)))
-                    {
-                        // Check rules
-                        var rule = promo.PromotionRules.FirstOrDefault();
-                        if (rule != null)
-                        {
-                            if (rule.MinOrderValue.HasValue && subTotal < rule.MinOrderValue.Value) continue;
-                            if (rule.RequiredDishId.HasValue && !orderItems.Any(oi => oi.DishId == rule.RequiredDishId.Value)) continue;
-                            if (rule.RequiredCategoryId.HasValue && !orderItems.Any(oi => oi.Dish.CategoryId == rule.RequiredCategoryId.Value)) continue;
-                        }
-
-                        var discount = CalculateDiscountAmount(promo.TypeLv.ValueCode, promo.DiscountValue, item.Price * item.Quantity);
-                        
-                        if (promotionDiscounts.ContainsKey(promo.PromotionId))
-                            promotionDiscounts[promo.PromotionId] += discount;
-                        else
-                            promotionDiscounts[promo.PromotionId] = discount;
-                    }
-                }
-            }
-
-            // 2. Automatic General Promotions (no targets)
-            var generalPromos = allActivePromotions.Where(p => !p.PromotionTargets.Any()).ToList();
-            foreach (var promo in generalPromos)
-            {
-                // Check rules
                 var rule = promo.PromotionRules.FirstOrDefault();
                 if (rule != null)
                 {
                     if (rule.MinOrderValue.HasValue && subTotal < rule.MinOrderValue.Value) continue;
+                    if (rule.MinQuantity.HasValue && orderItems.Sum(oi => oi.Quantity) < rule.MinQuantity.Value) continue;
                     if (rule.RequiredDishId.HasValue && !orderItems.Any(oi => oi.DishId == rule.RequiredDishId.Value)) continue;
                     if (rule.RequiredCategoryId.HasValue && !orderItems.Any(oi => oi.Dish.CategoryId == rule.RequiredCategoryId.Value)) continue;
                 }
 
-                var discount = CalculateDiscountAmount(promo.TypeLv.ValueCode, promo.DiscountValue, subTotal);
-                if (promotionDiscounts.ContainsKey(promo.PromotionId))
-                    promotionDiscounts[promo.PromotionId] += discount;
-                else
-                    promotionDiscounts[promo.PromotionId] = discount;
+                decimal baseAmount = subTotal;
+
+                if (promo.PromotionTargets.Any())
+                {
+                    baseAmount = 0m;
+                    foreach (var item in orderItems)
+                    {
+                        if (promo.PromotionTargets.Any(t => (t.DishId.HasValue && t.DishId == item.DishId) || 
+                                                            (t.CategoryId.HasValue && t.CategoryId == item.Dish.CategoryId)))
+                        {
+                            baseAmount += item.Price * item.Quantity;
+                        }
+                    }
+                }
+
+                var discount = CalculateDiscountAmount(promo.TypeLv.ValueCode, promo.DiscountValue, baseAmount);
+
+                if (discount > 0)
+                {
+                    if (promotionDiscounts.ContainsKey(promo.PromotionId))
+                        promotionDiscounts[promo.PromotionId] += discount;
+                    else
+                        promotionDiscounts[promo.PromotionId] = discount;
+                }
             }
 
             // 3. Apply all calculated promotions

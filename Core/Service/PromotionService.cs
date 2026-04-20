@@ -1,4 +1,4 @@
-﻿using Core.DTO.General;
+using Core.DTO.General;
 using Core.DTO.Promotion;
 using Core.Entity;
 using Core.Enum;
@@ -332,6 +332,14 @@ namespace Core.Service
             if (order == null)
                 throw new Exception("Order not found");
 
+            var validOrderItems = order.OrderItems
+                .Where(oi => oi.ItemStatusLv != null && 
+                             oi.ItemStatusLv.ValueCode != OrderItemStatusCode.REJECTED.ToString() && 
+                             oi.ItemStatusLv.ValueCode != OrderItemStatusCode.CANCELLED.ToString())
+                .ToList();
+
+            var subTotal = validOrderItems.Sum(oi => oi.Price * oi.Quantity);
+
             var promotions = await _promotionRepository
                 .GetActivePromotionsAsync(DateTime.UtcNow, ct);
 
@@ -339,14 +347,14 @@ namespace Core.Service
 
             foreach (var promo in promotions)
             {
-                var ruleCheck = CheckRules(order, promo);
+                var ruleCheck = CheckRules(subTotal, validOrderItems, promo);
 
                 if (!ruleCheck.IsValid)
                 {
                     continue;
                 }
 
-                var discount = CalculateDiscount(order, promo);
+                var discount = CalculateDiscount(subTotal, validOrderItems, promo);
                 var appliedRule = FormatRule(promo.PromotionRules.FirstOrDefault());
 
                 if (appliedRule == null && !promo.PromotionTargets.Any())
@@ -418,7 +426,7 @@ namespace Core.Service
             return PromotionStatusCode.EXPIRED;
         }
 
-        private (bool IsValid, string? Reason) CheckRules(Order order, Promotion promo)
+        private (bool IsValid, string? Reason) CheckRules(decimal subTotal, List<OrderItem> orderItems, Promotion promo)
         {
             var rule = promo.PromotionRules.FirstOrDefault();
 
@@ -426,14 +434,14 @@ namespace Core.Service
                 return (true, null);
 
             if (rule.MinOrderValue.HasValue &&
-                order.TotalAmount < rule.MinOrderValue.Value)
+                subTotal < rule.MinOrderValue.Value)
             {
                 return (false, "Order value not enough");
             }
 
             if (rule.MinQuantity.HasValue)
             {
-                var totalQty = order.OrderItems.Sum(x => x.Quantity);
+                var totalQty = orderItems.Sum(x => x.Quantity);
 
                 if (totalQty < rule.MinQuantity.Value)
                     return (false, "Quantity not enough");
@@ -441,7 +449,7 @@ namespace Core.Service
 
             if (rule.RequiredDishId.HasValue)
             {
-                var hasDish = order.OrderItems
+                var hasDish = orderItems
                     .Any(x => x.DishId == rule.RequiredDishId.Value);
 
                 if (!hasDish)
@@ -450,8 +458,8 @@ namespace Core.Service
 
             if (rule.RequiredCategoryId.HasValue)
             {
-                var hasCategory = order.OrderItems
-                    .Any(x => x.Dish.CategoryId == rule.RequiredCategoryId.Value);
+                var hasCategory = orderItems
+                    .Any(x => x.Dish != null && x.Dish.CategoryId == rule.RequiredCategoryId.Value);
 
                 if (!hasCategory)
                     return (false, "Required category missing");
@@ -460,9 +468,9 @@ namespace Core.Service
             return (true, null);
         }
 
-        private decimal CalculateDiscount(Order order, Promotion promo)
+        private decimal CalculateDiscount(decimal subTotal, List<OrderItem> orderItems, Promotion promo)
         {
-            decimal targetAmount = GetTargetAmount(order, promo);
+            decimal targetAmount = GetTargetAmount(subTotal, orderItems, promo);
 
             if (promo.TypeLv.ValueCode == "PERCENT")
             {
@@ -477,22 +485,19 @@ namespace Core.Service
             return 0;
         }
 
-        private decimal GetTargetAmount(Order order, Promotion promo)
+        private decimal GetTargetAmount(decimal subTotal, List<OrderItem> orderItems, Promotion promo)
         {
             if (!promo.PromotionTargets.Any())
-                return order.TotalAmount;
+                return subTotal;
 
             decimal total = 0;
 
-            foreach (var item in order.OrderItems)
+            foreach (var item in orderItems)
             {
-                foreach (var target in promo.PromotionTargets)
+                if (promo.PromotionTargets.Any(t => (t.DishId.HasValue && t.DishId == item.DishId) || 
+                                                    (t.CategoryId.HasValue && t.CategoryId == item.Dish?.CategoryId)))
                 {
-                    if (target.DishId == item.DishId)
-                        total += item.Price * item.Quantity;
-
-                    if (target.CategoryId == item.Dish.CategoryId)
-                        total += item.Price * item.Quantity;
+                    total += item.Price * item.Quantity;
                 }
             }
 
