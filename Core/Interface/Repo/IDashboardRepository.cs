@@ -38,4 +38,9 @@ public interface IDashboardRepository
         DateTime endDate,
         uint completedOrderStatusId,
         CancellationToken ct = default);
+
+    Task<LiveOperationsSnapshotDto> GetLiveOperationsSnapshotAsync(
+        LiveOperationsSnapshotQueryWindow window,
+        LiveOperationsLookupIds lookupIds,
+        CancellationToken ct = default);
 }
