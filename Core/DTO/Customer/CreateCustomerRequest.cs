@@ -5,8 +5,8 @@ namespace Core.DTO.Customer;
 public class CreateCustomerRequest
 {
     [Required(ErrorMessage = "Phone number is required")]
-    [StringLength(13, MinimumLength = 10, ErrorMessage = "Phone number must be between 10 and 13 characters")]
-    [RegularExpression(@"^\d+$", ErrorMessage = "Phone number must contain only digits")]
+    [StringLength(15, ErrorMessage = "Phone number cannot exceed 15 characters")]
+    [RegularExpression(@"^((0|\+84)[0-9]{9,10}|(\+41|0)[1-9][0-9]{7})$", ErrorMessage = "Invalid phone number format")]
     public string Phone { get; set; } = null!;
 
     [MaxLength(100, ErrorMessage = "Full name cannot exceed 100 characters")]

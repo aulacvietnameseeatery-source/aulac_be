@@ -11,8 +11,8 @@ public class UpdateSupplierRequest
     [MaxLength(200, ErrorMessage = "Supplier name cannot exceed 200 characters")]
     public string SupplierName { get; set; } = string.Empty;
 
-    [MaxLength(50, ErrorMessage = "Phone cannot exceed 50 characters")]
-    [RegularExpression(@"^\d+$", ErrorMessage = "Phone number must contain only digits")]
+    [MaxLength(15, ErrorMessage = "Phone number cannot exceed 15 characters")]
+    [RegularExpression(@"^((0|\+84)[0-9]{9,10}|(\+41|0)[1-9][0-9]{7})$", ErrorMessage = "Invalid phone number format")]
     public string? Phone { get; set; }
 
     [MaxLength(150, ErrorMessage = "Email cannot exceed 150 characters")]
