@@ -146,7 +146,7 @@ namespace Core.Service
         public Dictionary<long, LookupValueTranslationDto> MapBatch(
             IEnumerable<I18nText> texts)
         {
-            return texts.ToDictionary(
+            return texts.DistinctBy(t => t.TextId).ToDictionary(
                 t => t.TextId,
                 t => Map(t)
             );
