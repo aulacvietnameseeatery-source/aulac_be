@@ -24,7 +24,7 @@ namespace Core.Service
 
         public async Task<List<CouponDTO>> GetCouponsAsync(long? customerId, CancellationToken ct)
         {
-            var now = DateTime.Now;
+            var now = DateTime.UtcNow;
             var coupons = await _couponRepository.GetActiveCouponsAsync(now, ct);
 
             if (customerId.HasValue)
