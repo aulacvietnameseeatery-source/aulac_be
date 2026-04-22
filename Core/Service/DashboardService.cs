@@ -89,6 +89,73 @@ public class DashboardService : IDashboardService
         return await _dashboardRepository.GetStatisticsAsync(startDate, endDate, completedOrderStatusId, ct);
     }
 
+    public async Task<LiveOperationsSnapshotDto> GetLiveOperationsSnapshotAsync(LiveOperationsSnapshotRequest request, CancellationToken ct = default)
+    {
+        var nowUtc = DateTime.UtcNow;
+        var businessDate = request.BusinessDate ?? DateOnly.FromDateTime(nowUtc);
+        var isToday = businessDate == DateOnly.FromDateTime(nowUtc);
+
+        var currentStart = StartOfDayUtc(businessDate);
+        var currentEnd = isToday ? nowUtc : currentStart.AddDays(1).AddTicks(-1);
+
+        var compareDate = businessDate.AddDays(-1);
+        var compareStart = StartOfDayUtc(compareDate);
+        var compareEnd = compareStart.Add(currentEnd - currentStart);
+
+        var lookupIds = new LiveOperationsLookupIds
+        {
+            CompletedOrderStatusId = await OrderStatusCode.COMPLETED.ToOrderStatusIdAsync(_lookupResolver, ct),
+            CancelledOrderStatusId = await OrderStatusCode.CANCELLED.ToOrderStatusIdAsync(_lookupResolver, ct),
+            PendingReservationStatusId = await _lookupResolver.GetIdAsync(
+                (ushort)LookupTypeEnum.ReservationStatus,
+                ReservationStatusCode.PENDING,
+                ct),
+            ConfirmedReservationStatusId = await _lookupResolver.GetIdAsync(
+                (ushort)LookupTypeEnum.ReservationStatus,
+                ReservationStatusCode.CONFIRMED,
+                ct),
+            OccupiedTableStatusId = await TableStatusCode.OCCUPIED.ToTableStatusIdAsync(_lookupResolver, ct),
+            DineInSourceId = await _lookupResolver.GetIdAsync(
+                (ushort)LookupTypeEnum.OrderSource,
+                OrderSourceCode.DINE_IN,
+                ct),
+            CreatedItemStatusId = await _lookupResolver.GetIdAsync(
+                (ushort)LookupTypeEnum.OrderItemStatus,
+                OrderItemStatusCode.CREATED,
+                ct),
+            CookingItemStatusId = await _lookupResolver.GetIdAsync(
+                (ushort)LookupTypeEnum.OrderItemStatus,
+                OrderItemStatusCode.IN_PROGRESS,
+                ct),
+            ReadyItemStatusId = await _lookupResolver.GetIdAsync(
+                (ushort)LookupTypeEnum.OrderItemStatus,
+                OrderItemStatusCode.READY,
+                ct),
+            ServedItemStatusId = await _lookupResolver.GetIdAsync(
+                (ushort)LookupTypeEnum.OrderItemStatus,
+                OrderItemStatusCode.SERVED,
+                ct),
+        };
+
+        var window = new LiveOperationsSnapshotQueryWindow
+        {
+            CurrentWindowStart = currentStart,
+            CurrentWindowEnd = currentEnd,
+            CompareWindowStart = compareStart,
+            CompareWindowEnd = compareEnd,
+            SnapshotAt = currentEnd,
+            QueueWindowStart = currentEnd.AddMinutes(-15),
+            QueueWindowEnd = currentEnd.AddMinutes(45),
+            CompareQueueWindowStart = compareEnd.AddMinutes(-15),
+            CompareQueueWindowEnd = compareEnd.AddMinutes(45),
+        };
+
+        var snapshot = await _dashboardRepository.GetLiveOperationsSnapshotAsync(window, lookupIds, ct);
+        snapshot.BusinessDate = businessDate;
+        snapshot.SnapshotAt = currentEnd;
+        return snapshot;
+    }
+
     private TrendValueDto CalculateTrend(decimal current, decimal previous)
     {
         if (previous == 0)
@@ -101,5 +168,10 @@ public class DashboardService : IDashboardService
             Trend = Math.Round(Math.Abs(trend), 2),
             IsUp = trend >= 0
         };
+    }
+
+    private static DateTime StartOfDayUtc(DateOnly date)
+    {
+        return DateTime.SpecifyKind(date.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
     }
 }

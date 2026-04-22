@@ -51,5 +51,12 @@ namespace Api.Controllers
             var result = await _dashboardService.GetStatisticsAsync(request, ct);
             return Ok(new { success = true, code = 200, data = result });
         }
+
+        [HttpGet("live-operations")]
+        public async Task<IActionResult> GetLiveOperations([FromQuery] LiveOperationsSnapshotRequest request, CancellationToken ct)
+        {
+            var result = await _dashboardService.GetLiveOperationsSnapshotAsync(request, ct);
+            return Ok(new { success = true, code = 200, data = result });
+        }
     }
 }
