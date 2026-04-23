@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Core.Extensions;
 
 namespace Core.DTO.Account;
 
@@ -25,7 +26,7 @@ public record CreateAccountRequest
     /// <summary>
     /// Phone number (optional).
     /// </summary>
-    [RegularExpression(@"^((0|\+84)[0-9]{9,10}|(\+41|0)[1-9][0-9]{7})$", ErrorMessage = "Invalid phone number format")]
+    [RegularExpression(PhoneNumberExtensions.SupportedPhoneValidationPattern, ErrorMessage = "Invalid phone number format")]
     [StringLength(30, ErrorMessage = "Phone cannot exceed 30 characters")]
     public string? Phone { get; init; }
 

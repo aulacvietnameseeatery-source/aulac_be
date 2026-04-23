@@ -129,13 +129,14 @@ public sealed class EmailJobRunner
     /// Hangfire job: send reservation customer + admin notifications concurrently.
     /// </summary>
     [AutomaticRetry(Attempts = 3)]
-    public async Task SendReservationBothEmailsAsync(
+    public async Task SendReservationStatusBothEmailsAsync(
         long reservationId,
         string? customerEmail,
         string customerName,
         DateTime reservedTime,
         int partySize,
-        string tableCodes)
+        string tableCodes,
+        string status)
     {
         var sw = Stopwatch.StartNew();
         _logger.LogInformation(
@@ -145,24 +146,26 @@ public sealed class EmailJobRunner
 
         var tasks = new List<Task>
         {
-            RunInIsolatedScopeAsync(runner => runner.SendReservationAdminEmailAsync(
+            RunInIsolatedScopeAsync(runner => runner.SendReservationStatusAdminEmailAsync(
                 reservationId,
                 customerName,
                 reservedTime,
                 partySize,
-                tableCodes))
+                tableCodes,
+                status))
         };
 
         if (!string.IsNullOrWhiteSpace(customerEmail))
         {
             tasks.Add(
-                RunInIsolatedScopeAsync(runner => runner.SendReservationCustomerEmailAsync(
+                RunInIsolatedScopeAsync(runner => runner.SendReservationStatusCustomerEmailAsync(
                     reservationId,
                     customerEmail,
                     customerName,
                     reservedTime,
                     partySize,
-                    tableCodes)));
+                    tableCodes,
+                    status)));
         }
 
         await Task.WhenAll(tasks);
@@ -185,13 +188,14 @@ public sealed class EmailJobRunner
     /// Hangfire job: customer reservation confirmation email.
     /// </summary>
     [AutomaticRetry(Attempts = 3)]
-    public async Task SendReservationCustomerEmailAsync(
+    public async Task SendReservationStatusCustomerEmailAsync(
         long reservationId,
         string toEmail,
         string customerName,
         DateTime reservedTime,
         int partySize,
-        string tableCodes)
+        string tableCodes,
+        string status)
     {
         var sw = Stopwatch.StartNew();
         long lastMs = 0;
@@ -221,7 +225,7 @@ public sealed class EmailJobRunner
 
         try
         {
-            const string templateCode = "RESERVATION_CONFIRM";
+            string templateCode = $"RESERVATION_{status.ToUpper()}";
             LogMilestone("template_load_start");
             var template = await GetCachedTemplateAsync(templateCode);
             LogMilestone("template_load_done");
@@ -283,12 +287,13 @@ public sealed class EmailJobRunner
     /// falls back to store.email when notification settings are not configured.
     /// </summary>
     [AutomaticRetry(Attempts = 3)]
-    public async Task SendReservationAdminEmailAsync(
+    public async Task SendReservationStatusAdminEmailAsync(
         long reservationId,
         string customerName,
         DateTime reservedTime,
         int partySize,
-        string tableCodes)
+        string tableCodes,
+        string status)
     {
         var sw = Stopwatch.StartNew();
         long lastMs = 0;
@@ -337,7 +342,7 @@ public sealed class EmailJobRunner
                 recipients = new List<string> { storeEmail };
             }
 
-            const string templateCode = "RESERVATION_CONFIRM_ADMIN";
+            string templateCode = $"RESERVATION_{status.ToUpper()}_ADMIN";
             LogMilestone("template_load_start");
             var template = await GetCachedTemplateAsync(templateCode);
             LogMilestone("template_load_done");

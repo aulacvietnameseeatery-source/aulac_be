@@ -1,4 +1,4 @@
-﻿using Core.Interface.Service;
+using Core.Interface.Service;
 using Core.Interface.Service.Others;
 using Hangfire;
 using System;
@@ -44,8 +44,8 @@ namespace Infa.Service
             string tableCodes)
         {
             return _backgroundJobClient.Enqueue<EmailJobRunner>(
-                runner => runner.SendReservationCustomerEmailAsync(
-                    reservationId, toEmail, customerName, reservedTime, partySize, tableCodes));
+                runner => runner.SendReservationStatusCustomerEmailAsync(
+                    reservationId, toEmail, customerName, reservedTime, partySize, tableCodes, "CONFIRM"));
         }
 
         public string EnqueueReservationAdminEmail(
@@ -56,21 +56,22 @@ namespace Infa.Service
             string tableCodes)
         {
             return _backgroundJobClient.Enqueue<EmailJobRunner>(
-                runner => runner.SendReservationAdminEmailAsync(
-                    reservationId, customerName, reservedTime, partySize, tableCodes));
+                runner => runner.SendReservationStatusAdminEmailAsync(
+                    reservationId, customerName, reservedTime, partySize, tableCodes, "CONFIRM"));
         }
 
-        public string EnqueueReservationEmails(
+        public string EnqueueReservationStatusEmails(
             long reservationId,
             string? customerEmail,
             string customerName,
             DateTime reservedTime,
             int partySize,
-            string tableCodes)
+            string tableCodes,
+            string status)
         {
             return _backgroundJobClient.Enqueue<EmailJobRunner>(
-                runner => runner.SendReservationBothEmailsAsync(
-                    reservationId, customerEmail, customerName, reservedTime, partySize, tableCodes));
+                runner => runner.SendReservationStatusBothEmailsAsync(
+                    reservationId, customerEmail, customerName, reservedTime, partySize, tableCodes, status));
         }
     }
 }
