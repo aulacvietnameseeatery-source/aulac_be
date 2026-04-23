@@ -1,6 +1,7 @@
 ﻿using Core.DTO.Customer;
 using Core.DTO.General;
 using Core.Entity;
+using Core.Extensions;
 using Core.Exceptions;
 using Core.Interface.Repo;
 using Core.Interface.Service.Customer;
@@ -31,7 +32,11 @@ namespace Core.Service
 
         public async Task<CustomerDto?> GetByPhoneAsync(string phone)
         {
-            var customer = await _customerRepository.GetByPhoneAsync(phone);
+            var normalizedPhone = phone.NormalizePhoneNumber();
+            if (string.IsNullOrWhiteSpace(normalizedPhone))
+                return null;
+
+            var customer = await _customerRepository.GetByPhoneAsync(normalizedPhone);
 
             if (customer == null)
                 return null;
@@ -69,7 +74,8 @@ namespace Core.Service
 
         public async Task<long> FindOrCreateCustomerIdAsync(string phone, string? fullName, string? email, CancellationToken ct = default)
         {
-            var customer = await _customerRepository.FindOrCreateAsync(phone, fullName, email, ct);
+            var normalizedPhone = phone.NormalizePhoneNumber();
+            var customer = await _customerRepository.FindOrCreateAsync(normalizedPhone, fullName, email, ct);
             return customer.CustomerId;
         }
 
@@ -111,7 +117,8 @@ namespace Core.Service
             // CASE 2: Check by phone
             if (!string.IsNullOrWhiteSpace(customerDto.Phone))
             {
-                var existing = await _customerRepository.GetByPhoneAsync(customerDto.Phone);
+                var normalizedPhone = customerDto.Phone.NormalizePhoneNumber();
+                var existing = await _customerRepository.GetByPhoneAsync(normalizedPhone);
 
                 if (existing != null)
                 {
@@ -140,7 +147,7 @@ namespace Core.Service
                 // Create new customer
                 var newCustomer = new Customer
                 {
-                    Phone = customerDto.Phone,
+                    Phone = normalizedPhone,
                     FullName = customerDto.FullName,
                     Email = customerDto.Email,
                     CreatedAt = DateTime.UtcNow,
@@ -158,15 +165,15 @@ namespace Core.Service
 
         public async Task<CustomerDto> CreateCustomerAsync(CreateCustomerRequest request, CancellationToken ct = default)
         {
-            var trimmedPhone = request.Phone.Trim();
+            var normalizedPhone = request.Phone.NormalizePhoneNumber();
 
-            var existing = await _customerRepository.GetByPhoneAsync(trimmedPhone);
+            var existing = await _customerRepository.GetByPhoneAsync(normalizedPhone);
             if (existing != null)
-                throw new InvalidOperationException($"A customer with phone '{trimmedPhone}' already exists.");
+                throw new InvalidOperationException($"A customer with phone '{normalizedPhone}' already exists.");
 
             var customer = new Customer
             {
-                Phone = trimmedPhone,
+                Phone = normalizedPhone,
                 FullName = string.IsNullOrWhiteSpace(request.FullName) ? null : request.FullName.Trim(),
                 Email = string.IsNullOrWhiteSpace(request.Email) ? null : request.Email.Trim(),
                 IsMember = request.IsMember,
@@ -193,17 +200,17 @@ namespace Core.Service
             var customer = await _customerRepository.GetByIdAsync(id, ct)
                 ?? throw new KeyNotFoundException($"Customer with ID {id} was not found.");
 
-            var trimmedPhone = request.Phone.Trim();
+            var normalizedPhone = request.Phone.NormalizePhoneNumber();
 
             // Check phone uniqueness when changed
-            if (customer.Phone != trimmedPhone)
+            if (customer.Phone != normalizedPhone)
             {
-                var existing = await _customerRepository.GetByPhoneAsync(trimmedPhone);
+                var existing = await _customerRepository.GetByPhoneAsync(normalizedPhone);
                 if (existing != null && existing.CustomerId != id)
-                    throw new InvalidOperationException($"A customer with phone '{trimmedPhone}' already exists.");
+                    throw new InvalidOperationException($"A customer with phone '{normalizedPhone}' already exists.");
             }
 
-            customer.Phone = trimmedPhone;
+            customer.Phone = normalizedPhone;
             customer.FullName = string.IsNullOrWhiteSpace(request.FullName) ? null : request.FullName.Trim();
             customer.Email = string.IsNullOrWhiteSpace(request.Email) ? null : request.Email.Trim();
             customer.IsMember = request.IsMember;
@@ -268,7 +275,7 @@ namespace Core.Service
 
             var newGuest = new Customer
             {
-                Phone = "GUEST",
+                Phone = PhoneNumberExtensions.GuestPhoneSentinel,
                 FullName = "Guest Customer",
                 Email = null,
                 IsMember = false,

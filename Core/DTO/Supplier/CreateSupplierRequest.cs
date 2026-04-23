@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Core.Extensions;
 
 namespace Core.DTO.Supplier;
 
@@ -12,7 +13,7 @@ public class CreateSupplierRequest
     public string SupplierName { get; set; } = string.Empty;
 
     [MaxLength(15, ErrorMessage = "Phone number cannot exceed 15 characters")]
-    [RegularExpression(@"^((0|\+84)[0-9]{9,10}|(\+41|0)[1-9][0-9]{7})$", ErrorMessage = "Invalid phone number format")]
+    [RegularExpression(PhoneNumberExtensions.SupportedPhoneValidationPattern, ErrorMessage = "Invalid phone number format")]
     public string? Phone { get; set; }
 
     [MaxLength(150, ErrorMessage = "Email cannot exceed 150 characters")]

@@ -342,6 +342,8 @@ namespace Core.Service
             await _uow.BeginTransactionAsync(ct);
             try
             {
+                var normalizedPhone = request.Phone.NormalizePhoneNumber();
+
                 long customerId;
                 if (request.CustomerId.HasValue && request.CustomerId.Value > 0)
                 {
@@ -352,19 +354,19 @@ namespace Core.Service
                     }
                     else
                     {
-                        customerId = await _customerService.FindOrCreateCustomerIdAsync(request.Phone, request.CustomerName, request.Email, ct);
+                        customerId = await _customerService.FindOrCreateCustomerIdAsync(normalizedPhone, request.CustomerName, request.Email, ct);
                     }
                 }
                 else
                 {
-                    customerId = await _customerService.FindOrCreateCustomerIdAsync(request.Phone, request.CustomerName, request.Email, ct);
+                    customerId = await _customerService.FindOrCreateCustomerIdAsync(normalizedPhone, request.CustomerName, request.Email, ct);
                 }
 
             var reservation = new Reservation
             {
                 CustomerId = customerId,
                 CustomerName = request.CustomerName,
-                Phone = request.Phone,
+                Phone = normalizedPhone,
                 Email = request.Email,
                 PartySize = request.PartySize,
                 ReservedTime = request.ReservedTime,
@@ -915,6 +917,8 @@ namespace Core.Service
             await _uow.BeginTransactionAsync(ct);
             try
             {
+                var normalizedPhone = request.Phone.NormalizePhoneNumber();
+
                 var validatedTables = reservation.Tables.ToList();
 
                 if (mustRevalidateTables)
@@ -928,7 +932,7 @@ namespace Core.Service
                 }
 
                 reservation.CustomerName = request.CustomerName;
-                reservation.Phone = request.Phone;
+                reservation.Phone = normalizedPhone;
                 reservation.Email = request.Email;
                 reservation.PartySize = request.PartySize;
                 reservation.ReservedTime = request.ReservedTime;

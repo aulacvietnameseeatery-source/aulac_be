@@ -180,6 +180,8 @@ public class PublicReservationService : IPublicReservationService
         await _uow.BeginTransactionAsync(ct);
         try
         {
+            var normalizedPhone = request.Phone.NormalizePhoneNumber();
+
             var candidates = await FindCandidateTablesAsync(request.ReservedTime, request.PartySize, ct);
             if (candidates.Count == 0)
             {
@@ -210,12 +212,12 @@ public class PublicReservationService : IPublicReservationService
                 }
                 else
                 {
-                    customerId = await _customerService.FindOrCreateCustomerIdAsync(request.Phone, request.CustomerName, request.Email, ct);
+                    customerId = await _customerService.FindOrCreateCustomerIdAsync(normalizedPhone, request.CustomerName, request.Email, ct);
                 }
             }
             else
             {
-                customerId = await _customerService.FindOrCreateCustomerIdAsync(request.Phone, request.CustomerName, request.Email, ct);
+                customerId = await _customerService.FindOrCreateCustomerIdAsync(normalizedPhone, request.CustomerName, request.Email, ct);
             }
 
 
@@ -235,7 +237,7 @@ public class PublicReservationService : IPublicReservationService
             {
                 CustomerId = customerId,
                 CustomerName = request.CustomerName,
-                Phone = request.Phone,
+                Phone = normalizedPhone,
                 Email = request.Email,
                 PartySize = request.PartySize,
                 ReservedTime = request.ReservedTime,
