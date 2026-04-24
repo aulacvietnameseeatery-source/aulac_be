@@ -165,6 +165,29 @@ public class RoleServiceTests
         items.Should().BeEmpty();
     }
 
+    [Fact]
+    [Trait("Type", "Boundary")]
+    [Trait("Method", "GetPagedAsync")]
+    public async Task GetPagedAsync_WhenSearchIsEmptyString_PassesEmptyStringToRepo()
+    {
+        // Arrange
+        var roles = new List<Role> { MakeRole(1, "ADMIN", "Admin") };
+        _roleRepoMock
+            .Setup(r => r.GetPagedWithStaffCountAsync(1, 20, ""))
+            .ReturnsAsync((roles, 1));
+
+        var service = CreateService();
+        var query = new PagedQuery { PageIndex = 1, PageSize = 20, Search = "" };
+
+        // Act
+        var (items, totalCount) = await service.GetPagedAsync(query);
+
+        // Assert
+        totalCount.Should().Be(1);
+        items.Should().HaveCount(1);
+        _roleRepoMock.Verify(r => r.GetPagedWithStaffCountAsync(1, 20, ""), Times.Once);
+    }
+
 
     #endregion
 
@@ -242,6 +265,51 @@ public class RoleServiceTests
             .Should().OnlyContain(p => p.IsAssigned == false);
     }
 
+    [Fact]
+    [Trait("Type", "Boundary")]
+    [Trait("Method", "GetRoleDetailAsync")]
+    public async Task GetRoleDetailAsync_WhenRoleIsInactive_ReturnsIsActiveFalse()
+    {
+        // Arrange
+        var role = MakeRole(1, "MANAGER", "Manager", InactiveStatusId);
+        var allPermissions = MakeAllPermissions();
+
+        _roleRepoMock.Setup(r => r.GetRoleWithPermissionsAsync(1, default)).ReturnsAsync(role);
+        _roleRepoMock.Setup(r => r.GetAllPermissionsAsync(default)).ReturnsAsync(allPermissions);
+
+        var service = CreateService();
+
+        // Act
+        var result = await service.GetRoleDetailAsync(1);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.IsActive.Should().BeFalse();
+        result.RoleId.Should().Be(1);
+    }
+
+    [Fact]
+    [Trait("Type", "Boundary")]
+    [Trait("Method", "GetRoleDetailAsync")]
+    public async Task GetRoleDetailAsync_WhenRoleHasAllPermissions_ReturnsAllAssigned()
+    {
+        // Arrange
+        var allPermissions = MakeAllPermissions();
+        var role = MakeRole(1);
+        role.Permissions = new List<Permission>(allPermissions);
+
+        _roleRepoMock.Setup(r => r.GetRoleWithPermissionsAsync(1, default)).ReturnsAsync(role);
+        _roleRepoMock.Setup(r => r.GetAllPermissionsAsync(default)).ReturnsAsync(allPermissions);
+
+        var service = CreateService();
+
+        // Act
+        var result = await service.GetRoleDetailAsync(1);
+
+        // Assert
+        result.PermissionGroups.SelectMany(g => g.Permissions)
+            .Should().OnlyContain(p => p.IsAssigned == true);
+    }
 
 
     #endregion
@@ -504,6 +572,36 @@ public class RoleServiceTests
         result.Should().NotBeNull();
         _roleRepoMock.Verify(r => r.GetPermissionsByIdsAsync(
             It.Is<List<long>>(ids => ids.Count == 2), default), Times.Once);
+    }
+
+    [Fact]
+    [Trait("Type", "Boundary")]
+    [Trait("Method", "CreateRoleAsync")]
+    public async Task CreateRoleAsync_WhenEmptyPermissionIds_CreatesRoleWithNoPermissions()
+    {
+        // Arrange
+        var request = MakeCreateRequest("New Role", new List<long>());
+        var createdRole = MakeRole(10, "NEW_ROLE", "New Role");
+        createdRole.Permissions = new List<Permission>();
+
+        _roleRepoMock.Setup(r => r.RoleCodeExistsAsync("NEW_ROLE", default)).ReturnsAsync(false);
+        _roleRepoMock.Setup(r => r.GetRoleStatusIdAsync("ACTIVE")).ReturnsAsync(ActiveStatusId);
+        _roleRepoMock.Setup(r => r.GetPermissionsByIdsAsync(
+            It.Is<List<long>>(ids => ids.Count == 0), default)).ReturnsAsync(new List<Permission>());
+        _roleRepoMock.Setup(r => r.AddAsync(It.IsAny<Role>(), default)).ReturnsAsync(createdRole);
+        _roleRepoMock.Setup(r => r.GetRoleWithPermissionsAsync(10, default)).ReturnsAsync(createdRole);
+        _roleRepoMock.Setup(r => r.GetAllPermissionsAsync(default)).ReturnsAsync(MakeAllPermissions());
+
+        var service = CreateService();
+
+        // Act
+        var result = await service.CreateRoleAsync(request);
+
+        // Assert
+        result.Should().NotBeNull();
+        _roleRepoMock.Verify(r => r.AddAsync(It.Is<Role>(role =>
+            role.Permissions.Count == 0
+        ), default), Times.Once);
     }
 
     #endregion
@@ -771,6 +869,75 @@ public class RoleServiceTests
         // Assert — permissions unchanged: still 1 and 2
         existingRole.Permissions.Should().HaveCount(2);
         existingRole.Permissions.Select(p => p.PermissionId).Should().BeEquivalentTo(new[] { 1L, 2L });
+    }
+
+    [Fact]
+    [Trait("Type", "Boundary")]
+    [Trait("Method", "UpdateRoleAsync")]
+    public async Task UpdateRoleAsync_WhenDuplicatePermissionIds_DeduplicatesBeforeValidation()
+    {
+        // Arrange
+        var existingRole = MakeRole(1, "MANAGER", "Manager");
+        existingRole.Permissions = new List<Permission>
+        {
+            MakePermission(1, "ROLE", "READ"),
+            MakePermission(2, "ROLE", "CREATE")
+        };
+        var request = MakeUpdateRequest("Manager", true, new List<long> { 1, 1, 2, 2 });
+        var permissions = new List<Permission>
+        {
+            MakePermission(1, "ROLE", "READ"),
+            MakePermission(2, "ROLE", "CREATE")
+        };
+
+        _roleRepoMock.Setup(r => r.GetRoleWithPermissionsForUpdateAsync(1, default)).ReturnsAsync(existingRole);
+        _roleRepoMock.Setup(r => r.GetRoleStatusIdAsync("ACTIVE")).ReturnsAsync(ActiveStatusId);
+        _roleRepoMock.Setup(r => r.GetPermissionsByIdsAsync(
+            It.Is<List<long>>(ids => ids.Count == 2), default)).ReturnsAsync(permissions);
+        _roleRepoMock.Setup(r => r.UpdateAsync(It.IsAny<Role>())).Returns(Task.CompletedTask);
+        _roleRepoMock.Setup(r => r.GetRoleWithPermissionsAsync(1, default)).ReturnsAsync(existingRole);
+        _roleRepoMock.Setup(r => r.GetAllPermissionsAsync(default)).ReturnsAsync(MakeAllPermissions());
+
+        var service = CreateService();
+
+        // Act
+        await service.UpdateRoleAsync(1, request);
+
+        // Assert — permissions deduplicated: still 1 and 2
+        existingRole.Permissions.Should().HaveCount(2);
+        _roleRepoMock.Verify(r => r.GetPermissionsByIdsAsync(
+            It.Is<List<long>>(ids => ids.Count == 2), default), Times.Once);
+    }
+
+    [Fact]
+    [Trait("Type", "Boundary")]
+    [Trait("Method", "UpdateRoleAsync")]
+    public async Task UpdateRoleAsync_WhenEmptyPermissionIds_RemovesAllPermissions()
+    {
+        // Arrange — existing has perm 1,2; request wants empty
+        var existingRole = MakeRole(1, "MANAGER", "Manager");
+        existingRole.Permissions = new List<Permission>
+        {
+            MakePermission(1, "ROLE", "READ"),
+            MakePermission(2, "ROLE", "CREATE")
+        };
+        var request = MakeUpdateRequest("Manager", true, new List<long>());
+
+        _roleRepoMock.Setup(r => r.GetRoleWithPermissionsForUpdateAsync(1, default)).ReturnsAsync(existingRole);
+        _roleRepoMock.Setup(r => r.GetRoleStatusIdAsync("ACTIVE")).ReturnsAsync(ActiveStatusId);
+        _roleRepoMock.Setup(r => r.GetPermissionsByIdsAsync(
+            It.Is<List<long>>(ids => ids.Count == 0), default)).ReturnsAsync(new List<Permission>());
+        _roleRepoMock.Setup(r => r.UpdateAsync(It.IsAny<Role>())).Returns(Task.CompletedTask);
+        _roleRepoMock.Setup(r => r.GetRoleWithPermissionsAsync(1, default)).ReturnsAsync(existingRole);
+        _roleRepoMock.Setup(r => r.GetAllPermissionsAsync(default)).ReturnsAsync(MakeAllPermissions());
+
+        var service = CreateService();
+
+        // Act
+        await service.UpdateRoleAsync(1, request);
+
+        // Assert — all permissions removed
+        existingRole.Permissions.Should().BeEmpty();
     }
 
     #endregion

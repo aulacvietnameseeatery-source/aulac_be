@@ -153,6 +153,44 @@ public class CustomerServiceTests
     }
 
     [Fact]
+    [Trait("Type", "Boundary")]
+    [Trait("Method", "GetByPhoneAsync")]
+    public async Task GetByPhoneAsync_WhenPhoneIs10Digits_ReturnsCustomer()
+    {
+        // Arrange — Minimum phone length boundary (10 digits)
+        var customer = MakeCustomer(phone: "0123456789");
+        _repoMock.Setup(r => r.GetByPhoneAsync("0123456789"))
+                 .ReturnsAsync(customer);
+        var service = CreateService();
+
+        // Act
+        var result = await service.GetByPhoneAsync("0123456789");
+
+        // Assert — Verify minimum-length phone returns customer
+        result.Should().NotBeNull();
+        result!.Phone.Should().Be("0123456789");
+    }
+
+    [Fact]
+    [Trait("Type", "Boundary")]
+    [Trait("Method", "GetByPhoneAsync")]
+    public async Task GetByPhoneAsync_WhenPhoneIs13Digits_ReturnsCustomer()
+    {
+        // Arrange — Maximum phone length boundary (13 digits)
+        var customer = MakeCustomer(phone: "0123456789012");
+        _repoMock.Setup(r => r.GetByPhoneAsync("0123456789012"))
+                 .ReturnsAsync(customer);
+        var service = CreateService();
+
+        // Act
+        var result = await service.GetByPhoneAsync("0123456789012");
+
+        // Assert — Verify maximum-length phone returns customer
+        result.Should().NotBeNull();
+        result!.Phone.Should().Be("0123456789012");
+    }
+
+    [Fact]
     [Trait("Type", "Abnormal")]
     [Trait("Method", "GetByPhoneAsync")]
     public async Task GetByPhoneAsync_WhenCustomerNotFound_ReturnsNull()
@@ -239,6 +277,24 @@ public class CustomerServiceTests
         // Assert
         result.Should().Be(10);
         _repoMock.Verify(r => r.FindOrCreateAsync("0901234567", "Test", "test@test.com", It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    [Trait("Type", "Boundary")]
+    [Trait("Method", "FindOrCreateCustomerIdAsync")]
+    public async Task FindOrCreateCustomerIdAsync_WhenNullNameAndEmail_ReturnsCustomerId()
+    {
+        // Arrange — optional fields are null
+        var customer = MakeCustomer(id: 11);
+        _repoMock.Setup(r => r.FindOrCreateAsync("0901234567", null, null, It.IsAny<CancellationToken>()))
+                 .ReturnsAsync(customer);
+        var service = CreateService();
+
+        // Act
+        var result = await service.FindOrCreateCustomerIdAsync("0901234567", null, null);
+
+        // Assert — Verify works with minimal input (only phone)
+        result.Should().Be(11);
     }
 
     #endregion
@@ -417,6 +473,25 @@ public class CustomerServiceTests
     [Fact]
     [Trait("Type", "Boundary")]
     [Trait("Method", "ResolveCustomerAsync")]
+    public async Task ResolveCustomerAsync_WhenPhoneIsWhitespace_ReturnsGuestId()
+    {
+        // Arrange — whitespace-only phone treated as empty → guest
+        var guest = MakeGuestCustomer();
+        _repoMock.Setup(r => r.GetGuestCustomerAsync(It.IsAny<CancellationToken>()))
+                 .ReturnsAsync(guest);
+        var dto = new OrderCustomerDto { Phone = "   " };
+        var service = CreateService();
+
+        // Act
+        var result = await service.ResolveCustomerAsync(dto, CancellationToken.None);
+
+        // Assert — Verify whitespace phone falls back to guest customer
+        result.Should().Be(999);
+    }
+
+    [Fact]
+    [Trait("Type", "Boundary")]
+    [Trait("Method", "ResolveCustomerAsync")]
     public async Task ResolveCustomerAsync_WhenCustomerIdProvidedButNoChanges_DoesNotCallUpdate()
     {
         // Arrange
@@ -545,6 +620,26 @@ public class CustomerServiceTests
 
         // Assert
         result.Phone.Should().Be("0901234567");
+    }
+
+    [Fact]
+    [Trait("Type", "Normal")]
+    [Trait("Method", "CreateCustomerAsync")]
+    public async Task CreateCustomerAsync_WhenIsMemberFalse_CreatesNonMember()
+    {
+        // Arrange
+        _repoMock.Setup(r => r.GetByPhoneAsync("0907777777"))
+                 .ReturnsAsync((Customer?)null);
+        _repoMock.Setup(r => r.AddAsync(It.IsAny<Customer>(), It.IsAny<CancellationToken>()))
+                 .Returns(Task.CompletedTask);
+        var request = new CreateCustomerRequest { Phone = "0907777777", IsMember = false };
+        var service = CreateService();
+
+        // Act
+        var result = await service.CreateCustomerAsync(request);
+
+        // Assert — Verify non-member flag preserved
+        result.IsMember.Should().BeFalse();
     }
 
     #endregion
@@ -689,6 +784,28 @@ public class CustomerServiceTests
         _repoMock.Verify(r => r.GetByPhoneAsync(It.IsAny<string>()), Times.Never);
     }
 
+    [Fact]
+    [Trait("Type", "Boundary")]
+    [Trait("Method", "UpdateCustomerAsync")]
+    public async Task UpdateCustomerAsync_WhenPhoneHasSpaces_TrimsBeforeCompare()
+    {
+        // Arrange — phone with leading/trailing spaces should be trimmed
+        var customer = MakeCustomer(id: 1, phone: "0901234567");
+        _repoMock.Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>()))
+                 .ReturnsAsync(customer);
+        _repoMock.Setup(r => r.UpdateAsync(It.IsAny<Customer>(), It.IsAny<CancellationToken>()))
+                 .Returns(Task.CompletedTask);
+        var request = new UpdateCustomerRequest { Phone = "  0901234567  " };
+        var service = CreateService();
+
+        // Act
+        var result = await service.UpdateCustomerAsync(1, request);
+
+        // Assert — Verify phone trimmed, no uniqueness check since same after trim
+        result.Phone.Should().Be("0901234567");
+        _repoMock.Verify(r => r.GetByPhoneAsync(It.IsAny<string>()), Times.Never);
+    }
+
     #endregion
 
     // ══════════════════════════════════════════════════════════════════
@@ -827,6 +944,32 @@ public class CustomerServiceTests
 
         // Assert
         result.Should().BeSameAs(expected);
+    }
+
+    [Fact]
+    [Trait("Type", "Boundary")]
+    [Trait("Method", "GetCustomerOrdersAsync")]
+    public async Task GetCustomerOrdersAsync_WhenNoOrders_ReturnsEmptyPage()
+    {
+        // Arrange
+        var query = new CustomerOrderQueryDTO();
+        var expected = new PagedResultDTO<CustomerOrderDTO>
+        {
+            PageData = new List<CustomerOrderDTO>(),
+            PageIndex = 1,
+            PageSize = 10,
+            TotalCount = 0
+        };
+        _repoMock.Setup(r => r.GetCustomerOrdersAsync(query, It.IsAny<CancellationToken>()))
+                 .ReturnsAsync(expected);
+        var service = CreateService();
+
+        // Act
+        var result = await service.GetCustomerOrdersAsync(query, CancellationToken.None);
+
+        // Assert — Verify empty page when customer has no orders
+        result.TotalCount.Should().Be(0);
+        result.PageData.Should().BeEmpty();
     }
 
     #endregion
@@ -972,6 +1115,24 @@ public class CustomerServiceTests
 
         // Assert
         result.Should().BeEmpty();
+    }
+
+    [Fact]
+    [Trait("Type", "Boundary")]
+    [Trait("Method", "SearchByPhoneAsync")]
+    public async Task SearchByPhoneAsync_WhenLimitIs1_ReturnsSingleResult()
+    {
+        // Arrange — boundary: limit = 1
+        var customers = new List<Customer> { MakeCustomer(id: 1, phone: "0901111111") };
+        _repoMock.Setup(r => r.SearchByPhoneAsync("090", 1, It.IsAny<CancellationToken>()))
+                 .ReturnsAsync(customers);
+        var service = CreateService();
+
+        // Act
+        var result = await service.SearchByPhoneAsync("090", 1, CancellationToken.None);
+
+        // Assert — Verify single result respecting limit
+        result.Should().HaveCount(1);
     }
 
     #endregion

@@ -15,8 +15,10 @@ namespace Tests.Services;
 /// Method      : GetSaleInvoiceDetailAsync, GetSaleInvoiceListAsync
 /// Created By  : quantm
 /// Executed By : quantm
-/// Test Req.   : Kiểm tra logic tạo hoá đơn bán hàng từ đơn hàng, bao gồm mapping item,
-///               tính tổng, xử lý trường hợp không tìm thấy đơn hàng, và phân trang danh sách.
+/// Test Req.   : Staff retrieves a sale invoice by order ID, verifying item mapping, subtotal
+///               calculation, discount and tip handling, null navigation defaults, and order
+///               not-found errors. Staff also retrieves a paginated list of sale invoices with
+///               optional search and date filters.
 /// </summary>
 public class SaleInvoiceServiceTests
 {
