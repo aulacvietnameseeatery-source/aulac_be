@@ -538,9 +538,10 @@ public async Task<long> CreateOrderAsync(Order order, List<OrderItem> items, Can
         CancellationToken ct)
     {
         return await _context.Orders
-            .Include(o => o.OrderItems
-				.Where(od => od.ItemStatusLv.ValueCode == OrderItemStatusCode.SERVED.ToString()))
+            .Include(o => o.OrderItems)
             .ThenInclude(i => i.Dish)
+            .Include(o => o.OrderItems)
+            .ThenInclude(i => i.ItemStatusLv)
             .FirstOrDefaultAsync(o => o.OrderId == orderId, ct);
     }
 

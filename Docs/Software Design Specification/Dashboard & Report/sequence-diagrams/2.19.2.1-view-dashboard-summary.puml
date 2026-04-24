@@ -1,0 +1,75 @@
+@startuml
+title 2.19.2.1 View Dashboard Summary
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":Staff" as U
+participant ":DashboardPage" as Client
+participant ":DashboardController" as Ctrl
+participant ":DashboardService" as Svc
+participant ":ILookupResolver" as Lookup
+participant ":IDashboardRepository" as Repo
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : Open Dashboard page (optional date range filter)
+activate Client
+
+Client ->> Ctrl : GET /api/dashboard/summary (DashboardFilterRequest)
+activate Ctrl
+
+Ctrl ->> Svc : GetSummaryAsync(request, ct)
+activate Svc
+
+Svc ->> Svc : Resolve date range (StartDate ?? 7 days ago, EndDate ?? now)
+Svc ->> Svc : Calculate previous period (same duration before start date)
+
+Svc ->> Lookup : ToOrderStatusIdAsync(OrderStatusCode.COMPLETED, ct)
+activate Lookup
+Lookup -->> Svc : completedOrderStatusId
+deactivate Lookup
+
+Svc ->> Lookup : GetIdAsync(ReservationStatus, COMPLETED, ct)
+activate Lookup
+Lookup -->> Svc : completedReservationStatusId
+deactivate Lookup
+
+Svc ->> Repo : GetSummaryDataAsync(startDate, endDate, completedOrderStatusId, completedReservationStatusId, ct)
+activate Repo
+Repo ->> DB : Query completed orders count, total sales sum, and completed reservations count for current period
+activate DB
+DB -->> Repo : Return (OrderCount, TotalSales, ReservationCount)
+deactivate DB
+Repo -->> Svc : currentData tuple
+deactivate Repo
+
+Svc ->> Repo : GetSummaryDataAsync(prevStartDate, prevEndDate, completedOrderStatusId, completedReservationStatusId, ct)
+activate Repo
+Repo ->> DB : Query completed orders count, total sales sum, and completed reservations count for previous period
+activate DB
+DB -->> Repo : Return (OrderCount, TotalSales, ReservationCount)
+deactivate DB
+Repo -->> Svc : prevData tuple
+deactivate Repo
+
+Svc ->> Svc : Calculate average order value for current and previous periods
+Svc ->> Svc : CalculateTrend for TotalOrders, TotalSales, AverageOrderValue, TotalReservations
+
+Svc -->> Ctrl : DashboardSummaryDto (with TrendValueDto for each metric)
+deactivate Svc
+
+Ctrl -->> Client : 200 OK (DashboardSummaryDto)
+deactivate Ctrl
+
+Client -->> U : Display summary cards with trend indicators (orders, sales, avg order, reservations)
+deactivate Client
+deactivate U
+
+@enduml

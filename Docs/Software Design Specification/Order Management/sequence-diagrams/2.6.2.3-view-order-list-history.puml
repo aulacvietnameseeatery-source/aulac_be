@@ -23,18 +23,17 @@ U ->> Client : Open Order History page (with optional filters)
 activate Client
 
 par Fetch order list and status counts
-    Client ->> Ctrl : GET /api/orders/history?search=&pageIndex=1&pageSize=10&...
+    Client ->> Ctrl : GET /api/orders/history?search=&pageIndex=1&pageSize=10&status=&fromDate=&toDate=
     activate Ctrl
 
-    note right of Ctrl : [HasPermission(Permissions.ViewOrder)]
     Ctrl ->> Svc : GetOrderHistoryAsync(OrderHistoryQueryDTO, ct)
     activate Svc
 
     Svc ->> OrderRepo : GetOrderHistoryAsync(query, ct)
     activate OrderRepo
-    OrderRepo ->> DB : SELECT orders with filters, pagination, joins (table, staff, customer, items)
+    OrderRepo ->> DB : Query orders with filters, pagination, joins (table, staff, customer, items)
     activate DB
-    DB -->> OrderRepo : List<OrderHistoryDTO>, totalCount
+    DB -->> OrderRepo : Return paginated order list with total count
     deactivate DB
     OrderRepo -->> Svc : PagedResultDTO<OrderHistoryDTO>
     deactivate OrderRepo
@@ -42,7 +41,7 @@ par Fetch order list and status counts
     Svc -->> Ctrl : PagedResultDTO<OrderHistoryDTO>
     deactivate Svc
 
-    Ctrl -->> Client : 200 OK (paged order history)
+    Ctrl -->> Client : 200 OK (PagedResultDTO<OrderHistoryDTO>)
     deactivate Ctrl
 also
     Client ->> Ctrl : GET /api/orders/count
@@ -73,9 +72,9 @@ also
 
     Svc ->> OrderRepo : GetOrderStatusCountAsync(pendingId, inProgressId, completedId, cancelledId, ct)
     activate OrderRepo
-    OrderRepo ->> DB : SELECT COUNT grouped by status
+    OrderRepo ->> DB : Count orders grouped by status
     activate DB
-    DB -->> OrderRepo : counts
+    DB -->> OrderRepo : Return counts per status
     deactivate DB
     OrderRepo -->> Svc : OrderStatusCountDTO
     deactivate OrderRepo
@@ -87,7 +86,7 @@ also
     deactivate Ctrl
 end
 
-Client -->> U : Display order history list with status tabs
+Client -->> U : Display order history list with status badge tabs
 
 deactivate Client
 deactivate U

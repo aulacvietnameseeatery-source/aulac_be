@@ -37,11 +37,8 @@ namespace Core.Service
         private readonly IEmailTemplateService _emailTemplateService;
         private readonly IEmailQueue _emailQueue;
 
-        private const string TemplateCodeReservationConfirmation = "RESERVATION_CONFIRM";
-
         private const string SettingReservationDuration = "reservation.default_duration_minutes";
         private const string SettingImmediateWindow = "reservation.immediate_window_minutes";
-
         private readonly TimeZoneInfo _restaurantTz;
 
         public AdminReservationService(
@@ -345,6 +342,8 @@ namespace Core.Service
             await _uow.BeginTransactionAsync(ct);
             try
             {
+                var normalizedPhone = request.Phone.NormalizePhoneNumber();
+
                 long customerId;
                 if (request.CustomerId.HasValue && request.CustomerId.Value > 0)
                 {
@@ -355,19 +354,19 @@ namespace Core.Service
                     }
                     else
                     {
-                        customerId = await _customerService.FindOrCreateCustomerIdAsync(request.Phone, request.CustomerName, request.Email, ct);
+                        customerId = await _customerService.FindOrCreateCustomerIdAsync(normalizedPhone, request.CustomerName, request.Email, ct);
                     }
                 }
                 else
                 {
-                    customerId = await _customerService.FindOrCreateCustomerIdAsync(request.Phone, request.CustomerName, request.Email, ct);
+                    customerId = await _customerService.FindOrCreateCustomerIdAsync(normalizedPhone, request.CustomerName, request.Email, ct);
                 }
 
             var reservation = new Reservation
             {
                 CustomerId = customerId,
                 CustomerName = request.CustomerName,
-                Phone = request.Phone,
+                Phone = normalizedPhone,
                 Email = request.Email,
                 PartySize = request.PartySize,
                 ReservedTime = request.ReservedTime,
@@ -414,13 +413,20 @@ namespace Core.Service
                 .Select(x => x.TableCode)
                 .OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
 
-            // Send confirmation email (inside transaction to ensure connection lives)
-            if (!string.IsNullOrWhiteSpace(created.Email))
-            {
-                await SendReservationConfirmationEmailAsync(created, tableCodes);
-            }
-
             await _uow.CommitAsync(ct);
+
+            // Send confirmation email via Hangfire for consistency with Public Reservation
+            if (string.Equals(request.Status, nameof(ReservationStatusCode.CONFIRMED), StringComparison.OrdinalIgnoreCase))
+            {
+                _jobScheduler.EnqueueReservationStatusEmails(
+                    created.ReservationId,
+                    created.Email,
+                    created.CustomerName,
+                    created.ReservedTime,
+                    created.PartySize,
+                    tableCodes,
+                    "CONFIRM");
+            }
 
             var zones = selectedTables
                 .Select(x => x.ZoneLv?.ValueName ?? TableZoneCode.INDOOR.ToString())
@@ -527,6 +533,16 @@ namespace Core.Service
                     },
                     TargetPermissions = new List<string> { Permissions.ViewReservation }
                 }, cancellationToken);
+
+                var tableCodesStr = string.Join(", ", reservation.Tables.Select(t => t.TableCode));
+                _jobScheduler.EnqueueReservationStatusEmails(
+                    reservationId,
+                    reservation.Email,
+                    reservation.CustomerName,
+                    reservation.ReservedTime,
+                    reservation.PartySize,
+                    tableCodesStr,
+                    "CONFIRM");
             }
             catch (Exception)
             {
@@ -653,6 +669,15 @@ namespace Core.Service
                     },
                     TargetPermissions = new List<string> { Permissions.ViewReservation }
                 }, cancellationToken);
+
+                var tableCodesStr = reservation.Tables != null ? string.Join(", ", reservation.Tables.Select(t => t.TableCode)) : string.Empty;
+                if (newStatusCode == ReservationStatusCode.CONFIRMED.ToString()) {
+                    _jobScheduler.EnqueueReservationStatusEmails(reservationId, reservation.Email, reservation.CustomerName, reservation.ReservedTime, reservation.PartySize, tableCodesStr, "CONFIRM");
+                } else if (newStatusCode == ReservationStatusCode.CANCELLED.ToString()) {
+                    _jobScheduler.EnqueueReservationStatusEmails(reservationId, reservation.Email, reservation.CustomerName, reservation.ReservedTime, reservation.PartySize, tableCodesStr, "CANCEL");
+                } else if (newStatusCode == ReservationStatusCode.NO_SHOW.ToString()) {
+                    _jobScheduler.EnqueueReservationStatusEmails(reservationId, reservation.Email, reservation.CustomerName, reservation.ReservedTime, reservation.PartySize, tableCodesStr, "NOSHOW");
+                }
             }
             catch (Exception)
             {
@@ -700,6 +725,16 @@ namespace Core.Service
                 await _reservationRepository.UpdateAsync(reservation, ct);
 
                 await _uow.CommitAsync(ct);
+
+                var tableCodesStr = reservation.Tables != null ? string.Join(", ", reservation.Tables.Select(t => t.TableCode)) : string.Empty;
+                var statusStr = request.Status.ToString();
+                if (statusStr == ReservationStatusCode.CONFIRMED.ToString()) {
+                    _jobScheduler.EnqueueReservationStatusEmails(reservationId, reservation.Email, reservation.CustomerName, reservation.ReservedTime, reservation.PartySize, tableCodesStr, "CONFIRM");
+                } else if (statusStr == ReservationStatusCode.CANCELLED.ToString()) {
+                    _jobScheduler.EnqueueReservationStatusEmails(reservationId, reservation.Email, reservation.CustomerName, reservation.ReservedTime, reservation.PartySize, tableCodesStr, "CANCEL");
+                } else if (statusStr == ReservationStatusCode.NO_SHOW.ToString()) {
+                    _jobScheduler.EnqueueReservationStatusEmails(reservationId, reservation.Email, reservation.CustomerName, reservation.ReservedTime, reservation.PartySize, tableCodesStr, "NOSHOW");
+                }
 
                 return new ReservationStatusResponseDTO
                 {
@@ -759,6 +794,10 @@ namespace Core.Service
                     },
                     TargetPermissions = new List<string> { Permissions.ViewReservation }
                 });
+
+                var tableCodesStr = reservation.Tables != null ? string.Join(", ", reservation.Tables.Select(t => t.TableCode)) : string.Empty;
+                _jobScheduler.EnqueueReservationStatusEmails(reservationId, reservation.Email, reservation.CustomerName, reservation.ReservedTime, reservation.PartySize, tableCodesStr, "NOSHOW");
+
                 if (reservation.Tables != null)
                 {
                     foreach (var table in reservation.Tables)
@@ -878,6 +917,8 @@ namespace Core.Service
             await _uow.BeginTransactionAsync(ct);
             try
             {
+                var normalizedPhone = request.Phone.NormalizePhoneNumber();
+
                 var validatedTables = reservation.Tables.ToList();
 
                 if (mustRevalidateTables)
@@ -891,7 +932,7 @@ namespace Core.Service
                 }
 
                 reservation.CustomerName = request.CustomerName;
-                reservation.Phone = request.Phone;
+                reservation.Phone = normalizedPhone;
                 reservation.Email = request.Email;
                 reservation.PartySize = request.PartySize;
                 reservation.ReservedTime = request.ReservedTime;
@@ -1126,43 +1167,6 @@ namespace Core.Service
                 await _uow.CommitAsync(ct);
             }
             catch (Exception) { await _uow.RollbackAsync(ct); throw; }
-        }
-
-        private async Task SendReservationConfirmationEmailAsync(Reservation reservation, string tableCodes)
-        {
-            try
-            {
-                var template = await _emailTemplateService.GetByCodeAsync(TemplateCodeReservationConfirmation);
-                if (template == null)
-                {
-                    _logger.LogWarning("Email template {TemplateCode} not found. Skipping email.", TemplateCodeReservationConfirmation);
-                    return;
-                }
-
-                var body = template.BodyHtml
-                    .Replace("{{CustomerName}}", reservation.CustomerName)
-                    .Replace("{{ReservedTime}}", TimeZoneInfo.ConvertTimeFromUtc(
-                        DateTime.SpecifyKind(reservation.ReservedTime, DateTimeKind.Utc), _restaurantTz)
-                        .ToString("dd/MM/yyyy HH:mm"))
-                    .Replace("{{PartySize}}", reservation.PartySize.ToString())
-                    .Replace("{{TableCode}}", tableCodes)
-                    .Replace("{{TableCodes}}", tableCodes)
-                    .Replace("{{ReservationId}}", reservation.ReservationId.ToString());
-
-                var queuedEmail = new QueuedEmail(
-                    To: reservation.Email!,
-                    Subject: template.Subject,
-                    HtmlBody: body,
-                    CorrelationId: $"Res-{reservation.ReservationId}"
-                );
-
-                await _emailQueue.EnqueueAsync(queuedEmail);
-                _logger.LogInformation("Enqueued confirmation email for manual reservation {ReservationId} to {Email}", reservation.ReservationId, reservation.Email);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error enqueuing confirmation email for manual reservation {ReservationId}", reservation.ReservationId);
-            }
         }
     }
 }

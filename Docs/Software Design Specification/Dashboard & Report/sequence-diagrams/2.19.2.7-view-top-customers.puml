@@ -1,0 +1,57 @@
+@startuml
+title 2.19.2.7 View Top Customers
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":Staff" as U
+participant ":CustomerReportPage" as Client
+participant ":ReportController" as Ctrl
+participant ":ReportService" as Svc
+participant ":ILookupResolver" as Lookup
+participant ":IReportRepository" as Repo
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : Open Top Customers tab (with date range filter, page index, page size)
+activate Client
+
+Client ->> Ctrl : GET /api/reports/customers/top-spenders (ReportFilterRequest, pageIndex=1, pageSize=20)
+activate Ctrl
+
+Ctrl ->> Svc : GetTopSpendersAsync(request, pageIndex, pageSize, ct)
+activate Svc
+
+Svc ->> Lookup : GetIdAsync(OrderStatus, COMPLETED, ct)
+activate Lookup
+Lookup -->> Svc : completedId
+deactivate Lookup
+
+Svc ->> Svc : Calculate skip = (pageIndex - 1) * pageSize
+
+Svc ->> Repo : GetTopSpendersAsync(startDate, endDate, completedId, skip, pageSize, ct)
+activate Repo
+Repo ->> DB : Query non-guest customers with completed orders in date range, group by customer, calculate total orders, total spent, and last visit date, order by total spent descending, apply pagination
+activate DB
+DB -->> Repo : Return paginated list of (CustomerId, CustomerName, Phone, TotalOrders, TotalSpent, LastVisitDate) and total count
+deactivate DB
+Repo -->> Svc : (List<TopCustomerDto>, TotalCount)
+deactivate Repo
+
+Svc -->> Ctrl : (List<TopCustomerDto> Items, int TotalCount)
+deactivate Svc
+
+Ctrl -->> Client : 200 OK (paginated TopCustomerDto list with total count)
+deactivate Ctrl
+
+Client -->> U : Display top customers table with name, phone, orders, total spent, last visit, and pagination
+deactivate Client
+deactivate U
+
+@enduml

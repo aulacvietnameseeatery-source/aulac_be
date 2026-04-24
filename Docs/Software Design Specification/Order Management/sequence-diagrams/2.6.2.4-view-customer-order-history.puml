@@ -29,15 +29,15 @@ activate Svc
 
 Svc ->> OrderRepo : GetCustomerOrderByIdAsync(orderId, ct)
 activate OrderRepo
-OrderRepo ->> DB : SELECT order with items, table info (join Dish for name/price)
+OrderRepo ->> DB : Query order with items, table info, dish details, and item statuses
 activate DB
-DB -->> OrderRepo : CustomerOrderHistoryDTO
+DB -->> OrderRepo : Return order with navigation properties
 deactivate DB
 OrderRepo -->> Svc : CustomerOrderHistoryDTO
 deactivate OrderRepo
 
 alt#White Order not found
-    Svc -->> Ctrl : throw NotFoundException
+    Svc -->> Ctrl : throw KeyNotFoundException
     Ctrl -->> Client : 404 Not Found
     Client -->> U : Display "Order not found" message
 else Order found
@@ -47,7 +47,7 @@ else Order found
     Ctrl -->> Client : 200 OK (CustomerOrderHistoryDTO)
     deactivate Ctrl
 
-    Client -->> U : Display table code, items list, estimated total, tax amount
+    Client -->> U : Display table code, items list with statuses, estimated total, tax amount
 end
 
 deactivate Client

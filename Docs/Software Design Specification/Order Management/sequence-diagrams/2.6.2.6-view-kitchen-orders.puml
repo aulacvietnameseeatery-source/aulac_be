@@ -25,8 +25,6 @@ activate Client
 Client ->> Ctrl : GET /api/orders/kitchen
 activate Ctrl
 
-note right of Ctrl : [HasPermission(Permissions.ViewOrder)]
-
 Ctrl ->> Svc : GetKitchenOrdersAsync(ct)
 activate Svc
 
@@ -52,9 +50,9 @@ deactivate Lookup
 
 Svc ->> OrderRepo : GetKitchenOrdersAsync(pendingStatusId, inProgressStatusId, completedStatusId, cancelledStatusId, ct)
 activate OrderRepo
-OrderRepo ->> DB : SELECT active orders (PENDING + IN_PROGRESS) with items, table code, item statuses
+OrderRepo ->> DB : Query active orders (PENDING + IN_PROGRESS) with items, table code, and item statuses
 activate DB
-DB -->> OrderRepo : List<KitchenOrderDTO>
+DB -->> OrderRepo : Return list of kitchen orders with items
 deactivate DB
 OrderRepo -->> Svc : List<KitchenOrderDTO>
 deactivate OrderRepo
@@ -65,9 +63,7 @@ deactivate Svc
 Ctrl -->> Client : 200 OK (List<KitchenOrderDTO>)
 deactivate Ctrl
 
-Client -->> U : Display kitchen order board (orders grouped by table, items with statuses)
-
-note over Client : Real-time updates via SignalR\n(OrderCreated, OrderUpdated, OrderItemUpdated events)
+Client -->> U : Display kitchen order board grouped by table with item statuses
 
 deactivate Client
 deactivate U

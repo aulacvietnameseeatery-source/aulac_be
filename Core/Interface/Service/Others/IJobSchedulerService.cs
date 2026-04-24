@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -23,8 +23,8 @@ namespace Core.Interface.Service.Others
         string EnqueueReservationAdminEmail(long reservationId, string customerName, DateTime reservedTime, int partySize, string tableCodes);
 
         /// <summary>
-        /// Enqueues one Hangfire job that sends customer + admin reservation emails concurrently.
+        /// Enqueues one Hangfire job that sends customer + admin reservation emails concurrently based on status.
         /// </summary>
-        string EnqueueReservationEmails(long reservationId, string? customerEmail, string customerName, DateTime reservedTime, int partySize, string tableCodes);
+        string EnqueueReservationStatusEmails(long reservationId, string? customerEmail, string customerName, DateTime reservedTime, int partySize, string tableCodes, string status);
     }
 }

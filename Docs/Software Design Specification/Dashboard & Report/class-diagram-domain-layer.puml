@@ -27,15 +27,6 @@ package "Domain Layer" {
         +CustomerId : long?
     }
 
-    class Invoice <<Entity>> {
-        +InvoiceId : long
-        +OrderId : long
-        +CustomerId : long?
-        +NetTotal : decimal
-        +TaxTotal : decimal
-        +CreatedAt : DateTime?
-    }
-
     class Payment <<Entity>> {
         +PaymentId : long
         +OrderId : long
@@ -55,6 +46,11 @@ package "Domain Layer" {
     class DishCategory <<Entity>> {
         +CategoryId : long
         +CategoryName : string
+    }
+
+    class OrderSource <<LookupValue>> {
+        +ValueCode : string
+        +ValueName : string
     }
 
     class DishMedium <<Entity>> {
@@ -91,12 +87,10 @@ package "Domain Layer" {
 Order "1" *-- "0..*" OrderItem : contains line items
 Order --> "1" LookupValue : order status
 Order "1" *-- "0..*" Payment : paid via
+Order --> "1" LookupValue : order source (OrderSourceLvId)
 
 Reservation --> "0..1" Customer : made by
 Reservation --> "1" LookupValue : reservation status
-
-Invoice --> "1" Order : generated for
-Invoice --> "0..1" Customer : billed to
 
 OrderItem --> "1" Dish : refers to dish
 

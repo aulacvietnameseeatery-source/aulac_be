@@ -27,7 +27,7 @@ namespace Infa.Repo
                     !string.IsNullOrWhiteSpace(c.CouponCode) &&
                     c.StartTime <= now &&
                     c.EndTime >= now &&
-                    c.CouponStatusLv.ValueCode == "ACTIVE" &&
+                    (c.CouponStatusLv.ValueCode == "ACTIVE" || c.CouponStatusLv.ValueCode == "SCHEDULED") &&
                     (c.MaxUsage == null || (c.UsedCount ?? 0) < c.MaxUsage))
                 .OrderBy(c => c.CouponCode)
                 .ToListAsync(ct);

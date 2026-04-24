@@ -22,6 +22,7 @@ participant ":IOrderRepository" as OrderRepo
 participant ":IUnitOfWork" as UoW
 participant ":IOrderRealtimeService" as Realtime
 participant ":INotificationService" as Notif
+participant ":IShiftLiveRealtimePublisher" as ShiftLive
 participant ":Database" as DB
 
 activate U
@@ -32,100 +33,127 @@ activate Client
 Client ->> Ctrl : POST /api/orders/staff (CreateOrderRequest)
 activate Ctrl
 
-note right of Ctrl : [HasPermission(Permissions.CreateOrder)]
 Ctrl ->> Ctrl : Extract staffId from JWT claims
 
 Ctrl ->> Svc : CreateOrderAsync(staffId, CreateOrderRequest, ct)
 activate Svc
 
-Svc ->> Lookup : GetIdAsync(OrderSource, request.Source)
-activate Lookup
-Lookup -->> Svc : sourceLvId
-deactivate Lookup
+Svc ->> Svc : Validate request (at least one item, DINE_IN requires table, TAKEAWAY cannot have table)
 
-Svc ->> Lookup : GetIdAsync(OrderStatus, PENDING)
-activate Lookup
-Lookup -->> Svc : pendingStatusLvId
-deactivate Lookup
+alt#White Validation fails
+    Svc -->> Ctrl : throw InvalidOperationException
+    Ctrl -->> Client : 400 Bad Request
+    Client -->> U : Display validation error
+else Validation passed
 
-Svc ->> Lookup : GetIdAsync(OrderItemStatus, CREATED)
-activate Lookup
-Lookup -->> Svc : createdItemStatusLvId
-deactivate Lookup
+    Svc ->> UoW : BeginTransactionAsync(ct)
+    activate UoW
+    UoW -->> Svc : Transaction started
+    deactivate UoW
 
-opt#White TableId provided (DINE_IN)
-    Svc ->> TableRepo : GetByIdAsync(tableId, ct)
-    activate TableRepo
-    TableRepo ->> DB : SELECT table by id
+    Svc ->> Lookup : Resolve lookup IDs (OrderStatus PENDING, OrderItemStatus CREATED, OrderSource, TableStatus OCCUPIED/LOCKED)
+    activate Lookup
+    Lookup -->> Svc : orderStatusId, orderItemStatusId, sourceId, occupiedTableStatusId, lockedTableStatusId
+    deactivate Lookup
+
+    opt#White TableId provided (DINE_IN)
+        Svc ->> TableRepo : GetByIdAsync(tableId, ct)
+        activate TableRepo
+        TableRepo ->> DB : Query table by ID
+        activate DB
+        DB -->> TableRepo : Return table entity
+        deactivate DB
+        TableRepo -->> Svc : RestaurantTable
+        deactivate TableRepo
+
+        alt#White Table not found
+            Svc -->> Ctrl : throw NotFoundException
+            Ctrl -->> Client : 404 Not Found
+            Client -->> U : Display "Table not found" error
+        else Table found
+            alt#White Table is LOCKED or OCCUPIED
+                Svc -->> Ctrl : throw InvalidOperationException
+                Ctrl -->> Client : 400 Bad Request
+                Client -->> U : Display "Table not available" error
+            else Table is available
+                Svc ->> Svc : Set table.TableStatusLvId = occupiedTableStatusId
+                Svc ->> TableRepo : UpdateAsync(table, ct)
+                activate TableRepo
+                TableRepo -->> Svc : done
+                deactivate TableRepo
+            end
+        end
+    end
+
+    Svc ->> CustSvc : ResolveCustomerAsync(OrderCustomerDto, ct)
+    activate CustSvc
+    CustSvc -->> Svc : customerId
+    deactivate CustSvc
+
+    Svc ->> DishRepo : GetByIdsAsync(dishIds, ct)
+    activate DishRepo
+    DishRepo ->> DB : Query dishes by IDs in single query
     activate DB
-    DB -->> TableRepo : RestaurantTable
+    DB -->> DishRepo : Return list of dishes
     deactivate DB
-    TableRepo -->> Svc : RestaurantTable
-    deactivate TableRepo
+    DishRepo -->> Svc : List<Dish>
+    deactivate DishRepo
 
-    alt#White Table not found
+    alt#White One or more dishes not found
         Svc -->> Ctrl : throw NotFoundException
         Ctrl -->> Client : 404 Not Found
-        Client -->> U : Display error
+        Client -->> U : Display "Dish not found" error
+    else All dishes valid
+
+        Svc ->> Svc : Build Order entity with items, staffId, source, customer, calculate totals
+
+        Svc ->> Svc : ApplyTaxToOrderAsync(order, ct)
+        activate Svc
+        Svc ->> TaxRepo : GetDefaultTaxAsync(ct)
+        activate TaxRepo
+        TaxRepo -->> Svc : Tax
+        deactivate TaxRepo
+        Svc ->> Svc : Calculate tax amount
+        deactivate Svc
+
+        Svc ->> OrderRepo : AddAsync(order, ct)
+        activate OrderRepo
+        OrderRepo ->> DB : Insert order with order items
+        activate DB
+        DB -->> OrderRepo : Order persisted
+        deactivate DB
+        OrderRepo -->> Svc : done
+        deactivate OrderRepo
+
+        Svc ->> UoW : CommitAsync(ct)
+        activate UoW
+        UoW -->> Svc : Transaction committed
+        deactivate UoW
+
+        Svc ->> Realtime : OrderCreatedAsync(OrderRealtimeDTO)
+        activate Realtime
+        Realtime -->> Svc : done
+        deactivate Realtime
+
+        Svc ->> ShiftLive : PublishBoardChangedAsync(order_created event)
+        activate ShiftLive
+        ShiftLive -->> Svc : done
+        deactivate ShiftLive
+
+        Svc ->> Notif : PublishAsync(NEW_ORDER notification with item count, table code, total)
+        activate Notif
+        Notif -->> Svc : done
+        deactivate Notif
+
+        Svc -->> Ctrl : orderId (long)
+        deactivate Svc
+
+        Ctrl -->> Client : 200 OK (orderId)
+        deactivate Ctrl
+
+        Client -->> U : Display order created successfully
     end
 end
-
-Svc ->> CustSvc : Resolve or create customer from OrderCustomerDto
-activate CustSvc
-CustSvc -->> Svc : Customer (with CustomerId)
-deactivate CustSvc
-
-loop For each item in request.Items
-    Svc ->> DishRepo : GetByIdAsync(dishId, ct)
-    activate DishRepo
-    DishRepo -->> Svc : Dish (validate and get price)
-    deactivate DishRepo
-end
-
-Svc ->> Svc : Build Order entity with items, staffId, source, customer
-
-Svc ->> Svc : ApplyTaxToOrderAsync(order, ct)
-activate Svc
-Svc ->> TaxRepo : GetDefaultTaxAsync(ct)
-activate TaxRepo
-TaxRepo -->> Svc : Tax
-deactivate TaxRepo
-Svc ->> Svc : Calculate tax amount
-deactivate Svc
-
-Svc ->> UoW : BeginTransactionAsync(ct)
-activate UoW
-
-Svc ->> OrderRepo : AddAsync(order, ct)
-activate OrderRepo
-OrderRepo ->> DB : INSERT Order + OrderItems
-activate DB
-DB -->> OrderRepo : done
-deactivate DB
-OrderRepo -->> Svc : done
-deactivate OrderRepo
-
-Svc ->> UoW : SaveChangesAsync(ct)
-Svc ->> UoW : CommitAsync(ct)
-deactivate UoW
-
-Svc ->> Realtime : OrderCreatedAsync(OrderRealtimeDTO)
-activate Realtime
-Realtime -->> Svc : done
-deactivate Realtime
-
-Svc ->> Notif : PublishAsync(new order notification)
-activate Notif
-Notif -->> Svc : done
-deactivate Notif
-
-Svc -->> Ctrl : orderId (long)
-deactivate Svc
-
-Ctrl -->> Client : 200 OK (orderId)
-deactivate Ctrl
-
-Client -->> U : Display order created successfully
 
 deactivate Client
 deactivate U

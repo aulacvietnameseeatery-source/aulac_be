@@ -18,6 +18,9 @@ package "Presentation Layer" {
         +GetOrderMetrics(request, ct) : Task<IActionResult>
         +GetSalesItems(request, pageIndex, pageSize, ct) : Task<IActionResult>
         +GetTopSpenders(request, pageIndex, pageSize, ct) : Task<IActionResult>
+        +GetTop5Spenders(startDate, endDate, ct) : Task<IActionResult>
+        +GetDailyEarningDetail(date, ct) : Task<IActionResult>
+        +GetDishPerformanceDetail(dishId, request, ct) : Task<IActionResult>
     }
 }
 
@@ -42,6 +45,7 @@ package "Application Layer" {
         +GetOrderMetricsAsync(request, ct) : Task<OrderMetricsDto>
         +GetSalesItemsAsync(request, pageIndex, pageSize, ct) : Task<(List<SalesItemDto>, int)>
         +GetTopSpendersAsync(request, pageIndex, pageSize, ct) : Task<(List<TopCustomerDto>, int)>
+        +GetTop5SpendersAsync(startDate, endDate, ct) : Task<List<TopCustomerDto>>
         +GetDailyEarningDetailAsync(date, ct) : Task<DailyEarningDetailDto>
         +GetDishPerformanceDetailAsync(dishId, request, ct) : Task<DishPerformanceDetailDto>
         +GetCustomerProfileDetailAsync(customerId, request, ct) : Task<CustomerProfileDetailDto>
@@ -73,6 +77,7 @@ package "Persistence Layer" {
         +GetOrderMetricsAsync(start, end, completedId, cancelledId, ct) : Task<OrderMetricsDto>
         +GetSalesItemsAsync(start, end, completedId, skip, take, ct) : Task<(List<SalesItemDto>, int)>
         +GetTopSpendersAsync(start, end, completedId, skip, take, ct) : Task<(List<TopCustomerDto>, int)>
+        +GetDashboardTopSpendersAsync(start, end, completedId, ct) : Task<List<TopCustomerDto>>
         +GetDailyEarningDetailAsync(date, completedId, ct) : Task<DailyEarningDetailDto>
         +GetDishPerformanceDetailAsync(dishId, start, end, completedId, ct) : Task<DishPerformanceDetailDto>
         +GetCustomerProfileDetailAsync(customerId, start, end, completedId, ct) : Task<CustomerProfileDetailDto>

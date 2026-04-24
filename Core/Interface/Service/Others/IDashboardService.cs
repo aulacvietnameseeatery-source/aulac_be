@@ -13,5 +13,6 @@ namespace Core.Interface.Service.Others
         Task<List<RevenueChartItemDto>> GetRevenueChartAsync(DashboardFilterRequest request, CancellationToken ct = default);
         Task<List<TopSellingItemDto>> GetTopSellingAsync(DashboardFilterRequest request, int limit = 6, CancellationToken ct = default);
         Task<DashboardStatisticsDto> GetStatisticsAsync(DashboardFilterRequest request, CancellationToken ct = default);
+        Task<LiveOperationsSnapshotDto> GetLiveOperationsSnapshotAsync(LiveOperationsSnapshotRequest request, CancellationToken ct = default);
     }
 }

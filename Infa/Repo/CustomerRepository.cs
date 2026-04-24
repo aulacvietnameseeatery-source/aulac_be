@@ -2,6 +2,7 @@ using Core.DTO.Customer;
 using Core.DTO.General;
 using Core.DTO.LookUpValue;
 using Core.Entity;
+using Core.Extensions;
 using Core.Interface.Repo;
 using Core.Interface.Service.I18n;
 using Infa.Data;
@@ -107,9 +108,15 @@ namespace Infa.Repo
 
         public async Task<Customer?> GetByPhoneAsync(string phone)
         {
+            var lookupCandidates = phone.GetPhoneLookupCandidates().ToList();
+            if (lookupCandidates.Count == 0)
+            {
+                return null;
+            }
+
             return await _context.Customers
                 .AsNoTracking()
-                .FirstOrDefaultAsync(c => c.Phone == phone);
+                .FirstOrDefaultAsync(c => lookupCandidates.Contains(c.Phone));
         }
 
         public async Task UpdateAsync(Customer customer, CancellationToken ct = default)
@@ -141,13 +148,22 @@ namespace Infa.Repo
 
         public async Task<Customer> FindOrCreateAsync(string phone, string? fullName, string? email, CancellationToken ct = default)
         {
+            var normalizedPhone = phone.NormalizePhoneNumber();
+            var lookupCandidates = phone.GetPhoneLookupCandidates().ToList();
+
             // Try to find by phone first (unique key)
             var existing = await _context.Customers
-                .FirstOrDefaultAsync(c => c.Phone == phone, ct);
+                .FirstOrDefaultAsync(c => lookupCandidates.Contains(c.Phone), ct);
 
             if (existing != null)
             {
                 bool updated = false;
+                if (!string.Equals(existing.Phone, normalizedPhone, StringComparison.Ordinal) &&
+                    !existing.Phone.IsGuestPhoneSentinel())
+                {
+                    existing.Phone = normalizedPhone;
+                    updated = true;
+                }
                 if (!string.IsNullOrWhiteSpace(fullName) && existing.FullName != fullName.Trim())
                 {
                     existing.FullName = fullName.Trim();
@@ -170,7 +186,7 @@ namespace Infa.Repo
             // Create new customer
             var newCustomer = new Customer
             {
-                Phone = phone,
+                Phone = normalizedPhone,
                 FullName = string.IsNullOrWhiteSpace(fullName) ? null : fullName.Trim(),
                 Email = string.IsNullOrWhiteSpace(email) ? null : email.Trim(),
                 IsMember = false,
@@ -389,11 +405,20 @@ namespace Infa.Repo
             if (string.IsNullOrWhiteSpace(keyword))
                 return new List<Customer>();
 
-            keyword = keyword.Trim();
+            var searchTerms = keyword.GetPhoneLookupCandidates().ToArray();
+            if (searchTerms.Length == 0)
+                return new List<Customer>();
+
+            var term1 = searchTerms.ElementAtOrDefault(0);
+            var term2 = searchTerms.ElementAtOrDefault(1);
+            var term3 = searchTerms.ElementAtOrDefault(2);
 
             return await _context.Customers
                 .AsNoTracking()
-                .Where(c => c.Phone.StartsWith(keyword) || c.Phone.Contains(keyword))
+                .Where(c =>
+                    c.Phone.StartsWith(term1) || c.Phone.Contains(term1) ||
+                    (term2 != null && (c.Phone.StartsWith(term2) || c.Phone.Contains(term2))) ||
+                    (term3 != null && (c.Phone.StartsWith(term3) || c.Phone.Contains(term3))))
                 .OrderByDescending(c => c.CreatedAt)
                 .Take(limit)
                 .ToListAsync(ct);

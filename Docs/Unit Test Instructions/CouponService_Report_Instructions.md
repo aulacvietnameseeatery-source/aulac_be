@@ -246,22 +246,39 @@ For each method below, **copy the `Example` sheet template**, rename the tab to 
 | | | 15 (coupon found: {UsedCount=3, EndTime=now+30d}) | | | | | | | O | |
 | | | 16 (coupon found: {Code="SAMECODE", UsedCount=0, EndTime=now+30d}) | | | | | | | | O |
 | | request.CouponCode | | | | | | | | | |
-| | | "UPDATED2025" (no duplicate) | O | | | | | | | |
+| | | "UPDATED2025" (no duplicate) | O | | O | O | | O | O | |
 | | | "UPDATED2025" (used coupon — code ignored) | | O | | | | | | |
-| | | "UPDATED2025" | | | O | O | | | | |
 | | | "DUPLICATE" (duplicate exists — repo GetByCode returns existing) | | | | | O | | | |
-| | | "UPDATED2025" (StartTime=now+10d, EndTime=now+5d — invalid range) | | | | | | O | | |
-| | | "UPDATED2025" (EndTime before coupon.StartTime) | | | | | | | O | |
 | | | "SAMECODE" (same as existing code — case-insensitive match) | | | | | | | | O |
+| | request.CouponName | | | | | | | | | |
+| | | "Updated Coupon" | O | O | O | O | O | O | O | O |
+| | request.Description | | | | | | | | | |
+| | | "Updated description" | O | | O | O | O | O | | O |
+| | | "Updated description only" | | O | | | | | O | |
+| | request.StartTime | | | | | | | | | |
+| | | now-1d | O | O | O | O | O | | O | O |
+| | | now+10d | | | | | | O | | |
+| | request.EndTime | | | | | | | | | |
+| | | now+60d | O | | O | O | O | | | O |
+| | | now+90d | | O | | | | | | |
+| | | now+5d (before request.StartTime=now+10d) | | | | | | O | | |
+| | | coupon.StartTime-1d (before existing coupon.StartTime) | | | | | | | O | |
+| | request.DiscountValue | | | | | | | | | |
+| | | 30000 | O | O | O | O | O | O | O | O |
+| | request.MaxUsage | | | | | | | | | |
+| | | 200 | O | | O | O | O | O | | O |
+| | | 500 | | O | | | | | O | |
+| | request.Type | | | | | | | | | |
+| | | "FIXED_AMOUNT" | O | O | O | O | O | O | O | O |
 
 **Confirmation:**
 
 | Col A | Col B | Col D | UTCID01 | UTCID02 | UTCID03 | UTCID04 | UTCID05 | UTCID06 | UTCID07 | UTCID08 |
 |-------|-------|-------|---------|---------|---------|---------|---------|---------|---------|---------|
 | Confirm | Return | | | | | | | | | |
-| | | CouponCode=="UPDATED2025", CouponName=="Updated Coupon", DiscountValue==30000. Repo.UpdateAsync called once | O | | | | | | | |
-| | | CouponCode=="USED_CODE" (code NOT changed), MaxUsage==500. Repo.GetByCodeAsync never called | | O | | | | | | |
-| | | CouponCode=="SAMECODE". Repo.GetByCodeAsync never called (same code skips uniqueness check) | | | | | | | | O |
+| | | CouponCode=="UPDATED2025", CouponName=="Updated Coupon", DiscountValue==30000, MaxUsage==200, Type=="FIXED_AMOUNT", CouponStatus=="ACTIVE" | O | | | | | | | |
+| | | CouponCode=="USED_CODE" (code not changed), MaxUsage==500, Type=="FIXED_AMOUNT", CouponStatus=="ACTIVE" | | O | | | | | | |
+| | | CouponCode=="SAMECODE", CouponName=="Updated Coupon", DiscountValue==30000, Type=="FIXED_AMOUNT", CouponStatus=="ACTIVE" | | | | | | | | O |
 | | Exception | | | | | | | | | |
 | | | KeyNotFoundException: "Coupon with ID 999 not found." | | | O | | | | | |
 | | | InvalidOperationException: "Cannot update an expired coupon." | | | | O | | | | |

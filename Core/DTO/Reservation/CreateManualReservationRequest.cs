@@ -1,6 +1,7 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using Core.Extensions;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -22,8 +23,8 @@ namespace Core.DTO.Reservation
         public string CustomerName { get; set; } = null!;
 
         [Required]
-        [Phone]
-        [StringLength(30)]
+        [StringLength(15)]
+        [RegularExpression(PhoneNumberExtensions.SupportedPhoneValidationPattern, ErrorMessage = "Invalid phone number format")]
         public string Phone { get; set; } = null!;
 
         [EmailAddress]

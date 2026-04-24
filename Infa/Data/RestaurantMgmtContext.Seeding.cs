@@ -182,6 +182,178 @@ public partial class RestaurantMgmtContext
 </html>",
                 Description = "Email sent when an administrator resets a staff account to the default password.",
                 CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+            },
+            new EmailTemplate
+            {
+                TemplateId = 5,
+                TemplateCode = "RESERVATION_CANCEL",
+                TemplateName = "Reservation Cancellation",
+                Subject = "Reservation Cancelled - An Lac Restaurant",
+                BodyHtml = @"<!DOCTYPE html>
+<html>
+<head>
+    <meta charset=""utf-8"">
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .details { background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0; border: 1px solid #dee2e6; }
+        .highlight { color: #d97706; font-weight: bold; }
+        .footer { margin-top: 30px; font-size: 12px; color: #666; }
+    </style>
+</head>
+<body>
+    <div class=""container"">
+        <h2 style=""color: #1A3A51;"">Reservation Cancelled</h2>
+        <p>Hello <span class=""highlight"">{{CustomerName}}</span>,</p>
+        <p>Your reservation at An Lac Restaurant has been cancelled.</p>
+        <div class=""details"">
+            <p><strong>Reservation ID:</strong> #{{ReservationId}}</p>
+            <p><strong>Date & Time:</strong> {{ReservedTime}}</p>
+            <p><strong>Party Size:</strong> {{PartySize}} people</p>
+        </div>
+        <p>We hope to serve you another time.</p>
+        <div class=""footer"">
+            <p>An Lac Restaurant<br>123 Restaurant Street, City<br>Phone: (+84) 123-456-789</p>
+        </div>
+    </div>
+</body>
+</html>",
+                Description = "Email sent to customers when their reservation is cancelled.",
+                CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+            },
+            new EmailTemplate
+            {
+                TemplateId = 6,
+                TemplateCode = "RESERVATION_NOSHOW",
+                TemplateName = "Reservation No-Show",
+                Subject = "Missed Reservation - An Lac Restaurant",
+                BodyHtml = @"<!DOCTYPE html>
+<html>
+<head>
+    <meta charset=""utf-8"">
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .details { background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0; border: 1px solid #dee2e6; }
+        .highlight { color: #d97706; font-weight: bold; }
+        .footer { margin-top: 30px; font-size: 12px; color: #666; }
+    </style>
+</head>
+<body>
+    <div class=""container"">
+        <h2 style=""color: #1A3A51;"">Missed Reservation</h2>
+        <p>Hello <span class=""highlight"">{{CustomerName}}</span>,</p>
+        <p>We missed you today! As you didn't arrive for your reservation within the expected time, it has been marked as a No-Show and cancelled.</p>
+        <div class=""details"">
+            <p><strong>Reservation ID:</strong> #{{ReservationId}}</p>
+            <p><strong>Date & Time:</strong> {{ReservedTime}}</p>
+            <p><strong>Party Size:</strong> {{PartySize}} people</p>
+        </div>
+        <p>We hope to see you next time.</p>
+        <div class=""footer"">
+            <p>An Lac Restaurant<br>123 Restaurant Street, City<br>Phone: (+84) 123-456-789</p>
+        </div>
+    </div>
+</body>
+</html>",
+                Description = "Email sent to customers when they do not show up for their reservation.",
+                CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+            },
+            new EmailTemplate
+            {
+                TemplateId = 7,
+                TemplateCode = "RESERVATION_CONFIRM_ADMIN",
+                TemplateName = "Admin Reservation Notification",
+                Subject = "New Reservation - An Lac Restaurant",
+                BodyHtml = @"<!DOCTYPE html>
+<html>
+<head>
+    <meta charset=""utf-8"">
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .details { background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0; border: 1px solid #dee2e6; }
+    </style>
+</head>
+<body>
+    <div class=""container"">
+        <h2 style=""color: #1A3A51;"">New Reservation Confirmed</h2>
+        <p>A new reservation has been confirmed for <strong>{{CustomerName}}</strong>.</p>
+        <div class=""details"">
+            <p><strong>Reservation ID:</strong> #{{ReservationId}}</p>
+            <p><strong>Date & Time:</strong> {{ReservedTime}}</p>
+            <p><strong>Party Size:</strong> {{PartySize}} people</p>
+            <p><strong>Table(s):</strong> {{TableCodes}}</p>
+        </div>
+    </div>
+</body>
+</html>",
+                Description = "Notification to admin when a reservation is confirmed.",
+                CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+            },
+            new EmailTemplate
+            {
+                TemplateId = 8,
+                TemplateCode = "RESERVATION_CANCEL_ADMIN",
+                TemplateName = "Admin Reservation Cancellation Notification",
+                Subject = "Reservation Cancelled - An Lac Restaurant",
+                BodyHtml = @"<!DOCTYPE html>
+<html>
+<head>
+    <meta charset=""utf-8"">
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .details { background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0; border: 1px solid #dee2e6; }
+    </style>
+</head>
+<body>
+    <div class=""container"">
+        <h2 style=""color: #1A3A51;"">Reservation Cancelled</h2>
+        <p>A reservation for <strong>{{CustomerName}}</strong> has been cancelled.</p>
+        <div class=""details"">
+            <p><strong>Reservation ID:</strong> #{{ReservationId}}</p>
+            <p><strong>Date & Time:</strong> {{ReservedTime}}</p>
+            <p><strong>Party Size:</strong> {{PartySize}} people</p>
+            <p><strong>Table(s):</strong> {{TableCodes}}</p>
+        </div>
+    </div>
+</body>
+</html>",
+                Description = "Notification to admin when a reservation is cancelled.",
+                CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+            },
+            new EmailTemplate
+            {
+                TemplateId = 9,
+                TemplateCode = "RESERVATION_NOSHOW_ADMIN",
+                TemplateName = "Admin Reservation No-Show Notification",
+                Subject = "Reservation No-Show - An Lac Restaurant",
+                BodyHtml = @"<!DOCTYPE html>
+<html>
+<head>
+    <meta charset=""utf-8"">
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .details { background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0; border: 1px solid #dee2e6; }
+    </style>
+</head>
+<body>
+    <div class=""container"">
+        <h2 style=""color: #1A3A51;"">Reservation No-Show</h2>
+        <p>A reservation for <strong>{{CustomerName}}</strong> has been marked as No-Show.</p>
+        <div class=""details"">
+            <p><strong>Reservation ID:</strong> #{{ReservationId}}</p>
+            <p><strong>Date & Time:</strong> {{ReservedTime}}</p>
+            <p><strong>Party Size:</strong> {{PartySize}} people</p>
+            <p><strong>Table(s):</strong> {{TableCodes}}</p>
+        </div>
+    </div>
+</body>
+</html>",
+                Description = "Notification to admin when a reservation is marked as no-show.",
+                CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc)
             }
         );
     }

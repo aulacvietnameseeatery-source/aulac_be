@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Core.Extensions;
 
 namespace Core.DTO.Reservation;
 
@@ -14,8 +15,8 @@ public class CreateReservationRequest
     public string CustomerName { get; set; } = null!;
 
     [Required]
-    [Phone]
-    [StringLength(30)]
+    [StringLength(15)]
+    [RegularExpression(PhoneNumberExtensions.SupportedPhoneValidationPattern, ErrorMessage = "Invalid phone number format")]
     public string Phone { get; set; } = null!;
 
     [EmailAddress]

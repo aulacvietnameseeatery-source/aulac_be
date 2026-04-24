@@ -1,0 +1,62 @@
+@startuml
+title 2.19.2.3 View Top Dishes
+
+skinparam maxMessageSize 250
+skinparam sequence {
+    ParticipantBackgroundColor #ffffff
+    ActorBackgroundColor #ffffff
+}
+
+autonumber
+
+actor ":Staff" as U
+participant ":DashboardPage" as Client
+participant ":DashboardController" as Ctrl
+participant ":DashboardService" as Svc
+participant ":ILookupResolver" as Lookup
+participant ":IDashboardRepository" as Repo
+participant ":Database" as DB
+
+activate U
+
+U ->> Client : View top selling dishes section (optional date range, limit)
+activate Client
+
+Client ->> Ctrl : GET /api/dashboard/top-selling (DashboardFilterRequest, limit=6)
+activate Ctrl
+
+Ctrl ->> Svc : GetTopSellingAsync(request, limit, ct)
+activate Svc
+
+Svc ->> Svc : Resolve date range (StartDate ?? 30 days ago, EndDate ?? now)
+
+Svc ->> Lookup : ToOrderStatusIdAsync(OrderStatusCode.COMPLETED, ct)
+activate Lookup
+Lookup -->> Svc : completedOrderStatusId
+deactivate Lookup
+
+Svc ->> Lookup : GetIdAsync(MediaType, IMAGE, ct)
+activate Lookup
+Lookup -->> Svc : imageMediaTypeId
+deactivate Lookup
+
+Svc ->> Repo : GetTopSellingAsync(startDate, endDate, completedOrderStatusId, imageMediaTypeId, limit, ct)
+activate Repo
+Repo ->> DB : Query order items from completed orders, group by dish, sum quantities, join dish name and primary image URL, order by total quantity descending, take top N
+activate DB
+DB -->> Repo : Return list of (DishId, DishName, TotalQuantity, ImageUrl)
+deactivate DB
+Repo -->> Svc : List<TopSellingItemDto>
+deactivate Repo
+
+Svc -->> Ctrl : List<TopSellingItemDto>
+deactivate Svc
+
+Ctrl -->> Client : 200 OK (List<TopSellingItemDto>)
+deactivate Ctrl
+
+Client -->> U : Display top selling dishes with images, names, and quantities
+deactivate Client
+deactivate U
+
+@enduml

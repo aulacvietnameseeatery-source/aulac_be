@@ -43,8 +43,6 @@ public class PublicReservationService : IPublicReservationService
 
     private const string SettingReservationDuration = "reservation.default_duration_minutes";
     private const string SettingImmediateWindow = "reservation.immediate_window_minutes";
-    private const string TemplateCodeReservationConfirmation = "RESERVATION_CONFIRM";
-    private const string TemplateCodeReservationConfirmationAdmin = "RESERVATION_CONFIRM_ADMIN";
     private const string SettingStoreEmail = "store.email";
 
     public PublicReservationService(
@@ -182,6 +180,8 @@ public class PublicReservationService : IPublicReservationService
         await _uow.BeginTransactionAsync(ct);
         try
         {
+            var normalizedPhone = request.Phone.NormalizePhoneNumber();
+
             var candidates = await FindCandidateTablesAsync(request.ReservedTime, request.PartySize, ct);
             if (candidates.Count == 0)
             {
@@ -212,12 +212,12 @@ public class PublicReservationService : IPublicReservationService
                 }
                 else
                 {
-                    customerId = await _customerService.FindOrCreateCustomerIdAsync(request.Phone, request.CustomerName, request.Email, ct);
+                    customerId = await _customerService.FindOrCreateCustomerIdAsync(normalizedPhone, request.CustomerName, request.Email, ct);
                 }
             }
             else
             {
-                customerId = await _customerService.FindOrCreateCustomerIdAsync(request.Phone, request.CustomerName, request.Email, ct);
+                customerId = await _customerService.FindOrCreateCustomerIdAsync(normalizedPhone, request.CustomerName, request.Email, ct);
             }
 
 
@@ -237,7 +237,7 @@ public class PublicReservationService : IPublicReservationService
             {
                 CustomerId = customerId,
                 CustomerName = request.CustomerName,
-                Phone = request.Phone,
+                Phone = normalizedPhone,
                 Email = request.Email,
                 PartySize = request.PartySize,
                 ReservedTime = request.ReservedTime,
@@ -258,13 +258,14 @@ public class PublicReservationService : IPublicReservationService
             await _uow.CommitAsync(ct);
 
             // Fire-and-forget via Hangfire — one combined job runs customer + admin emails concurrently.
-            _jobScheduler.EnqueueReservationEmails(
+            _jobScheduler.EnqueueReservationStatusEmails(
                 created.ReservationId,
                 created.Email,
                 created.CustomerName,
                 created.ReservedTime,
                 created.PartySize,
-                tableCodes);
+                tableCodes,
+                "PENDING");
             var zones = candidates
                 .Select(x => x.Zone)
                 .Where(x => !string.IsNullOrWhiteSpace(x))
@@ -422,79 +423,5 @@ public class PublicReservationService : IPublicReservationService
     }
 
 
-    private async Task SendReservationConfirmationEmailAsync(Reservation reservation, string tableCodes)
-    {
-        try
-        {
-            var template = await _emailTemplateService.GetByCodeAsync(TemplateCodeReservationConfirmation);
-            if (template == null)
-            {
-                _logger.LogWarning("Email template {TemplateCode} not found. Skipping email.", TemplateCodeReservationConfirmation);
-                return;
-            }
 
-            var body = template.BodyHtml
-                .Replace("{{CustomerName}}", reservation.CustomerName)
-                .Replace("{{ReservedTime}}", TimeZoneInfo.ConvertTimeFromUtc(
-                    DateTime.SpecifyKind(reservation.ReservedTime, DateTimeKind.Utc), _restaurantTz)
-                    .ToString("dd/MM/yyyy HH:mm"))
-                .Replace("{{PartySize}}", reservation.PartySize.ToString())
-                .Replace("{{TableCode}}", tableCodes)
-                .Replace("{{TableCodes}}", tableCodes)
-                .Replace("{{ReservationId}}", reservation.ReservationId.ToString());
-
-            var queuedEmail = new QueuedEmail(
-                To: reservation.Email!,
-                Subject: template.Subject,
-                HtmlBody: body,
-                CorrelationId: $"Res-{reservation.ReservationId}"
-            );
-
-            await _emailQueue.EnqueueAsync(queuedEmail);
-            _logger.LogInformation("Enqueued confirmation email for reservation {ReservationId} to {Email}", reservation.ReservationId, reservation.Email);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error enqueuing confirmation email for reservation {ReservationId}", reservation.ReservationId);
-        }
-    }
-
-    private async Task SendReservationConfirmationEmailToAdminAsync(Reservation reservation, string tableCodes)
-    {
-        try
-        {
-            var template = await _emailTemplateService.GetByCodeAsync(TemplateCodeReservationConfirmationAdmin);
-            if (template == null)
-            {
-                _logger.LogWarning("Email template {TemplateCode} not found. Skipping email.", TemplateCodeReservationConfirmationAdmin);
-                return;
-            }
-
-            var body = template.BodyHtml
-                .Replace("{{CustomerName}}", reservation.CustomerName)
-                .Replace("{{ReservedTime}}", TimeZoneInfo.ConvertTimeFromUtc(
-                    DateTime.SpecifyKind(reservation.ReservedTime, DateTimeKind.Utc), _restaurantTz)
-                    .ToString("dd/MM/yyyy HH:mm"))
-                .Replace("{{PartySize}}", reservation.PartySize.ToString())
-                .Replace("{{TableCode}}", tableCodes)
-                .Replace("{{TableCodes}}", tableCodes)
-                .Replace("{{ReservationId}}", reservation.ReservationId.ToString());
-
-            var adminEmail = await _systemSettingService.GetStringAsync(SettingStoreEmail);
-
-            var queuedEmail = new QueuedEmail(
-                To: adminEmail!,
-                Subject: template.Subject,
-                HtmlBody: body,
-                CorrelationId: $"Res-{reservation.ReservationId}"
-            );
-
-            await _emailQueue.EnqueueAsync(queuedEmail);
-            _logger.LogInformation("Enqueued confirmation email for reservation {ReservationId} to {Email}", reservation.ReservationId, reservation.Email);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error enqueuing confirmation email for reservation {ReservationId}", reservation.ReservationId);
-        }
-    }
 }

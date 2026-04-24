@@ -16,6 +16,8 @@ participant ":OrderService" as Svc
 participant ":ILookupResolver" as Lookup
 participant ":IOrderRepository" as OrderRepo
 participant ":IOrderRealtimeService" as Realtime
+participant ":INotificationService" as Notif
+participant ":IShiftLiveRealtimePublisher" as ShiftLive
 participant ":Database" as DB
 
 activate U
@@ -29,59 +31,97 @@ activate Ctrl
 Ctrl ->> Svc : CancelOrderItemAsync(orderItemId, ct)
 activate Svc
 
-Svc ->> Lookup : GetIdAsync(OrderItemStatus, CREATED)
-activate Lookup
-Lookup -->> Svc : createdStatusLvId
-deactivate Lookup
+Svc ->> OrderRepo : GetOrderItemAsync(orderItemId, ct)
+activate OrderRepo
+OrderRepo ->> DB : Query order item with order and table info
+activate DB
+DB -->> OrderRepo : Return order item with dish name and table code
+deactivate DB
+OrderRepo -->> Svc : OrderItem (for notification context)
+deactivate OrderRepo
 
-Svc ->> Lookup : GetIdAsync(OrderItemStatus, CANCELLED)
+Svc ->> Lookup : ToOrderItemStatusIdAsync(CANCELLED)
 activate Lookup
 Lookup -->> Svc : cancelledStatusLvId
 deactivate Lookup
 
-Svc ->> OrderRepo : GetOrderItemAsync(orderItemId, ct)
-activate OrderRepo
-OrderRepo ->> DB : SELECT OrderItem with Order
-activate DB
-DB -->> OrderRepo : OrderItem
-deactivate DB
-OrderRepo -->> Svc : OrderItem
-deactivate OrderRepo
+Svc ->> Svc : Delegate to UpdateOrderItemStatusAsync(orderItemId, cancelledStatusLvId, null, ct)
 
-alt#White Item not found
-    Svc -->> Ctrl : throw NotFoundException
+Svc ->> Lookup : Resolve all order item status IDs (IN_PROGRESS, READY, SERVED, REJECTED, CANCELLED)
+activate Lookup
+Lookup -->> Svc : all item status LvIds
+deactivate Lookup
+
+Svc ->> Lookup : Resolve all order status IDs (PENDING, IN_PROGRESS, COMPLETED, CANCELLED) and table status (AVAILABLE)
+activate Lookup
+Lookup -->> Svc : all order/table status LvIds
+deactivate Lookup
+
+Svc ->> OrderRepo : UpdateOrderItemStatusAsync(orderItemId, cancelledStatusLvId, null, ...allLvIds, ct)
+activate OrderRepo
+
+OrderRepo ->> DB : Query order item by ID
+activate DB
+DB -->> OrderRepo : Return order item entity
+deactivate DB
+
+alt#White Order item not found
+    OrderRepo -->> Svc : throw KeyNotFoundException
+    Svc -->> Ctrl : throw KeyNotFoundException
     Ctrl -->> Client : 404 Not Found
     Client -->> U : Display "Item not found" error
 else Item found
-    alt#White Item status is NOT CREATED
-        Svc -->> Ctrl : throw InvalidOperationException("Only CREATED items can be cancelled")
-        Ctrl -->> Client : 400 Bad Request
-        Client -->> U : Display "Cannot cancel — item already in progress"
-    else Item status is CREATED
-        Svc ->> Svc : Set item.ItemStatusLvId = cancelledStatusLvId
 
-        Svc ->> OrderRepo : Save updated item (via context tracking + SaveChanges)
-        activate OrderRepo
-        OrderRepo ->> DB : UPDATE OrderItem SET ItemStatusLvId = cancelledStatusLvId
+    OrderRepo ->> DB : Update order item status to CANCELLED
+    activate DB
+    DB -->> OrderRepo : Item status updated
+    deactivate DB
+
+    OrderRepo ->> DB : Query parent order with table
+    activate DB
+    DB -->> OrderRepo : Return order with table
+    deactivate DB
+
+    OrderRepo ->> OrderRepo : Subtract cancelled item amount from order totals
+    OrderRepo ->> OrderRepo : Recalculate parent order status from all item statuses
+
+    opt#White All items cancelled — auto-cancel order and free table
+        OrderRepo ->> DB : Update order status to CANCELLED and table status to AVAILABLE
         activate DB
-        DB -->> OrderRepo : done
+        DB -->> OrderRepo : Order and table status updated
         deactivate DB
-        OrderRepo -->> Svc : done
-        deactivate OrderRepo
 
-        Svc ->> Realtime : OrderItemUpdatedAsync(OrderItemRealtimeDTO)
+        OrderRepo ->> Realtime : OrderUpdatedAsync(OrderRealtimeDTO)
         activate Realtime
-        Realtime -->> Svc : done
+        Realtime -->> OrderRepo : done
         deactivate Realtime
-
-        Svc -->> Ctrl : (void - success)
-        deactivate Svc
-
-        Ctrl -->> Client : 200 OK
-        deactivate Ctrl
-
-        Client -->> U : Item removed from order display
     end
+
+    OrderRepo ->> Realtime : OrderItemUpdatedAsync(OrderItemRealtimeDTO)
+    activate Realtime
+    Realtime -->> OrderRepo : done
+    deactivate Realtime
+
+    OrderRepo -->> Svc : done
+    deactivate OrderRepo
+
+    Svc ->> ShiftLive : PublishBoardChangedAsync(order_item_changed event)
+    activate ShiftLive
+    ShiftLive -->> Svc : done
+    deactivate ShiftLive
+
+    Svc ->> Notif : PublishAsync(ORDER_ITEM_CANCELLED notification with dish name and table code)
+    activate Notif
+    Notif -->> Svc : done
+    deactivate Notif
+
+    Svc -->> Ctrl : (void - success)
+    deactivate Svc
+
+    Ctrl -->> Client : 200 OK ("Order item cancelled successfully")
+    deactivate Ctrl
+
+    Client -->> U : Item removed from order display
 end
 
 deactivate Client

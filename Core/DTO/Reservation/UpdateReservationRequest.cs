@@ -1,10 +1,16 @@
 using System;
+using System.ComponentModel.DataAnnotations;
+using Core.Extensions;
 
 namespace Core.DTO.Reservation
 {
     public class UpdateReservationRequest
     {
         public string CustomerName { get; set; } = string.Empty;
+
+        [Required]
+        [StringLength(15)]
+        [RegularExpression(PhoneNumberExtensions.SupportedPhoneValidationPattern, ErrorMessage = "Invalid phone number format")]
         public string Phone { get; set; } = string.Empty;
         public string? Email { get; set; }
         public int PartySize { get; set; }

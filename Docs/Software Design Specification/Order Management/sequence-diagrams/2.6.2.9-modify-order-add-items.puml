@@ -16,13 +16,16 @@ participant ":OrderService" as Svc
 participant ":ILookupResolver" as Lookup
 participant ":IDishRepository" as DishRepo
 participant ":IOrderRepository" as OrderRepo
+participant ":IUnitOfWork" as UoW
+participant ":ITaxRepository" as TaxRepo
 participant ":IOrderRealtimeService" as Realtime
 participant ":INotificationService" as Notif
+participant ":IShiftLiveRealtimePublisher" as ShiftLive
 participant ":Database" as DB
 
 activate U
 
-U ->> Client : Select additional dishes and submit (customer QR or staff)
+U ->> Client : Select additional dishes and submit
 activate Client
 
 alt#White Customer QR flow
@@ -31,89 +34,165 @@ alt#White Customer QR flow
 
     Ctrl ->> Svc : AddItemsToOrderAsync(orderId, AddOrderItemsRequestDTO, ct)
     activate Svc
+
+    Svc ->> OrderRepo : GetByIdForUpdateAsync(orderId, ct)
+    activate OrderRepo
+    OrderRepo ->> DB : Query order by ID with payments
+    activate DB
+    DB -->> OrderRepo : Return order entity
+    deactivate DB
+    OrderRepo -->> Svc : Order
+    deactivate OrderRepo
+
+    alt#White Order not found
+        Svc -->> Ctrl : throw KeyNotFoundException
+        Ctrl -->> Client : 404 Not Found
+        Client -->> U : Display "Order not found" error
+    else Order found
+        alt#White Order already paid
+            Svc -->> Ctrl : throw InvalidOperationException
+            Ctrl -->> Client : 400 Bad Request
+            Client -->> U : Display "Order already paid" error
+        else Order not yet paid
+
+            Svc ->> Lookup : Resolve status IDs (OrderItemStatus CREATED, OrderStatus COMPLETED/CANCELLED/PENDING)
+            activate Lookup
+            Lookup -->> Svc : createdItemLvId, completedOrderStatusId, cancelledOrderStatusId, pendingOrderStatusId
+            deactivate Lookup
+
+            Svc ->> Svc : Build List<OrderItem> from request items
+
+            Svc ->> OrderRepo : AddItemsToOrderAsync(orderId, items, completedOrderStatusId, cancelledOrderStatusId, pendingOrderStatusId, ct)
+            activate OrderRepo
+            OrderRepo ->> DB : Query order and validate status is active (not COMPLETED/CANCELLED)
+            activate DB
+            DB -->> OrderRepo : Order validated
+            deactivate DB
+
+            OrderRepo ->> DB : Insert new order items and update order totals
+            activate DB
+            DB -->> OrderRepo : Items added and totals updated
+            deactivate DB
+            OrderRepo -->> Svc : done
+            deactivate OrderRepo
+
+            Svc ->> Notif : PublishAsync(ORDER_ITEMS_ADDED notification with dish names and table code)
+            activate Notif
+            Notif -->> Svc : done
+            deactivate Notif
+
+            Svc ->> Svc : ApplyTaxToOrderAsync(order, ct) — recalculate tax after adding items
+            activate Svc
+            Svc ->> TaxRepo : GetDefaultTaxAsync(ct)
+            activate TaxRepo
+            TaxRepo -->> Svc : Tax
+            deactivate TaxRepo
+            deactivate Svc
+
+            Svc ->> UoW : SaveChangesAsync(ct)
+            activate UoW
+            UoW -->> Svc : done
+            deactivate UoW
+
+            Svc -->> Ctrl : (void - success)
+            deactivate Svc
+
+            Ctrl -->> Client : 200 OK ("Items added to order successfully")
+            deactivate Ctrl
+
+            Client -->> U : Display updated order with new items
+        end
+    end
+
 else Staff flow
     Client ->> Ctrl : POST /api/orders/staff/{id}/items (AddOrderItemsRequest)
     activate Ctrl
 
-    note right of Ctrl : [HasPermission(Permissions.EditOrder)]
-
     Ctrl ->> Svc : AddItemsAsync(orderId, AddOrderItemsRequest, ct)
     activate Svc
-end
 
-Svc ->> Lookup : GetIdAsync(OrderItemStatus, CREATED)
-activate Lookup
-Lookup -->> Svc : createdItemStatusLvId
-deactivate Lookup
+    Svc ->> UoW : BeginTransactionAsync(ct)
+    activate UoW
+    UoW -->> Svc : Transaction started
+    deactivate UoW
 
-Svc ->> Lookup : GetIdAsync(OrderStatus, PENDING)
-activate Lookup
-Lookup -->> Svc : pendingOrderStatusId
-deactivate Lookup
+    Svc ->> Lookup : Resolve status IDs (OrderStatus CANCELLED/COMPLETED/IN_PROGRESS, OrderItemStatus CREATED)
+    activate Lookup
+    Lookup -->> Svc : canceledStatusId, completedStatusId, inProgressStatusId, createdItemStatusId
+    deactivate Lookup
 
-Svc ->> Lookup : GetIdAsync(OrderStatus, COMPLETED)
-activate Lookup
-Lookup -->> Svc : completedOrderStatusId
-deactivate Lookup
-
-Svc ->> Lookup : GetIdAsync(OrderStatus, CANCELLED)
-activate Lookup
-Lookup -->> Svc : cancelledOrderStatusId
-deactivate Lookup
-
-loop For each item in request.Items
-    Svc ->> DishRepo : GetByIdAsync(dishId, ct)
-    activate DishRepo
-    DishRepo -->> Svc : Dish (validate and get price)
-    deactivate DishRepo
-end
-
-Svc ->> Svc : Build List<OrderItem> from validated dishes
-
-Svc ->> OrderRepo : AddItemsToOrderAsync(orderId, items, completedOrderStatusId, cancelledOrderStatusId, pendingOrderStatusId, ct)
-activate OrderRepo
-
-OrderRepo ->> DB : SELECT Order by id
-activate DB
-DB -->> OrderRepo : Order
-deactivate DB
-
-alt#White Order not found or already COMPLETED/CANCELLED
-    OrderRepo -->> Svc : throw InvalidOperationException
-    Svc -->> Ctrl : throw InvalidOperationException
-    Ctrl -->> Client : 400 Bad Request
-    Client -->> U : Display error message
-else Order is active (PENDING or IN_PROGRESS)
-    OrderRepo ->> DB : INSERT new OrderItems
+    Svc ->> OrderRepo : GetByIdForUpdateAsync(orderId, ct)
+    activate OrderRepo
+    OrderRepo ->> DB : Query order by ID with payments and status
     activate DB
-    DB -->> OrderRepo : done
+    DB -->> OrderRepo : Return order entity
     deactivate DB
-
-    OrderRepo ->> DB : UPDATE Order totals (SubTotalAmount, TotalAmount, TaxAmount)
-    activate DB
-    DB -->> OrderRepo : done
-    deactivate DB
-
-    OrderRepo -->> Svc : done
+    OrderRepo -->> Svc : Order
     deactivate OrderRepo
 
-    Svc ->> Realtime : OrderUpdatedAsync(OrderRealtimeDTO)
-    activate Realtime
-    Realtime -->> Svc : done
-    deactivate Realtime
+    alt#White Order not found
+        Svc -->> Ctrl : throw NotFoundException
+        Ctrl -->> Client : 404 Not Found
+        Client -->> U : Display error
+    else Order found
+        alt#White Order is cancelled or already paid
+            Svc -->> Ctrl : throw InvalidOperationException
+            Ctrl -->> Client : 400 Bad Request
+            Client -->> U : Display error
+        else Order is active
 
-    Svc ->> Notif : PublishAsync(items added notification)
-    activate Notif
-    Notif -->> Svc : done
-    deactivate Notif
+            Svc ->> DishRepo : GetByIdsAsync(dishIds, ct)
+            activate DishRepo
+            DishRepo ->> DB : Query dishes by IDs in single query
+            activate DB
+            DB -->> DishRepo : Return list of dishes
+            deactivate DB
+            DishRepo -->> Svc : List<Dish>
+            deactivate DishRepo
 
-    Svc -->> Ctrl : (void - success)
-    deactivate Svc
+            Svc ->> Svc : Build OrderItem entities, calculate additional total, add to order
 
-    Ctrl -->> Client : 200 OK
-    deactivate Ctrl
+            Svc ->> Svc : ApplyTaxToOrderAsync(order, ct)
+            activate Svc
+            Svc ->> TaxRepo : GetDefaultTaxAsync(ct)
+            activate TaxRepo
+            TaxRepo -->> Svc : Tax
+            deactivate TaxRepo
+            deactivate Svc
 
-    Client -->> U : Display updated order with new items
+            opt#White Order was COMPLETED — revert to IN_PROGRESS
+                Svc ->> Svc : Set order.OrderStatusLvId = inProgressStatusId
+            end
+
+            Svc ->> UoW : SaveChangesAsync(ct)
+            activate UoW
+            UoW -->> Svc : done
+            deactivate UoW
+
+            Svc ->> UoW : CommitAsync(ct)
+            activate UoW
+            UoW -->> Svc : Transaction committed
+            deactivate UoW
+
+            Svc ->> Realtime : OrderUpdatedAsync(OrderRealtimeDTO)
+            activate Realtime
+            Realtime -->> Svc : done
+            deactivate Realtime
+
+            Svc ->> ShiftLive : PublishBoardChangedAsync(order_items_added event)
+            activate ShiftLive
+            ShiftLive -->> Svc : done
+            deactivate ShiftLive
+
+            Svc -->> Ctrl : (void - success)
+            deactivate Svc
+
+            Ctrl -->> Client : 200 OK ("Items added successfully")
+            deactivate Ctrl
+
+            Client -->> U : Display updated order with new items
+        end
+    end
 end
 
 deactivate Client

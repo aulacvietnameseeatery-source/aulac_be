@@ -1,4 +1,4 @@
-﻿using Core.DTO.General;
+using Core.DTO.General;
 using Core.DTO.Payment;
 using Core.Entity;
 using Core.Interface.Repo;
@@ -138,7 +138,8 @@ namespace Infa.Repo
                 .Include(p => p.TypeLv)
                 .Include(p => p.PromotionRules)
                 .Include(p => p.PromotionTargets)
-                .Where(p => p.PromotionStatusLvId == activePromotionStatusId)
+                .Include(p => p.PromotionStatusLv)
+                .Where(p => p.PromotionStatusLv.ValueCode != PromotionStatusCode.DISABLED.ToString())
                 .Where(p => now >= p.StartTime && now <= p.EndTime)
                 .Where(p => !p.MaxUsage.HasValue || (p.UsedCount ?? 0) < p.MaxUsage.Value)
                 .ToListAsync(ct);

@@ -15,12 +15,13 @@ participant ":OrderController" as Ctrl
 participant ":OrderService" as Svc
 participant ":ILookupResolver" as Lookup
 participant ":ITableRepository" as TableRepo
-participant ":IDishRepository" as DishRepo
-participant ":ITaxRepository" as TaxRepo
 participant ":ICustomerService" as CustSvc
 participant ":IOrderRepository" as OrderRepo
+participant ":ITaxRepository" as TaxRepo
+participant ":IUnitOfWork" as UoW
 participant ":IOrderRealtimeService" as Realtime
 participant ":INotificationService" as Notif
+participant ":IShiftLiveRealtimePublisher" as ShiftLive
 participant ":Database" as DB
 
 activate U
@@ -34,79 +35,167 @@ activate Ctrl
 Ctrl ->> Svc : CreateOrderAsync(CreateOrderRequestDTO, ct)
 activate Svc
 
-Svc ->> Lookup : GetIdAsync(OrderSource, DINE_IN)
-activate Lookup
-Lookup -->> Svc : sourceLvId
-deactivate Lookup
+Svc ->> UoW : BeginTransactionAsync(ct)
+activate UoW
+UoW -->> Svc : Transaction started
+deactivate UoW
 
-Svc ->> Lookup : GetIdAsync(OrderStatus, PENDING)
-activate Lookup
-Lookup -->> Svc : pendingStatusLvId
-deactivate Lookup
-
-Svc ->> TableRepo : GetByIdAsync(tableCode, ct)
+Svc ->> TableRepo : GetByCodeAsync(tableCode, ct)
 activate TableRepo
-TableRepo ->> DB : SELECT table by code
+TableRepo ->> DB : Query table by code
 activate DB
-DB -->> TableRepo : RestaurantTable
+DB -->> TableRepo : Return table entity
 deactivate DB
 TableRepo -->> Svc : RestaurantTable
 deactivate TableRepo
 
-alt#White Table not found or not available
-    Svc -->> Ctrl : throw NotFoundException / InvalidOperationException
-    Ctrl -->> Client : 404 / 400 Error
-    Client -->> U : Display error message
-else Table is valid
-    Svc ->> CustSvc : Resolve walk-in / guest customer
-    activate CustSvc
-    CustSvc -->> Svc : Customer
-    deactivate CustSvc
+alt#White Table not found
+    Svc -->> Ctrl : throw KeyNotFoundException
+    Ctrl -->> Client : 404 Not Found
+    Client -->> U : Display "Table not found" error
+else Table found
 
-    loop For each item in request.Items
-        Svc ->> DishRepo : GetByIdAsync(dishId, ct)
-        activate DishRepo
-        DishRepo -->> Svc : Dish (validate exists and available)
-        deactivate DishRepo
+    opt#White QR token provided
+        Svc ->> Svc : Validate QR token matches table.QrToken
+        alt#White Invalid QR token
+            Svc -->> Ctrl : throw ValidationException
+            Ctrl -->> Client : 400 Bad Request
+            Client -->> U : Display "Invalid QR token" error
+        end
     end
 
-    Svc ->> Svc : Build Order entity with items
+    Svc ->> Lookup : Resolve table status IDs (AVAILABLE, OCCUPIED, LOCKED, RESERVED)
+    activate Lookup
+    Lookup -->> Svc : availableLvId, occupiedLvId, lockedLvId, reservedLvId
+    deactivate Lookup
 
-    Svc ->> Svc : ApplyTaxToOrderAsync(order, ct)
-    activate Svc
-    Svc ->> TaxRepo : GetDefaultTaxAsync(ct)
-    activate TaxRepo
-    TaxRepo -->> Svc : Tax
-    deactivate TaxRepo
-    Svc ->> Svc : Calculate tax amount
-    deactivate Svc
+    alt#White Table is LOCKED or deleted
+        Svc -->> Ctrl : throw InvalidOperationException
+        Ctrl -->> Client : 400 Bad Request
+        Client -->> U : Display "Table not available" error
+    else Table is usable
 
-    Svc ->> OrderRepo : CreateOrderAsync(order, items, ct)
-    activate OrderRepo
-    OrderRepo ->> DB : INSERT Order + OrderItems
-    activate DB
-    DB -->> OrderRepo : orderId
-    deactivate DB
-    OrderRepo -->> Svc : orderId
-    deactivate OrderRepo
+        alt#White Table is OCCUPIED (existing active order)
+            Svc ->> OrderRepo : GetActiveOrderByTableAsync(tableId, ct)
+            activate OrderRepo
+            OrderRepo ->> DB : Query active order for table
+            activate DB
+            DB -->> OrderRepo : Return existing order
+            deactivate DB
+            OrderRepo -->> Svc : Existing Order
+            deactivate OrderRepo
 
-    Svc ->> Realtime : OrderCreatedAsync(OrderRealtimeDTO)
-    activate Realtime
-    Realtime -->> Svc : done
-    deactivate Realtime
+            opt#White Existing active order found
+                Svc ->> Lookup : Resolve order item/status IDs for add-items flow
+                activate Lookup
+                Lookup -->> Svc : createdItemLvId, completedOrderLvId, cancelledOrderLvId, pendingOrderLvId
+                deactivate Lookup
 
-    Svc ->> Notif : PublishAsync(new order notification)
-    activate Notif
-    Notif -->> Svc : done
-    deactivate Notif
+                Svc ->> Svc : Build additional OrderItem entities from request
 
-    Svc -->> Ctrl : CreateOrderResponseDTO
-    deactivate Svc
+                Svc ->> OrderRepo : AddItemsToOrderAsync(existingOrderId, items, statusIds, ct)
+                activate OrderRepo
+                OrderRepo ->> DB : Insert new items and update order totals
+                activate DB
+                DB -->> OrderRepo : Items added
+                deactivate DB
+                OrderRepo -->> Svc : done
+                deactivate OrderRepo
 
-    Ctrl -->> Client : 200 OK (CreateOrderResponseDTO)
-    deactivate Ctrl
+                Svc ->> Svc : ApplyTaxToOrderAsync(existingOrder, ct)
+                Svc ->> UoW : CommitAsync(ct)
+                activate UoW
+                UoW -->> Svc : Transaction committed
+                deactivate UoW
 
-    Client -->> U : Display order confirmation
+                Svc ->> Realtime : OrderCreatedAsync(OrderRealtimeDTO)
+                activate Realtime
+                Realtime -->> Svc : done
+                deactivate Realtime
+
+                Svc ->> ShiftLive : PublishBoardChangedAsync(customer_order_created event)
+                activate ShiftLive
+                ShiftLive -->> Svc : done
+                deactivate ShiftLive
+
+                Svc ->> Notif : PublishAsync(NEW_ORDER notification with item count and table code)
+                activate Notif
+                Notif -->> Svc : done
+                deactivate Notif
+
+                Svc -->> Ctrl : CreateOrderResponseDTO (existing order ID)
+                deactivate Svc
+                Ctrl -->> Client : 201 Created (CreateOrderResponseDTO)
+                deactivate Ctrl
+                Client -->> U : Display order confirmation (items added to existing order)
+            end
+
+        else Table is AVAILABLE or RESERVED (new order)
+
+            Svc ->> Svc : Set table.TableStatusLvId = occupiedLvId
+            Svc ->> TableRepo : UpdateAsync(table, ct)
+            activate TableRepo
+            TableRepo -->> Svc : done
+            deactivate TableRepo
+
+            Svc ->> CustSvc : GetGuestCustomerIdAsync(ct)
+            activate CustSvc
+            CustSvc -->> Svc : guestCustomerId
+            deactivate CustSvc
+
+            Svc ->> Lookup : Resolve order lookup IDs (PENDING status, DINE_IN source, CREATED item status)
+            activate Lookup
+            Lookup -->> Svc : pendingOrderLvId, dineInSourceLvId, createdItemLvId
+            deactivate Lookup
+
+            Svc ->> Svc : Build Order entity with items, calculate totals
+            Svc ->> Svc : ApplyTaxToOrderAsync(order, ct)
+            activate Svc
+            Svc ->> TaxRepo : GetDefaultTaxAsync(ct)
+            activate TaxRepo
+            TaxRepo -->> Svc : Tax
+            deactivate TaxRepo
+            Svc ->> Svc : Calculate tax amount
+            deactivate Svc
+
+            Svc ->> OrderRepo : CreateOrderAsync(order, items, ct)
+            activate OrderRepo
+            OrderRepo ->> DB : Insert order and order items
+            activate DB
+            DB -->> OrderRepo : Return generated orderId
+            deactivate DB
+            OrderRepo -->> Svc : orderId
+            deactivate OrderRepo
+
+            Svc ->> UoW : CommitAsync(ct)
+            activate UoW
+            UoW -->> Svc : Transaction committed
+            deactivate UoW
+
+            Svc ->> Realtime : OrderCreatedAsync(OrderRealtimeDTO)
+            activate Realtime
+            Realtime -->> Svc : done
+            deactivate Realtime
+
+            Svc ->> ShiftLive : PublishBoardChangedAsync(customer_order_created event)
+            activate ShiftLive
+            ShiftLive -->> Svc : done
+            deactivate ShiftLive
+
+            Svc ->> Notif : PublishAsync(NEW_ORDER notification with item count and table code)
+            activate Notif
+            Notif -->> Svc : done
+            deactivate Notif
+
+            Svc -->> Ctrl : CreateOrderResponseDTO
+            deactivate Svc
+
+            Ctrl -->> Client : 201 Created (CreateOrderResponseDTO)
+            deactivate Ctrl
+
+            Client -->> U : Display order confirmation
+        end
+    end
 end
 
 deactivate Client

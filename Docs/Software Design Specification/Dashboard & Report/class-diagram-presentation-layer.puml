@@ -3,24 +3,28 @@ title Dashboard & Report Module - Presentation Layer Class Diagram
 
 package "Presentation Layer" {
 
-    class DashboardController <<Controller>> {
-        -_dashboardService : IDashboardService
-        +GetSummary(request: DashboardFilterRequest, ct: CancellationToken) : Task<IActionResult>
-        +GetRevenueChart(request: DashboardFilterRequest, ct: CancellationToken) : Task<IActionResult>
-        +GetTopSelling(request: DashboardFilterRequest, limit: int, ct: CancellationToken) : Task<IActionResult>
-        +GetStatistics(request: DashboardFilterRequest, ct: CancellationToken) : Task<IActionResult>
-    }
+    package "Controllers" {
+        class DashboardController <<Controller>> {
+            -_dashboardService : IDashboardService
+            +GetSummary(request: DashboardFilterRequest, ct: CancellationToken) : Task<IActionResult>
+            +GetRevenueChart(request: DashboardFilterRequest, ct: CancellationToken) : Task<IActionResult>
+            +GetTopSelling(request: DashboardFilterRequest, limit: int, ct: CancellationToken) : Task<IActionResult>
+            +GetStatistics(request: DashboardFilterRequest, ct: CancellationToken) : Task<IActionResult>
+        }
 
-    class ReportController <<Controller>> {
-        -_reportService : IReportService
-        -_logger : ILogger<ReportController>
-        +GetEarningSummary(request: ReportFilterRequest, ct: CancellationToken) : Task<IActionResult>
-        +GetPaymentMethods(request: ReportFilterRequest, ct: CancellationToken) : Task<IActionResult>
-        +GetEarningTable(request: ReportFilterRequest, pageIndex: int, pageSize: int, ct: CancellationToken) : Task<IActionResult>
-        +GetOrderMetrics(request: ReportFilterRequest, ct: CancellationToken) : Task<IActionResult>
-        +GetSalesItems(request: ReportFilterRequest, pageIndex: int, pageSize: int, ct: CancellationToken) : Task<IActionResult>
-        +GetTopSpenders(request: ReportFilterRequest, pageIndex: int, pageSize: int, ct: CancellationToken) : Task<IActionResult>
-        +GetTop5Spenders(startDate: DateTime?, endDate: DateTime?, ct: CancellationToken) : Task<IActionResult>
+        class ReportController <<Controller>> {
+            -_reportService : IReportService
+            -_logger : ILogger<ReportController>
+            +GetEarningSummary(request: ReportFilterRequest, ct: CancellationToken) : Task<IActionResult>
+            +GetPaymentMethods(request: ReportFilterRequest, ct: CancellationToken) : Task<IActionResult>
+            +GetEarningTable(request: ReportFilterRequest, pageIndex: int, pageSize: int, ct: CancellationToken) : Task<IActionResult>
+            +GetOrderMetrics(request: ReportFilterRequest, ct: CancellationToken) : Task<IActionResult>
+            +GetSalesItems(request: ReportFilterRequest, pageIndex: int, pageSize: int, ct: CancellationToken) : Task<IActionResult>
+            +GetTopSpenders(request: ReportFilterRequest, pageIndex: int, pageSize: int, ct: CancellationToken) : Task<IActionResult>
+            +GetTop5Spenders(startDate: DateTime?, endDate: DateTime?, ct: CancellationToken) : Task<IActionResult>
+            +GetDailyEarningDetail(date: DateTime, ct: CancellationToken) : Task<IActionResult>
+            +GetDishPerformanceDetail(dishId: long, request: ReportFilterRequest, ct: CancellationToken) : Task<IActionResult>
+        }
     }
 
     ' ── Request DTOs ──
@@ -121,6 +125,46 @@ package "Presentation Layer" {
         +LastVisitDate : DateTime?
     }
 
+    class DailyEarningDetailDto <<DTO>> {
+        +TotalNet : decimal
+        +AvgOrder : decimal
+        +TotalOrders : int
+        +HourlyRevenue : List<HourlyRevenueDto>
+        +RecentOrders : List<RecentOrderDto>
+    }
+
+    class HourlyRevenueDto <<DTO>> {
+        +Time : string
+        +Revenue : decimal
+    }
+
+    class RecentOrderDto <<DTO>> {
+        +Id : string
+        +Time : string
+        +Customer : string
+        +Amount : decimal
+        +Status : string
+    }
+
+    class DishPerformanceDetailDto <<DTO>> {
+        +TotalRevenue : decimal
+        +TotalSold : int
+        +AvgDailySold : double
+        +Trend : List<SalesTrendDto>
+        +FrequentlyBoughtWith : List<CrossSellItemDto>
+    }
+
+    class SalesTrendDto <<DTO>> {
+        +Date : string
+        +Quantity : int
+    }
+
+    class CrossSellItemDto <<DTO>> {
+        +Id : string
+        +Name : string
+        +Frequency : int
+    }
+
 }
 
 ' ── Relationships ──
@@ -138,8 +182,14 @@ ReportController ..> EarningTableItemDto : returns paged earning rows
 ReportController ..> OrderMetricsDto : returns order metrics
 ReportController ..> SalesItemDto : returns paged sales items
 ReportController ..> ReportTopCustomerDto : returns paged top customers
+ReportController ..> DailyEarningDetailDto : returns daily earning detail
+ReportController ..> DishPerformanceDetailDto : returns dish performance
 
 DashboardSummaryDto *-- "4" TrendValueDto : wraps trend values
 DashboardStatisticsDto --> "0..1" DashboardTopCustomerDto : top customer snapshot
+DailyEarningDetailDto *-- "0..*" HourlyRevenueDto : hourly breakdown
+DailyEarningDetailDto *-- "0..*" RecentOrderDto : recent orders
+DishPerformanceDetailDto *-- "0..*" SalesTrendDto : daily trend
+DishPerformanceDetailDto *-- "0..*" CrossSellItemDto : frequently bought with
 
 @enduml
