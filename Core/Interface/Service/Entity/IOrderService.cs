@@ -37,4 +37,11 @@ public interface IOrderService
 
     Task<List<RecentOrderDTO>> GetRecentOrdersAsync(long userId, List<string> roles, int limit, CancellationToken ct);
 
+    /// <summary>
+    /// Atomically adjusts existing items, appends new items, and optionally updates the customer
+    /// for an order — all in a single transaction.
+    /// Throws if the order is CANCELLED or already paid.
+    /// </summary>
+    Task UpdateOrderItemsAsync(long orderId, UpdateOrderItemsRequest request, CancellationToken ct);
+
 }

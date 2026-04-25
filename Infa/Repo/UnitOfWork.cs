@@ -38,6 +38,9 @@ namespace Infa.Repo
 
         public Task SaveChangesAsync(CancellationToken ct)
             => _db.SaveChangesAsync(ct); // Persist all changes to the database
+
+        public void Remove<T>(T entity) where T : class
+            => _db.Remove(entity); // Mark entity for deletion
     }
 
 }
