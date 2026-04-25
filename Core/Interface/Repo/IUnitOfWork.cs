@@ -31,5 +31,10 @@ namespace Core.Interface.Repo
         /// </summary>
         /// <param name="ct">Cancellation token.</param>
         Task SaveChangesAsync(CancellationToken ct);
+
+        /// <summary>
+        /// Marks an entity for deletion so it is removed on the next SaveChanges.
+        /// </summary>
+        void Remove<T>(T entity) where T : class;
     }
 }

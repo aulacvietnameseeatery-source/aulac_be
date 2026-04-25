@@ -3,6 +3,7 @@ using Core.Data;
 using Core.DTO.General;
 using Core.DTO.Order;
 using Core.Enum;
+using Core.Exceptions;
 using Core.Extensions;
 using Core.Interface.Service.Entity;
 using API.Models;
@@ -497,6 +498,64 @@ namespace Api.Controllers
                 UserMessage = "Items added successfully",
                 ServerTime = DateTimeOffset.UtcNow
             });
+        }
+
+        /// <summary>
+        /// Adjusts existing order items, appends new items, and optionally updates the customer
+        /// — all in a single atomic transaction.
+        ///
+        /// Rules:
+        ///   CREATED items → full edit (qty up/down, remove).
+        ///   IN_PROGRESS items → locked (returns 400).
+        ///   SERVED items → decrease/remove only; reason required.
+        ///   REJECTED items → locked (returns 400).
+        ///   CANCELLED or paid orders → locked (returns 400).
+        /// </summary>
+        [HttpPut("staff/{id:long}/items")]
+        [HasPermission(Permissions.EditOrder)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> UpdateStaffOrderItems(
+            long id,
+            [FromBody] UpdateOrderItemsRequest request,
+            CancellationToken ct)
+        {
+            try
+            {
+                await _orderService.UpdateOrderItemsAsync(id, request, ct);
+
+                return Ok(new ApiResponse<object>
+                {
+                    Success = true,
+                    Code = 200,
+                    SubCode = 0,
+                    UserMessage = "Order items updated successfully",
+                    ServerTime = DateTimeOffset.UtcNow,
+                });
+            }
+            catch (NotFoundException ex)
+            {
+                return NotFound(new ApiResponse<object>
+                {
+                    Success = false,
+                    Code = 404,
+                    SubCode = 1,
+                    UserMessage = ex.Message,
+                    ServerTime = DateTimeOffset.UtcNow,
+                });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new ApiResponse<object>
+                {
+                    Success = false,
+                    Code = 400,
+                    SubCode = 2,
+                    UserMessage = ex.Message,
+                    ServerTime = DateTimeOffset.UtcNow,
+                });
+            }
         }
 
         /// <summary>

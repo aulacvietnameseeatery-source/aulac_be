@@ -941,6 +941,260 @@ public class OrderService : IOrderService
         return await _orderRepository.GetRecentOrdersAsync(userId, roles, limit, ct);
     }
 
+    // ── Lookup ID bag — resolved once and shared across all UpdateOrderItems helpers ──────────
+    private sealed record UpdateOrderIds(
+        uint CancelledOrderId, uint PendingOrderId, uint CompletedOrderId, uint InProgressOrderId,
+        uint CreatedItemId, uint InProgressItemId, uint ServedItemId,
+        uint RejectedItemId, uint CancelledItemId, uint ReadyItemId,
+        uint AvailableTableId, uint OccupiedTableId);
+
+    private async Task<UpdateOrderIds> ResolveUpdateOrderIdsAsync(CancellationToken ct) => new(
+        CancelledOrderId:  await OrderStatusCode.CANCELLED.ToOrderStatusIdAsync(_lookupResolver, ct),
+        PendingOrderId:    await OrderStatusCode.PENDING.ToOrderStatusIdAsync(_lookupResolver, ct),
+        CompletedOrderId:  await OrderStatusCode.COMPLETED.ToOrderStatusIdAsync(_lookupResolver, ct),
+        InProgressOrderId: await OrderStatusCode.IN_PROGRESS.ToOrderStatusIdAsync(_lookupResolver, ct),
+        CreatedItemId:     await OrderItemStatusCode.CREATED.ToOrderItemStatusIdAsync(_lookupResolver, ct),
+        InProgressItemId:  await OrderItemStatusCode.IN_PROGRESS.ToOrderItemStatusIdAsync(_lookupResolver, ct),
+        ServedItemId:      await OrderItemStatusCode.SERVED.ToOrderItemStatusIdAsync(_lookupResolver, ct),
+        RejectedItemId:    await OrderItemStatusCode.REJECTED.ToOrderItemStatusIdAsync(_lookupResolver, ct),
+        CancelledItemId:   await OrderItemStatusCode.CANCELLED.ToOrderItemStatusIdAsync(_lookupResolver, ct),
+        ReadyItemId:       await OrderItemStatusCode.READY.ToOrderItemStatusIdAsync(_lookupResolver, ct),
+        AvailableTableId:  await TableStatusCode.AVAILABLE.ToTableStatusIdAsync(_lookupResolver, ct),
+        OccupiedTableId:   await TableStatusCode.OCCUPIED.ToTableStatusIdAsync(_lookupResolver, ct));
+
+    // ─────────────────────────────────────────────────────────────────────────────────────────
+
+    /// <inheritdoc />
+    public async Task UpdateOrderItemsAsync(long orderId, UpdateOrderItemsRequest request, CancellationToken ct)
+    {
+        var ids = await ResolveUpdateOrderIdsAsync(ct);
+
+        await _uow.BeginTransactionAsync(ct);
+        try
+        {
+            // ── 1. Load & validate order ──
+            var order = await _orderRepository.GetByIdForUpdateAsync(orderId, ct)
+                ?? throw new NotFoundException($"Order {orderId} not found.");
+
+            if (order.OrderStatusLvId == ids.CancelledOrderId)
+                throw new InvalidOperationException("Cannot modify a cancelled order.");
+
+            if (order.Payments.Any())
+                throw new InvalidOperationException("Cannot modify a paid order.");
+
+            // ── 2. Apply item adjustments ──
+            foreach (var adj in request.Adjustments)
+                ApplySingleAdjustment(order, adj, ids);
+
+            // ── 3. Append new items ──
+            var newOrderStatus = order.OrderStatusLv.ValueCode;
+            if (request.NewItems.Any())
+                newOrderStatus = await AppendNewItemsAsync(order, request.NewItems, ids, ct) ?? newOrderStatus;
+
+            // ── 4. Auto-recalculate order status when removals were processed ──
+            if (request.Adjustments.Any(a => a.NewQuantity <= 0) && !request.NewItems.Any())
+                newOrderStatus = await RecalculateOrderStatusAfterRemovalAsync(order, ids, ct) ?? newOrderStatus;
+
+            // ── 5. Update customer ──
+            if (request.Customer != null && !string.IsNullOrWhiteSpace(request.Customer.Phone))
+            {
+                var customerId = await _customerService.ResolveCustomerAsync(request.Customer, ct);
+                if (order.CustomerId != customerId)
+                    order.CustomerId = customerId;
+            }
+
+            // ── 6. Recalculate totals ──
+            order.TotalAmount    = order.OrderItems
+                .Where(i => i.ItemStatusLvId != ids.RejectedItemId && i.ItemStatusLvId != ids.CancelledItemId)
+                .Sum(i => i.Price * i.Quantity);
+            order.SubTotalAmount = order.TotalAmount;
+            order.UpdatedAt      = DateTime.UtcNow;
+
+            await ApplyTaxToOrderAsync(order, ct);
+            await _uow.SaveChangesAsync(ct);
+            await _uow.CommitAsync(ct);
+
+            // ── 7. Realtime event ──
+            await _realtime.OrderUpdatedAsync(new OrderRealtimeDTO
+            {
+                OrderId   = orderId,
+                Status    = newOrderStatus,
+                TableId   = order.TableId,
+                UpdatedAt = DateTime.UtcNow,
+            });
+
+            await PublishShiftLiveOrderEventAsync("order_updated", orderId, order.StaffId, ct);
+        }
+        catch
+        {
+            await _uow.RollbackAsync(ct);
+            throw;
+        }
+    }
+
+    /// <summary>Validates and applies one adjustment to an existing order item.</summary>
+    private void ApplySingleAdjustment(Order order, OrderItemAdjustmentDto adj, UpdateOrderIds ids)
+    {
+        var item = order.OrderItems.FirstOrDefault(i => i.OrderItemId == adj.OrderItemId)
+            ?? throw new NotFoundException($"Order item {adj.OrderItemId} not found in order {order.OrderId}.");
+
+        if (item.ItemStatusLvId == ids.InProgressItemId)
+            throw new InvalidOperationException($"Item {adj.OrderItemId} is IN_PROGRESS and cannot be modified.");
+
+        if (item.ItemStatusLvId == ids.RejectedItemId)
+            throw new InvalidOperationException($"Item {adj.OrderItemId} is REJECTED and cannot be modified.");
+
+        if (item.ItemStatusLvId == ids.ServedItemId)
+        {
+            if (adj.NewQuantity > item.Quantity)
+                throw new InvalidOperationException(
+                    $"Item {adj.OrderItemId} has already been SERVED — quantity cannot be increased.");
+
+            if (string.IsNullOrWhiteSpace(adj.Reason))
+                throw new InvalidOperationException(
+                    $"A reason is required when adjusting a SERVED item (item {adj.OrderItemId}).");
+        }
+
+        if (adj.NewQuantity <= 0)
+        {
+            if (item.ItemStatusLvId == ids.CreatedItemId)
+            {
+                // CREATED: physically remove from the order
+                order.OrderItems.Remove(item);
+                _uow.Remove(item);
+            }
+            else
+            {
+                // Non-CREATED (e.g. SERVED): mark as REJECTED with audit trail
+                item.ItemStatusLvId = ids.RejectedItemId;
+                item.ItemStatus     = 5; // REJECTED ordinal
+                item.RejectReason   = adj.Reason;
+            }
+        }
+        else if (item.ItemStatusLvId == ids.CreatedItemId)
+        {
+            // CREATED: simple qty + note edit
+            item.Quantity = adj.NewQuantity;
+            if (adj.Note != null) item.Note = adj.Note;
+        }
+        else
+        {
+            // SERVED: update qty and append structured audit-trail note (parseable by FE for i18n)
+            item.Quantity = adj.NewQuantity;
+            item.Note     = BuildAdjustedNote(item.Note, adj.NewQuantity, adj.Reason);
+        }
+    }
+
+    /// <summary>
+    /// Builds the structured audit-trail note for a SERVED item adjustment.
+    /// Replaces any existing ADJUSTED segment while preserving the original base note.
+    /// </summary>
+    private static string BuildAdjustedNote(string? existing, int newQty, string? reason)
+    {
+        var raw    = existing ?? "";
+        var adjIdx = raw.IndexOf("ADJUSTED:");
+        string? baseNote = adjIdx < 0
+            ? (string.IsNullOrWhiteSpace(raw) ? null : raw.Trim())
+            : (raw[..adjIdx].TrimEnd().TrimEnd('|').TrimEnd() is { Length: > 0 } b ? b : null);
+
+        var segment = $"ADJUSTED:{newQty}|REASON:{reason}";
+        return baseNote is null ? segment : $"{baseNote} | {segment}";
+    }
+
+    /// <summary>
+    /// Appends new dishes to the order.
+    /// Returns the updated order status string if the order status changed (COMPLETED → IN_PROGRESS),
+    /// or <c>null</c> if no status change occurred.
+    /// </summary>
+    private async Task<string?> AppendNewItemsAsync(
+        Order order, List<CreateOrderItemDto> newItems, UpdateOrderIds ids, CancellationToken ct)
+    {
+        var dishIds = newItems.Select(i => i.DishId).Distinct().ToList();
+        var dishes  = await _dishRepository.GetByIdsAsync(dishIds, ct);
+
+        if (dishes.Count != dishIds.Count)
+            throw new NotFoundException("One or more dishes not found.");
+
+        foreach (var newItem in newItems)
+        {
+            var dish = dishes.First(d => d.DishId == newItem.DishId);
+            order.OrderItems.Add(new OrderItem
+            {
+                OrderId        = order.OrderId,
+                DishId         = newItem.DishId,
+                Quantity       = newItem.Quantity,
+                Price          = dish.Price,
+                Note           = newItem.Note,
+                ItemStatus     = 1,            // CREATED ordinal
+                ItemStatusLvId = ids.CreatedItemId,
+            });
+        }
+
+        // COMPLETED → IN_PROGRESS: order is re-opened when new items arrive
+        if (order.OrderStatusLvId == ids.CompletedOrderId)
+        {
+            order.OrderStatusLvId = ids.InProgressOrderId;
+            return OrderStatusCode.IN_PROGRESS.ToString();
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Recalculates order status after one or more items were removed (qty → 0).
+    /// Cancels or completes the order when all remaining items are in a terminal state.
+    /// Also frees the table if the order is cancelled and the table is still OCCUPIED.
+    /// Returns the updated order status string, or <c>null</c> if the status did not change.
+    /// </summary>
+    private async Task<string?> RecalculateOrderStatusAfterRemovalAsync(
+        Order order, UpdateOrderIds ids, CancellationToken ct)
+    {
+        var allStatuses = order.OrderItems.Select(i => i.ItemStatusLvId).ToList();
+
+        if (allStatuses.Count == 0)
+        {
+            // All items deleted — cancel order and free table
+            if (order.OrderStatusLvId != ids.CancelledOrderId)
+                order.OrderStatusLvId = ids.CancelledOrderId;
+
+            await FreeTableIfOccupiedAsync(order, ids, ct);
+            return OrderStatusCode.CANCELLED.ToString();
+        }
+
+        bool allFinished = allStatuses.All(s =>
+            s == ids.ServedItemId  || s == ids.ReadyItemId ||
+            s == ids.RejectedItemId || s == ids.CancelledItemId);
+
+        if (!allFinished) return null;
+
+        bool hasBeenWorked  = allStatuses.Any(s => s == ids.ServedItemId || s == ids.ReadyItemId);
+        var  targetStatusId = hasBeenWorked ? ids.CompletedOrderId : ids.CancelledOrderId;
+
+        if (order.OrderStatusLvId == targetStatusId) return null;
+
+        order.OrderStatusLvId = targetStatusId;
+
+        if (!hasBeenWorked)
+            await FreeTableIfOccupiedAsync(order, ids, ct);
+
+        return hasBeenWorked ? OrderStatusCode.COMPLETED.ToString() : OrderStatusCode.CANCELLED.ToString();
+    }
+
+    /// <summary>Sets the order's table to AVAILABLE if it is currently OCCUPIED.</summary>
+    private async Task FreeTableIfOccupiedAsync(Order order, UpdateOrderIds ids, CancellationToken ct)
+    {
+        if (!order.TableId.HasValue) return;
+
+        var table = await _tableRepository.GetByIdAsync(order.TableId.Value, ct);
+        if (table is null || table.TableStatusLvId != ids.OccupiedTableId) return;
+
+        table.TableStatusLvId = ids.AvailableTableId;
+        table.UpdatedAt       = DateTime.UtcNow;
+        await _tableRepository.UpdateAsync(table, ct);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────────────────
+
     private Task PublishShiftLiveOrderEventAsync(string eventType, long orderId, long? staffId, CancellationToken ct)
     {
         return _shiftLiveRealtimePublisher.PublishBoardChangedAsync(new ShiftLiveRealtimeEventDto
