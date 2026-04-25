@@ -87,25 +87,34 @@ public class OrderService : IOrderService
             cancellationToken);
     }
 
+    private const string StaffCancelledReason = "Staff cancelled order";
+
     public async Task UpdateOrderStatusAsync(long orderId, OrderStatusCode newStatus, CancellationToken cancellationToken = default)
     {
-        var pendingStatusId = await OrderStatusCode.PENDING.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+        var pendingStatusId    = await OrderStatusCode.PENDING.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
         var inProgressStatusId = await OrderStatusCode.IN_PROGRESS.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
-        var completedStatusId = await OrderStatusCode.COMPLETED.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
-        var cancelledStatusId = await OrderStatusCode.CANCELLED.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+        var completedStatusId  = await OrderStatusCode.COMPLETED.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+        var cancelledStatusId  = await OrderStatusCode.CANCELLED.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
+
+        var createdItemStatusId    = await OrderItemStatusCode.CREATED.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
+        var inProgressItemStatusId = await OrderItemStatusCode.IN_PROGRESS.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
+        var servedItemStatusId     = await OrderItemStatusCode.SERVED.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
+        var readyItemStatusId      = await OrderItemStatusCode.READY.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
+        var rejectedItemStatusId   = await OrderItemStatusCode.REJECTED.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
+        var cancelledItemStatusId  = await OrderItemStatusCode.CANCELLED.ToOrderItemStatusIdAsync(_lookupResolver, cancellationToken);
 
         var availableTableStatusId = await TableStatusCode.AVAILABLE.ToTableStatusIdAsync(_lookupResolver, cancellationToken);
-        var occupiedTableStatusId = await TableStatusCode.OCCUPIED.ToTableStatusIdAsync(_lookupResolver, cancellationToken);
+        var occupiedTableStatusId  = await TableStatusCode.OCCUPIED.ToTableStatusIdAsync(_lookupResolver, cancellationToken);
 
         var order = await _orderRepository.GetByIdForUpdateAsync(orderId, cancellationToken)
             ?? throw new NotFoundException("Order not found.");
 
         var current = order.OrderStatusLvId switch
         {
-            var id when id == pendingStatusId => OrderStatusCode.PENDING,
+            var id when id == pendingStatusId    => OrderStatusCode.PENDING,
             var id when id == inProgressStatusId => OrderStatusCode.IN_PROGRESS,
-            var id when id == completedStatusId => OrderStatusCode.COMPLETED,
-            var id when id == cancelledStatusId => OrderStatusCode.CANCELLED,
+            var id when id == completedStatusId  => OrderStatusCode.COMPLETED,
+            var id when id == cancelledStatusId  => OrderStatusCode.CANCELLED,
             _ => throw new InvalidOperationException("Current order status is invalid.")
         };
 
@@ -114,12 +123,12 @@ public class OrderService : IOrderService
 
         var isTransitionAllowed = (current, newStatus) switch
         {
-            (OrderStatusCode.PENDING, OrderStatusCode.IN_PROGRESS) => true,
-            (OrderStatusCode.PENDING, OrderStatusCode.CANCELLED) => true,
-            (OrderStatusCode.IN_PROGRESS, OrderStatusCode.COMPLETED) => true,
-            (OrderStatusCode.IN_PROGRESS, OrderStatusCode.CANCELLED) => true,
-            (OrderStatusCode.CANCELLED, OrderStatusCode.PENDING) => true,
-            (OrderStatusCode.COMPLETED, OrderStatusCode.IN_PROGRESS) => true,
+            (OrderStatusCode.PENDING,    OrderStatusCode.IN_PROGRESS) => true,
+            (OrderStatusCode.PENDING,    OrderStatusCode.CANCELLED)   => true,
+            (OrderStatusCode.IN_PROGRESS, OrderStatusCode.COMPLETED)  => true,
+            (OrderStatusCode.IN_PROGRESS, OrderStatusCode.CANCELLED)  => true,
+            (OrderStatusCode.CANCELLED,  OrderStatusCode.PENDING)     => true,
+            (OrderStatusCode.COMPLETED,  OrderStatusCode.IN_PROGRESS) => true,
             _ => false
         };
 
@@ -129,20 +138,63 @@ public class OrderService : IOrderService
         if (newStatus == OrderStatusCode.CANCELLED && order.Payments.Any())
             throw new InvalidOperationException("Cannot cancel a paid order.");
 
+        // ── Reset validation: allow if there are cascade-cancelled OR kitchen-rejected items to restore ──
+        if (current == OrderStatusCode.CANCELLED && newStatus == OrderStatusCode.PENDING)
+        {
+            var hasRestorableItems = order.OrderItems
+                .Any(i => (i.RejectReason == StaffCancelledReason && i.ItemStatusLvId == cancelledItemStatusId)
+                       || i.ItemStatusLvId == rejectedItemStatusId);
+
+            if (!hasRestorableItems)
+                throw new InvalidOperationException("Cannot reset order: no items to restore. Please create a new order.");
+        }
+
         await _uow.BeginTransactionAsync(cancellationToken);
         try
         {
             var targetStatusId = newStatus switch
             {
-                OrderStatusCode.PENDING => pendingStatusId,
+                OrderStatusCode.PENDING     => pendingStatusId,
                 OrderStatusCode.IN_PROGRESS => inProgressStatusId,
-                OrderStatusCode.COMPLETED => completedStatusId,
-                OrderStatusCode.CANCELLED => cancelledStatusId,
+                OrderStatusCode.COMPLETED   => completedStatusId,
+                OrderStatusCode.CANCELLED   => cancelledStatusId,
                 _ => throw new InvalidOperationException("Unsupported order status.")
             };
 
             order.OrderStatusLvId = targetStatusId;
             order.UpdatedAt = DateTime.UtcNow;
+
+            // ── Cascade Cancel: set active items to CANCELLED with reason ──
+            if (newStatus == OrderStatusCode.CANCELLED)
+            {
+                var terminalStatuses = new HashSet<uint> { servedItemStatusId, readyItemStatusId, rejectedItemStatusId, cancelledItemStatusId };
+                foreach (var item in order.OrderItems)
+                {
+                    if (terminalStatuses.Contains(item.ItemStatusLvId)) continue;
+
+                    item.ItemStatusLvId = cancelledItemStatusId;
+                    item.RejectReason   = StaffCancelledReason;
+                    order.TotalAmount    -= item.Price * item.Quantity;
+                    order.SubTotalAmount -= item.Price * item.Quantity;
+                }
+            }
+
+            // ── Reset: restore cascade-cancelled items AND kitchen-rejected items ──
+            if (current == OrderStatusCode.CANCELLED && newStatus == OrderStatusCode.PENDING)
+            {
+                foreach (var item in order.OrderItems)
+                {
+                    var isCascadeCancelled = item.ItemStatusLvId == cancelledItemStatusId && item.RejectReason == StaffCancelledReason;
+                    var isKitchenRejected  = item.ItemStatusLvId == rejectedItemStatusId;
+                    if (isCascadeCancelled || isKitchenRejected)
+                    {
+                        item.ItemStatusLvId = createdItemStatusId;
+                        item.RejectReason   = null;
+                        order.TotalAmount    += item.Price * item.Quantity;
+                        order.SubTotalAmount += item.Price * item.Quantity;
+                    }
+                }
+            }
 
             if (order.TableId.HasValue)
             {
@@ -167,7 +219,6 @@ public class OrderService : IOrderService
             await _uow.SaveChangesAsync(cancellationToken);
             await _uow.CommitAsync(cancellationToken);
 
-            // Notify about order status change
             if (newStatus == OrderStatusCode.CANCELLED)
             {
                 await _notificationService.PublishAsync(new PublishNotificationRequest

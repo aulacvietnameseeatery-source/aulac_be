@@ -1076,7 +1076,8 @@ namespace Core.Service
                 throw new InvalidOperationException("Reservation already in this status.");
 
             if (current == ReservationStatusCode.CANCELLED ||
-                current == ReservationStatusCode.NO_SHOW)
+                current == ReservationStatusCode.NO_SHOW ||
+                current == ReservationStatusCode.COMPLETED)
                 throw new InvalidOperationException("Reservation already closed.");
         }
 
