@@ -154,25 +154,27 @@ namespace Core.Service
             if (coupon == null)
                 throw new KeyNotFoundException($"Coupon with ID {id} not found.");
 
+            var now = DateTime.UtcNow;
+
             // If coupon is expired, do not allow any updates
-            if (coupon.EndTime < DateTime.UtcNow)
+            if (coupon.EndTime < now)
                 throw new InvalidOperationException("Cannot update an expired coupon.");
 
-            var isUsed = coupon.UsedCount > 0;
+            var isActive = coupon.StartTime <= now && coupon.EndTime >= now;
 
-            if (isUsed)
+            if (isActive)
             {
-                // Used coupon: only allow updating Description, EndTime, MaxUsage
+                // Active coupon: only allow updating CouponName, Description, EndTime (not MaxUsage)
                 if (request.EndTime <= coupon.StartTime)
                     throw new InvalidOperationException("End time must be after start time.");
 
+                coupon.CouponName = request.CouponName.Trim();
                 coupon.Description = request.Description?.Trim();
                 coupon.EndTime = request.EndTime;
-                coupon.MaxUsage = request.MaxUsage;
             }
             else
             {
-                // Unused coupon: allow full update
+                // Scheduled coupon: allow full update
                 // Normalize coupon code: remove all whitespace and convert to uppercase
                 request.CouponCode = string.Concat(request.CouponCode.Split()).ToUpper();
 
