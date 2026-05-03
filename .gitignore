@@ -377,3 +377,4 @@ Api/appsettings.json
 .idea 
 Tests/*.xlsx
 Tests/*.py
+/.artifacts

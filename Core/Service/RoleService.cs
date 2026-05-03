@@ -15,10 +15,17 @@ namespace Core.Service
     public class RoleService : IRoleService
     {
         private readonly IRoleRepository _roleRepository;
+        private readonly IAccountRepository _accountRepository;
+        private readonly IUnitOfWork _unitOfWork;
 
-        public RoleService(IRoleRepository roleRepository)
+        public RoleService(
+            IRoleRepository roleRepository,
+            IAccountRepository accountRepository,
+            IUnitOfWork unitOfWork)
         {
             _roleRepository = roleRepository;
+            _accountRepository = accountRepository;
+            _unitOfWork = unitOfWork;
         }
 
         public async Task<(List<RoleListItemDto> Items, int TotalCount)>
@@ -93,33 +100,73 @@ namespace Core.Service
             };
         }
 
-        public async Task DeleteRoleAsync(long roleId)
+        public async Task ArchiveRoleAsync(
+            long roleId,
+            ArchiveRoleRequestDto? request = null,
+            CancellationToken cancellationToken = default)
         {
-            var role = await _roleRepository.FindByIdAsync(roleId);
+            var role = await _roleRepository.FindByIdAsync(roleId, cancellationToken);
             if (role == null)
             {
                 throw new KeyNotFoundException($"Role with ID {roleId} not found.");
             }
 
-            // Check if staff are assigned using optimized query
-            if (await _roleRepository.HasStaffAssignedAsync(roleId))
-            {
-                throw new InvalidOperationException("Cannot delete role that has assigned staff accounts.");
-            }
-
-            // Soft delete: Update status to INACTIVE
-            // Look up the "INACTIVE" status value since IDs are dynamic
             var inactiveStatus = await _roleRepository.GetRoleStatusIdAsync(RoleStatusCode.INACTIVE.ToString());
             if (inactiveStatus == null)
             {
-                 // Fallback or error if status configuration is missing. 
-                 // Ideally this shouldn't happen if SQL script ran correctly.
-                 // For safety, throwing exception or logging.
-                 throw new InvalidOperationException("Role Status 'INACTIVE' not found config in database.");
+                throw new InvalidOperationException("Role Status 'INACTIVE' not found config in database.");
             }
 
-            role.RoleStatusLvId = inactiveStatus.Value;
-            await _roleRepository.UpdateAsync(role);
+            var hasStaffAssigned = await _roleRepository.HasStaffAssignedAsync(roleId, cancellationToken);
+            if (!hasStaffAssigned)
+            {
+                role.RoleStatusLvId = inactiveStatus.Value;
+                await _roleRepository.UpdateAsync(role);
+                return;
+            }
+
+            if (request?.ReplacementRoleId == null)
+            {
+                throw new InvalidOperationException("Replacement role is required to archive a role that has assigned staff accounts.");
+            }
+
+            if (request.ReplacementRoleId.Value == roleId)
+            {
+                throw new InvalidOperationException("Replacement role must be different from the role being archived.");
+            }
+
+            var replacementRole = await _roleRepository.FindByIdAsync(request.ReplacementRoleId.Value, cancellationToken);
+            if (replacementRole == null)
+            {
+                throw new KeyNotFoundException($"Replacement role with ID {request.ReplacementRoleId.Value} not found.");
+            }
+
+            var activeStatus = await _roleRepository.GetRoleStatusIdAsync(RoleStatusCode.ACTIVE.ToString());
+            if (activeStatus == null)
+            {
+                throw new InvalidOperationException("Role Status 'ACTIVE' not found config in database.");
+            }
+
+            if (replacementRole.RoleStatusLvId != activeStatus.Value)
+            {
+                throw new InvalidOperationException("Replacement role must be active before it can receive staff accounts.");
+            }
+
+            await _unitOfWork.BeginTransactionAsync(cancellationToken);
+            try
+            {
+                await _accountRepository.ReassignRoleAsync(roleId, replacementRole.RoleId, cancellationToken);
+
+                role.RoleStatusLvId = inactiveStatus.Value;
+                await _roleRepository.UpdateAsync(role);
+
+                await _unitOfWork.CommitAsync(cancellationToken);
+            }
+            catch
+            {
+                await _unitOfWork.RollbackAsync(cancellationToken);
+                throw;
+            }
         }
 
         public async Task<RoleDetailDto> CreateRoleAsync(CreateRoleRequestDto request)
@@ -176,6 +223,11 @@ namespace Core.Service
             if (existingRole == null)
             {
                 throw new KeyNotFoundException($"Role with ID {roleId} not found.");
+            }
+
+            if (!request.IsActive && await _roleRepository.HasStaffAssignedAsync(roleId))
+            {
+                throw new InvalidOperationException("Cannot deactivate a role that still has assigned staff accounts. Reassign staff first or archive the role with a replacement role.");
             }
 
             // Get the appropriate status ID based on IsActive flag

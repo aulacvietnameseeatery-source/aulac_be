@@ -11,6 +11,7 @@ namespace API.Controllers
 {
     [Route("api/reservations")]
     [ApiController]
+    [Authorize]
     public class ReservationController : ControllerBase
     {
         private readonly IAdminReservationService _reservationService;
@@ -23,7 +24,7 @@ namespace API.Controllers
         // --- 1. GET LIST RESERVATIONS ---
         // URL: GET /api/reservations?pageIndex=1&pageSize=10&date=2024-02-15&statusId=21
         [HttpGet]
-        // [HasPermission(Permissions.ViewReservation)] // Bỏ comment khi tích hợp Auth
+        [HasPermission(Permissions.ViewReservation)]
         [ProducesResponseType(typeof(ApiResponse<PagedResult<ReservationManagementDto>>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetReservations(
             [FromQuery] GetReservationsRequest request,
@@ -60,7 +61,7 @@ namespace API.Controllers
         // --- 2. GET STATUSES FOR TABS ---
         // URL: GET /api/reservations/statuses
         [HttpGet("statuses")]
-        [AllowAnonymous] // Cho phép gọi không cần token để render UI (hoặc cần Auth tùy nghiệp vụ)
+        [HasPermission(Permissions.ViewReservation)]
         [ProducesResponseType(typeof(ApiResponse<List<ReservationStatusDto>>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetStatuses(CancellationToken cancellationToken)
         {
@@ -111,7 +112,7 @@ namespace API.Controllers
 
         // URL: PATCH /api/reservations/{id}/status
         [HttpPatch("{id:long}/status")]
-        // [HasPermission(Permissions.EditReservation)]
+        [HasPermission(Permissions.UpdateReservation)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
         public async Task<IActionResult> UpdateReservationStatus(
             long id,
@@ -161,7 +162,7 @@ namespace API.Controllers
         // --- 5. ASSIGN TABLE & CONFIRM RESERVATION ---
         // URL: PATCH /api/reservations/{id}/assign-and-confirm
         [HttpPatch("{id:long}/assign-and-confirm")]
-        // [HasPermission(Permissions.EditReservation)]
+        [HasPermission(Permissions.UpdateReservation)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
         public async Task<IActionResult> AssignTableAndConfirm(
             long id,
@@ -206,7 +207,7 @@ namespace API.Controllers
         // --- 6. UPDATE RESERVATION ---
         // URL: PUT /api/reservations/{id}
         [HttpPut("{id:long}")]
-        // [HasPermission(Permissions.EditReservation)]
+        [HasPermission(Permissions.UpdateReservation)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
         public async Task<IActionResult> UpdateReservation(
             long id,
@@ -250,7 +251,7 @@ namespace API.Controllers
         // --- 7. DELETE RESERVATION ---
         // URL: DELETE /api/reservations/{id}
         [HttpDelete("{id:long}")]
-        // [HasPermission(Permissions.DeleteReservation)]
+        [HasPermission(Permissions.DeleteReservation)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
         public async Task<IActionResult> DeleteReservation(long id, CancellationToken cancellationToken)
         {

@@ -49,6 +49,18 @@ public interface IAccountRepository
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Reassigns all staff accounts from one role to another in a single database operation.
+    /// </summary>
+    /// <param name="sourceRoleId">Role currently assigned to the staff accounts</param>
+    /// <param name="targetRoleId">Replacement role for the staff accounts</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Number of affected accounts</returns>
+    Task<int> ReassignRoleAsync(
+        long sourceRoleId,
+        long targetRoleId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Finds an account by username.
     /// </summary>
     /// <param name="username">The username to search for</param>

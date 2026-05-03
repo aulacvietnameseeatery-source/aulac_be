@@ -12,7 +12,7 @@ namespace Tests.Services;
 /// <summary>
 /// Unit Test — RoleService
 /// Code Module : Core/Service/RoleService.cs
-/// Methods     : GetPagedAsync, GetRoleDetailAsync, DeleteRoleAsync, CreateRoleAsync, UpdateRoleAsync
+/// Methods     : GetPagedAsync, GetRoleDetailAsync, ArchiveRoleAsync, CreateRoleAsync, UpdateRoleAsync
 /// Created By  : AI Agent
 /// Executed By : Tester
 /// Test Req.   : Validate role CRUD operations including paging, detail retrieval,
@@ -22,9 +22,14 @@ public class RoleServiceTests
 {
     // ── Mocks ──────────────────────────────────────────────────────────────
     private readonly Mock<IRoleRepository> _roleRepoMock = new();
+    private readonly Mock<IAccountRepository> _accountRepoMock = new();
+    private readonly Mock<IUnitOfWork> _unitOfWorkMock = new();
 
     // ── Factory ────────────────────────────────────────────────────────────
-    private RoleService CreateService() => new(_roleRepoMock.Object);
+    private RoleService CreateService() => new(
+        _roleRepoMock.Object,
+        _accountRepoMock.Object,
+        _unitOfWorkMock.Object);
 
     // ── Constants ──────────────────────────────────────────────────────────
     private const uint ActiveStatusId = 10u;
@@ -315,15 +320,15 @@ public class RoleServiceTests
     #endregion
 
     // ══════════════════════════════════════════════════════════════════════
-    //  DeleteRoleAsync
+    //  ArchiveRoleAsync
     // ══════════════════════════════════════════════════════════════════════
 
-    #region DeleteRoleAsync
+    #region ArchiveRoleAsync
 
     [Fact]
     [Trait("Type", "Normal")]
-    [Trait("Method", "DeleteRoleAsync")]
-    public async Task DeleteRoleAsync_WhenRoleExistsAndNoStaff_SoftDeletesSuccessfully()
+    [Trait("Method", "ArchiveRoleAsync")]
+    public async Task ArchiveRoleAsync_WhenRoleExistsAndNoStaff_SoftDeletesSuccessfully()
     {
         // Arrange
         var role = MakeRole(1);
@@ -335,7 +340,7 @@ public class RoleServiceTests
         var service = CreateService();
 
         // Act
-        await service.DeleteRoleAsync(1);
+        await service.ArchiveRoleAsync(1);
 
         // Assert
         role.RoleStatusLvId.Should().Be(InactiveStatusId);
@@ -344,8 +349,8 @@ public class RoleServiceTests
 
     [Fact]
     [Trait("Type", "Abnormal")]
-    [Trait("Method", "DeleteRoleAsync")]
-    public async Task DeleteRoleAsync_WhenRoleNotFound_ThrowsKeyNotFoundException()
+    [Trait("Method", "ArchiveRoleAsync")]
+    public async Task ArchiveRoleAsync_WhenRoleNotFound_ThrowsKeyNotFoundException()
     {
         // Arrange
         _roleRepoMock.Setup(r => r.FindByIdAsync(999, default)).ReturnsAsync((Role?)null);
@@ -353,7 +358,7 @@ public class RoleServiceTests
         var service = CreateService();
 
         // Act
-        var act = () => service.DeleteRoleAsync(999);
+        var act = () => service.ArchiveRoleAsync(999);
 
         // Assert
         await act.Should().ThrowAsync<KeyNotFoundException>()
@@ -362,28 +367,29 @@ public class RoleServiceTests
 
     [Fact]
     [Trait("Type", "Abnormal")]
-    [Trait("Method", "DeleteRoleAsync")]
-    public async Task DeleteRoleAsync_WhenStaffAssigned_ThrowsInvalidOperationException()
+    [Trait("Method", "ArchiveRoleAsync")]
+    public async Task ArchiveRoleAsync_WhenStaffAssignedAndNoReplacement_ThrowsInvalidOperationException()
     {
         // Arrange
         var role = MakeRole(1);
         _roleRepoMock.Setup(r => r.FindByIdAsync(1, default)).ReturnsAsync(role);
         _roleRepoMock.Setup(r => r.HasStaffAssignedAsync(1, default)).ReturnsAsync(true);
+        _roleRepoMock.Setup(r => r.GetRoleStatusIdAsync("INACTIVE")).ReturnsAsync(InactiveStatusId);
 
         var service = CreateService();
 
         // Act
-        var act = () => service.DeleteRoleAsync(1);
+        var act = () => service.ArchiveRoleAsync(1);
 
         // Assert
         await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*assigned staff*");
+            .WithMessage("*Replacement role is required*");
     }
 
     [Fact]
     [Trait("Type", "Abnormal")]
-    [Trait("Method", "DeleteRoleAsync")]
-    public async Task DeleteRoleAsync_WhenInactiveStatusMissing_ThrowsInvalidOperationException()
+    [Trait("Method", "ArchiveRoleAsync")]
+    public async Task ArchiveRoleAsync_WhenInactiveStatusMissing_ThrowsInvalidOperationException()
     {
         // Arrange
         var role = MakeRole(1);
@@ -394,11 +400,45 @@ public class RoleServiceTests
         var service = CreateService();
 
         // Act
-        var act = () => service.DeleteRoleAsync(1);
+        var act = () => service.ArchiveRoleAsync(1);
 
         // Assert
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*INACTIVE*not found*");
+    }
+
+    [Fact]
+    [Trait("Type", "Normal")]
+    [Trait("Method", "ArchiveRoleAsync")]
+    public async Task ArchiveRoleAsync_WhenStaffAssignedAndReplacementProvided_ReassignsStaffAndArchivesRole()
+    {
+        // Arrange
+        var role = MakeRole(1, "MANAGER", "Manager");
+        var replacementRole = MakeRole(2, "SUPERVISOR", "Supervisor");
+        var request = new ArchiveRoleRequestDto { ReplacementRoleId = 2 };
+
+        _roleRepoMock.Setup(r => r.FindByIdAsync(1, default)).ReturnsAsync(role);
+        _roleRepoMock.Setup(r => r.FindByIdAsync(2, default)).ReturnsAsync(replacementRole);
+        _roleRepoMock.Setup(r => r.HasStaffAssignedAsync(1, default)).ReturnsAsync(true);
+        _roleRepoMock.Setup(r => r.GetRoleStatusIdAsync("INACTIVE")).ReturnsAsync(InactiveStatusId);
+        _roleRepoMock.Setup(r => r.GetRoleStatusIdAsync("ACTIVE")).ReturnsAsync(ActiveStatusId);
+        _roleRepoMock.Setup(r => r.UpdateAsync(It.IsAny<Role>())).Returns(Task.CompletedTask);
+        _accountRepoMock.Setup(r => r.ReassignRoleAsync(1, 2, default)).ReturnsAsync(3);
+        _unitOfWorkMock.Setup(u => u.BeginTransactionAsync(default)).Returns(Task.CompletedTask);
+        _unitOfWorkMock.Setup(u => u.CommitAsync(default)).Returns(Task.CompletedTask);
+
+        var service = CreateService();
+
+        // Act
+        await service.ArchiveRoleAsync(1, request);
+
+        // Assert
+        role.RoleStatusLvId.Should().Be(InactiveStatusId);
+        _unitOfWorkMock.Verify(u => u.BeginTransactionAsync(default), Times.Once);
+        _accountRepoMock.Verify(r => r.ReassignRoleAsync(1, 2, default), Times.Once);
+        _roleRepoMock.Verify(r => r.UpdateAsync(role), Times.Once);
+        _unitOfWorkMock.Verify(u => u.CommitAsync(default), Times.Once);
+        _unitOfWorkMock.Verify(u => u.RollbackAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
     #endregion
@@ -663,6 +703,7 @@ public class RoleServiceTests
         };
 
         _roleRepoMock.Setup(r => r.GetRoleWithPermissionsForUpdateAsync(1, default)).ReturnsAsync(existingRole);
+    _roleRepoMock.Setup(r => r.HasStaffAssignedAsync(1, default)).ReturnsAsync(false);
         _roleRepoMock.Setup(r => r.GetRoleStatusIdAsync("INACTIVE")).ReturnsAsync(InactiveStatusId);
         _roleRepoMock.Setup(r => r.GetPermissionsByIdsAsync(It.IsAny<List<long>>(), default)).ReturnsAsync(permissions);
         _roleRepoMock.Setup(r => r.UpdateAsync(It.IsAny<Role>())).Returns(Task.CompletedTask);
@@ -676,6 +717,28 @@ public class RoleServiceTests
 
         // Assert
         existingRole.RoleStatusLvId.Should().Be(InactiveStatusId);
+    }
+
+    [Fact]
+    [Trait("Type", "Abnormal")]
+    [Trait("Method", "UpdateRoleAsync")]
+    public async Task UpdateRoleAsync_WhenDeactivatingWithStaffAssigned_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        var existingRole = MakeRole(1, "MANAGER", "Manager");
+        var request = MakeUpdateRequest("Manager", false, new List<long> { 1, 2 });
+
+        _roleRepoMock.Setup(r => r.GetRoleWithPermissionsForUpdateAsync(1, default)).ReturnsAsync(existingRole);
+        _roleRepoMock.Setup(r => r.HasStaffAssignedAsync(1, default)).ReturnsAsync(true);
+
+        var service = CreateService();
+
+        // Act
+        var act = () => service.UpdateRoleAsync(1, request);
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*Reassign staff first or archive the role*");
     }
 
     [Fact]

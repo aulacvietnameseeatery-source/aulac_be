@@ -20,11 +20,13 @@ namespace Core.Interface.Service.Role
         Task<(List<RoleListItemDto> Items, int TotalCount)> GetPagedAsync(PagedQuery query);
 
         /// <summary>
-        /// Deletes a role.
+        /// Archives a role.
         /// </summary>
         /// <param name="roleId">The role ID</param>
+        /// <param name="request">Optional replacement role information for reassignment</param>
+        /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>Task</returns>
-        Task DeleteRoleAsync(long roleId);
+        Task ArchiveRoleAsync(long roleId, ArchiveRoleRequestDto? request = null, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Gets detailed information about a role including all permissions.

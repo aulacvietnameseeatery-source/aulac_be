@@ -43,8 +43,27 @@ using Core.Interface.Service.Reservation;
 using Core.Interface.Service.Notification;
 using Core.Interface.Service.Report;
 using Infa.Repository;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
+
+static string GetClientAddress(HttpContext context)
+{
+    var cfConnectingIp = context.Request.Headers["CF-Connecting-IP"].FirstOrDefault();
+    if (!string.IsNullOrWhiteSpace(cfConnectingIp))
+    {
+        return cfConnectingIp.Trim();
+    }
+
+    var forwardedFor = context.Request.Headers["X-Forwarded-For"].FirstOrDefault();
+    if (!string.IsNullOrWhiteSpace(forwardedFor))
+    {
+        return forwardedFor.Split(',')[0].Trim();
+    }
+
+    return context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+}
 
 const long maxRequestBodySizeBytes = 100L * 1024L * 1024L; // 100 MB
 
@@ -139,8 +158,86 @@ builder.Services.Configure<AttendanceOptions>(
 builder.Services.Configure<Core.Extensions.RestaurantOptions>(
     builder.Configuration.GetSection(Core.Extensions.RestaurantOptions.SectionName));
 
+builder.Services.Configure<Core.Extensions.PublicReservationOptions>(
+    builder.Configuration.GetSection(Core.Extensions.PublicReservationOptions.SectionName));
+
 // In-process memory cache for email templates etc. (independent of CacheMode)
 builder.Services.AddMemoryCache();
+
+var publicReservationOptions = builder.Configuration
+    .GetSection(Core.Extensions.PublicReservationOptions.SectionName)
+    .Get<Core.Extensions.PublicReservationOptions>()
+    ?? new Core.Extensions.PublicReservationOptions();
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.OnRejected = async (context, cancellationToken) =>
+    {
+        var response = context.HttpContext.Response;
+        response.ContentType = "application/json";
+
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+        {
+            response.Headers.RetryAfter = Math.Max(1, (int)Math.Ceiling(retryAfter.TotalSeconds)).ToString();
+        }
+
+        var apiResponse = new ApiResponse<object>
+        {
+            Success = false,
+            Code = StatusCodes.Status429TooManyRequests,
+            SubCode = 29,
+            UserMessage = "Too many requests. Please try again in a moment.",
+            SystemMessage = "RATE_LIMIT_EXCEEDED",
+            ValidateInfo = new List<string>(),
+            Data = new { },
+            GetLastData = false,
+            ServerTime = DateTimeOffset.UtcNow
+        };
+
+        await response.WriteAsync(JsonSerializer.Serialize(apiResponse, new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        }), cancellationToken);
+    };
+
+    options.AddPolicy("PublicReservationPhoneLookup", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: $"public-phone-lookup:{GetClientAddress(context)}",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = Math.Max(1, publicReservationOptions.RateLimit.PhoneLookup.PermitLimit),
+                Window = TimeSpan.FromMinutes(Math.Max(1, publicReservationOptions.RateLimit.PhoneLookup.WindowMinutes)),
+                QueueLimit = Math.Max(0, publicReservationOptions.RateLimit.PhoneLookup.QueueLimit),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                AutoReplenishment = true
+            }));
+
+    options.AddPolicy("PublicReservationFitCheck", context =>
+        RateLimitPartition.GetSlidingWindowLimiter(
+            partitionKey: $"public-fit-check:{GetClientAddress(context)}",
+            factory: _ => new SlidingWindowRateLimiterOptions
+            {
+                PermitLimit = Math.Max(1, publicReservationOptions.RateLimit.FitCheck.PermitLimit),
+                Window = TimeSpan.FromMinutes(Math.Max(1, publicReservationOptions.RateLimit.FitCheck.WindowMinutes)),
+                SegmentsPerWindow = Math.Max(1, publicReservationOptions.RateLimit.FitCheck.SegmentsPerWindow),
+                QueueLimit = Math.Max(0, publicReservationOptions.RateLimit.FitCheck.QueueLimit),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                AutoReplenishment = true
+            }));
+
+    options.AddPolicy("PublicReservationCreate", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: $"public-create:{GetClientAddress(context)}",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = Math.Max(1, publicReservationOptions.RateLimit.CreateReservation.PermitLimit),
+                Window = TimeSpan.FromMinutes(Math.Max(1, publicReservationOptions.RateLimit.CreateReservation.WindowMinutes)),
+                QueueLimit = Math.Max(0, publicReservationOptions.RateLimit.CreateReservation.QueueLimit),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                AutoReplenishment = true
+            }));
+});
 
 #endregion
 
@@ -510,6 +607,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseCors("AllowFrontend");
 app.UseHttpsRedirection();
+app.UseRateLimiter();
 
 // Authentication & Authorization Middleware
 // Must be before UseAuthorization

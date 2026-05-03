@@ -160,6 +160,12 @@ namespace Api.Controllers
             [FromBody] string status, 
             CancellationToken cancellationToken = default)
         {
+            var requestingUserId = GetCurrentUserId();
+            if (!requestingUserId.HasValue)
+            {
+                return Unauthorized();
+            }
+
             if (!Enum.TryParse<AccountStatusCode>(status, true, out var statusCode))
             {
                 return BadRequest(new ApiResponse<object>
@@ -167,7 +173,19 @@ namespace Api.Controllers
                     Success = false,
                     Code = 400,
                     UserMessage = "Invalid status code. Allowed values: ACTIVE, INACTIVE, LOCKED",
-                    Data = null,
+                    Data = null!,
+                    ServerTime = DateTimeOffset.UtcNow
+                });
+            }
+
+            if (requestingUserId.Value == id && statusCode == AccountStatusCode.INACTIVE)
+            {
+                return BadRequest(new ApiResponse<object>
+                {
+                    Success = false,
+                    Code = 400,
+                    UserMessage = "You cannot deactivate your own account.",
+                    Data = null!,
                     ServerTime = DateTimeOffset.UtcNow
                 });
             }
@@ -179,7 +197,7 @@ namespace Api.Controllers
                 Success = true,
                 Code = 200,
                 UserMessage = $"Account status updated to {statusCode}",
-                Data = null,
+                Data = null!,
                 ServerTime = DateTimeOffset.UtcNow
             });
         }

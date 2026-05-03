@@ -59,6 +59,19 @@ public class AccountRepository : IAccountRepository
     }
 
     /// <inheritdoc />
+    public Task<int> ReassignRoleAsync(
+        long sourceRoleId,
+        long targetRoleId,
+        CancellationToken cancellationToken = default)
+    {
+        return _context.StaffAccounts
+            .Where(account => account.RoleId == sourceRoleId)
+            .ExecuteUpdateAsync(
+                setters => setters.SetProperty(account => account.RoleId, targetRoleId),
+                cancellationToken);
+    }
+
+    /// <inheritdoc />
     public async Task<StaffAccount?> FindByUsernameAsync(
    string username,
     CancellationToken cancellationToken = default)

@@ -1,12 +1,16 @@
 ﻿using API.Models;
+using API.Attributes;
+using Core.Data;
 using Core.DTO.Reservation;
 using Core.Interface.Service.Reservation;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Api.Controllers
 {
     [Route("api/manual")]
     [ApiController]
+    [Authorize]
     public class ManualReservationController : ControllerBase
     {
         private readonly IAdminReservationService _reservationService;
@@ -29,6 +33,7 @@ namespace Api.Controllers
         /// <returns>List of available tables</returns>
         /// <response code="200">Returns list of available tables</response>
         [HttpGet("table/availability")]
+        [HasPermission(Permissions.ViewReservation)]
         [ProducesResponseType(typeof(ApiResponse<List<ManualTableOptionDto>>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetAvailability(
             [FromQuery] DateTime? reservedTime,
@@ -63,6 +68,7 @@ namespace Api.Controllers
         /// <response code="400">Invalid or expired lock token</response>
         /// <response code="404">Table not found</response>
         [HttpPost("reservations")]
+        [HasPermission(Permissions.CreateReservation)]
         [ProducesResponseType(typeof(ApiResponse<ReservationResponseDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -91,6 +97,7 @@ namespace Api.Controllers
         /// Update reservation status.
         /// </summary>
         [HttpPatch("reservations/{id}/status")]
+        [HasPermission(Permissions.UpdateReservation)]
         public async Task<IActionResult> UpdateReservationStatus(
             long id,
             [FromBody] UpdateReservationStatusRequest request,

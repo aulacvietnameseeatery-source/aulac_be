@@ -319,38 +319,43 @@ namespace Api.Controllers
         }
 
         /// <summary>
-        /// Deletes a role by ID.
+        /// Archives a role by ID.
         /// </summary>
         /// <param name="id">The role ID</param>
+        /// <param name="request">Optional replacement role for reassignment before archive</param>
+        /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>Success confirmation</returns>
-        /// <response code="200">Role deleted successfully</response>
+        /// <response code="200">Role archived successfully</response>
         /// <response code="404">Role not found</response>
-        /// <response code="400">Role cannot be deleted (e.g., has assigned users)</response>
+        /// <response code="400">Role cannot be archived with the supplied replacement information</response>
         [HttpDelete("{id}")]
         [HasPermission(Permissions.DeleteRole)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> DeleteRole(long id)
+        public async Task<IActionResult> ArchiveRole(
+            long id,
+            [FromBody] ArchiveRoleRequestDto? request,
+            CancellationToken cancellationToken = default)
         {
             try
             {
-                await _roleService.DeleteRoleAsync(id);
+                await _roleService.ArchiveRoleAsync(id, request, cancellationToken);
 
-                _logger.LogInformation("Role deleted successfully. ID: {RoleId}", id);
+                _logger.LogInformation("Role archived successfully. ID: {RoleId}", id);
 
                 return Ok(new ApiResponse<object>
                 {
                     Success = true,
                     Code = 200,
-                    UserMessage = "Role deleted successfully.",
+                    UserMessage = "Role archived successfully.",
                     Data = new { },
                     ServerTime = DateTimeOffset.UtcNow
                 });
             }
             catch (KeyNotFoundException ex)
             {
-                 _logger.LogWarning("Delete role failed: {Message}", ex.Message);
+                 _logger.LogWarning("Archive role failed: {Message}", ex.Message);
                 return NotFound(new ApiResponse<object>
                 {
                     Success = false,
@@ -362,7 +367,7 @@ namespace Api.Controllers
             }
             catch (InvalidOperationException ex)
             {
-                 _logger.LogWarning("Delete role failed: {Message}", ex.Message);
+                  _logger.LogWarning("Archive role failed: {Message}", ex.Message);
                 return BadRequest(new ApiResponse<object>
                 {
                     Success = false,

@@ -1,4 +1,5 @@
 using Core.DTO.Reservation;
+using Core.DTO.Customer;
 using Core.Entity;
 using Core.Enum;
 using Core.Extensions;
@@ -181,6 +182,8 @@ public class PublicReservationService : IPublicReservationService
         try
         {
             var normalizedPhone = request.Phone.NormalizePhoneNumber();
+            var requestedName = NormalizeOptionalText(request.CustomerName);
+            var requestedEmail = NormalizeOptionalText(request.Email);
 
             var candidates = await FindCandidateTablesAsync(request.ReservedTime, request.PartySize, ct);
             if (candidates.Count == 0)
@@ -202,23 +205,39 @@ public class PublicReservationService : IPublicReservationService
                 ct);
             var pendingStatusId = await ReservationStatusCode.PENDING.ToReservationStatusIdAsync(_lookupResolver, ct);
 
+            CustomerDto? existingCustomer = null;
             long customerId;
             if (request.CustomerId.HasValue && request.CustomerId.Value > 0)
             {
-                var existingCustomer = await _customerService.GetByIdAsync(request.CustomerId.Value, ct);
+                existingCustomer = await _customerService.GetByIdAsync(request.CustomerId.Value, ct);
                 if (existingCustomer != null)
                 {
                     customerId = request.CustomerId.Value;
                 }
                 else
                 {
-                    customerId = await _customerService.FindOrCreateCustomerIdAsync(normalizedPhone, request.CustomerName, request.Email, ct);
+                    if (string.IsNullOrWhiteSpace(requestedName))
+                    {
+                        throw new InvalidOperationException("Customer name is required.");
+                    }
+
+                    customerId = await _customerService.FindOrCreateCustomerIdAsync(normalizedPhone, requestedName, requestedEmail, ct);
                 }
             }
             else
             {
-                customerId = await _customerService.FindOrCreateCustomerIdAsync(normalizedPhone, request.CustomerName, request.Email, ct);
+                if (string.IsNullOrWhiteSpace(requestedName))
+                {
+                    throw new InvalidOperationException("Customer name is required.");
+                }
+
+                customerId = await _customerService.FindOrCreateCustomerIdAsync(normalizedPhone, requestedName, requestedEmail, ct);
             }
+
+            var finalCustomerName = requestedName
+                ?? NormalizeOptionalText(existingCustomer?.FullName)
+                ?? throw new InvalidOperationException("Customer name is required.");
+            var finalEmail = requestedEmail ?? NormalizeOptionalText(existingCustomer?.Email);
 
 
             var selectedTables = new List<RestaurantTable>();
@@ -236,9 +255,9 @@ public class PublicReservationService : IPublicReservationService
             var reservation = new Reservation
             {
                 CustomerId = customerId,
-                CustomerName = request.CustomerName,
+                CustomerName = finalCustomerName,
                 Phone = normalizedPhone,
-                Email = request.Email,
+                Email = finalEmail,
                 PartySize = request.PartySize,
                 ReservedTime = request.ReservedTime,
                 Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(),
@@ -274,7 +293,7 @@ public class PublicReservationService : IPublicReservationService
 
             _logger.LogInformation(
                 "Reservation {ReservationId} created for {CustomerName} in PENDING status with tables: {TableCodes}",
-                created.ReservationId, request.CustomerName, tableCodes);
+                created.ReservationId, finalCustomerName, tableCodes);
 
             // Send notifications to dashboard
             await _realtimeNotification.NotifyReservationUpdatedAsync(created.ReservationId, ReservationStatusCode.PENDING.ToString());
@@ -291,7 +310,7 @@ public class PublicReservationService : IPublicReservationService
                 Metadata = new Dictionary<string, object>
                 {
                     ["reservationId"] = created.ReservationId.ToString(),
-                    ["customerName"] = request.CustomerName,
+                    ["customerName"] = finalCustomerName,
                     ["partySize"] = request.PartySize.ToString(),
                     ["tableCode"] = tableCodes,
                     ["reservedTime"] = request.ReservedTime.ToString("yyyy-MM-dd HH:mm")
@@ -423,5 +442,11 @@ public class PublicReservationService : IPublicReservationService
     }
 
 
+
+    private static string? NormalizeOptionalText(string? value)
+    {
+        var trimmed = value?.Trim();
+        return string.IsNullOrWhiteSpace(trimmed) ? null : trimmed;
+    }
 
 }
