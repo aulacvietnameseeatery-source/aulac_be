@@ -75,6 +75,7 @@ public class PaymentServiceTests : IDisposable
 
     // ── Factory ──
     private PaymentService CreateService() => new(
+        _context,
         _lookupResolverMock.Object,
         _unitOfWorkMock.Object,
         _systemSettingMock.Object,

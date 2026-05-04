@@ -455,4 +455,317 @@ public class SystemSettingServiceTests
 
         result.RelativePath.Should().Be("store-logo/logo.png");
     }
+
+    [Fact]
+    [Trait("Type", "Boundary")]
+    [Trait("Method", "UploadStoreLogoAsync")]
+    public async Task UploadStoreLogoAsync_WhenJpegImage_AlsoRoutesToStoreLogoFolder()
+    {
+        var uploadResult = new FileUploadResult
+        {
+            RelativePath = "store-logo/banner.jpg",
+            PublicUrl = "/uploads/store-logo/banner.jpg",
+            OriginalFileName = "banner.jpg",
+            SizeBytes = 5000
+        };
+
+        _fileStorageMock
+            .Setup(f => f.SaveAsync(
+                It.IsAny<FileUploadRequest>(),
+                "store-logo",
+                It.IsAny<FileValidationOptions>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(uploadResult);
+
+        var service = CreateService();
+        using var stream = new MemoryStream([1, 2, 3, 4, 5]);
+
+        var result = await service.UploadStoreLogoAsync(stream, "banner.jpg", "image/jpeg", CancellationToken.None);
+
+        result.RelativePath.Should().Be("store-logo/banner.jpg");
+        result.OriginalFileName.Should().Be("banner.jpg");
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // UploadStoreFileAsync — additional coverage
+    // ═══════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    [Trait("Type", "Normal")]
+    [Trait("Method", "UploadStoreFileAsync")]
+    public async Task UploadStoreFileAsync_WhenImage_RoutesToStoreMediaFolder()
+    {
+        var uploadResult = new FileUploadResult
+        {
+            RelativePath = "store-media/hero.png",
+            PublicUrl = "/uploads/store-media/hero.png",
+            OriginalFileName = "hero.png",
+            SizeBytes = 2000
+        };
+
+        _fileStorageMock
+            .Setup(f => f.SaveAsync(
+                It.IsAny<FileUploadRequest>(),
+                "store-media",
+                It.IsAny<FileValidationOptions>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(uploadResult);
+
+        var service = CreateService();
+        using var stream = new MemoryStream([1, 2, 3]);
+
+        var result = await service.UploadStoreFileAsync(stream, "hero.png", "image/png", CancellationToken.None);
+
+        result.RelativePath.Should().Be("store-media/hero.png");
+    }
+
+    [Fact]
+    [Trait("Type", "Boundary")]
+    [Trait("Method", "UploadStoreFileAsync")]
+    public async Task UploadStoreFileAsync_WhenMp4ExtensionButDifferentContentType_StillRoutesToStoreVideos()
+    {
+        var uploadResult = new FileUploadResult
+        {
+            RelativePath = "store-videos/clip.mp4",
+            PublicUrl = "/uploads/store-videos/clip.mp4",
+            OriginalFileName = "clip.mp4",
+            SizeBytes = 50000
+        };
+
+        _fileStorageMock
+            .Setup(f => f.SaveAsync(
+                It.IsAny<FileUploadRequest>(),
+                "store-videos",
+                It.IsAny<FileValidationOptions>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(uploadResult);
+
+        var service = CreateService();
+        using var stream = new MemoryStream([1, 2, 3]);
+
+        var result = await service.UploadStoreFileAsync(stream, "clip.mp4", "application/octet-stream", CancellationToken.None);
+
+        result.RelativePath.Should().Be("store-videos/clip.mp4");
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // CreateSettingAsync — additional coverage
+    // ═══════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    [Trait("Type", "Normal")]
+    [Trait("Method", "CreateSettingAsync")]
+    public async Task CreateSettingAsync_WhenTypeIsBool_ParsesAndSavesBoolValue()
+    {
+        _repositoryMock
+            .Setup(r => r.SaveAsync(It.IsAny<SystemSetting>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        _cacheServiceMock
+            .Setup(c => c.RemoveAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        var service = CreateService();
+
+        await service.CreateSettingAsync("feature.enabled", "Feature Toggle", "BOOL", "true",
+            description: "Enable feature", cancellationToken: CancellationToken.None);
+
+        _repositoryMock.Verify(r => r.SaveAsync(
+            It.Is<SystemSetting>(s =>
+                s.SettingKey == "feature.enabled" &&
+                s.ValueType == "BOOL" &&
+                s.ValueBool == true &&
+                s.Description == "Enable feature"),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    [Trait("Type", "Abnormal")]
+    [Trait("Method", "CreateSettingAsync")]
+    public async Task CreateSettingAsync_WhenIntValueUnparseable_DefaultsToZero()
+    {
+        _repositoryMock
+            .Setup(r => r.SaveAsync(It.IsAny<SystemSetting>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        _cacheServiceMock
+            .Setup(c => c.RemoveAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        var service = CreateService();
+
+        await service.CreateSettingAsync("reservation.limit", "Limit", "INT", "not-a-number",
+            cancellationToken: CancellationToken.None);
+
+        _repositoryMock.Verify(r => r.SaveAsync(
+            It.Is<SystemSetting>(s =>
+                s.SettingKey == "reservation.limit" &&
+                s.ValueType == "INT" &&
+                s.ValueInt == 0),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    [Trait("Type", "Boundary")]
+    [Trait("Method", "CreateSettingAsync")]
+    public async Task CreateSettingAsync_WhenUnknownValueType_DefaultsToString()
+    {
+        _repositoryMock
+            .Setup(r => r.SaveAsync(It.IsAny<SystemSetting>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        _cacheServiceMock
+            .Setup(c => c.RemoveAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        var service = CreateService();
+
+        await service.CreateSettingAsync("custom.field", "Custom", "UNKNOWN_TYPE", "raw-value",
+            cancellationToken: CancellationToken.None);
+
+        _repositoryMock.Verify(r => r.SaveAsync(
+            It.Is<SystemSetting>(s =>
+                s.SettingKey == "custom.field" &&
+                s.ValueType == "STRING" &&
+                s.ValueString == "raw-value"),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // GetAllGroupedAsync — additional coverage
+    // ═══════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    [Trait("Type", "Boundary")]
+    [Trait("Method", "GetAllGroupedAsync")]
+    public async Task GetAllGroupedAsync_WhenNoSettings_ReturnsEmptyDictionary()
+    {
+        _repositoryMock
+            .Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<SystemSetting>());
+
+        var service = CreateService();
+
+        var result = await service.GetAllGroupedAsync(CancellationToken.None);
+
+        result.Should().BeEmpty();
+    }
+
+    [Fact]
+    [Trait("Type", "Boundary")]
+    [Trait("Method", "GetAllGroupedAsync")]
+    public async Task GetAllGroupedAsync_WhenAllKeysWithoutDot_AllGoToGeneralGroup()
+    {
+        var settings = new List<SystemSetting>
+        {
+            MakeSetting("timezone", "STRING", valueString: "UTC"),
+            MakeSetting("currency", "STRING", valueString: "VND")
+        };
+
+        _repositoryMock
+            .Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(settings);
+
+        var service = CreateService();
+
+        var result = await service.GetAllGroupedAsync(CancellationToken.None);
+
+        result.Should().HaveCount(1);
+        result.Should().ContainKey("general");
+        result["general"].Should().HaveCount(2);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // GetGroupAsync — additional coverage
+    // ═══════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    [Trait("Type", "Normal")]
+    [Trait("Method", "GetGroupAsync")]
+    public async Task GetGroupAsync_WhenNonStoreGroup_ReturnsSettingsWithoutPublicUrl()
+    {
+        var settings = new List<SystemSetting>
+        {
+            MakeSetting("reservation.default_duration_minutes", "INT", valueInt: 120),
+            MakeSetting("reservation.max_party_size", "INT", valueInt: 20)
+        };
+
+        _repositoryMock
+            .Setup(r => r.GetByGroupPrefixAsync("reservation", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(settings);
+
+        var service = CreateService();
+
+        var result = await service.GetGroupAsync("reservation", CancellationToken.None);
+
+        result.Should().HaveCount(2);
+        result.Should().AllSatisfy(dto => dto.PublicUrl.Should().BeNull());
+    }
+
+    [Fact]
+    [Trait("Type", "Boundary")]
+    [Trait("Method", "GetGroupAsync")]
+    public async Task GetGroupAsync_WhenNoSettingsInGroup_ReturnsEmptyList()
+    {
+        _repositoryMock
+            .Setup(r => r.GetByGroupPrefixAsync("nonexistent", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<SystemSetting>());
+
+        var service = CreateService();
+
+        var result = await service.GetGroupAsync("nonexistent", CancellationToken.None);
+
+        result.Should().BeEmpty();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // GetPublicGroupAsync — additional coverage
+    // ═══════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    [Trait("Type", "Boundary")]
+    [Trait("Method", "GetPublicGroupAsync")]
+    public async Task GetPublicGroupAsync_WhenAllSettingsSensitive_ReturnsEmptyList()
+    {
+        var settings = new List<SystemSetting>
+        {
+            MakeSetting("store.smtp.password", "STRING", valueString: "secret", isSensitive: true),
+            MakeSetting("store.api.key", "STRING", valueString: "key123", isSensitive: true)
+        };
+
+        _repositoryMock
+            .Setup(r => r.GetByGroupPrefixAsync("store", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(settings);
+
+        var service = CreateService();
+
+        var result = await service.GetPublicGroupAsync("store", CancellationToken.None);
+
+        result.Should().BeEmpty();
+    }
+
+    [Fact]
+    [Trait("Type", "Boundary")]
+    [Trait("Method", "GetPublicGroupAsync")]
+    public async Task GetPublicGroupAsync_WhenStoreGroupWithMediaKey_AttachesPublicUrlForNonSensitive()
+    {
+        var settings = new List<SystemSetting>
+        {
+            MakeSetting("store.logoUrl", "STRING", valueString: "uploads/store-logo/logo.png", isSensitive: false),
+            MakeSetting("store.smtp.password", "STRING", valueString: "secret", isSensitive: true)
+        };
+
+        _repositoryMock
+            .Setup(r => r.GetByGroupPrefixAsync("store", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(settings);
+
+        _fileStorageMock
+            .Setup(f => f.GetPublicUrl("store-logo/logo.png"))
+            .Returns("/uploads/store-logo/logo.png");
+
+        var service = CreateService();
+
+        var result = await service.GetPublicGroupAsync("store", CancellationToken.None);
+
+        result.Should().HaveCount(1);
+        result.Single().SettingKey.Should().Be("store.logoUrl");
+        result.Single().PublicUrl.Should().Be("/uploads/store-logo/logo.png");
+    }
 }

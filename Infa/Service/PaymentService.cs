@@ -11,10 +11,13 @@ using Core.Interface.Service.Entity;
 using Core.Interface.Service.Notification;
 using Core.Interface.Service.Shift;
 using Core.Interface.Service.Others;
+using Infa.Data;
+using Microsoft.EntityFrameworkCore;
 using Core.DTO.General;
 using Core.DTO.Payment;
+using Infa.Repo;
 
-namespace Core.Service;
+namespace Infa.Service;
 
 public class PaymentService : IPaymentService
 {
@@ -22,6 +25,7 @@ public class PaymentService : IPaymentService
     private const string LoyaltyPointBaseSettingKey = "loyalty.point_base_amount";
     private const long GuestCustomerId = 68;
 
+    private readonly RestaurantMgmtContext _context;
     private readonly ILookupResolver _lookupResolver;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ISystemSettingService _systemSettingService;
@@ -31,6 +35,7 @@ public class PaymentService : IPaymentService
     private readonly IOrderRealtimeService _orderRealtime;
 
     public PaymentService(
+        RestaurantMgmtContext context,
         ILookupResolver lookupResolver,
         IUnitOfWork unitOfWork,
         ISystemSettingService systemSettingService,
@@ -39,6 +44,7 @@ public class PaymentService : IPaymentService
         IPaymentRepository paymentRepository,
         IOrderRealtimeService orderRealtime)
     {
+        _context = context;
         _lookupResolver = lookupResolver;
         _unitOfWork = unitOfWork;
         _systemSettingService = systemSettingService;
@@ -50,7 +56,13 @@ public class PaymentService : IPaymentService
 
     public async Task ProcessPaymentAsync(CreatePaymentDTO dto, CancellationToken cancellationToken = default)
     {
-        var order = await _paymentRepository.GetOrderForPaymentAsync(dto.OrderId, cancellationToken)
+        var order = await _context.Orders
+            .Include(o => o.Payments)
+            .Include(o => o.Customer)
+            .Include(o => o.OrderItems)
+            .Include(o => o.OrderCoupons)
+            .Include(o => o.OrderPromotions)
+            .FirstOrDefaultAsync(o => o.OrderId == dto.OrderId, cancellationToken)
             ?? throw new KeyNotFoundException($"Order {dto.OrderId} not found");
 
         var cancelledStatusId = await OrderStatusCode.CANCELLED.ToOrderStatusIdAsync(_lookupResolver, cancellationToken);
@@ -90,7 +102,9 @@ public class PaymentService : IPaymentService
             {
                 foreach (var couponId in dto.CouponIds.Distinct())
                 {
-                    var coupon = await _paymentRepository.GetCouponWithTypeAsync(couponId, cancellationToken)
+                    var coupon = await _context.Coupons
+                        .Include(c => c.TypeLv)
+                        .FirstOrDefaultAsync(c => c.CouponId == couponId, cancellationToken)
                         ?? throw new InvalidOperationException($"Coupon {couponId} not found.");
 
                     if (coupon.CustomerId.HasValue && coupon.CustomerId.Value != order.CustomerId)
@@ -128,7 +142,14 @@ public class PaymentService : IPaymentService
             }
 
             // Handle Promotions (Automatic)
-            var allActivePromotions = await _paymentRepository.GetActivePromotionsAsync(activePromotionStatusId, now, cancellationToken);
+            var allActivePromotions = await _context.Promotions
+                .Include(p => p.TypeLv)
+                .Include(p => p.PromotionRules)
+                .Include(p => p.PromotionTargets)
+                .Where(p => p.PromotionStatusLvId == activePromotionStatusId)
+                .Where(p => now >= p.StartTime && now <= p.EndTime)
+                .Where(p => !p.MaxUsage.HasValue || (p.UsedCount ?? 0) < p.MaxUsage.Value)
+                .ToListAsync(cancellationToken);
 
             var promotionDiscounts = new Dictionary<long, decimal>();
 
@@ -222,7 +243,7 @@ public class PaymentService : IPaymentService
                 MethodLvId = methodLvId
             };
 
-            await _paymentRepository.AddPaymentAsync(payment, cancellationToken);
+            _context.Payments.Add(payment);
 
             // Update Order status to COMPLETED
             order.SubTotalAmount = subTotal;
@@ -234,7 +255,7 @@ public class PaymentService : IPaymentService
             // Update Table status to AVAILABLE if it's a dine-in order
             if (order.TableId.HasValue)
             {
-                var table = await _paymentRepository.GetTableByIdAsync(order.TableId.Value, cancellationToken);
+                var table = await _context.RestaurantTables.FirstOrDefaultAsync(t => t.TableId == order.TableId.Value, cancellationToken);
                 if (table != null)
                 {
                     table.TableStatusLvId = availableTableStatusId;
@@ -245,7 +266,7 @@ public class PaymentService : IPaymentService
             if (loyaltyEnabled && order.CustomerId != GuestCustomerId)
             {
                 var earnedPoints = CalculateLoyaltyPoints(finalAmountRounded, loyaltyPointBaseAmount);
-                if (earnedPoints > 0 && order.Customer != null)
+                if (earnedPoints > 0)
                 {
                     order.Customer.LoyaltyPoints = (order.Customer.LoyaltyPoints ?? 0) + earnedPoints;
                 }
